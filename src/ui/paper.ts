@@ -49,6 +49,7 @@ interface InstructionCopy {
   passwordHint: string;
   preservation: string;
   warning: string;
+  footer: string;
 }
 
 const INSTRUCTIONS: Record<string, InstructionCopy> = {
@@ -67,23 +68,25 @@ const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Keep it safe: print with a laser printer, store away from light and moisture, and keep copies in separate places.',
     warning: 'This sheet is not encrypted. Never write your password here.',
+    footer: 'Restore: ImageVault + your password, with enough pages.',
   },
   fr: {
     heading: 'Comment restaurer ce coffre',
-    intro: 'Ces pages contiennent un fichier chiffre, encode en images QR corrigees d erreurs.',
+    intro: "Ces pages contiennent un fichier chiffré, encodé en images QR corrigées d'erreurs.",
     steps: [
-      '1. Procurez-vous ImageVault (extension) ou le decodeur Python de reference sur la page du projet ci-dessous.',
-      '2. Numerisez ou photographiez chaque page, puis importez les fichiers image.',
-      '3. Saisissez votre mot de passe. Le fichier original est restaure.',
+      '1. Procurez-vous ImageVault (extension) ou le décodeur Python de référence sur la page du projet ci-dessous.',
+      '2. Numérisez ou photographiez chaque page, puis importez les fichiers image.',
+      '3. Saisissez votre mot de passe. Le fichier original est restauré.',
     ],
     resilience:
-      'Vous pouvez perdre ou abimer quelques pages et restaurer quand meme, tant que la plupart survivent.',
-    project: 'Projet et decodeur de reference :',
-    keyLocation: 'Emplacement de la cle :',
+      'Vous pouvez perdre ou abîmer quelques pages et restaurer quand même, tant que la plupart survivent.',
+    project: 'Projet et décodeur de référence :',
+    keyLocation: 'Emplacement de la clé :',
     passwordHint: 'Indice de mot de passe :',
     preservation:
-      'A conserver : imprimez au laser, a l abri de la lumiere et de l humidite, et gardez des copies en lieux distincts.',
-    warning: 'Cette feuille n est pas chiffree. N y ecrivez jamais votre mot de passe.',
+      "À conserver : imprimez au laser, à l'abri de la lumière et de l'humidité, et gardez des copies en lieux distincts.",
+    warning: "Cette feuille n'est pas chiffrée. N'y écrivez jamais votre mot de passe.",
+    footer: 'Restaurer : ImageVault + votre mot de passe, avec assez de pages.',
   },
 };
 
@@ -197,7 +200,9 @@ export async function saveFileToPaper(
 
   if (options.includeInstructions) addInstructionSheet(pdf, font, bold, options);
 
-  const restoreHint = `Restore at ${PROJECT_URL} — needs your password and enough pages.`;
+  // Bilingual short restore hint (browser locale + English) plus the URL,
+  // repeated on every page so a stray page still explains itself.
+  const footerLines = [...instructionLangs().map((c) => c.footer), PROJECT_URL];
 
   for (let i = 0; i < total; i++) {
     const img = codec.encode(imagePayloads[i]!, PROFILE_PAPER);
@@ -220,7 +225,11 @@ export async function saveFileToPaper(
     const qy = y - side;
     page.drawImage(png, { x: qx, y: qy, width: side, height: side });
 
-    drawText(page, restoreHint, MARGIN, MARGIN, 8, font);
+    let fy = MARGIN + (footerLines.length - 1) * 10;
+    for (const line of footerLines) {
+      drawText(page, line, MARGIN, fy, 8, font);
+      fy -= 10;
+    }
   }
 
   const bytes = await pdf.save();

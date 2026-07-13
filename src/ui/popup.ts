@@ -23,6 +23,7 @@ const saveStatus = el('save-status');
 const estimate = el('estimate');
 const lockBtn = el<HTMLButtonElement>('lock-btn');
 const addBand = el<HTMLInputElement>('add-band');
+const addBandLabel = el('add-band-label');
 const bandFields = el('band-fields');
 const bandTitle = el<HTMLInputElement>('band-title');
 const asZip = el<HTMLInputElement>('as-zip');
@@ -55,6 +56,10 @@ function reflectDestination(): void {
   const paper = selectedDest() === 'paper';
   show(zipField, !paper);
   show(paperFields, paper);
+  // The "add readable label" toggle is disk-only; paper pages always have a
+  // header, so the title field is always available there.
+  show(addBandLabel, !paper);
+  show(bandFields, paper || addBand.checked);
 }
 
 async function loadPrefs(): Promise<void> {
