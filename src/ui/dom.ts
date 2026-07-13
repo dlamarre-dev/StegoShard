@@ -1,8 +1,27 @@
 import browser from 'webextension-polyfill';
+import {
+  FileTooLargeError,
+  MissingKeyError,
+  TooManyImagesError,
+  WrongPasswordError,
+} from '@core';
 
 /** Localized message lookup. */
 export function msg(key: string, subs?: string | string[]): string {
   return browser.i18n.getMessage(key, subs);
+}
+
+/** Map a known core error to a localized message, falling back to its text. */
+export function friendlyError(err: unknown): string {
+  if (err instanceof WrongPasswordError) return msg('errWrongPassword');
+  if (err instanceof MissingKeyError) return msg('errMissingKey');
+  if (err instanceof FileTooLargeError) {
+    return msg('errFileTooLarge', [String(Math.ceil(err.size / 1024)), String(Math.floor(err.limit / 1024))]);
+  }
+  if (err instanceof TooManyImagesError) {
+    return msg('errTooManyImages', [String(err.count), String(err.limit)]);
+  }
+  return errText(err);
 }
 
 /** Get a required element by id, or throw. */

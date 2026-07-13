@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
-import { estimateImages, WrongPasswordError, type KeyMode } from '@core';
+import { estimateImages, type KeyMode } from '@core';
 import { localizeDom } from './i18n';
-import { el, errText, msg, setStatus, show } from './dom';
+import { el, friendlyError, msg, setStatus, show } from './dom';
 import { currentSession, isKeySet, lock, unlock } from './keystore';
 import { restoreFileFromDisk, saveFileToDisk } from './disk';
 
@@ -44,9 +44,11 @@ async function refreshState(): Promise<void> {
   show(saveSection, hasKey && unlocked);
 }
 
-el<HTMLButtonElement>('open-options').addEventListener('click', () => {
+function openOptions(): void {
   void browser.runtime.openOptionsPage();
-});
+}
+el<HTMLButtonElement>('open-options').addEventListener('click', openOptions);
+el<HTMLButtonElement>('footer-options').addEventListener('click', openOptions);
 
 unlockBtn.addEventListener('click', async () => {
   if (!unlockPw.value) return setStatus(unlockStatus, msg('errNoPassword'), true);
@@ -57,8 +59,7 @@ unlockBtn.addEventListener('click', async () => {
     setStatus(unlockStatus, '');
     await refreshState();
   } catch (err) {
-    const text = err instanceof WrongPasswordError ? msg('errWrongPassword') : errText(err);
-    setStatus(unlockStatus, text, true);
+    setStatus(unlockStatus, friendlyError(err), true);
   } finally {
     unlockBtn.disabled = false;
   }
@@ -110,7 +111,7 @@ saveBtn.addEventListener('click', async () => {
     const key = keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile';
     setStatus(saveStatus, msg(key, String(imageCount)));
   } catch (err) {
-    setStatus(saveStatus, errText(err), true);
+    setStatus(saveStatus, friendlyError(err), true);
   } finally {
     saveBtn.disabled = false;
   }
@@ -128,8 +129,7 @@ restoreBtn.addEventListener('click', async () => {
     const { filename } = await restoreFileFromDisk(files, restorePw.value, keyFile);
     setStatus(restoreStatus, msg('statusRestored', filename));
   } catch (err) {
-    const text = err instanceof WrongPasswordError ? msg('errWrongPassword') : errText(err);
-    setStatus(restoreStatus, text, true);
+    setStatus(restoreStatus, friendlyError(err), true);
   } finally {
     restoreBtn.disabled = false;
   }

@@ -115,6 +115,20 @@
     "message": "Déverrouillez d'abord votre coffre.",
     "description": "Popup: shown when saving while locked."
   },
+  "errMissingKey": {
+    "message": "Ce jeu d'images nécessite son fichier .key séparé pour être restauré.",
+    "description": "Shown when a keyfile-mode set is restored without the .key."
+  },
+  "errFileTooLarge": {
+    "message": "Fichier trop volumineux ($SIZE$ Ko). Ce coffre vise les petits secrets (max $LIMIT$ Ko).",
+    "description": "Shown when the file exceeds the size limit.",
+    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+  },
+  "errTooManyImages": {
+    "message": "Ce fichier nécessiterait $COUNT$ images (max $LIMIT$). Essayez un fichier plus petit.",
+    "description": "Shown when the vault would exceed the image ceiling.",
+    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+  },
 
   "optKeyHeading": { "message": "Clé de coffre", "description": "Options: key section heading." },
   "optKeyBodyNew": {

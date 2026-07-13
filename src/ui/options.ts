@@ -1,6 +1,5 @@
-import { WrongPasswordError } from '@core';
 import { localizeDom } from './i18n';
-import { el, errText, msg, setStatus, show } from './dom';
+import { el, friendlyError, msg, setStatus, show } from './dom';
 import {
   changePassword,
   eraseKey,
@@ -51,7 +50,7 @@ createBtn.addEventListener('click', async () => {
     setStatus(createStatus, msg('statusKeyCreated'));
     await refreshState();
   } catch (e) {
-    setStatus(createStatus, errText(e), true);
+    setStatus(createStatus, friendlyError(e), true);
   } finally {
     createBtn.disabled = false;
   }
@@ -73,7 +72,7 @@ changeBtn.addEventListener('click', async () => {
     oldPw.value = changeNewPw.value = changeConfirmPw.value = '';
     setStatus(changeStatus, msg('statusPwChanged'));
   } catch (e) {
-    setStatus(changeStatus, e instanceof WrongPasswordError ? msg('errWrongPassword') : errText(e), true);
+    setStatus(changeStatus, friendlyError(e), true);
   } finally {
     changeBtn.disabled = false;
   }
@@ -89,7 +88,7 @@ exportBtn.addEventListener('click', async () => {
     downloadBlob(new Blob([keyBlock as BufferSource]), 'imagevault.key');
     setStatus(exportStatus, msg('statusKeyExported'));
   } catch (e) {
-    setStatus(exportStatus, errText(e), true);
+    setStatus(exportStatus, friendlyError(e), true);
   }
 });
 
@@ -111,7 +110,7 @@ importBtn.addEventListener('click', async () => {
     setStatus(importStatus, msg('statusKeyImported'));
     await refreshState();
   } catch (e) {
-    setStatus(importStatus, e instanceof WrongPasswordError ? msg('errWrongPassword') : errText(e), true);
+    setStatus(importStatus, friendlyError(e), true);
   } finally {
     importBtn.disabled = false;
   }
@@ -128,7 +127,7 @@ eraseBtn.addEventListener('click', async () => {
     setStatus(eraseStatus, msg('statusKeyErased'));
     await refreshState();
   } catch (e) {
-    setStatus(eraseStatus, errText(e), true);
+    setStatus(eraseStatus, friendlyError(e), true);
   }
 });
 

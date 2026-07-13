@@ -115,6 +115,20 @@
     "message": "Unlock your vault first.",
     "description": "Popup: shown when saving while locked."
   },
+  "errMissingKey": {
+    "message": "This image set needs its separate .key file to restore.",
+    "description": "Shown when a keyfile-mode set is restored without the .key."
+  },
+  "errFileTooLarge": {
+    "message": "File too large ($SIZE$ KB). This vault targets small secrets (max $LIMIT$ KB).",
+    "description": "Shown when the file exceeds the size limit.",
+    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+  },
+  "errTooManyImages": {
+    "message": "This file would need $COUNT$ images (max $LIMIT$). Try a smaller file.",
+    "description": "Shown when the vault would exceed the image ceiling.",
+    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+  },
 
   "optKeyHeading": { "message": "Vault key", "description": "Options: key section heading." },
   "optKeyBodyNew": {

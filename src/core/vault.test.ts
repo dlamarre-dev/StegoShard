@@ -6,6 +6,7 @@ import {
   serializeKeyBlock,
 } from './crypto';
 import {
+  FileTooLargeError,
   MAX_FILE_BYTES,
   MissingKeyError,
   type VaultKey,
@@ -75,9 +76,9 @@ describe('vault export/import round-trip (embedded key)', () => {
 
   it('enforces the hard file-size limit', async () => {
     const key = await makeKey('pw');
-    await expect(exportVault('big.bin', new Uint8Array(MAX_FILE_BYTES + 1), key)).rejects.toThrow(
-      /too large/,
-    );
+    await expect(
+      exportVault('big.bin', new Uint8Array(MAX_FILE_BYTES + 1), key),
+    ).rejects.toBeInstanceOf(FileTooLargeError);
   });
 });
 

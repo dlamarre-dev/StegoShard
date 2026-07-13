@@ -43,9 +43,31 @@ import { SET_ID_LEN } from './header';
 import { getCodec } from './codec';
 
 /** Hard limit on the source file — this vault targets small secrets (plan §5). */
-export const MAX_FILE_BYTES = 64 * 1024;
+export const MAX_FILE_BYTES = 256 * 1024;
 /** Independent safety ceiling on the number of images (plan §5). */
-export const MAX_IMAGES = 50;
+export const MAX_IMAGES = 150;
+
+/** Thrown when the source file exceeds MAX_FILE_BYTES. Carries the numbers. */
+export class FileTooLargeError extends Error {
+  constructor(
+    readonly size: number,
+    readonly limit: number,
+  ) {
+    super(`file too large: ${size} bytes (limit ${limit}); this vault targets small secrets`);
+    this.name = 'FileTooLargeError';
+  }
+}
+
+/** Thrown when a vault would need more than MAX_IMAGES images. */
+export class TooManyImagesError extends Error {
+  constructor(
+    readonly count: number,
+    readonly limit: number,
+  ) {
+    super(`would need ${count} images (limit ${limit})`);
+    this.name = 'TooManyImagesError';
+  }
+}
 
 /** Bytes of shard data that fit one image for a codec/profile (header aside). */
 function dataPerShard(codecId: number, profile: number): number {
@@ -167,9 +189,7 @@ export async function exportVault(
   options: ExportOptions = {},
 ): Promise<ExportResult> {
   if (content.length > MAX_FILE_BYTES) {
-    throw new RangeError(
-      `file too large: ${content.length} bytes (limit ${MAX_FILE_BYTES}); this vault targets small secrets`,
-    );
+    throw new FileTooLargeError(content.length, MAX_FILE_BYTES);
   }
   const profile = options.profile ?? PROFILE_DISK;
   const codecId = options.codecId ?? CODEC_QR_GRID;
@@ -186,7 +206,7 @@ export async function exportVault(
   const m = parityCount(k);
   const total = k + m;
   if (total > MAX_IMAGES) {
-    throw new RangeError(`would need ${total} images (limit ${MAX_IMAGES})`);
+    throw new TooManyImagesError(total, MAX_IMAGES);
   }
 
   const { shards, shardLen } = encodeShards(blob, k, m);

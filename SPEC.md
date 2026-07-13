@@ -195,7 +195,7 @@ Cross-image redundancy so the vault survives lost or corrupt images.
   with an absolute floor of **2** (`MIN_PARITY`), so even a one-shard vault keeps
   two spares. Tolerates the loss/corruption of up to `m` images.
 - Absolute ceiling: `k + m ≤ 256` (field size) and, as a product guard,
-  `k + m ≤ 50` images (`MAX_IMAGES`).
+  `k + m ≤ 150` images (`MAX_IMAGES`).
 
 ### 7.3 Sharding
 
@@ -245,7 +245,7 @@ If fewer than `k` shards survive, reconstruction is impossible.
 | GF polynomial    | `0x11D`, generator `0x02`                         |
 | Parity           | `m = max(ceil(k·0.3), 2)`                          |
 | Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 1067) |
-| Limits           | file ≤ 64 KiB, images ≤ 50                         |
+| Limits           | file ≤ 256 KiB, images ≤ 150                       |
 | Compression      | gzip (RFC 1952), opportunistic                    |
 
 ---
