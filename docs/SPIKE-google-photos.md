@@ -28,28 +28,30 @@ assumption (§4): the *invisible* stego profile is **disk-only** (lossless PNG);
 remains deferred; if/when it lands, its robust profile would use the Cloud codec
 (visible), not LSB.
 
+## Live verification ✅ (2026-07-13)
+
+The full round-trip was confirmed against the real Google Photos API with a
+configured OAuth client: a file was uploaded to a dedicated album, then selected
+back through the Picker and **restored intact** (Cloud profile). The simulated
+verdict holds in practice — Google Photos is a working optional destination.
+
+Implementation notes that mattered:
+
+- OAuth uses `browser.identity.launchWebAuthFlow` (implicit flow, no secret);
+  the token is cached in `storage.session`. The `identity` + Google host
+  permissions are optional and requested on demand.
+- Upload: create a dedicated album → `appendonly` upload each PNG → batch-create
+  into the album. Restore: Picker API session → poll → list → download → decode.
+- The Photos **restore must run in its own tab** (`ui/photos.html`), not the
+  popup: opening the picker dismisses the popup and would kill the flow.
+- Uploaded images carry the readable title/date/page band, like disk and paper.
+
 ## Caveats
 
-- This is a *simulation*. jpeg-js approximates Google Photos' encoder; the real
-  service may differ in quantization tables and any resampling. A **live
-  round-trip** (upload → download → decode) must confirm this once OAuth is
-  configured. The Cloud profile's ECC and the cross-image erasure coding provide
-  additional margin beyond a single-image decode.
 - Google Photos as data storage is **fragile on ToS grounds** and must never be
   the only copy — Disk and Paper do not depend on it (plan §11).
-
-## Next (implementation, externally gated)
-
-Building the live destination requires infrastructure only the repository owner
-can provision:
-
-1. A **Google Cloud project** with the Photos Library API and Photos Picker API
-   enabled.
-2. An **OAuth client** (the client id is configured, not committed).
-3. **Google app verification** for the sensitive `photoslibrary.appendonly`
-   scope before non-test users can use it.
-
-Planned flow: optional `identity` permission requested on demand → OAuth via
-`browser.identity.launchWebAuthFlow` → upload PNGs (`appendonly`) into a
-dedicated album → restore by selecting them with the **Picker API**
-(`photospicker.mediaitems.readonly`), decoding with the Cloud profile.
+- The OAuth client id lives in a gitignored `.env` (see `.env.example`), injected
+  at build time; the destination is hidden when it is not configured.
+- **Google app verification** for the sensitive `photoslibrary.appendonly` scope
+  is still required before *non-test* users can use it (test users work without
+  it). This is a store/release concern for Phase 6.

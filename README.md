@@ -63,7 +63,8 @@ extension and runs in CI as a cross-implementation conformance test. An **option
 Photos** destination (upload to a dedicated album, restore via the Picker API, Cloud
 profile) is available when a Google OAuth client id is configured in a local `.env` (see
 `.env.example`); it is a convenience, never the only copy. The on-image format is frozen
-in [SPEC.md](SPEC.md). The stego key mode and full localization come in later phases.
+in [SPEC.md](SPEC.md). Full localization (Phase 5) and cross-browser hardening + store
+submission (Phase 6), plus the optional stego key mode, come next.
 
 ## Development
 
