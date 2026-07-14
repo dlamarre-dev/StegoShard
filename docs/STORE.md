@@ -62,14 +62,17 @@ accounts you add as **test users** (up to 100) can use the Google Photos
 destination — perfect for development, but not for the public. To let *any* user
 use it, publish the consent screen and pass **OAuth verification**:
 
-1. **Prerequisites (host them first).** Google requires a public homepage and a
-   privacy policy on a domain you control. The GitHub Pages site provides both:
+1. **Prerequisites (host them first).** Google requires a public homepage, a
+   privacy policy, and a terms-of-service page on a domain you control. The
+   GitHub Pages site provides all three:
    - Homepage: `https://dlamarre-dev.github.io/ImageVault/`
-   - Privacy policy: publish `docs/PRIVACY.md` as a page there and link it.
+   - Privacy policy: `https://dlamarre-dev.github.io/ImageVault/privacy.html`
+   - Terms of service: `https://dlamarre-dev.github.io/ImageVault/terms.html`
    - Add that domain under **APIs & Services → OAuth consent screen →
      Authorized domains**, and verify ownership in Google Search Console.
 2. **Complete the consent screen**: app name, logo (`public/icons/icon-128.png`),
-   support email, homepage, privacy policy URL, and authorized domains.
+   support email, homepage, privacy policy URL, terms-of-service URL, and
+   authorized domains.
 3. **Justify the scopes**: explain that `photoslibrary.appendonly` uploads the
    user's own encrypted images to their own account, and that
    `photospicker.mediaitems.readonly` reads only images the user picks. Record a

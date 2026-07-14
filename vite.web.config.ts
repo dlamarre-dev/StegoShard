@@ -24,6 +24,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'src/web/index.html'),
         privacy: resolve(__dirname, 'src/web/privacy.html'),
+        terms: resolve(__dirname, 'src/web/terms.html'),
       },
     },
   },
