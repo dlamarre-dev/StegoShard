@@ -7,19 +7,27 @@
     <link rel="stylesheet" href="./ui.css" />
   </head>
   <body>
-    <main class="panel wide">
-      <h1 data-i18n="photosHeading"></h1>
-      <p class="muted" data-i18n="photosIntro"></p>
+    <header class="appbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">IV</span>
+        <div class="brand-name" data-i18n="photosHeading"></div>
+      </div>
+    </header>
 
-      <label data-i18n="labelKeyFile" for="photos-key"></label>
-      <input id="photos-key" type="file" accept=".key" />
-      <p class="muted" data-i18n="keyFileHint"></p>
+    <main class="app">
+      <section class="card">
+        <p class="muted" data-i18n="photosIntro"></p>
 
-      <label data-i18n="labelPassword" for="photos-pw"></label>
-      <input id="photos-pw" type="password" autocomplete="current-password" />
+        <label data-i18n="labelKeyFile" for="photos-key"></label>
+        <input id="photos-key" type="file" accept=".key" />
+        <p class="muted" data-i18n="keyFileHint"></p>
 
-      <button id="photos-restore-btn" data-i18n="btnRestorePhotos"></button>
-      <p id="photos-status" class="status" role="status"></p>
+        <label data-i18n="labelPassword" for="photos-pw"></label>
+        <input id="photos-pw" type="password" autocomplete="current-password" />
+
+        <button id="photos-restore-btn" class="btn-primary" data-i18n="btnRestorePhotos"></button>
+        <p id="photos-status" class="status" role="status"></p>
+      </section>
     </main>
     <script type="module" src="./photos.ts"></script>
   </body>

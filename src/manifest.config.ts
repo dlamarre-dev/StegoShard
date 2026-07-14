@@ -23,8 +23,9 @@ export function buildManifest(target: Target): Record<string, unknown> {
     // The offline core needs no network and no host access.
     permissions: ['storage'],
 
+    // No default_popup: clicking the icon opens the full-page app in a tab
+    // (handled by action.onClicked in the service worker).
     action: {
-      default_popup: 'ui/popup.html',
       default_title: '__MSG_extName__',
     },
     options_ui: {

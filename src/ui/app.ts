@@ -14,6 +14,7 @@ localizeDom();
 const noKeySection = el('no-key');
 const lockedSection = el('locked');
 const saveSection = el('save');
+const statePill = el('state-pill');
 
 const unlockPw = el<HTMLInputElement>('unlock-pw');
 const unlockBtn = el<HTMLButtonElement>('unlock-btn');
@@ -87,18 +88,25 @@ async function loadPrefs(): Promise<void> {
   reflectDestination();
 }
 
+function setPill(state: 'none' | 'locked' | 'unlocked'): void {
+  show(statePill, state !== 'none');
+  statePill.textContent = state === 'unlocked' ? msg('pillUnlocked') : msg('pillLocked');
+  statePill.classList.toggle('pill-ok', state === 'unlocked');
+}
+
 async function refreshState(): Promise<void> {
   const [hasKey, session] = await Promise.all([isKeySet(), getSession()]);
   show(noKeySection, !hasKey);
   show(lockedSection, hasKey && !session);
   show(saveSection, hasKey && session !== null);
+  setPill(!hasKey ? 'none' : session ? 'unlocked' : 'locked');
 }
 
 function openOptions(): void {
   void browser.runtime.openOptionsPage();
 }
 el<HTMLButtonElement>('open-options').addEventListener('click', openOptions);
-el<HTMLButtonElement>('footer-options').addEventListener('click', openOptions);
+el<HTMLButtonElement>('settings-btn').addEventListener('click', openOptions);
 
 unlockBtn.addEventListener('click', async () => {
   if (!unlockPw.value) return setStatus(unlockStatus, msg('errNoPassword'), true);
@@ -113,6 +121,9 @@ unlockBtn.addEventListener('click', async () => {
   } finally {
     unlockBtn.disabled = false;
   }
+});
+unlockPw.addEventListener('keydown', (e) => {
+  if ((e as KeyboardEvent).key === 'Enter') unlockBtn.click();
 });
 
 lockBtn.addEventListener('click', async () => {
@@ -235,8 +246,8 @@ restoreBtn.addEventListener('click', async () => {
   }
 });
 
-// The Photos picker opens in a new tab, which would dismiss this popup and kill
-// the flow — so run the whole Photos restore in its own persistent tab.
+// The Photos picker opens in a new tab, which would dismiss a popup and kill the
+// flow — run the whole Photos restore in its own persistent tab.
 restorePhotosBtn.addEventListener('click', () => {
   void browser.tabs.create({ url: browser.runtime.getURL('ui/photos.html') });
 });

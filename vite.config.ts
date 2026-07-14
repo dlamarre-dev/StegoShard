@@ -47,7 +47,7 @@ export default defineConfig({
       input: {
         background: resolve(__dirname, 'src/background/index.ts'),
         offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
-        popup: resolve(__dirname, 'src/ui/popup.html'),
+        app: resolve(__dirname, 'src/ui/app.html'),
         options: resolve(__dirname, 'src/ui/options.html'),
         photos: resolve(__dirname, 'src/ui/photos.html'),
       },

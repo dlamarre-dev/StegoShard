@@ -33,6 +33,12 @@ browser.runtime.onInstalled.addListener(() => {
   console.log('[imagevault] installed');
 });
 
+// Clicking the toolbar icon opens the full-page app in a tab (no popup).
+const APP_URL = 'ui/app.html';
+browser.action.onClicked.addListener(() => {
+  void browser.tabs.create({ url: browser.runtime.getURL(APP_URL) });
+});
+
 // Report spike results coming back from the offscreen document.
 browser.runtime.onMessage.addListener((message: unknown) => {
   const msg = message as { type?: string; payload?: unknown };

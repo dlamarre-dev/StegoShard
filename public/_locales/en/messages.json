@@ -12,6 +12,9 @@
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": { "message": "ImageVault settings", "description": "Options page heading." },
+  "extShortName": { "message": "ImageVault", "description": "Product name shown in the app header." },
+  "pillLocked": { "message": "Locked", "description": "Header status pill when the vault is locked." },
+  "pillUnlocked": { "message": "Unlocked", "description": "Header status pill when the vault is unlocked." },
 
   "unlockHeading": { "message": "Vault", "description": "Popup: unlock section heading." },
   "unlockPrompt": {

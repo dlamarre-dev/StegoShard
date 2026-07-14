@@ -7,11 +7,16 @@
     <link rel="stylesheet" href="./ui.css" />
   </head>
   <body>
-    <main class="panel wide">
-      <h1 data-i18n="optionsTitle"></h1>
+    <header class="appbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">IV</span>
+        <div class="brand-name" data-i18n="optionsTitle"></div>
+      </div>
+    </header>
 
-      <section>
-        <h2 data-i18n="optKeyHeading"></h2>
+    <main class="app">
+      <section class="card">
+        <div class="card-head"><h2 data-i18n="optKeyHeading"></h2></div>
         <p id="key-body-new" class="muted" data-i18n="optKeyBodyNew" hidden></p>
         <p id="key-body-exists" class="muted" data-i18n="optKeyBodyExists" hidden></p>
 
@@ -22,53 +27,49 @@
           <label data-i18n="labelConfirmPassword" for="confirm-pw"></label>
           <input id="confirm-pw" type="password" autocomplete="new-password" />
           <p class="muted warn" data-i18n="passwordHint"></p>
-          <button id="create-btn" data-i18n="btnCreateKey"></button>
+          <button id="create-btn" class="btn-primary" data-i18n="btnCreateKey"></button>
           <p id="create-status" class="status" role="status"></p>
         </div>
       </section>
 
       <!-- Management (shown only when a key exists) -->
       <div id="manage" hidden>
-        <hr />
-        <section>
-          <h2 data-i18n="changePwHeading"></h2>
+        <section class="card">
+          <div class="card-head"><h2 data-i18n="changePwHeading"></h2></div>
           <label data-i18n="labelOldPassword" for="old-pw"></label>
           <input id="old-pw" type="password" autocomplete="current-password" />
           <label data-i18n="labelNewPassword" for="change-new-pw"></label>
           <input id="change-new-pw" type="password" autocomplete="new-password" />
           <label data-i18n="labelConfirmPassword" for="change-confirm-pw"></label>
           <input id="change-confirm-pw" type="password" autocomplete="new-password" />
-          <button id="change-btn" data-i18n="btnChangePw"></button>
+          <button id="change-btn" class="btn-primary" data-i18n="btnChangePw"></button>
           <p id="change-status" class="status" role="status"></p>
         </section>
 
-        <hr />
-        <section>
-          <h2 data-i18n="exportHeading"></h2>
+        <section class="card">
+          <div class="card-head"><h2 data-i18n="exportHeading"></h2></div>
           <p class="muted" data-i18n="exportBody"></p>
-          <button id="export-btn" data-i18n="btnExportKey"></button>
+          <button id="export-btn" class="btn-secondary" data-i18n="btnExportKey"></button>
           <p id="export-status" class="status" role="status"></p>
         </section>
 
-        <hr />
-        <section>
-          <h2 data-i18n="eraseHeading"></h2>
+        <section class="card">
+          <div class="card-head"><h2 data-i18n="eraseHeading"></h2></div>
           <p class="muted warn" data-i18n="eraseBody"></p>
-          <button id="erase-btn" class="danger" data-i18n="btnEraseKey"></button>
+          <button id="erase-btn" class="btn-primary danger" data-i18n="btnEraseKey"></button>
           <p id="erase-status" class="status" role="status"></p>
         </section>
       </div>
 
       <!-- Import is available in both states (it can set or replace the key) -->
-      <hr />
-      <section>
-        <h2 data-i18n="importHeading"></h2>
+      <section class="card">
+        <div class="card-head"><h2 data-i18n="importHeading"></h2></div>
         <p class="muted" data-i18n="importBody"></p>
         <label data-i18n="labelKeyFile" for="import-key"></label>
         <input id="import-key" type="file" accept=".key" />
         <label data-i18n="labelPassword" for="import-pw"></label>
         <input id="import-pw" type="password" autocomplete="current-password" />
-        <button id="import-btn" data-i18n="btnImportKey"></button>
+        <button id="import-btn" class="btn-secondary" data-i18n="btnImportKey"></button>
         <p id="import-status" class="status" role="status"></p>
       </section>
     </main>
