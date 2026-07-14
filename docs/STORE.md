@@ -28,7 +28,6 @@ by loading it unpacked before uploading.
 | Permission | Justification |
 | ---------- | ------------- |
 | `storage` | Store the password-wrapped vault key and non-sensitive preferences locally. |
-| `offscreen` | Render/decode QR images on a Canvas, unavailable in the MV3 service worker. |
 | `identity` (optional) | Only for the optional Google Photos destination's OAuth sign-in. |
 | Google host permissions (optional) | Upload to / download from the user's own Google Photos, only when that destination is used. |
 | `'wasm-unsafe-eval'` in CSP | Run the audited Argon2id (hash-wasm) WebAssembly for key derivation. |

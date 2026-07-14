@@ -1,7 +1,7 @@
 /**
  * Small, dependency-free byte helpers shared across the core (crypto, codec,
  * erasure coding, payload). Kept pure and browser-agnostic so they run
- * unchanged under Node (tests), the service worker, and the offscreen document.
+ * unchanged under Node (tests), the service worker, and browser pages.
  */
 
 /** Lowercase hex string for a byte array (e.g. for set-id filenames). */

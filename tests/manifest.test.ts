@@ -8,7 +8,8 @@ describe('buildManifest', () => {
     expect(m.default_locale).toBe('en');
     expect(m.name).toBe('__MSG_extName__');
     expect((m.background as { service_worker: string }).service_worker).toBe('background.js');
-    expect(m.permissions).toContain('offscreen');
+    // Minimal permissions: only 'storage' by default (no offscreen).
+    expect(m.permissions).toEqual(['storage']);
   });
 
   it('allows WASM execution via CSP', () => {
@@ -29,8 +30,6 @@ describe('buildManifest', () => {
     const m = buildManifest('firefox');
     expect((m.background as { scripts: string[] }).scripts).toEqual(['background.js']);
     expect(m).toHaveProperty('browser_specific_settings');
-    // Firefox has no chrome.offscreen API.
-    expect(m.permissions).not.toContain('offscreen');
     // Firefox rejects `identity` in optional_permissions; Photos is Phase 4.
     expect(m).not.toHaveProperty('optional_permissions');
     expect(m).not.toHaveProperty('optional_host_permissions');

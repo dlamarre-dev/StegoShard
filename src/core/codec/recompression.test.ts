@@ -1,14 +1,11 @@
 /**
- * Google Photos recompression spike (plan Phase 4 — "spike first").
+ * Cloud-profile recompression: cloud hosts like Google Photos re-encode uploads
+ * as JPEG (luminance-preserving, 4:2:0 chroma). This test confirms the
+ * Cloud-profile QR survives a JPEG round-trip (jpeg-js) at typical qualities, so
+ * the Google Photos destination round-trips in practice.
  *
- * Google Photos re-encodes uploads as JPEG (luminance-preserving, 4:2:0 chroma,
- * downscaled if very large). Before building the upload/OAuth path we must
- * confirm the Cloud-profile QR survives that recompression. Here we simulate it
- * with a JPEG round-trip (jpeg-js) at Photos-like qualities and check the codec
- * still decodes.
- *
- * We also confirm the pessimistic assumption behind the stego "invisible" mode:
- * a classic LSB does NOT survive JPEG, so that mode is disk-only (plan §4).
+ * It also confirms that a classic LSB does NOT survive JPEG — the reason the
+ * (future) "invisible" stego mode is disk-only.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -33,7 +30,7 @@ function recompress(img: ImageDataLike, quality: number): ImageDataLike {
 
 const payload = Uint8Array.from({ length: 900 }, (_, i) => (i * 41 + 7) & 0xff);
 
-describe('Google Photos recompression spike', () => {
+describe('Cloud-profile recompression', () => {
   for (const quality of [92, 85, 75]) {
     it(`Cloud profile survives a JPEG round-trip at quality ${quality}`, () => {
       const img = qrGridCodec.encode(payload, PROFILE_CLOUD);

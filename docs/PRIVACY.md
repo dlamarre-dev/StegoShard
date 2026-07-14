@@ -33,7 +33,6 @@ The Google Photos destination is **opt-in** and off unless you enable it:
 ## Permissions
 
 - `storage` — save the wrapped key and preferences locally.
-- `offscreen` (Chrome/Edge) — render and decode images off the service worker.
 - `identity` and the Google host permissions — **optional**, requested only if
   you use Google Photos.
 

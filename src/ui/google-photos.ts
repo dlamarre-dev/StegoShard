@@ -1,7 +1,7 @@
 /**
  * Google Photos destination (plan §6, Phase 4) — an OPTIONAL convenience, never
  * the only copy. Google Photos recompresses uploads to JPEG; the Cloud profile
- * survives it (see docs/SPIKE-google-photos.md).
+ * survives it (see src/core/codec/recompression.test.ts).
  *
  * OAuth uses browser.identity.launchWebAuthFlow (cross-browser) with the implicit
  * flow — no client secret, and our per-session model does not need refresh

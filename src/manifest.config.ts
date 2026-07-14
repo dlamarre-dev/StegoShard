@@ -45,8 +45,7 @@ export function buildManifest(target: Target): Record<string, unknown> {
       open_in_tab: true,
     },
 
-    // MV3 requires 'wasm-unsafe-eval' to run the Argon2id / Reed-Solomon WASM.
-    // Validated by the Init WASM spike (see docs/SPIKE-wasm-csp.md).
+    // MV3 requires 'wasm-unsafe-eval' to run the Argon2id WASM (hash-wasm).
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
     },
@@ -54,7 +53,7 @@ export function buildManifest(target: Target): Record<string, unknown> {
 
   if (target === 'firefox') {
     // Firefox MV3 uses an event-page style background (scripts), not a service
-    // worker, and has no chrome.offscreen API — canvas work runs elsewhere.
+    // worker.
     return {
       ...base,
       background: {
@@ -77,7 +76,6 @@ export function buildManifest(target: Target): Record<string, unknown> {
   // optional_permissions and its OAuth flow differs — revisited in Phase 4.
   return {
     ...base,
-    permissions: [...(base.permissions as string[]), 'offscreen'],
     optional_permissions: ['identity'],
     optional_host_permissions: [
       'https://photoslibrary.googleapis.com/*',
