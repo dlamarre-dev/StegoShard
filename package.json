@@ -20,7 +20,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "fixtures": "tsx scripts/gen-fixtures.ts"
+    "fixtures": "tsx scripts/gen-fixtures.ts",
+    "icons": "tsx scripts/gen-icons.ts",
+    "package": "npm run build && npm run build:firefox && tsx scripts/package.ts"
   },
   "dependencies": {
     "fflate": "^0.8.3",

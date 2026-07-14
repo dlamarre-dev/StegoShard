@@ -64,9 +64,12 @@ Photos** destination (upload to a dedicated album, restore via the Picker API, C
 profile) is available when a Google OAuth client id is configured in a local `.env` (see
 `.env.example`); it is a convenience, never the only copy. The UI is localized into 8
 languages (en, fr, it, de, es, pt, ja, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)).
-The on-image format is frozen in [SPEC.md](SPEC.md). Cross-browser hardening + store
-submission (Phase 6), the store-screenshot pipeline, and the optional stego key mode come
-next.
+The on-image format is frozen in [SPEC.md](SPEC.md). The extension is packaged for the
+Chrome Web Store, Edge Add-ons, and Firefox (`npm run package`); see
+[docs/STORE.md](docs/STORE.md) and the [privacy policy](docs/PRIVACY.md). Remaining before
+a public 1.0: native proofread of the `ja`/`zh_TW` locales, localized store screenshots,
+Google's OAuth verification (only for public Google Photos), and an optional external
+crypto review. The optional stego key mode is a later addition.
 
 ## Development
 

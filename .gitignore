@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 coverage/
+packages/
 *.log
 
 # Python (reference decoder)

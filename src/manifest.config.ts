@@ -9,7 +9,16 @@
 export type Target = 'chrome' | 'firefox';
 
 // Bumped independently of the npm package version; surfaced in stores.
-const VERSION = '0.0.1';
+const VERSION = '0.1.0';
+
+const HOMEPAGE = 'https://github.com/dlamarre-dev/ImageVault';
+
+const ICONS = {
+  '16': 'icons/icon-16.png',
+  '32': 'icons/icon-32.png',
+  '48': 'icons/icon-48.png',
+  '128': 'icons/icon-128.png',
+};
 
 export function buildManifest(target: Target): Record<string, unknown> {
   const base: Record<string, unknown> = {
@@ -19,6 +28,8 @@ export function buildManifest(target: Target): Record<string, unknown> {
     description: '__MSG_extDesc__',
     default_locale: 'en',
     version: VERSION,
+    homepage_url: HOMEPAGE,
+    icons: ICONS,
 
     // The offline core needs no network and no host access.
     permissions: ['storage'],
@@ -27,6 +38,7 @@ export function buildManifest(target: Target): Record<string, unknown> {
     // (handled by action.onClicked in the service worker).
     action: {
       default_title: '__MSG_extName__',
+      default_icon: ICONS,
     },
     options_ui: {
       page: 'ui/options.html',
