@@ -16,7 +16,6 @@ import {
   type VaultKey,
 } from '@core';
 import { saveFileToDisk, restoreFileFromDisk } from '../ui/disk';
-import { saveFileToPaper } from '../ui/paper';
 import { localizeDom, msg, friendlyError } from './i18n';
 
 localizeDom();
@@ -122,6 +121,8 @@ saveBtn.addEventListener('click', async () => {
   try {
     const key = await makeKey(savePw.value);
     if (dest === 'paper') {
+      // Lazy-load the PDF path (pdf-lib) so it is not in the initial bundle.
+      const { saveFileToPaper } = await import('../ui/paper');
       const { imageCount } = await saveFileToPaper(file, key, {
         keyMode,
         title: title || undefined,

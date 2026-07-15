@@ -5,7 +5,6 @@ import { el, friendlyError, msg, setStatus, show } from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
 import { type Destination, getPrefs, savePrefs } from './prefs';
 import { restoreFileFromDisk, saveFileToDisk } from './disk';
-import { saveFileToPaper } from './paper';
 import { HAS_GOOGLE_PHOTOS } from './config';
 import { saveToPhotos } from './google-photos';
 import { wireKeyManager } from './keymanager';
@@ -213,6 +212,8 @@ saveBtn.addEventListener('click', async () => {
       });
       setStatus(saveStatus, msg('statusSavedCloud', [String(imageCount), albumTitle]));
     } else if (dest === 'paper') {
+      // Lazy-load the PDF path (pdf-lib) so it is not in the initial bundle.
+      const { saveFileToPaper } = await import('./paper');
       const { imageCount } = await saveFileToPaper(file, session, {
         keyMode,
         title: title || undefined,
