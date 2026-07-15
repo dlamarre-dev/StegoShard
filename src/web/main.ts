@@ -15,6 +15,7 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
+import { el, pick, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import { saveFileToDisk, restoreFileFromDisk } from '../ui/disk';
 import { localizeDom, msg, friendlyError } from './i18n';
 
@@ -22,26 +23,9 @@ localizeDom();
 
 type Dest = 'disk' | 'paper';
 
-function el<T extends HTMLElement>(id: string): T {
-  const found = document.getElementById(id);
-  if (!found) throw new Error(`missing element #${id}`);
-  return found as T;
-}
-function show(node: HTMLElement, visible: boolean): void {
-  node.hidden = !visible;
-}
-function setStatus(node: HTMLElement, text: string, error = false): void {
-  node.textContent = text;
-  node.classList.toggle('error', error);
-}
-function pick<T extends string>(name: string, fallback: T): T {
-  return (
-    (document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value as T) ??
-    fallback
-  );
-}
-
 const saveFile = el<HTMLInputElement>('save-file');
+const fileDrop = el('file-drop');
+const dzFile = el('dz-file');
 const savePw = el<HTMLInputElement>('save-pw');
 const estimate = el('estimate');
 const addBand = el<HTMLInputElement>('add-band');
@@ -55,15 +39,27 @@ const pwHint = el<HTMLInputElement>('pw-hint');
 const keyLocation = el<HTMLInputElement>('key-location');
 const saveBtn = el<HTMLButtonElement>('save-btn');
 const saveStatus = el('save-status');
+const saveResult = el('save-result');
+const saveResultNote = el('save-result-note');
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
+const restoreDrop = el('restore-drop');
+const restoreDzFile = el('restore-dz-file');
 const restoreKey = el<HTMLInputElement>('restore-key');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
 const restoreStatus = el('restore-status');
+const restoreResult = el('restore-result');
+const restoreResultNote = el('restore-result-note');
 
 const selectedDest = () => pick<Dest>('dest', 'disk');
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
+
+function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputElement): void {
+  const file = input.files?.[0];
+  drop.classList.toggle('has-file', Boolean(file));
+  chip.textContent = file ? file.name : '';
+}
 
 function reflectDestination(): void {
   const paper = selectedDest() === 'paper';
@@ -89,7 +85,6 @@ async function updateEstimate(): Promise<void> {
 }
 
 addBand.addEventListener('change', () => show(bandFields, addBand.checked));
-saveFile.addEventListener('change', updateEstimate);
 for (const r of document.querySelectorAll('input[name="dest"]')) {
   r.addEventListener('change', () => {
     reflectDestination();
@@ -99,6 +94,13 @@ for (const r of document.querySelectorAll('input[name="dest"]')) {
 for (const r of document.querySelectorAll('input[name="keymode"]')) {
   r.addEventListener('change', () => void updateEstimate());
 }
+
+wireDropzone(fileDrop, saveFile, () => {
+  reflectFile(fileDrop, dzFile, saveFile);
+  show(saveResult, false);
+  void updateEstimate();
+});
+wireDropzone(restoreDrop, restoreFiles, () => reflectFile(restoreDrop, restoreDzFile, restoreFiles));
 
 async function makeKey(password: string): Promise<VaultKey> {
   const { dek, block } = await createKeyBlock(password);
@@ -117,11 +119,12 @@ saveBtn.addEventListener('click', async () => {
   const title = useLabel ? bandTitle.value.trim() : '';
 
   saveBtn.disabled = true;
+  show(saveResult, false);
   setStatus(saveStatus, msg('statusSaving'));
   try {
     const key = await makeKey(savePw.value);
+    let note: string;
     if (dest === 'paper') {
-      // Lazy-load the PDF path (pdf-lib) so it is not in the initial bundle.
       const { saveFileToPaper } = await import('../ui/paper');
       const { imageCount } = await saveFileToPaper(file, key, {
         keyMode,
@@ -131,7 +134,7 @@ saveBtn.addEventListener('click', async () => {
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
       });
-      setStatus(saveStatus, msg('statusSavedPdf', String(imageCount)));
+      note = msg('statusSavedPdf', String(imageCount));
     } else {
       const label = useLabel ? { title, date } : undefined;
       const { imageCount } = await saveFileToDisk(file, key, {
@@ -139,9 +142,11 @@ saveBtn.addEventListener('click', async () => {
         label,
         asZip: asZip.checked,
       });
-      const statusKey = keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile';
-      setStatus(saveStatus, msg(statusKey, String(imageCount)));
+      note = msg(keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile', String(imageCount));
     }
+    setStatus(saveStatus, '');
+    saveResultNote.textContent = note;
+    show(saveResult, true);
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -155,10 +160,13 @@ restoreBtn.addEventListener('click', async () => {
   if (!restorePw.value) return setStatus(restoreStatus, msg('errNoPassword'), true);
 
   restoreBtn.disabled = true;
+  show(restoreResult, false);
   setStatus(restoreStatus, msg('statusRestoring'));
   try {
     const { filename } = await restoreFileFromDisk(files, restorePw.value, restoreKey.files?.[0]);
-    setStatus(restoreStatus, msg('statusRestored', filename));
+    setStatus(restoreStatus, '');
+    restoreResultNote.textContent = msg('statusRestored', filename);
+    show(restoreResult, true);
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {

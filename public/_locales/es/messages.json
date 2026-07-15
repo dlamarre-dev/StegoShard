@@ -1,143 +1,337 @@
 {
-  "extName": { "message": "ImageVault: cifra y respalda secretos como imágenes QR / papel" },
+  "extName": {
+    "message": "ImageVault: cifra y respalda secretos como imágenes QR / papel"
+  },
   "extDesc": {
     "message": "Cifra un archivo en imágenes robustas con corrección de errores para guardar en disco, imprimir o subir a la nube."
   },
-  "popupTagline": { "message": "Cifra un archivo en imágenes resilientes — disco, papel o nube." },
-  "optionsTitle": { "message": "Ajustes de ImageVault" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "Bloqueado" },
-  "pillUnlocked": { "message": "Desbloqueado" },
-  "unlockHeading": { "message": "Caja fuerte" },
-  "unlockPrompt": { "message": "Introduce tu contraseña para habilitar el guardado." },
-  "btnUnlock": { "message": "Desbloquear" },
-  "btnLock": { "message": "Bloquear" },
-  "statusUnlocked": { "message": "Desbloqueado: ya puedes guardar archivos." },
-  "noKeyTitle": { "message": "Aún no hay clave de la caja fuerte" },
-  "noKeyBody": { "message": "Crea tu clave en los ajustes antes de guardar." },
-  "btnOpenOptions": { "message": "Abrir ajustes" },
-  "saveHeading": { "message": "Guardar un archivo" },
-  "restoreHeading": { "message": "Restaurar un archivo" },
-  "labelFile": { "message": "Archivo" },
-  "labelImages": { "message": "Archivos de imagen" },
-  "labelPassword": { "message": "Contraseña" },
-  "destHeading": { "message": "Destino" },
-  "destDisk": { "message": "Disco (PNG o .zip)" },
-  "destPaper": { "message": "Papel (PDF imprimible)" },
-  "destCloud": { "message": "Google Fotos (opcional)" },
+  "popupTagline": {
+    "message": "Cifra un archivo en imágenes resilientes — disco, papel o nube."
+  },
+  "optionsTitle": {
+    "message": "Ajustes de ImageVault"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "Bloqueado"
+  },
+  "pillUnlocked": {
+    "message": "Desbloqueado"
+  },
+  "unlockHeading": {
+    "message": "Caja fuerte"
+  },
+  "unlockPrompt": {
+    "message": "Introduce tu contraseña para habilitar el guardado."
+  },
+  "btnUnlock": {
+    "message": "Desbloquear"
+  },
+  "btnLock": {
+    "message": "Bloquear"
+  },
+  "statusUnlocked": {
+    "message": "Desbloqueado: ya puedes guardar archivos."
+  },
+  "noKeyTitle": {
+    "message": "Aún no hay clave de la caja fuerte"
+  },
+  "noKeyBody": {
+    "message": "Crea tu clave en los ajustes antes de guardar."
+  },
+  "btnOpenOptions": {
+    "message": "Abrir ajustes"
+  },
+  "saveHeading": {
+    "message": "Guardar un archivo"
+  },
+  "restoreHeading": {
+    "message": "Restaurar un archivo"
+  },
+  "labelFile": {
+    "message": "Archivo"
+  },
+  "labelImages": {
+    "message": "Archivos de imagen"
+  },
+  "labelPassword": {
+    "message": "Contraseña"
+  },
+  "destHeading": {
+    "message": "Destino"
+  },
+  "destDisk": {
+    "message": "Disco (PNG o .zip)"
+  },
+  "destPaper": {
+    "message": "Papel (PDF imprimible)"
+  },
+  "destCloud": {
+    "message": "Google Fotos (opcional)"
+  },
   "cloudNote": {
-    "message": "Una comodidad, nunca tu única copia. Se sube a un álbum dedicado."
+    "message": "Una comodidad, nunca tu única copia."
   },
   "statusSavedCloud": {
     "message": "Se subieron $COUNT$ imagen(es) al álbum «$ALBUM$». Guarda bien tu contraseña.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "Restaurar desde Google Fotos" },
-  "photosHeading": { "message": "Restaurar desde Google Fotos" },
+  "btnRestorePhotos": {
+    "message": "Restaurar desde Google Fotos"
+  },
+  "photosHeading": {
+    "message": "Restaurar desde Google Fotos"
+  },
   "photosIntro": {
     "message": "Esto se ejecuta en su propia pestaña para seguir abierta mientras eliges tus imágenes. Introduce tu contraseña, inicia, selecciona las imágenes de la caja fuerte en el selector y vuelve aquí."
   },
   "statusPickerOpen": {
     "message": "Elige tus imágenes de ImageVault en la ventana abierta y vuelve aquí…"
   },
-  "labelInstructions": { "message": "Incluir una hoja de instrucciones" },
-  "labelPasswordHint": { "message": "Pista de contraseña (opcional)" },
-  "labelKeyLocation": { "message": "Nota de ubicación de la clave (opcional)" },
+  "labelInstructions": {
+    "message": "Incluir una hoja de instrucciones"
+  },
+  "labelPasswordHint": {
+    "message": "Pista de contraseña (opcional)"
+  },
+  "labelKeyLocation": {
+    "message": "Nota de ubicación de la clave (opcional)"
+  },
   "paperCleartextWarn": {
     "message": "La hoja de instrucciones no está cifrada: escribe una pista, nunca la contraseña."
   },
   "statusSavedPdf": {
     "message": "Listo. Se descargó un PDF de $COUNT$ página(s). Guarda bien tu contraseña.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Almacenamiento de la clave" },
-  "keyModeEmbedded": { "message": "En las imágenes (autónoma)" },
-  "keyModeKeyfile": { "message": "Archivo .key aparte" },
+  "keyModeHeading": {
+    "message": "Almacenamiento de la clave"
+  },
+  "keyModeEmbedded": {
+    "message": "Sencillo: un solo conjunto de imágenes"
+  },
+  "keyModeKeyfile": {
+    "message": "Mayor seguridad: un archivo de clave aparte"
+  },
   "keyModeHelp": {
-    "message": "Integrada: bastan las imágenes y tu contraseña. Archivo: una imagen filtrada no revela nada sin el .key aparte."
+    "message": "Con un archivo de clave aparte, una imagen filtrada no revela nada por sí sola, pero también debes conservar el .key."
   },
-  "labelAddBand": { "message": "Añadir una etiqueta legible en las imágenes" },
-  "labelTitle": { "message": "Título de la etiqueta" },
+  "labelAddBand": {
+    "message": "Añadir una etiqueta legible en las imágenes"
+  },
+  "labelTitle": {
+    "message": "Título de la etiqueta"
+  },
   "titlePlaceholder": {
     "message": "Nombra esta caja fuerte — p. ej. «Archivo Alfa». Evita «Claves Bitcoin»."
   },
-  "bandWarning": { "message": "La etiqueta no está cifrada: nunca pongas un secreto en ella." },
-  "labelKeyFile": { "message": "Archivo de clave (.key)" },
+  "bandWarning": {
+    "message": "La etiqueta no está cifrada: nunca pongas un secreto en ella."
+  },
+  "labelKeyFile": {
+    "message": "Archivo de clave (.key)"
+  },
   "keyFileHint": {
     "message": "Solo necesario para conjuntos guardados con un archivo .key aparte (ignóralo si está en el .zip)."
   },
-  "labelAsZip": { "message": "Agrupar todo en un único .zip" },
-  "labelImagesOrZip": { "message": "Archivos de imagen o un .zip" },
-  "btnSave": { "message": "Cifrar y descargar las imágenes" },
-  "btnRestore": { "message": "Restaurar el archivo" },
-  "estimateImages": { "message": "Imágenes estimadas:" },
-  "statusSaving": { "message": "Cifrando y generando las imágenes…" },
+  "labelAsZip": {
+    "message": "Agrupar todo en un único .zip"
+  },
+  "labelImagesOrZip": {
+    "message": "Archivos de imagen o un .zip"
+  },
+  "btnSave": {
+    "message": "Cifrar y descargar las imágenes"
+  },
+  "btnRestore": {
+    "message": "Restaurar el archivo"
+  },
+  "estimateImages": {
+    "message": "Imágenes estimadas:"
+  },
+  "statusSaving": {
+    "message": "Cifrando y generando las imágenes…"
+  },
   "statusSaved": {
     "message": "Listo. Se descargaron $COUNT$ imagen(es). Guarda tu contraseña: no se puede recuperar.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Listo. Se descargaron $COUNT$ imagen(es) y un archivo .key. Guarda el .key y tu contraseña.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "Decodificando las imágenes y restaurando…" },
+  "statusRestoring": {
+    "message": "Decodificando las imágenes y restaurando…"
+  },
   "statusRestored": {
     "message": "$NAME$ restaurado y descargado.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "Elige primero un archivo." },
-  "errNoImages": { "message": "Elige los archivos de imagen para restaurar." },
-  "errNoPassword": { "message": "Introduce una contraseña." },
-  "errWrongPassword": { "message": "Contraseña incorrecta. Inténtalo de nuevo." },
-  "errLocked": { "message": "Desbloquea primero tu caja fuerte." },
+  "errNoFile": {
+    "message": "Elige primero un archivo."
+  },
+  "errNoImages": {
+    "message": "Elige los archivos de imagen para restaurar."
+  },
+  "errNoPassword": {
+    "message": "Introduce una contraseña."
+  },
+  "errWrongPassword": {
+    "message": "Contraseña incorrecta. Inténtalo de nuevo."
+  },
+  "errLocked": {
+    "message": "Desbloquea primero tu caja fuerte."
+  },
   "errMissingKey": {
     "message": "Este conjunto de imágenes necesita su archivo .key aparte para restaurar."
   },
   "errFileTooLarge": {
     "message": "Archivo demasiado grande ($SIZE$ KB). Esta caja fuerte es para secretos pequeños (máx. $LIMIT$ KB).",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "Este archivo necesitaría $COUNT$ imágenes (máx. $LIMIT$). Prueba con un archivo más pequeño.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "Clave de la caja fuerte" },
+  "optKeyHeading": {
+    "message": "Clave de la caja fuerte"
+  },
   "optKeyBodyNew": {
     "message": "Crea una clave de la caja fuerte. Cada archivo que guardes se cifra con ella."
   },
-  "optKeyBodyExists": { "message": "Hay una clave de la caja fuerte configurada en este dispositivo." },
-  "labelNewPassword": { "message": "Nueva contraseña" },
-  "labelConfirmPassword": { "message": "Confirmar la contraseña" },
-  "labelOldPassword": { "message": "Contraseña actual" },
-  "btnCreateKey": { "message": "Crear la clave" },
+  "optKeyBodyExists": {
+    "message": "Hay una clave de la caja fuerte configurada en este dispositivo."
+  },
+  "labelNewPassword": {
+    "message": "Nueva contraseña"
+  },
+  "labelConfirmPassword": {
+    "message": "Confirmar la contraseña"
+  },
+  "labelOldPassword": {
+    "message": "Contraseña actual"
+  },
+  "btnCreateKey": {
+    "message": "Crear la clave"
+  },
   "passwordHint": {
     "message": "La contraseña no se puede recuperar. Si la olvidas, tus cajas fuertes se pierden: considera exportar tu clave."
   },
-  "errPasswordMismatch": { "message": "Las contraseñas no coinciden." },
-  "errPasswordTooShort": { "message": "Usa al menos 8 caracteres." },
-  "statusKeyCreated": { "message": "Clave de la caja fuerte creada." },
-  "changePwHeading": { "message": "Cambiar la contraseña" },
-  "btnChangePw": { "message": "Cambiar la contraseña" },
-  "statusPwChanged": { "message": "Contraseña cambiada." },
-  "exportHeading": { "message": "Exportar la clave" },
+  "errPasswordMismatch": {
+    "message": "Las contraseñas no coinciden."
+  },
+  "errPasswordTooShort": {
+    "message": "Usa al menos 8 caracteres."
+  },
+  "statusKeyCreated": {
+    "message": "Clave de la caja fuerte creada."
+  },
+  "changePwHeading": {
+    "message": "Cambiar la contraseña"
+  },
+  "btnChangePw": {
+    "message": "Cambiar la contraseña"
+  },
+  "statusPwChanged": {
+    "message": "Contraseña cambiada."
+  },
+  "exportHeading": {
+    "message": "Exportar la clave"
+  },
   "exportBody": {
     "message": "Descarga la clave protegida (.key) para transferirla o respaldarla. Sigue protegida por contraseña."
   },
-  "btnExportKey": { "message": "Exportar .key" },
-  "statusKeyExported": { "message": "Clave exportada." },
-  "importHeading": { "message": "Importar una clave" },
+  "btnExportKey": {
+    "message": "Exportar .key"
+  },
+  "statusKeyExported": {
+    "message": "Clave exportada."
+  },
+  "importHeading": {
+    "message": "Importar una clave"
+  },
   "importBody": {
     "message": "Importa un archivo .key de otro dispositivo. Esto reemplaza la clave actual."
   },
-  "btnImportKey": { "message": "Importar la clave" },
-  "statusKeyImported": { "message": "Clave importada." },
-  "eraseHeading": { "message": "Borrar la clave" },
+  "btnImportKey": {
+    "message": "Importar la clave"
+  },
+  "statusKeyImported": {
+    "message": "Clave importada."
+  },
+  "eraseHeading": {
+    "message": "Borrar la clave"
+  },
   "eraseBody": {
     "message": "Elimina permanentemente la clave de este dispositivo. Los archivos ya guardados quedan irrecuperables sin un .key exportado. Acción irreversible."
   },
-  "btnEraseKey": { "message": "Borrar la clave" },
+  "btnEraseKey": {
+    "message": "Borrar la clave"
+  },
   "confirmErase": {
     "message": "¿Borrar de verdad la clave de la caja fuerte? Los archivos guardados serán irrecuperables sin un .key exportado."
   },
-  "statusKeyErased": { "message": "Clave de la caja fuerte borrada." }
+  "statusKeyErased": {
+    "message": "Clave de la caja fuerte borrada."
+  },
+  "dropTitle": {
+    "message": "Suelta tu archivo aquí"
+  },
+  "dropPrompt": {
+    "message": "o haz clic para elegir"
+  },
+  "advancedOptions": {
+    "message": "Opciones avanzadas"
+  },
+  "whyLabel": {
+    "message": "¿Por qué?"
+  },
+  "savedTitle": {
+    "message": "Guardado"
+  },
+  "restoredTitle": {
+    "message": "Restaurado"
+  },
+  "webIntro": {
+    "message": "Una versión web gratuita y de código abierto: sin instalación, sin cuenta y nada sale de tu dispositivo. Guarda un archivo como imágenes o restaura uno. (Google Fotos requiere la extensión del navegador.)"
+  }
 }

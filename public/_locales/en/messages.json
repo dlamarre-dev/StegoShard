@@ -52,7 +52,7 @@
     "description": "Popup: Google Photos destination."
   },
   "cloudNote": {
-    "message": "A convenience, never your only copy. Uploaded to a dedicated album.",
+    "message": "A convenience — never your only copy.",
     "description": "Popup: note under the Google Photos option."
   },
   "statusSavedCloud": {
@@ -97,19 +97,25 @@
     "description": "Popup: status after saving to PDF.",
     "placeholders": { "count": { "content": "$1" } }
   },
-  "keyModeHeading": { "message": "Key storage", "description": "Popup: key-mode selector heading." },
+  "keyModeHeading": { "message": "Key", "description": "Key-mode selector heading." },
   "keyModeEmbedded": {
-    "message": "In the images (self-contained)",
-    "description": "Popup: embedded key mode."
+    "message": "Keep it simple — one set of images",
+    "description": "Embedded key mode (plain language)."
   },
   "keyModeKeyfile": {
-    "message": "Separate .key file",
-    "description": "Popup: keyfile key mode."
+    "message": "Extra safety — a separate key file",
+    "description": "Keyfile key mode (plain language)."
   },
   "keyModeHelp": {
-    "message": "Embedded: the images plus your password are enough. Keyfile: a leaked image reveals nothing without the separate .key.",
-    "description": "Popup: key-mode explanation."
+    "message": "With a separate key file, a leaked image reveals nothing on its own — but you must keep the .key too.",
+    "description": "Key-mode explanation (shown under a Why? disclosure)."
   },
+  "dropTitle": { "message": "Drop your file here", "description": "File drop zone title." },
+  "dropPrompt": { "message": "or click to choose", "description": "File drop zone subtitle." },
+  "advancedOptions": { "message": "Advanced options", "description": "Disclosure for advanced save options." },
+  "whyLabel": { "message": "Why?", "description": "Info disclosure toggle." },
+  "savedTitle": { "message": "Saved", "description": "Success panel title after saving." },
+  "restoredTitle": { "message": "Restored", "description": "Success panel title after restoring." },
 
   "labelAddBand": {
     "message": "Add a readable label on the images",

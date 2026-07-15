@@ -1,143 +1,337 @@
 {
-  "extName": { "message": "ImageVault：將機密加密並以 QR／紙本圖像備份" },
+  "extName": {
+    "message": "ImageVault：將機密加密並以 QR／紙本圖像備份"
+  },
   "extDesc": {
     "message": "把檔案加密成具備錯誤更正的穩健圖像，可存於磁碟、列印或上傳雲端。"
   },
-  "popupTagline": { "message": "把檔案加密成穩健圖像 — 磁碟、紙本或雲端。" },
-  "optionsTitle": { "message": "ImageVault 設定" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "已鎖定" },
-  "pillUnlocked": { "message": "已解鎖" },
-  "unlockHeading": { "message": "保險庫" },
-  "unlockPrompt": { "message": "輸入密碼以啟用儲存。" },
-  "btnUnlock": { "message": "解鎖" },
-  "btnLock": { "message": "鎖定" },
-  "statusUnlocked": { "message": "已解鎖 — 可以儲存檔案。" },
-  "noKeyTitle": { "message": "尚無保險庫金鑰" },
-  "noKeyBody": { "message": "儲存前請先在設定中建立金鑰。" },
-  "btnOpenOptions": { "message": "開啟設定" },
-  "saveHeading": { "message": "儲存檔案" },
-  "restoreHeading": { "message": "還原檔案" },
-  "labelFile": { "message": "檔案" },
-  "labelImages": { "message": "圖像檔案" },
-  "labelPassword": { "message": "密碼" },
-  "destHeading": { "message": "目的地" },
-  "destDisk": { "message": "磁碟（PNG 或 .zip）" },
-  "destPaper": { "message": "紙本（可列印的 PDF）" },
-  "destCloud": { "message": "Google 相簿（選用）" },
+  "popupTagline": {
+    "message": "把檔案加密成穩健圖像 — 磁碟、紙本或雲端。"
+  },
+  "optionsTitle": {
+    "message": "ImageVault 設定"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "已鎖定"
+  },
+  "pillUnlocked": {
+    "message": "已解鎖"
+  },
+  "unlockHeading": {
+    "message": "保險庫"
+  },
+  "unlockPrompt": {
+    "message": "輸入密碼以啟用儲存。"
+  },
+  "btnUnlock": {
+    "message": "解鎖"
+  },
+  "btnLock": {
+    "message": "鎖定"
+  },
+  "statusUnlocked": {
+    "message": "已解鎖 — 可以儲存檔案。"
+  },
+  "noKeyTitle": {
+    "message": "尚無保險庫金鑰"
+  },
+  "noKeyBody": {
+    "message": "儲存前請先在設定中建立金鑰。"
+  },
+  "btnOpenOptions": {
+    "message": "開啟設定"
+  },
+  "saveHeading": {
+    "message": "儲存檔案"
+  },
+  "restoreHeading": {
+    "message": "還原檔案"
+  },
+  "labelFile": {
+    "message": "檔案"
+  },
+  "labelImages": {
+    "message": "圖像檔案"
+  },
+  "labelPassword": {
+    "message": "密碼"
+  },
+  "destHeading": {
+    "message": "目的地"
+  },
+  "destDisk": {
+    "message": "磁碟（PNG 或 .zip）"
+  },
+  "destPaper": {
+    "message": "紙本（可列印的 PDF）"
+  },
+  "destCloud": {
+    "message": "Google 相簿（選用）"
+  },
   "cloudNote": {
-    "message": "只是便利選項，切勿當作唯一副本。會上傳到專屬相簿。"
+    "message": "僅為便利之用 — 切勿當作唯一的備份。"
   },
   "statusSavedCloud": {
     "message": "已將 $COUNT$ 張圖像上傳到相簿「$ALBUM$」。請妥善保管密碼。",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "從 Google 相簿還原" },
-  "photosHeading": { "message": "從 Google 相簿還原" },
+  "btnRestorePhotos": {
+    "message": "從 Google 相簿還原"
+  },
+  "photosHeading": {
+    "message": "從 Google 相簿還原"
+  },
   "photosIntro": {
     "message": "此頁在自己的分頁中執行，讓您挑選圖像時保持開啟。輸入密碼並開始，在選取器中選擇保險庫的圖像，然後回到這裡。"
   },
   "statusPickerOpen": {
     "message": "在開啟的視窗中選擇您的 ImageVault 圖像，然後回到這裡…"
   },
-  "labelInstructions": { "message": "附上說明頁" },
-  "labelPasswordHint": { "message": "密碼提示（選填）" },
-  "labelKeyLocation": { "message": "金鑰位置備註（選填）" },
+  "labelInstructions": {
+    "message": "附上說明頁"
+  },
+  "labelPasswordHint": {
+    "message": "密碼提示（選填）"
+  },
+  "labelKeyLocation": {
+    "message": "金鑰位置備註（選填）"
+  },
   "paperCleartextWarn": {
     "message": "說明頁不會加密 — 只寫提示，切勿寫下密碼。"
   },
   "statusSavedPdf": {
     "message": "完成。已下載 $COUNT$ 頁的 PDF。請妥善保管密碼。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "金鑰儲存方式" },
-  "keyModeEmbedded": { "message": "在圖像內（自足）" },
-  "keyModeKeyfile": { "message": "獨立的 .key 檔案" },
+  "keyModeHeading": {
+    "message": "金鑰儲存方式"
+  },
+  "keyModeEmbedded": {
+    "message": "簡單 — 只需一組圖片"
+  },
+  "keyModeKeyfile": {
+    "message": "更安全 — 獨立的金鑰檔案"
+  },
   "keyModeHelp": {
-    "message": "內嵌：只需圖像與密碼。檔案：即使圖像外洩，沒有獨立的 .key 也無從破解。"
+    "message": "使用獨立的金鑰檔案時，即使圖片外洩，單靠圖片也無法得知任何內容 — 但您必須同時保管 .key 檔案。"
   },
-  "labelAddBand": { "message": "在圖像上加入可讀標籤" },
-  "labelTitle": { "message": "標籤標題" },
+  "labelAddBand": {
+    "message": "在圖像上加入可讀標籤"
+  },
+  "labelTitle": {
+    "message": "標籤標題"
+  },
   "titlePlaceholder": {
     "message": "為這個保險庫命名 — 例如「封存 Alpha」。避免「比特幣金鑰」之類。"
   },
-  "bandWarning": { "message": "標籤不會加密 — 切勿在其中寫入機密。" },
-  "labelKeyFile": { "message": "金鑰檔案（.key）" },
+  "bandWarning": {
+    "message": "標籤不會加密 — 切勿在其中寫入機密。"
+  },
+  "labelKeyFile": {
+    "message": "金鑰檔案（.key）"
+  },
   "keyFileHint": {
     "message": "僅在以獨立 .key 檔案儲存的組合才需要（若已在 .zip 中則略過）。"
   },
-  "labelAsZip": { "message": "全部打包成單一 .zip" },
-  "labelImagesOrZip": { "message": "圖像檔案或一個 .zip" },
-  "btnSave": { "message": "加密並下載圖像" },
-  "btnRestore": { "message": "還原檔案" },
-  "estimateImages": { "message": "預估圖像數：" },
-  "statusSaving": { "message": "正在加密並產生圖像…" },
+  "labelAsZip": {
+    "message": "全部打包成單一 .zip"
+  },
+  "labelImagesOrZip": {
+    "message": "圖像檔案或一個 .zip"
+  },
+  "btnSave": {
+    "message": "加密並下載圖像"
+  },
+  "btnRestore": {
+    "message": "還原檔案"
+  },
+  "estimateImages": {
+    "message": "預估圖像數："
+  },
+  "statusSaving": {
+    "message": "正在加密並產生圖像…"
+  },
   "statusSaved": {
     "message": "完成。已下載 $COUNT$ 張圖像。密碼無法找回，請妥善保管。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "完成。已下載 $COUNT$ 張圖像與一個 .key 檔案。請妥善保管 .key 與密碼。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "正在解碼圖像並還原…" },
+  "statusRestoring": {
+    "message": "正在解碼圖像並還原…"
+  },
   "statusRestored": {
     "message": "已還原並下載 $NAME$。",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "請先選擇檔案。" },
-  "errNoImages": { "message": "請選擇要還原的圖像檔案。" },
-  "errNoPassword": { "message": "請輸入密碼。" },
-  "errWrongPassword": { "message": "密碼錯誤，請再試一次。" },
-  "errLocked": { "message": "請先解鎖您的保險庫。" },
+  "errNoFile": {
+    "message": "請先選擇檔案。"
+  },
+  "errNoImages": {
+    "message": "請選擇要還原的圖像檔案。"
+  },
+  "errNoPassword": {
+    "message": "請輸入密碼。"
+  },
+  "errWrongPassword": {
+    "message": "密碼錯誤，請再試一次。"
+  },
+  "errLocked": {
+    "message": "請先解鎖您的保險庫。"
+  },
   "errMissingKey": {
     "message": "此圖像組合需要其獨立的 .key 檔案才能還原。"
   },
   "errFileTooLarge": {
     "message": "檔案過大（$SIZE$ KB）。此保險庫用於小型機密（上限 $LIMIT$ KB）。",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "此檔案需要 $COUNT$ 張圖像（上限 $LIMIT$）。請改用較小的檔案。",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "保險庫金鑰" },
+  "optKeyHeading": {
+    "message": "保險庫金鑰"
+  },
   "optKeyBodyNew": {
     "message": "建立保險庫金鑰。您儲存的每個檔案都以它加密。"
   },
-  "optKeyBodyExists": { "message": "此裝置已設定保險庫金鑰。" },
-  "labelNewPassword": { "message": "新密碼" },
-  "labelConfirmPassword": { "message": "確認密碼" },
-  "labelOldPassword": { "message": "目前密碼" },
-  "btnCreateKey": { "message": "建立金鑰" },
+  "optKeyBodyExists": {
+    "message": "此裝置已設定保險庫金鑰。"
+  },
+  "labelNewPassword": {
+    "message": "新密碼"
+  },
+  "labelConfirmPassword": {
+    "message": "確認密碼"
+  },
+  "labelOldPassword": {
+    "message": "目前密碼"
+  },
+  "btnCreateKey": {
+    "message": "建立金鑰"
+  },
   "passwordHint": {
     "message": "密碼無法找回。若忘記，您的保險庫將遺失 — 建議匯出金鑰。"
   },
-  "errPasswordMismatch": { "message": "兩次密碼不一致。" },
-  "errPasswordTooShort": { "message": "請至少使用 8 個字元。" },
-  "statusKeyCreated": { "message": "已建立保險庫金鑰。" },
-  "changePwHeading": { "message": "變更密碼" },
-  "btnChangePw": { "message": "變更密碼" },
-  "statusPwChanged": { "message": "已變更密碼。" },
-  "exportHeading": { "message": "匯出金鑰" },
+  "errPasswordMismatch": {
+    "message": "兩次密碼不一致。"
+  },
+  "errPasswordTooShort": {
+    "message": "請至少使用 8 個字元。"
+  },
+  "statusKeyCreated": {
+    "message": "已建立保險庫金鑰。"
+  },
+  "changePwHeading": {
+    "message": "變更密碼"
+  },
+  "btnChangePw": {
+    "message": "變更密碼"
+  },
+  "statusPwChanged": {
+    "message": "已變更密碼。"
+  },
+  "exportHeading": {
+    "message": "匯出金鑰"
+  },
   "exportBody": {
     "message": "下載受保護的金鑰（.key）以便移轉或備份。仍受密碼保護。"
   },
-  "btnExportKey": { "message": "匯出 .key" },
-  "statusKeyExported": { "message": "已匯出金鑰。" },
-  "importHeading": { "message": "匯入金鑰" },
+  "btnExportKey": {
+    "message": "匯出 .key"
+  },
+  "statusKeyExported": {
+    "message": "已匯出金鑰。"
+  },
+  "importHeading": {
+    "message": "匯入金鑰"
+  },
   "importBody": {
     "message": "從另一裝置匯入 .key 檔案。這會取代目前的金鑰。"
   },
-  "btnImportKey": { "message": "匯入金鑰" },
-  "statusKeyImported": { "message": "已匯入金鑰。" },
-  "eraseHeading": { "message": "清除金鑰" },
+  "btnImportKey": {
+    "message": "匯入金鑰"
+  },
+  "statusKeyImported": {
+    "message": "已匯入金鑰。"
+  },
+  "eraseHeading": {
+    "message": "清除金鑰"
+  },
   "eraseBody": {
     "message": "從此裝置永久刪除保險庫金鑰。除非您保留了匯出的 .key，否則已儲存的檔案將無法還原。此動作無法復原。"
   },
-  "btnEraseKey": { "message": "清除金鑰" },
+  "btnEraseKey": {
+    "message": "清除金鑰"
+  },
   "confirmErase": {
     "message": "確定要清除保險庫金鑰嗎？若無匯出的 .key，已儲存的檔案將無法還原。"
   },
-  "statusKeyErased": { "message": "已清除保險庫金鑰。" }
+  "statusKeyErased": {
+    "message": "已清除保險庫金鑰。"
+  },
+  "dropTitle": {
+    "message": "將檔案拖放到這裡"
+  },
+  "dropPrompt": {
+    "message": "或點擊選擇"
+  },
+  "advancedOptions": {
+    "message": "進階選項"
+  },
+  "whyLabel": {
+    "message": "為什麼？"
+  },
+  "savedTitle": {
+    "message": "已儲存"
+  },
+  "restoredTitle": {
+    "message": "已還原"
+  },
+  "webIntro": {
+    "message": "免費的開放原始碼網頁版本 — 無需安裝、無需帳號，任何資料都不會離開您的裝置。可將檔案儲存為圖片或還原。（Google 相簿需要瀏覽器擴充功能。）"
+  }
 }
