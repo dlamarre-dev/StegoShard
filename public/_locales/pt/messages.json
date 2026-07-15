@@ -1,143 +1,337 @@
 {
-  "extName": { "message": "ImageVault: cifre e faça backup de segredos como imagens QR / papel" },
+  "extName": {
+    "message": "ImageVault: cifre e faça backup de segredos como imagens QR / papel"
+  },
   "extDesc": {
     "message": "Cifre um arquivo em imagens robustas com correção de erros para guardar no disco, imprimir ou enviar à nuvem."
   },
-  "popupTagline": { "message": "Cifre um arquivo em imagens resilientes — disco, papel ou nuvem." },
-  "optionsTitle": { "message": "Configurações do ImageVault" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "Bloqueado" },
-  "pillUnlocked": { "message": "Desbloqueado" },
-  "unlockHeading": { "message": "Cofre" },
-  "unlockPrompt": { "message": "Digite sua senha para habilitar o salvamento." },
-  "btnUnlock": { "message": "Desbloquear" },
-  "btnLock": { "message": "Bloquear" },
-  "statusUnlocked": { "message": "Desbloqueado — você pode salvar arquivos." },
-  "noKeyTitle": { "message": "Ainda sem chave do cofre" },
-  "noKeyBody": { "message": "Crie sua chave nas configurações antes de salvar." },
-  "btnOpenOptions": { "message": "Abrir configurações" },
-  "saveHeading": { "message": "Salvar um arquivo" },
-  "restoreHeading": { "message": "Restaurar um arquivo" },
-  "labelFile": { "message": "Arquivo" },
-  "labelImages": { "message": "Arquivos de imagem" },
-  "labelPassword": { "message": "Senha" },
-  "destHeading": { "message": "Destino" },
-  "destDisk": { "message": "Disco (PNG ou .zip)" },
-  "destPaper": { "message": "Papel (PDF para impressão)" },
-  "destCloud": { "message": "Google Fotos (opcional)" },
+  "popupTagline": {
+    "message": "Cifre um arquivo em imagens resilientes — disco, papel ou nuvem."
+  },
+  "optionsTitle": {
+    "message": "Configurações do ImageVault"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "Bloqueado"
+  },
+  "pillUnlocked": {
+    "message": "Desbloqueado"
+  },
+  "unlockHeading": {
+    "message": "Cofre"
+  },
+  "unlockPrompt": {
+    "message": "Digite sua senha para habilitar o salvamento."
+  },
+  "btnUnlock": {
+    "message": "Desbloquear"
+  },
+  "btnLock": {
+    "message": "Bloquear"
+  },
+  "statusUnlocked": {
+    "message": "Desbloqueado — você pode salvar arquivos."
+  },
+  "noKeyTitle": {
+    "message": "Ainda sem chave do cofre"
+  },
+  "noKeyBody": {
+    "message": "Crie sua chave nas configurações antes de salvar."
+  },
+  "btnOpenOptions": {
+    "message": "Abrir configurações"
+  },
+  "saveHeading": {
+    "message": "Salvar um arquivo"
+  },
+  "restoreHeading": {
+    "message": "Restaurar um arquivo"
+  },
+  "labelFile": {
+    "message": "Arquivo"
+  },
+  "labelImages": {
+    "message": "Arquivos de imagem"
+  },
+  "labelPassword": {
+    "message": "Senha"
+  },
+  "destHeading": {
+    "message": "Destino"
+  },
+  "destDisk": {
+    "message": "Disco (PNG ou .zip)"
+  },
+  "destPaper": {
+    "message": "Papel (PDF para impressão)"
+  },
+  "destCloud": {
+    "message": "Google Fotos (opcional)"
+  },
   "cloudNote": {
-    "message": "Uma comodidade, nunca sua única cópia. Enviado para um álbum dedicado."
+    "message": "Uma comodidade — nunca sua única cópia."
   },
   "statusSavedCloud": {
     "message": "$COUNT$ imagem(ns) enviada(s) ao álbum «$ALBUM$». Guarde bem sua senha.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "Restaurar do Google Fotos" },
-  "photosHeading": { "message": "Restaurar do Google Fotos" },
+  "btnRestorePhotos": {
+    "message": "Restaurar do Google Fotos"
+  },
+  "photosHeading": {
+    "message": "Restaurar do Google Fotos"
+  },
   "photosIntro": {
     "message": "Isto roda em sua própria aba para permanecer aberta enquanto você escolhe suas imagens. Digite sua senha, inicie, selecione as imagens do cofre no seletor e volte aqui."
   },
   "statusPickerOpen": {
     "message": "Escolha suas imagens do ImageVault na janela aberta e volte aqui…"
   },
-  "labelInstructions": { "message": "Incluir uma folha de instruções" },
-  "labelPasswordHint": { "message": "Dica de senha (opcional)" },
-  "labelKeyLocation": { "message": "Nota de localização da chave (opcional)" },
+  "labelInstructions": {
+    "message": "Incluir uma folha de instruções"
+  },
+  "labelPasswordHint": {
+    "message": "Dica de senha (opcional)"
+  },
+  "labelKeyLocation": {
+    "message": "Nota de localização da chave (opcional)"
+  },
   "paperCleartextWarn": {
     "message": "A folha de instruções não é cifrada — escreva uma dica, nunca a senha."
   },
   "statusSavedPdf": {
     "message": "Pronto. PDF de $COUNT$ página(s) baixado. Guarde bem sua senha.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Armazenamento da chave" },
-  "keyModeEmbedded": { "message": "Nas imagens (autônoma)" },
-  "keyModeKeyfile": { "message": "Arquivo .key separado" },
+  "keyModeHeading": {
+    "message": "Armazenamento da chave"
+  },
+  "keyModeEmbedded": {
+    "message": "Simples — um único conjunto de imagens"
+  },
+  "keyModeKeyfile": {
+    "message": "Mais segurança — um arquivo de chave separado"
+  },
   "keyModeHelp": {
-    "message": "Embutida: as imagens e sua senha bastam. Arquivo: uma imagem vazada não revela nada sem o .key separado."
+    "message": "Com um arquivo de chave separado, uma imagem vazada não revela nada sozinha — mas você também precisa guardar o .key."
   },
-  "labelAddBand": { "message": "Adicionar um rótulo legível nas imagens" },
-  "labelTitle": { "message": "Título do rótulo" },
+  "labelAddBand": {
+    "message": "Adicionar um rótulo legível nas imagens"
+  },
+  "labelTitle": {
+    "message": "Título do rótulo"
+  },
   "titlePlaceholder": {
     "message": "Nomeie este cofre — ex. «Arquivo Alfa». Evite «Chaves Bitcoin»."
   },
-  "bandWarning": { "message": "O rótulo não é cifrado — nunca coloque um segredo nele." },
-  "labelKeyFile": { "message": "Arquivo de chave (.key)" },
+  "bandWarning": {
+    "message": "O rótulo não é cifrado — nunca coloque um segredo nele."
+  },
+  "labelKeyFile": {
+    "message": "Arquivo de chave (.key)"
+  },
   "keyFileHint": {
     "message": "Necessário apenas para conjuntos salvos com um arquivo .key separado (ignore se estiver no .zip)."
   },
-  "labelAsZip": { "message": "Agrupar tudo em um único .zip" },
-  "labelImagesOrZip": { "message": "Arquivos de imagem ou um .zip" },
-  "btnSave": { "message": "Cifrar e baixar as imagens" },
-  "btnRestore": { "message": "Restaurar o arquivo" },
-  "estimateImages": { "message": "Imagens estimadas:" },
-  "statusSaving": { "message": "Cifrando e gerando as imagens…" },
+  "labelAsZip": {
+    "message": "Agrupar tudo em um único .zip"
+  },
+  "labelImagesOrZip": {
+    "message": "Arquivos de imagem ou um .zip"
+  },
+  "btnSave": {
+    "message": "Cifrar e baixar as imagens"
+  },
+  "btnRestore": {
+    "message": "Restaurar o arquivo"
+  },
+  "estimateImages": {
+    "message": "Imagens estimadas:"
+  },
+  "statusSaving": {
+    "message": "Cifrando e gerando as imagens…"
+  },
   "statusSaved": {
     "message": "Pronto. $COUNT$ imagem(ns) baixada(s). Guarde sua senha: ela não pode ser recuperada.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Pronto. $COUNT$ imagem(ns) e um arquivo .key baixados. Guarde o .key e sua senha.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "Decodificando as imagens e restaurando…" },
+  "statusRestoring": {
+    "message": "Decodificando as imagens e restaurando…"
+  },
   "statusRestored": {
     "message": "$NAME$ restaurado e baixado.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "Escolha um arquivo primeiro." },
-  "errNoImages": { "message": "Escolha os arquivos de imagem para restaurar." },
-  "errNoPassword": { "message": "Digite uma senha." },
-  "errWrongPassword": { "message": "Senha incorreta. Tente novamente." },
-  "errLocked": { "message": "Desbloqueie seu cofre primeiro." },
+  "errNoFile": {
+    "message": "Escolha um arquivo primeiro."
+  },
+  "errNoImages": {
+    "message": "Escolha os arquivos de imagem para restaurar."
+  },
+  "errNoPassword": {
+    "message": "Digite uma senha."
+  },
+  "errWrongPassword": {
+    "message": "Senha incorreta. Tente novamente."
+  },
+  "errLocked": {
+    "message": "Desbloqueie seu cofre primeiro."
+  },
   "errMissingKey": {
     "message": "Este conjunto de imagens precisa do seu arquivo .key separado para restaurar."
   },
   "errFileTooLarge": {
     "message": "Arquivo grande demais ($SIZE$ KB). Este cofre é para pequenos segredos (máx. $LIMIT$ KB).",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "Este arquivo precisaria de $COUNT$ imagens (máx. $LIMIT$). Tente um arquivo menor.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "Chave do cofre" },
+  "optKeyHeading": {
+    "message": "Chave do cofre"
+  },
   "optKeyBodyNew": {
     "message": "Crie uma chave do cofre. Todo arquivo que você salvar é cifrado com ela."
   },
-  "optKeyBodyExists": { "message": "Há uma chave do cofre configurada neste dispositivo." },
-  "labelNewPassword": { "message": "Nova senha" },
-  "labelConfirmPassword": { "message": "Confirmar a senha" },
-  "labelOldPassword": { "message": "Senha atual" },
-  "btnCreateKey": { "message": "Criar a chave" },
+  "optKeyBodyExists": {
+    "message": "Há uma chave do cofre configurada neste dispositivo."
+  },
+  "labelNewPassword": {
+    "message": "Nova senha"
+  },
+  "labelConfirmPassword": {
+    "message": "Confirmar a senha"
+  },
+  "labelOldPassword": {
+    "message": "Senha atual"
+  },
+  "btnCreateKey": {
+    "message": "Criar a chave"
+  },
   "passwordHint": {
     "message": "A senha não pode ser recuperada. Se você esquecê-la, seus cofres se perdem — considere exportar sua chave."
   },
-  "errPasswordMismatch": { "message": "As senhas não coincidem." },
-  "errPasswordTooShort": { "message": "Use pelo menos 8 caracteres." },
-  "statusKeyCreated": { "message": "Chave do cofre criada." },
-  "changePwHeading": { "message": "Alterar a senha" },
-  "btnChangePw": { "message": "Alterar a senha" },
-  "statusPwChanged": { "message": "Senha alterada." },
-  "exportHeading": { "message": "Exportar a chave" },
+  "errPasswordMismatch": {
+    "message": "As senhas não coincidem."
+  },
+  "errPasswordTooShort": {
+    "message": "Use pelo menos 8 caracteres."
+  },
+  "statusKeyCreated": {
+    "message": "Chave do cofre criada."
+  },
+  "changePwHeading": {
+    "message": "Alterar a senha"
+  },
+  "btnChangePw": {
+    "message": "Alterar a senha"
+  },
+  "statusPwChanged": {
+    "message": "Senha alterada."
+  },
+  "exportHeading": {
+    "message": "Exportar a chave"
+  },
   "exportBody": {
     "message": "Baixe a chave protegida (.key) para transferi-la ou fazer backup. Ela continua protegida por senha."
   },
-  "btnExportKey": { "message": "Exportar .key" },
-  "statusKeyExported": { "message": "Chave exportada." },
-  "importHeading": { "message": "Importar uma chave" },
+  "btnExportKey": {
+    "message": "Exportar .key"
+  },
+  "statusKeyExported": {
+    "message": "Chave exportada."
+  },
+  "importHeading": {
+    "message": "Importar uma chave"
+  },
   "importBody": {
     "message": "Importe um arquivo .key de outro dispositivo. Isto substitui a chave atual."
   },
-  "btnImportKey": { "message": "Importar a chave" },
-  "statusKeyImported": { "message": "Chave importada." },
-  "eraseHeading": { "message": "Apagar a chave" },
+  "btnImportKey": {
+    "message": "Importar a chave"
+  },
+  "statusKeyImported": {
+    "message": "Chave importada."
+  },
+  "eraseHeading": {
+    "message": "Apagar a chave"
+  },
   "eraseBody": {
     "message": "Exclua permanentemente a chave deste dispositivo. Os arquivos já salvos ficam irrecuperáveis sem um .key exportado. Ação irreversível."
   },
-  "btnEraseKey": { "message": "Apagar a chave" },
+  "btnEraseKey": {
+    "message": "Apagar a chave"
+  },
   "confirmErase": {
     "message": "Apagar mesmo a chave do cofre? Os arquivos salvos ficarão irrecuperáveis sem um .key exportado."
   },
-  "statusKeyErased": { "message": "Chave do cofre apagada." }
+  "statusKeyErased": {
+    "message": "Chave do cofre apagada."
+  },
+  "dropTitle": {
+    "message": "Solte o arquivo aqui"
+  },
+  "dropPrompt": {
+    "message": "ou clique para escolher"
+  },
+  "advancedOptions": {
+    "message": "Opções avançadas"
+  },
+  "whyLabel": {
+    "message": "Por quê?"
+  },
+  "savedTitle": {
+    "message": "Salvo"
+  },
+  "restoredTitle": {
+    "message": "Restaurado"
+  },
+  "webIntro": {
+    "message": "Uma versão web gratuita e de código aberto — sem instalação, sem conta e nada sai do seu dispositivo. Salve um arquivo como imagens ou restaure um. (O Google Fotos requer a extensão do navegador.)"
+  }
 }

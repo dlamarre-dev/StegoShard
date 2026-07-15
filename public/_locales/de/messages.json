@@ -1,147 +1,337 @@
 {
-  "extName": { "message": "ImageVault: Geheimnisse als QR-/Papier-Bilder verschlüsseln & sichern" },
+  "extName": {
+    "message": "ImageVault: Geheimnisse als QR-/Papier-Bilder verschlüsseln & sichern"
+  },
   "extDesc": {
     "message": "Verschlüssle eine Datei in robuste, fehlerkorrigierte Bilder für Festplatte, Ausdruck oder Cloud."
   },
   "popupTagline": {
     "message": "Verschlüssle eine Datei in widerstandsfähige Bilder — Festplatte, Papier oder Cloud."
   },
-  "optionsTitle": { "message": "ImageVault-Einstellungen" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "Gesperrt" },
-  "pillUnlocked": { "message": "Entsperrt" },
-  "unlockHeading": { "message": "Tresor" },
-  "unlockPrompt": { "message": "Passwort eingeben, um das Speichern zu ermöglichen." },
-  "btnUnlock": { "message": "Entsperren" },
-  "btnLock": { "message": "Sperren" },
-  "statusUnlocked": { "message": "Entsperrt — du kannst Dateien speichern." },
-  "noKeyTitle": { "message": "Noch kein Tresorschlüssel" },
-  "noKeyBody": { "message": "Erstelle deinen Schlüssel in den Einstellungen, bevor du speicherst." },
-  "btnOpenOptions": { "message": "Einstellungen öffnen" },
-  "saveHeading": { "message": "Datei speichern" },
-  "restoreHeading": { "message": "Datei wiederherstellen" },
-  "labelFile": { "message": "Datei" },
-  "labelImages": { "message": "Bilddateien" },
-  "labelPassword": { "message": "Passwort" },
-  "destHeading": { "message": "Ziel" },
-  "destDisk": { "message": "Festplatte (PNG oder .zip)" },
-  "destPaper": { "message": "Papier (druckbares PDF)" },
-  "destCloud": { "message": "Google Fotos (optional)" },
+  "optionsTitle": {
+    "message": "ImageVault-Einstellungen"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "Gesperrt"
+  },
+  "pillUnlocked": {
+    "message": "Entsperrt"
+  },
+  "unlockHeading": {
+    "message": "Tresor"
+  },
+  "unlockPrompt": {
+    "message": "Passwort eingeben, um das Speichern zu ermöglichen."
+  },
+  "btnUnlock": {
+    "message": "Entsperren"
+  },
+  "btnLock": {
+    "message": "Sperren"
+  },
+  "statusUnlocked": {
+    "message": "Entsperrt — du kannst Dateien speichern."
+  },
+  "noKeyTitle": {
+    "message": "Noch kein Tresorschlüssel"
+  },
+  "noKeyBody": {
+    "message": "Erstelle deinen Schlüssel in den Einstellungen, bevor du speicherst."
+  },
+  "btnOpenOptions": {
+    "message": "Einstellungen öffnen"
+  },
+  "saveHeading": {
+    "message": "Datei speichern"
+  },
+  "restoreHeading": {
+    "message": "Datei wiederherstellen"
+  },
+  "labelFile": {
+    "message": "Datei"
+  },
+  "labelImages": {
+    "message": "Bilddateien"
+  },
+  "labelPassword": {
+    "message": "Passwort"
+  },
+  "destHeading": {
+    "message": "Ziel"
+  },
+  "destDisk": {
+    "message": "Festplatte (PNG oder .zip)"
+  },
+  "destPaper": {
+    "message": "Papier (druckbares PDF)"
+  },
+  "destCloud": {
+    "message": "Google Fotos (optional)"
+  },
   "cloudNote": {
-    "message": "Ein Komfort, nie deine einzige Kopie. In ein eigenes Album hochgeladen."
+    "message": "Eine Bequemlichkeit — niemals Ihre einzige Kopie."
   },
   "statusSavedCloud": {
     "message": "$COUNT$ Bild(er) ins Album „$ALBUM$“ hochgeladen. Bewahre dein Passwort sicher auf.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "Aus Google Fotos wiederherstellen" },
-  "photosHeading": { "message": "Aus Google Fotos wiederherstellen" },
+  "btnRestorePhotos": {
+    "message": "Aus Google Fotos wiederherstellen"
+  },
+  "photosHeading": {
+    "message": "Aus Google Fotos wiederherstellen"
+  },
   "photosIntro": {
     "message": "Dies läuft in einem eigenen Tab, damit es offen bleibt, während du deine Bilder auswählst. Gib dein Passwort ein, starte, wähle die Tresor-Bilder im Picker und komm dann hierher zurück."
   },
   "statusPickerOpen": {
     "message": "Wähle deine ImageVault-Bilder im geöffneten Fenster und komm dann zurück…"
   },
-  "labelInstructions": { "message": "Ein Anleitungsblatt beilegen" },
-  "labelPasswordHint": { "message": "Passworthinweis (optional)" },
-  "labelKeyLocation": { "message": "Hinweis zum Schlüsselort (optional)" },
+  "labelInstructions": {
+    "message": "Ein Anleitungsblatt beilegen"
+  },
+  "labelPasswordHint": {
+    "message": "Passworthinweis (optional)"
+  },
+  "labelKeyLocation": {
+    "message": "Hinweis zum Schlüsselort (optional)"
+  },
   "paperCleartextWarn": {
     "message": "Das Anleitungsblatt ist nicht verschlüsselt — schreibe einen Hinweis, nie das Passwort."
   },
   "statusSavedPdf": {
     "message": "Fertig. PDF mit $COUNT$ Seite(n) heruntergeladen. Bewahre dein Passwort sicher auf.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Schlüsselspeicherung" },
-  "keyModeEmbedded": { "message": "In den Bildern (eigenständig)" },
-  "keyModeKeyfile": { "message": "Separate .key-Datei" },
+  "keyModeHeading": {
+    "message": "Schlüsselspeicherung"
+  },
+  "keyModeEmbedded": {
+    "message": "Einfach — ein einziger Satz Bilder"
+  },
+  "keyModeKeyfile": {
+    "message": "Mehr Sicherheit — separate Schlüsseldatei"
+  },
   "keyModeHelp": {
-    "message": "Eingebettet: Bilder und Passwort genügen. Datei: ein durchgesickertes Bild verrät nichts ohne die separate .key."
+    "message": "Mit einer separaten Schlüsseldatei verrät ein durchgesickertes Bild allein nichts — aber Sie müssen auch die .key-Datei aufbewahren."
   },
-  "labelAddBand": { "message": "Lesbare Beschriftung auf die Bilder setzen" },
-  "labelTitle": { "message": "Beschriftungstitel" },
+  "labelAddBand": {
+    "message": "Lesbare Beschriftung auf die Bilder setzen"
+  },
+  "labelTitle": {
+    "message": "Beschriftungstitel"
+  },
   "titlePlaceholder": {
     "message": "Benenne diesen Tresor — z. B. „Archiv Alpha“. Vermeide „Bitcoin-Schlüssel“."
   },
   "bandWarning": {
     "message": "Die Beschriftung ist nicht verschlüsselt — schreibe dort nie ein Geheimnis hin."
   },
-  "labelKeyFile": { "message": "Schlüsseldatei (.key)" },
+  "labelKeyFile": {
+    "message": "Schlüsseldatei (.key)"
+  },
   "keyFileHint": {
     "message": "Nur nötig für Sätze, die du als separate .key-Datei gespeichert hast (überspringen, wenn sie im .zip ist)."
   },
-  "labelAsZip": { "message": "Alles in eine einzige .zip packen" },
-  "labelImagesOrZip": { "message": "Bilddateien oder eine .zip" },
-  "btnSave": { "message": "Verschlüsseln & Bilder herunterladen" },
-  "btnRestore": { "message": "Datei wiederherstellen" },
-  "estimateImages": { "message": "Geschätzte Bilder:" },
-  "statusSaving": { "message": "Verschlüsseln und Bilder erzeugen…" },
+  "labelAsZip": {
+    "message": "Alles in eine einzige .zip packen"
+  },
+  "labelImagesOrZip": {
+    "message": "Bilddateien oder eine .zip"
+  },
+  "btnSave": {
+    "message": "Verschlüsseln & Bilder herunterladen"
+  },
+  "btnRestore": {
+    "message": "Datei wiederherstellen"
+  },
+  "estimateImages": {
+    "message": "Geschätzte Bilder:"
+  },
+  "statusSaving": {
+    "message": "Verschlüsseln und Bilder erzeugen…"
+  },
   "statusSaved": {
     "message": "Fertig. $COUNT$ Bild(er) heruntergeladen. Bewahre dein Passwort auf — es ist nicht wiederherstellbar.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Fertig. $COUNT$ Bild(er) und eine .key-Datei heruntergeladen. Bewahre .key und Passwort sicher auf.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "Bilder werden dekodiert und wiederhergestellt…" },
+  "statusRestoring": {
+    "message": "Bilder werden dekodiert und wiederhergestellt…"
+  },
   "statusRestored": {
     "message": "$NAME$ wiederhergestellt und heruntergeladen.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "Wähle zuerst eine Datei." },
-  "errNoImages": { "message": "Wähle die Bilddateien zum Wiederherstellen." },
-  "errNoPassword": { "message": "Gib ein Passwort ein." },
-  "errWrongPassword": { "message": "Falsches Passwort. Bitte erneut versuchen." },
-  "errLocked": { "message": "Entsperre zuerst deinen Tresor." },
+  "errNoFile": {
+    "message": "Wähle zuerst eine Datei."
+  },
+  "errNoImages": {
+    "message": "Wähle die Bilddateien zum Wiederherstellen."
+  },
+  "errNoPassword": {
+    "message": "Gib ein Passwort ein."
+  },
+  "errWrongPassword": {
+    "message": "Falsches Passwort. Bitte erneut versuchen."
+  },
+  "errLocked": {
+    "message": "Entsperre zuerst deinen Tresor."
+  },
   "errMissingKey": {
     "message": "Dieser Bildersatz benötigt seine separate .key-Datei zur Wiederherstellung."
   },
   "errFileTooLarge": {
     "message": "Datei zu groß ($SIZE$ KB). Dieser Tresor ist für kleine Geheimnisse (max. $LIMIT$ KB).",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "Diese Datei bräuchte $COUNT$ Bilder (max. $LIMIT$). Versuche eine kleinere Datei.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "Tresorschlüssel" },
+  "optKeyHeading": {
+    "message": "Tresorschlüssel"
+  },
   "optKeyBodyNew": {
     "message": "Erstelle einen Tresorschlüssel. Jede gespeicherte Datei wird damit verschlüsselt."
   },
-  "optKeyBodyExists": { "message": "Auf diesem Gerät ist ein Tresorschlüssel eingerichtet." },
-  "labelNewPassword": { "message": "Neues Passwort" },
-  "labelConfirmPassword": { "message": "Passwort bestätigen" },
-  "labelOldPassword": { "message": "Aktuelles Passwort" },
-  "btnCreateKey": { "message": "Schlüssel erstellen" },
+  "optKeyBodyExists": {
+    "message": "Auf diesem Gerät ist ein Tresorschlüssel eingerichtet."
+  },
+  "labelNewPassword": {
+    "message": "Neues Passwort"
+  },
+  "labelConfirmPassword": {
+    "message": "Passwort bestätigen"
+  },
+  "labelOldPassword": {
+    "message": "Aktuelles Passwort"
+  },
+  "btnCreateKey": {
+    "message": "Schlüssel erstellen"
+  },
   "passwordHint": {
     "message": "Das Passwort ist nicht wiederherstellbar. Vergisst du es, sind deine Tresore verloren — exportiere ggf. deinen Schlüssel."
   },
-  "errPasswordMismatch": { "message": "Die Passwörter stimmen nicht überein." },
-  "errPasswordTooShort": { "message": "Verwende mindestens 8 Zeichen." },
-  "statusKeyCreated": { "message": "Tresorschlüssel erstellt." },
-  "changePwHeading": { "message": "Passwort ändern" },
-  "btnChangePw": { "message": "Passwort ändern" },
-  "statusPwChanged": { "message": "Passwort geändert." },
-  "exportHeading": { "message": "Schlüssel exportieren" },
+  "errPasswordMismatch": {
+    "message": "Die Passwörter stimmen nicht überein."
+  },
+  "errPasswordTooShort": {
+    "message": "Verwende mindestens 8 Zeichen."
+  },
+  "statusKeyCreated": {
+    "message": "Tresorschlüssel erstellt."
+  },
+  "changePwHeading": {
+    "message": "Passwort ändern"
+  },
+  "btnChangePw": {
+    "message": "Passwort ändern"
+  },
+  "statusPwChanged": {
+    "message": "Passwort geändert."
+  },
+  "exportHeading": {
+    "message": "Schlüssel exportieren"
+  },
   "exportBody": {
     "message": "Lade den geschützten Schlüssel (.key) herunter, um ihn zu übertragen oder zu sichern. Er bleibt passwortgeschützt."
   },
-  "btnExportKey": { "message": ".key exportieren" },
-  "statusKeyExported": { "message": "Schlüssel exportiert." },
-  "importHeading": { "message": "Schlüssel importieren" },
+  "btnExportKey": {
+    "message": ".key exportieren"
+  },
+  "statusKeyExported": {
+    "message": "Schlüssel exportiert."
+  },
+  "importHeading": {
+    "message": "Schlüssel importieren"
+  },
   "importBody": {
     "message": "Importiere eine .key-Datei von einem anderen Gerät. Dies ersetzt den aktuellen Schlüssel."
   },
-  "btnImportKey": { "message": "Schlüssel importieren" },
-  "statusKeyImported": { "message": "Schlüssel importiert." },
-  "eraseHeading": { "message": "Schlüssel löschen" },
+  "btnImportKey": {
+    "message": "Schlüssel importieren"
+  },
+  "statusKeyImported": {
+    "message": "Schlüssel importiert."
+  },
+  "eraseHeading": {
+    "message": "Schlüssel löschen"
+  },
   "eraseBody": {
     "message": "Lösche den Tresorschlüssel dauerhaft von diesem Gerät. Bereits gespeicherte Dateien werden ohne einen exportierten .key unwiederbringlich. Nicht umkehrbar."
   },
-  "btnEraseKey": { "message": "Schlüssel löschen" },
+  "btnEraseKey": {
+    "message": "Schlüssel löschen"
+  },
   "confirmErase": {
     "message": "Tresorschlüssel wirklich löschen? Gespeicherte Dateien sind ohne exportierten .key unwiederbringlich."
   },
-  "statusKeyErased": { "message": "Tresorschlüssel gelöscht." }
+  "statusKeyErased": {
+    "message": "Tresorschlüssel gelöscht."
+  },
+  "dropTitle": {
+    "message": "Datei hier ablegen"
+  },
+  "dropPrompt": {
+    "message": "oder klicken zum Auswählen"
+  },
+  "advancedOptions": {
+    "message": "Erweiterte Optionen"
+  },
+  "whyLabel": {
+    "message": "Warum?"
+  },
+  "savedTitle": {
+    "message": "Gespeichert"
+  },
+  "restoredTitle": {
+    "message": "Wiederhergestellt"
+  },
+  "webIntro": {
+    "message": "Eine kostenlose, quelloffene Web-Version — ohne Installation, ohne Konto, und nichts verlässt Ihr Gerät. Speichern Sie eine Datei als Bilder oder stellen Sie sie wieder her. (Google Fotos erfordert die Browser-Erweiterung.)"
+  }
 }

@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { estimateImages, PROFILE_CLOUD, PROFILE_DISK, PROFILE_PAPER, type KeyMode } from '@core';
 import { localizeDom } from './i18n';
-import { el, friendlyError, msg, setStatus, show } from './dom';
+import { el, friendlyError, msg, pick, setStatus, show, wireDropzone } from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
 import { type Destination, getPrefs, savePrefs } from './prefs';
 import { restoreFileFromDisk, saveFileToDisk } from './disk';
@@ -21,8 +21,12 @@ const unlockBtn = el<HTMLButtonElement>('unlock-btn');
 const unlockStatus = el('unlock-status');
 
 const saveFile = el<HTMLInputElement>('save-file');
+const fileDrop = el('file-drop');
+const dzFile = el('dz-file');
 const saveBtn = el<HTMLButtonElement>('save-btn');
 const saveStatus = el('save-status');
+const saveResult = el('save-result');
+const saveResultNote = el('save-result-note');
 const estimate = el('estimate');
 const lockBtn = el<HTMLButtonElement>('lock-btn');
 const addBand = el<HTMLInputElement>('add-band');
@@ -37,16 +41,16 @@ const pwHint = el<HTMLInputElement>('pw-hint');
 const keyLocation = el<HTMLInputElement>('key-location');
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
+const restoreDrop = el('restore-drop');
+const restoreDzFile = el('restore-dz-file');
 const restoreKey = el<HTMLInputElement>('restore-key');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
 const restorePhotosBtn = el<HTMLButtonElement>('restore-photos-btn');
 const restoreStatus = el('restore-status');
+const restoreResult = el('restore-result');
+const restoreResultNote = el('restore-result-note');
 
-function pick<T extends string>(name: string, fallback: T): T {
-  const checked = document.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`);
-  return (checked?.value as T) ?? fallback;
-}
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
 const selectedDest = () => pick<Destination>('dest', 'disk');
 
@@ -55,18 +59,22 @@ function setRadio(name: string, value: string): void {
   if (radio) radio.checked = true;
 }
 
+/** Reflect the chosen file in the drop zone (chip + state class). */
+function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputElement): void {
+  const file = input.files?.[0];
+  drop.classList.toggle('has-file', Boolean(file));
+  chip.textContent = file ? file.name : '';
+}
+
 /** Show the option controls that match the chosen destination. */
 function reflectDestination(): void {
   const dest = selectedDest();
   show(zipField, dest === 'disk');
   show(paperFields, dest === 'paper');
-  // The label toggle is available for every destination; its title field shows
-  // only when the box is checked.
-  show(addBandLabel, true);
-  show(bandFields, addBand.checked);
+  show(addBandLabel, dest === 'disk');
+  show(bandFields, dest !== 'disk' || addBand.checked);
 }
 
-// Reveal the Google Photos controls only when a client id is configured.
 if (HAS_GOOGLE_PHOTOS) {
   show(el('dest-cloud-label'), true);
   show(el('cloud-note'), true);
@@ -75,14 +83,14 @@ if (HAS_GOOGLE_PHOTOS) {
 
 async function loadPrefs(): Promise<void> {
   const prefs = await getPrefs();
-  const destination = prefs.destination === 'cloud' && !HAS_GOOGLE_PHOTOS ? 'disk' : prefs.destination;
+  const destination =
+    prefs.destination === 'cloud' && !HAS_GOOGLE_PHOTOS ? 'disk' : prefs.destination;
   setRadio('dest', destination);
   setRadio('keymode', prefs.keyMode);
   addBand.checked = prefs.addBand;
   bandTitle.value = prefs.title;
   asZip.checked = prefs.asZip;
   addInstructions.checked = prefs.includeInstructions;
-  show(bandFields, prefs.addBand);
   reflectDestination();
 }
 
@@ -107,12 +115,11 @@ function openSettings(): void {
 }
 el<HTMLButtonElement>('open-options').addEventListener('click', openSettings);
 el<HTMLButtonElement>('settings-btn').addEventListener('click', openSettings);
+el<HTMLButtonElement>('footer-options').addEventListener('click', openSettings);
 el<HTMLButtonElement>('settings-close').addEventListener('click', () => settingsModal.close());
-// Click on the backdrop (outside the dialog box) closes it.
 settingsModal.addEventListener('click', (e) => {
   if (e.target === settingsModal) settingsModal.close();
 });
-// Reflect any key changes made in the modal once it closes.
 settingsModal.addEventListener('close', () => void refreshState());
 wireKeyManager(() => void refreshState());
 
@@ -186,7 +193,12 @@ async function updateEstimate(): Promise<void> {
   }
 }
 
-saveFile.addEventListener('change', updateEstimate);
+wireDropzone(fileDrop, saveFile, () => {
+  reflectFile(fileDrop, dzFile, saveFile);
+  show(saveResult, false);
+  void updateEstimate();
+});
+wireDropzone(restoreDrop, restoreFiles, () => reflectFile(restoreDrop, restoreDzFile, restoreFiles));
 
 saveBtn.addEventListener('click', async () => {
   const session = await getSession();
@@ -197,22 +209,22 @@ saveBtn.addEventListener('click', async () => {
   const keyMode = selectedKeyMode();
   const dest = selectedDest();
   const date = new Date().toISOString().slice(0, 10);
-  // The label checkbox governs whether a title is applied on every destination.
   const useLabel = addBand.checked;
   const title = useLabel ? bandTitle.value.trim() : '';
 
   saveBtn.disabled = true;
+  show(saveResult, false);
   setStatus(saveStatus, msg('statusSaving'));
   try {
+    let note: string;
     if (dest === 'cloud') {
       const { imageCount, albumTitle } = await saveToPhotos(file, session, {
         keyMode,
         title: title || undefined,
         date,
       });
-      setStatus(saveStatus, msg('statusSavedCloud', [String(imageCount), albumTitle]));
+      note = msg('statusSavedCloud', [String(imageCount), albumTitle]);
     } else if (dest === 'paper') {
-      // Lazy-load the PDF path (pdf-lib) so it is not in the initial bundle.
       const { saveFileToPaper } = await import('./paper');
       const { imageCount } = await saveFileToPaper(file, session, {
         keyMode,
@@ -222,7 +234,7 @@ saveBtn.addEventListener('click', async () => {
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
       });
-      setStatus(saveStatus, msg('statusSavedPdf', String(imageCount)));
+      note = msg('statusSavedPdf', String(imageCount));
     } else {
       const label = useLabel ? { title, date } : undefined;
       const { imageCount } = await saveFileToDisk(file, session, {
@@ -230,9 +242,11 @@ saveBtn.addEventListener('click', async () => {
         label,
         asZip: asZip.checked,
       });
-      const statusKey = keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile';
-      setStatus(saveStatus, msg(statusKey, String(imageCount)));
+      note = msg(keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile', String(imageCount));
     }
+    setStatus(saveStatus, '');
+    saveResultNote.textContent = note;
+    show(saveResult, true);
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -246,11 +260,14 @@ restoreBtn.addEventListener('click', async () => {
   if (!restorePw.value) return setStatus(restoreStatus, msg('errNoPassword'), true);
 
   restoreBtn.disabled = true;
+  show(restoreResult, false);
   setStatus(restoreStatus, msg('statusRestoring'));
   try {
     const keyFile = restoreKey.files?.[0];
     const { filename } = await restoreFileFromDisk(files, restorePw.value, keyFile);
-    setStatus(restoreStatus, msg('statusRestored', filename));
+    setStatus(restoreStatus, '');
+    restoreResultNote.textContent = msg('statusRestored', filename);
+    show(restoreResult, true);
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {

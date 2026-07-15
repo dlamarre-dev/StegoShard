@@ -1,143 +1,337 @@
 {
-  "extName": { "message": "ImageVault: cifra e salva i segreti come immagini QR / carta" },
+  "extName": {
+    "message": "ImageVault: cifra e salva i segreti come immagini QR / carta"
+  },
   "extDesc": {
     "message": "Cifra un file in immagini robuste e con correzione d'errore da salvare su disco, stampare o caricare nel cloud."
   },
-  "popupTagline": { "message": "Cifra un file in immagini resilienti — disco, carta o cloud." },
-  "optionsTitle": { "message": "Impostazioni di ImageVault" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "Bloccato" },
-  "pillUnlocked": { "message": "Sbloccato" },
-  "unlockHeading": { "message": "Cassaforte" },
-  "unlockPrompt": { "message": "Inserisci la password per abilitare il salvataggio." },
-  "btnUnlock": { "message": "Sblocca" },
-  "btnLock": { "message": "Blocca" },
-  "statusUnlocked": { "message": "Sbloccato — puoi salvare file." },
-  "noKeyTitle": { "message": "Nessuna chiave della cassaforte" },
-  "noKeyBody": { "message": "Crea la chiave nelle impostazioni prima di salvare." },
-  "btnOpenOptions": { "message": "Apri le impostazioni" },
-  "saveHeading": { "message": "Salva un file" },
-  "restoreHeading": { "message": "Ripristina un file" },
-  "labelFile": { "message": "File" },
-  "labelImages": { "message": "File immagine" },
-  "labelPassword": { "message": "Password" },
-  "destHeading": { "message": "Destinazione" },
-  "destDisk": { "message": "Disco (PNG o .zip)" },
-  "destPaper": { "message": "Carta (PDF stampabile)" },
-  "destCloud": { "message": "Google Photos (opzionale)" },
+  "popupTagline": {
+    "message": "Cifra un file in immagini resilienti — disco, carta o cloud."
+  },
+  "optionsTitle": {
+    "message": "Impostazioni di ImageVault"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "Bloccato"
+  },
+  "pillUnlocked": {
+    "message": "Sbloccato"
+  },
+  "unlockHeading": {
+    "message": "Cassaforte"
+  },
+  "unlockPrompt": {
+    "message": "Inserisci la password per abilitare il salvataggio."
+  },
+  "btnUnlock": {
+    "message": "Sblocca"
+  },
+  "btnLock": {
+    "message": "Blocca"
+  },
+  "statusUnlocked": {
+    "message": "Sbloccato — puoi salvare file."
+  },
+  "noKeyTitle": {
+    "message": "Nessuna chiave della cassaforte"
+  },
+  "noKeyBody": {
+    "message": "Crea la chiave nelle impostazioni prima di salvare."
+  },
+  "btnOpenOptions": {
+    "message": "Apri le impostazioni"
+  },
+  "saveHeading": {
+    "message": "Salva un file"
+  },
+  "restoreHeading": {
+    "message": "Ripristina un file"
+  },
+  "labelFile": {
+    "message": "File"
+  },
+  "labelImages": {
+    "message": "File immagine"
+  },
+  "labelPassword": {
+    "message": "Password"
+  },
+  "destHeading": {
+    "message": "Destinazione"
+  },
+  "destDisk": {
+    "message": "Disco (PNG o .zip)"
+  },
+  "destPaper": {
+    "message": "Carta (PDF stampabile)"
+  },
+  "destCloud": {
+    "message": "Google Photos (opzionale)"
+  },
   "cloudNote": {
-    "message": "Una comodità, mai la tua unica copia. Caricato in un album dedicato."
+    "message": "Una comodità, mai la tua unica copia."
   },
   "statusSavedCloud": {
     "message": "Caricate $COUNT$ immagine/i nell'album «$ALBUM$». Conserva la password.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "Ripristina da Google Photos" },
-  "photosHeading": { "message": "Ripristina da Google Photos" },
+  "btnRestorePhotos": {
+    "message": "Ripristina da Google Photos"
+  },
+  "photosHeading": {
+    "message": "Ripristina da Google Photos"
+  },
   "photosIntro": {
     "message": "Questo viene eseguito in una scheda dedicata per restare aperto mentre scegli le immagini. Inserisci la password, avvia, seleziona le immagini della cassaforte nel selettore, poi torna qui."
   },
   "statusPickerOpen": {
     "message": "Scegli le immagini di ImageVault nella finestra aperta, poi torna qui…"
   },
-  "labelInstructions": { "message": "Includi un foglio di istruzioni" },
-  "labelPasswordHint": { "message": "Suggerimento password (opzionale)" },
-  "labelKeyLocation": { "message": "Nota sulla posizione della chiave (opzionale)" },
+  "labelInstructions": {
+    "message": "Includi un foglio di istruzioni"
+  },
+  "labelPasswordHint": {
+    "message": "Suggerimento password (opzionale)"
+  },
+  "labelKeyLocation": {
+    "message": "Nota sulla posizione della chiave (opzionale)"
+  },
   "paperCleartextWarn": {
     "message": "Il foglio di istruzioni non è cifrato — scrivi un suggerimento, mai la password."
   },
   "statusSavedPdf": {
     "message": "Fatto. Scaricato un PDF di $COUNT$ pagina/e. Conserva la password.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Archiviazione della chiave" },
-  "keyModeEmbedded": { "message": "Nelle immagini (autonoma)" },
-  "keyModeKeyfile": { "message": "File .key separato" },
+  "keyModeHeading": {
+    "message": "Archiviazione della chiave"
+  },
+  "keyModeEmbedded": {
+    "message": "Semplice: un unico set di immagini"
+  },
+  "keyModeKeyfile": {
+    "message": "Maggiore sicurezza: un file chiave separato"
+  },
   "keyModeHelp": {
-    "message": "Integrata: bastano le immagini e la password. File: un'immagine trapelata non rivela nulla senza il .key separato."
+    "message": "Con un file chiave separato, un'immagine trapelata non rivela nulla da sola, ma devi conservare anche il .key."
   },
-  "labelAddBand": { "message": "Aggiungi un'etichetta leggibile sulle immagini" },
-  "labelTitle": { "message": "Titolo dell'etichetta" },
+  "labelAddBand": {
+    "message": "Aggiungi un'etichetta leggibile sulle immagini"
+  },
+  "labelTitle": {
+    "message": "Titolo dell'etichetta"
+  },
   "titlePlaceholder": {
     "message": "Dai un nome a questa cassaforte — es. «Archivio Alfa». Evita «Chiavi Bitcoin»."
   },
-  "bandWarning": { "message": "L'etichetta non è cifrata — non inserirvi mai un segreto." },
-  "labelKeyFile": { "message": "File chiave (.key)" },
+  "bandWarning": {
+    "message": "L'etichetta non è cifrata — non inserirvi mai un segreto."
+  },
+  "labelKeyFile": {
+    "message": "File chiave (.key)"
+  },
   "keyFileHint": {
     "message": "Necessario solo per i set salvati con un file .key separato (ignoralo se è nello .zip)."
   },
-  "labelAsZip": { "message": "Raggruppa tutto in un unico .zip" },
-  "labelImagesOrZip": { "message": "File immagine o uno .zip" },
-  "btnSave": { "message": "Cifra e scarica le immagini" },
-  "btnRestore": { "message": "Ripristina il file" },
-  "estimateImages": { "message": "Immagini stimate:" },
-  "statusSaving": { "message": "Cifratura e rendering delle immagini…" },
+  "labelAsZip": {
+    "message": "Raggruppa tutto in un unico .zip"
+  },
+  "labelImagesOrZip": {
+    "message": "File immagine o uno .zip"
+  },
+  "btnSave": {
+    "message": "Cifra e scarica le immagini"
+  },
+  "btnRestore": {
+    "message": "Ripristina il file"
+  },
+  "estimateImages": {
+    "message": "Immagini stimate:"
+  },
+  "statusSaving": {
+    "message": "Cifratura e rendering delle immagini…"
+  },
   "statusSaved": {
     "message": "Fatto. Scaricate $COUNT$ immagine/i. Conserva la password: non è recuperabile.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Fatto. Scaricate $COUNT$ immagine/i e un file .key. Conserva il .key e la password.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "Decodifica delle immagini e ripristino…" },
+  "statusRestoring": {
+    "message": "Decodifica delle immagini e ripristino…"
+  },
   "statusRestored": {
     "message": "$NAME$ ripristinato e scaricato.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "Scegli prima un file." },
-  "errNoImages": { "message": "Scegli i file immagine da cui ripristinare." },
-  "errNoPassword": { "message": "Inserisci una password." },
-  "errWrongPassword": { "message": "Password errata. Riprova." },
-  "errLocked": { "message": "Sblocca prima la cassaforte." },
+  "errNoFile": {
+    "message": "Scegli prima un file."
+  },
+  "errNoImages": {
+    "message": "Scegli i file immagine da cui ripristinare."
+  },
+  "errNoPassword": {
+    "message": "Inserisci una password."
+  },
+  "errWrongPassword": {
+    "message": "Password errata. Riprova."
+  },
+  "errLocked": {
+    "message": "Sblocca prima la cassaforte."
+  },
   "errMissingKey": {
     "message": "Questo set di immagini richiede il suo file .key separato per il ripristino."
   },
   "errFileTooLarge": {
     "message": "File troppo grande ($SIZE$ KB). Questa cassaforte è per piccoli segreti (max $LIMIT$ KB).",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "Questo file richiederebbe $COUNT$ immagini (max $LIMIT$). Prova un file più piccolo.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "Chiave della cassaforte" },
+  "optKeyHeading": {
+    "message": "Chiave della cassaforte"
+  },
   "optKeyBodyNew": {
     "message": "Crea una chiave della cassaforte. Ogni file che salvi viene cifrato con essa."
   },
-  "optKeyBodyExists": { "message": "Una chiave della cassaforte è configurata su questo dispositivo." },
-  "labelNewPassword": { "message": "Nuova password" },
-  "labelConfirmPassword": { "message": "Conferma la password" },
-  "labelOldPassword": { "message": "Password attuale" },
-  "btnCreateKey": { "message": "Crea la chiave" },
+  "optKeyBodyExists": {
+    "message": "Una chiave della cassaforte è configurata su questo dispositivo."
+  },
+  "labelNewPassword": {
+    "message": "Nuova password"
+  },
+  "labelConfirmPassword": {
+    "message": "Conferma la password"
+  },
+  "labelOldPassword": {
+    "message": "Password attuale"
+  },
+  "btnCreateKey": {
+    "message": "Crea la chiave"
+  },
   "passwordHint": {
     "message": "La password non è recuperabile. Se la dimentichi, le tue casseforti sono perse — valuta di esportare la chiave."
   },
-  "errPasswordMismatch": { "message": "Le password non corrispondono." },
-  "errPasswordTooShort": { "message": "Usa almeno 8 caratteri." },
-  "statusKeyCreated": { "message": "Chiave della cassaforte creata." },
-  "changePwHeading": { "message": "Cambia la password" },
-  "btnChangePw": { "message": "Cambia la password" },
-  "statusPwChanged": { "message": "Password cambiata." },
-  "exportHeading": { "message": "Esporta la chiave" },
+  "errPasswordMismatch": {
+    "message": "Le password non corrispondono."
+  },
+  "errPasswordTooShort": {
+    "message": "Usa almeno 8 caratteri."
+  },
+  "statusKeyCreated": {
+    "message": "Chiave della cassaforte creata."
+  },
+  "changePwHeading": {
+    "message": "Cambia la password"
+  },
+  "btnChangePw": {
+    "message": "Cambia la password"
+  },
+  "statusPwChanged": {
+    "message": "Password cambiata."
+  },
+  "exportHeading": {
+    "message": "Esporta la chiave"
+  },
   "exportBody": {
     "message": "Scarica la chiave protetta (.key) per trasferirla o farne una copia. Resta protetta da password."
   },
-  "btnExportKey": { "message": "Esporta .key" },
-  "statusKeyExported": { "message": "Chiave esportata." },
-  "importHeading": { "message": "Importa una chiave" },
+  "btnExportKey": {
+    "message": "Esporta .key"
+  },
+  "statusKeyExported": {
+    "message": "Chiave esportata."
+  },
+  "importHeading": {
+    "message": "Importa una chiave"
+  },
   "importBody": {
     "message": "Importa un file .key da un altro dispositivo. Sostituisce la chiave attuale."
   },
-  "btnImportKey": { "message": "Importa la chiave" },
-  "statusKeyImported": { "message": "Chiave importata." },
-  "eraseHeading": { "message": "Cancella la chiave" },
+  "btnImportKey": {
+    "message": "Importa la chiave"
+  },
+  "statusKeyImported": {
+    "message": "Chiave importata."
+  },
+  "eraseHeading": {
+    "message": "Cancella la chiave"
+  },
   "eraseBody": {
     "message": "Elimina definitivamente la chiave da questo dispositivo. I file già salvati diventano irrecuperabili senza un .key esportato. Azione irreversibile."
   },
-  "btnEraseKey": { "message": "Cancella la chiave" },
+  "btnEraseKey": {
+    "message": "Cancella la chiave"
+  },
   "confirmErase": {
     "message": "Cancellare davvero la chiave della cassaforte? I file salvati saranno irrecuperabili senza un .key esportato."
   },
-  "statusKeyErased": { "message": "Chiave della cassaforte cancellata." }
+  "statusKeyErased": {
+    "message": "Chiave della cassaforte cancellata."
+  },
+  "dropTitle": {
+    "message": "Trascina qui il tuo file"
+  },
+  "dropPrompt": {
+    "message": "o fai clic per scegliere"
+  },
+  "advancedOptions": {
+    "message": "Opzioni avanzate"
+  },
+  "whyLabel": {
+    "message": "Perché?"
+  },
+  "savedTitle": {
+    "message": "Salvato"
+  },
+  "restoredTitle": {
+    "message": "Ripristinato"
+  },
+  "webIntro": {
+    "message": "Una versione web gratuita e open source: nessuna installazione, nessun account e nulla lascia il tuo dispositivo. Salva un file come immagini o ripristinalo. (Google Foto richiede l'estensione del browser.)"
+  }
 }

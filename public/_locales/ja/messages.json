@@ -1,143 +1,337 @@
 {
-  "extName": { "message": "ImageVault：秘密を暗号化しQR・紙の画像でバックアップ" },
+  "extName": {
+    "message": "ImageVault：秘密を暗号化しQR・紙の画像でバックアップ"
+  },
   "extDesc": {
     "message": "ファイルを暗号化し、誤り訂正付きの堅牢な画像に変換。ディスク保存・印刷・クラウドに対応。"
   },
-  "popupTagline": { "message": "ファイルを堅牢な画像に暗号化 — ディスク・紙・クラウド。" },
-  "optionsTitle": { "message": "ImageVault の設定" },
-  "extShortName": { "message": "ImageVault" },
-  "pillLocked": { "message": "ロック中" },
-  "pillUnlocked": { "message": "ロック解除済み" },
-  "unlockHeading": { "message": "金庫" },
-  "unlockPrompt": { "message": "保存を有効にするにはパスワードを入力してください。" },
-  "btnUnlock": { "message": "ロック解除" },
-  "btnLock": { "message": "ロック" },
-  "statusUnlocked": { "message": "ロック解除済み — ファイルを保存できます。" },
-  "noKeyTitle": { "message": "金庫の鍵がまだありません" },
-  "noKeyBody": { "message": "保存する前に、設定で鍵を作成してください。" },
-  "btnOpenOptions": { "message": "設定を開く" },
-  "saveHeading": { "message": "ファイルを保存" },
-  "restoreHeading": { "message": "ファイルを復元" },
-  "labelFile": { "message": "ファイル" },
-  "labelImages": { "message": "画像ファイル" },
-  "labelPassword": { "message": "パスワード" },
-  "destHeading": { "message": "保存先" },
-  "destDisk": { "message": "ディスク（PNG または .zip）" },
-  "destPaper": { "message": "紙（印刷可能な PDF）" },
-  "destCloud": { "message": "Google フォト（任意）" },
+  "popupTagline": {
+    "message": "ファイルを堅牢な画像に暗号化 — ディスク・紙・クラウド。"
+  },
+  "optionsTitle": {
+    "message": "ImageVault の設定"
+  },
+  "extShortName": {
+    "message": "ImageVault"
+  },
+  "pillLocked": {
+    "message": "ロック中"
+  },
+  "pillUnlocked": {
+    "message": "ロック解除済み"
+  },
+  "unlockHeading": {
+    "message": "金庫"
+  },
+  "unlockPrompt": {
+    "message": "保存を有効にするにはパスワードを入力してください。"
+  },
+  "btnUnlock": {
+    "message": "ロック解除"
+  },
+  "btnLock": {
+    "message": "ロック"
+  },
+  "statusUnlocked": {
+    "message": "ロック解除済み — ファイルを保存できます。"
+  },
+  "noKeyTitle": {
+    "message": "金庫の鍵がまだありません"
+  },
+  "noKeyBody": {
+    "message": "保存する前に、設定で鍵を作成してください。"
+  },
+  "btnOpenOptions": {
+    "message": "設定を開く"
+  },
+  "saveHeading": {
+    "message": "ファイルを保存"
+  },
+  "restoreHeading": {
+    "message": "ファイルを復元"
+  },
+  "labelFile": {
+    "message": "ファイル"
+  },
+  "labelImages": {
+    "message": "画像ファイル"
+  },
+  "labelPassword": {
+    "message": "パスワード"
+  },
+  "destHeading": {
+    "message": "保存先"
+  },
+  "destDisk": {
+    "message": "ディスク（PNG または .zip）"
+  },
+  "destPaper": {
+    "message": "紙（印刷可能な PDF）"
+  },
+  "destCloud": {
+    "message": "Google フォト（任意）"
+  },
   "cloudNote": {
-    "message": "あくまで補助であり、唯一のコピーにはしないでください。専用アルバムにアップロードされます。"
+    "message": "あくまで補助であり、唯一のコピーにはしないでください。"
   },
   "statusSavedCloud": {
     "message": "$COUNT$ 枚の画像をアルバム「$ALBUM$」にアップロードしました。パスワードを大切に保管してください。",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
-  "btnRestorePhotos": { "message": "Google フォトから復元" },
-  "photosHeading": { "message": "Google フォトから復元" },
+  "btnRestorePhotos": {
+    "message": "Google フォトから復元"
+  },
+  "photosHeading": {
+    "message": "Google フォトから復元"
+  },
   "photosIntro": {
     "message": "画像を選んでいる間も開いたままにするため、これは専用のタブで実行されます。パスワードを入力して開始し、ピッカーで金庫の画像を選択したら、ここに戻ってください。"
   },
   "statusPickerOpen": {
     "message": "開いたウィンドウで ImageVault の画像を選び、ここに戻ってください…"
   },
-  "labelInstructions": { "message": "説明シートを含める" },
-  "labelPasswordHint": { "message": "パスワードのヒント（任意）" },
-  "labelKeyLocation": { "message": "鍵の保管場所メモ（任意）" },
+  "labelInstructions": {
+    "message": "説明シートを含める"
+  },
+  "labelPasswordHint": {
+    "message": "パスワードのヒント（任意）"
+  },
+  "labelKeyLocation": {
+    "message": "鍵の保管場所メモ（任意）"
+  },
   "paperCleartextWarn": {
     "message": "説明シートは暗号化されません — ヒントのみを書き、パスワードは決して書かないでください。"
   },
   "statusSavedPdf": {
     "message": "完了。$COUNT$ ページの PDF をダウンロードしました。パスワードを大切に保管してください。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "鍵の保存方法" },
-  "keyModeEmbedded": { "message": "画像内（自己完結）" },
-  "keyModeKeyfile": { "message": "別の .key ファイル" },
+  "keyModeHeading": {
+    "message": "鍵の保存方法"
+  },
+  "keyModeEmbedded": {
+    "message": "シンプル — 画像一式のみ"
+  },
+  "keyModeKeyfile": {
+    "message": "より安全 — 鍵ファイルを分離"
+  },
   "keyModeHelp": {
-    "message": "埋め込み：画像とパスワードだけで十分です。ファイル：画像が漏れても、別の .key がなければ何も分かりません。"
+    "message": "鍵ファイルを分けておくと、画像が流出しても単独では何も分かりません。ただし .key も保管する必要があります。"
   },
-  "labelAddBand": { "message": "画像に読めるラベルを追加" },
-  "labelTitle": { "message": "ラベルのタイトル" },
+  "labelAddBand": {
+    "message": "画像に読めるラベルを追加"
+  },
+  "labelTitle": {
+    "message": "ラベルのタイトル"
+  },
   "titlePlaceholder": {
     "message": "この金庫に名前を — 例「アーカイブ Alpha」。「ビットコインの鍵」などは避けてください。"
   },
-  "bandWarning": { "message": "ラベルは暗号化されません — 秘密を書き込まないでください。" },
-  "labelKeyFile": { "message": "鍵ファイル（.key）" },
+  "bandWarning": {
+    "message": "ラベルは暗号化されません — 秘密を書き込まないでください。"
+  },
+  "labelKeyFile": {
+    "message": "鍵ファイル（.key）"
+  },
   "keyFileHint": {
     "message": ".key ファイルを別に保存したセットにのみ必要です（.zip に含まれている場合は不要）。"
   },
-  "labelAsZip": { "message": "すべてを 1 つの .zip にまとめる" },
-  "labelImagesOrZip": { "message": "画像ファイルまたは .zip" },
-  "btnSave": { "message": "暗号化して画像をダウンロード" },
-  "btnRestore": { "message": "ファイルを復元" },
-  "estimateImages": { "message": "推定画像数：" },
-  "statusSaving": { "message": "暗号化して画像を生成中…" },
+  "labelAsZip": {
+    "message": "すべてを 1 つの .zip にまとめる"
+  },
+  "labelImagesOrZip": {
+    "message": "画像ファイルまたは .zip"
+  },
+  "btnSave": {
+    "message": "暗号化して画像をダウンロード"
+  },
+  "btnRestore": {
+    "message": "ファイルを復元"
+  },
+  "estimateImages": {
+    "message": "推定画像数："
+  },
+  "statusSaving": {
+    "message": "暗号化して画像を生成中…"
+  },
   "statusSaved": {
     "message": "完了。$COUNT$ 枚の画像をダウンロードしました。パスワードは復元できません。大切に保管してください。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "完了。$COUNT$ 枚の画像と .key ファイルをダウンロードしました。.key とパスワードを保管してください。",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "statusRestoring": { "message": "画像を復号して復元中…" },
+  "statusRestoring": {
+    "message": "画像を復号して復元中…"
+  },
   "statusRestored": {
     "message": "$NAME$ を復元してダウンロードしました。",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-  "errNoFile": { "message": "まずファイルを選んでください。" },
-  "errNoImages": { "message": "復元元の画像ファイルを選んでください。" },
-  "errNoPassword": { "message": "パスワードを入力してください。" },
-  "errWrongPassword": { "message": "パスワードが違います。もう一度お試しください。" },
-  "errLocked": { "message": "まず金庫のロックを解除してください。" },
+  "errNoFile": {
+    "message": "まずファイルを選んでください。"
+  },
+  "errNoImages": {
+    "message": "復元元の画像ファイルを選んでください。"
+  },
+  "errNoPassword": {
+    "message": "パスワードを入力してください。"
+  },
+  "errWrongPassword": {
+    "message": "パスワードが違います。もう一度お試しください。"
+  },
+  "errLocked": {
+    "message": "まず金庫のロックを解除してください。"
+  },
   "errMissingKey": {
     "message": "この画像セットの復元には、別の .key ファイルが必要です。"
   },
   "errFileTooLarge": {
     "message": "ファイルが大きすぎます（$SIZE$ KB）。この金庫は小さな秘密向けです（最大 $LIMIT$ KB）。",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "このファイルには $COUNT$ 枚の画像が必要です（最大 $LIMIT$）。より小さいファイルをお試しください。",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-  "optKeyHeading": { "message": "金庫の鍵" },
+  "optKeyHeading": {
+    "message": "金庫の鍵"
+  },
   "optKeyBodyNew": {
     "message": "金庫の鍵を作成します。保存する各ファイルはこの鍵で暗号化されます。"
   },
-  "optKeyBodyExists": { "message": "このデバイスに金庫の鍵が設定されています。" },
-  "labelNewPassword": { "message": "新しいパスワード" },
-  "labelConfirmPassword": { "message": "パスワードの確認" },
-  "labelOldPassword": { "message": "現在のパスワード" },
-  "btnCreateKey": { "message": "鍵を作成" },
+  "optKeyBodyExists": {
+    "message": "このデバイスに金庫の鍵が設定されています。"
+  },
+  "labelNewPassword": {
+    "message": "新しいパスワード"
+  },
+  "labelConfirmPassword": {
+    "message": "パスワードの確認"
+  },
+  "labelOldPassword": {
+    "message": "現在のパスワード"
+  },
+  "btnCreateKey": {
+    "message": "鍵を作成"
+  },
   "passwordHint": {
     "message": "パスワードは復元できません。忘れると金庫は失われます — 鍵のエクスポートをご検討ください。"
   },
-  "errPasswordMismatch": { "message": "パスワードが一致しません。" },
-  "errPasswordTooShort": { "message": "8 文字以上にしてください。" },
-  "statusKeyCreated": { "message": "金庫の鍵を作成しました。" },
-  "changePwHeading": { "message": "パスワードの変更" },
-  "btnChangePw": { "message": "パスワードを変更" },
-  "statusPwChanged": { "message": "パスワードを変更しました。" },
-  "exportHeading": { "message": "鍵のエクスポート" },
+  "errPasswordMismatch": {
+    "message": "パスワードが一致しません。"
+  },
+  "errPasswordTooShort": {
+    "message": "8 文字以上にしてください。"
+  },
+  "statusKeyCreated": {
+    "message": "金庫の鍵を作成しました。"
+  },
+  "changePwHeading": {
+    "message": "パスワードの変更"
+  },
+  "btnChangePw": {
+    "message": "パスワードを変更"
+  },
+  "statusPwChanged": {
+    "message": "パスワードを変更しました。"
+  },
+  "exportHeading": {
+    "message": "鍵のエクスポート"
+  },
   "exportBody": {
     "message": "保護された鍵（.key）をダウンロードして、移行やバックアップに使えます。パスワード保護は維持されます。"
   },
-  "btnExportKey": { "message": ".key をエクスポート" },
-  "statusKeyExported": { "message": "鍵をエクスポートしました。" },
-  "importHeading": { "message": "鍵のインポート" },
+  "btnExportKey": {
+    "message": ".key をエクスポート"
+  },
+  "statusKeyExported": {
+    "message": "鍵をエクスポートしました。"
+  },
+  "importHeading": {
+    "message": "鍵のインポート"
+  },
   "importBody": {
     "message": "別のデバイスから .key ファイルをインポートします。現在の鍵を置き換えます。"
   },
-  "btnImportKey": { "message": "鍵をインポート" },
-  "statusKeyImported": { "message": "鍵をインポートしました。" },
-  "eraseHeading": { "message": "鍵の削除" },
+  "btnImportKey": {
+    "message": "鍵をインポート"
+  },
+  "statusKeyImported": {
+    "message": "鍵をインポートしました。"
+  },
+  "eraseHeading": {
+    "message": "鍵の削除"
+  },
   "eraseBody": {
     "message": "このデバイスから金庫の鍵を完全に削除します。エクスポート済みの .key がない場合、保存済みファイルは復元不能になります。取り消せません。"
   },
-  "btnEraseKey": { "message": "鍵を削除" },
+  "btnEraseKey": {
+    "message": "鍵を削除"
+  },
   "confirmErase": {
     "message": "本当に金庫の鍵を削除しますか？ エクスポート済みの .key がないと、保存済みファイルは復元できません。"
   },
-  "statusKeyErased": { "message": "金庫の鍵を削除しました。" }
+  "statusKeyErased": {
+    "message": "金庫の鍵を削除しました。"
+  },
+  "dropTitle": {
+    "message": "ここにファイルをドロップ"
+  },
+  "dropPrompt": {
+    "message": "またはクリックして選択"
+  },
+  "advancedOptions": {
+    "message": "詳細オプション"
+  },
+  "whyLabel": {
+    "message": "なぜ？"
+  },
+  "savedTitle": {
+    "message": "保存しました"
+  },
+  "restoredTitle": {
+    "message": "復元しました"
+  },
+  "webIntro": {
+    "message": "無料でオープンソースのウェブ版です。インストールも登録も不要で、データが端末の外に出ることはありません。ファイルを画像として保存したり、復元したりできます。（Google フォトはブラウザ拡張機能が必要です。）"
+  }
 }

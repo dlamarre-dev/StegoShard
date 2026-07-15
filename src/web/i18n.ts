@@ -6,12 +6,13 @@
 
 import en from '../../public/_locales/en/messages.json';
 import fr from '../../public/_locales/fr/messages.json';
-import {
-  FileTooLargeError,
-  MissingKeyError,
-  TooManyImagesError,
-  WrongPasswordError,
-} from '@core';
+import de from '../../public/_locales/de/messages.json';
+import es from '../../public/_locales/es/messages.json';
+import it from '../../public/_locales/it/messages.json';
+import pt from '../../public/_locales/pt/messages.json';
+import ja from '../../public/_locales/ja/messages.json';
+import zhTW from '../../public/_locales/zh_TW/messages.json';
+import { friendlyError as friendlyErrorWith } from '../ui/domhelpers';
 
 interface Entry {
   message: string;
@@ -19,8 +20,23 @@ interface Entry {
 }
 type Catalog = Record<string, Entry>;
 
+// All eight supported catalogs, bundled at build time so the web app matches
+// the extension. Chinese maps any zh-* tag to Traditional (the only variant we
+// ship); every other locale keys off its two-letter prefix.
+const CATALOGS: Record<string, Catalog> = {
+  en: en as Catalog,
+  fr: fr as Catalog,
+  de: de as Catalog,
+  es: es as Catalog,
+  it: it as Catalog,
+  pt: pt as Catalog,
+  ja: ja as Catalog,
+  zh: zhTW as Catalog,
+};
+
 const lang = (navigator.language || 'en').toLowerCase();
-const chosen: Catalog = lang.startsWith('fr') ? (fr as Catalog) : (en as Catalog);
+const prefix = lang.split('-')[0] ?? 'en';
+const chosen: Catalog = CATALOGS[prefix] ?? (en as Catalog);
 const MESSAGES: Catalog = { ...(en as Catalog), ...chosen };
 
 export function msg(key: string, subs?: string | string[]): string {
@@ -49,16 +65,5 @@ export function localizeDom(root: ParentNode = document): void {
 }
 
 export function friendlyError(err: unknown): string {
-  if (err instanceof WrongPasswordError) return msg('errWrongPassword');
-  if (err instanceof MissingKeyError) return msg('errMissingKey');
-  if (err instanceof FileTooLargeError) {
-    return msg('errFileTooLarge', [
-      String(Math.ceil(err.size / 1024)),
-      String(Math.floor(err.limit / 1024)),
-    ]);
-  }
-  if (err instanceof TooManyImagesError) {
-    return msg('errTooManyImages', [String(err.count), String(err.limit)]);
-  }
-  return err instanceof Error ? err.message : String(err);
+  return friendlyErrorWith(err, msg);
 }

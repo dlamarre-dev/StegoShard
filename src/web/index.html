@@ -28,87 +28,110 @@
 
     <main class="app">
       <section class="card banner">
-        <p class="muted" data-i18n="webIntro"></p>
+        <p class="lead" data-i18n="webIntro"></p>
       </section>
 
       <div class="grid">
         <section class="card">
           <div class="card-head"><h2 data-i18n="saveHeading"></h2></div>
 
-          <label data-i18n="labelFile" for="save-file"></label>
-          <input id="save-file" type="file" />
+          <div id="file-drop" class="dropzone" tabindex="0" role="button">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 16V4M7 9l5-5 5 5" />
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+            </svg>
+            <span class="dz-prompt">
+              <span class="dz-title" data-i18n="dropTitle"></span><br />
+              <span class="muted" data-i18n="dropPrompt"></span>
+            </span>
+            <span id="dz-file" class="dz-file"></span>
+            <input id="save-file" type="file" />
+          </div>
           <p class="muted estimate-line">
             <span data-i18n="estimateImages"></span> <span id="estimate" class="badge">—</span>
           </p>
 
-          <label data-i18n="labelPassword" for="save-pw"></label>
-          <input id="save-pw" type="password" autocomplete="new-password" />
+          <input id="save-pw" type="password" autocomplete="new-password" data-i18n-placeholder="labelPassword" />
 
-          <fieldset>
-            <legend data-i18n="destHeading"></legend>
-            <label class="radio"
-              ><input type="radio" name="dest" value="disk" checked />
-              <span data-i18n="destDisk"></span
-            ></label>
-            <label class="radio"
-              ><input type="radio" name="dest" value="paper" />
-              <span data-i18n="destPaper"></span
-            ></label>
-          </fieldset>
+          <details class="advanced">
+            <summary data-i18n="advancedOptions"></summary>
 
-          <fieldset>
-            <legend data-i18n="keyModeHeading"></legend>
-            <label class="radio"
-              ><input type="radio" name="keymode" value="embedded" checked />
-              <span data-i18n="keyModeEmbedded"></span
-            ></label>
-            <label class="radio"
-              ><input type="radio" name="keymode" value="keyfile" />
-              <span data-i18n="keyModeKeyfile"></span
-            ></label>
-            <p class="muted" data-i18n="keyModeHelp"></p>
-          </fieldset>
+            <label class="muted" data-i18n="destHeading"></label>
+            <fieldset class="segmented">
+              <label><input type="radio" name="dest" value="disk" checked /><span data-i18n="destDisk"></span></label>
+              <label><input type="radio" name="dest" value="paper" /><span data-i18n="destPaper"></span></label>
+            </fieldset>
 
-          <label class="checkbox"
-            ><input id="add-band" type="checkbox" /> <span data-i18n="labelAddBand"></span
-          ></label>
-          <div id="band-fields" hidden>
-            <label data-i18n="labelTitle" for="band-title"></label>
-            <input id="band-title" type="text" data-i18n-placeholder="titlePlaceholder" />
-            <p class="muted warn" data-i18n="bandWarning"></p>
-          </div>
+            <label class="muted" data-i18n="keyModeHeading"></label>
+            <fieldset class="segmented">
+              <label><input type="radio" name="keymode" value="embedded" checked /><span data-i18n="keyModeEmbedded"></span></label>
+              <label><input type="radio" name="keymode" value="keyfile" /><span data-i18n="keyModeKeyfile"></span></label>
+            </fieldset>
+            <details class="why"><summary data-i18n="whyLabel"></summary><p data-i18n="keyModeHelp"></p></details>
 
-          <label id="zip-field" class="checkbox"
-            ><input id="as-zip" type="checkbox" checked /> <span data-i18n="labelAsZip"></span
-          ></label>
-
-          <div id="paper-fields" hidden>
             <label class="checkbox"
-              ><input id="add-instructions" type="checkbox" />
-              <span data-i18n="labelInstructions"></span
+              ><input id="add-band" type="checkbox" /> <span data-i18n="labelAddBand"></span
             ></label>
-            <label data-i18n="labelPasswordHint" for="pw-hint"></label>
-            <input id="pw-hint" type="text" />
-            <label data-i18n="labelKeyLocation" for="key-location"></label>
-            <input id="key-location" type="text" />
-            <p class="muted warn" data-i18n="paperCleartextWarn"></p>
-          </div>
+            <div id="band-fields" hidden>
+              <input id="band-title" type="text" data-i18n-placeholder="titlePlaceholder" />
+              <p class="muted warn" data-i18n="bandWarning"></p>
+            </div>
 
-          <button id="save-btn" class="btn-primary" data-i18n="btnSave"></button>
+            <label id="zip-field" class="checkbox"
+              ><input id="as-zip" type="checkbox" checked /> <span data-i18n="labelAsZip"></span
+            ></label>
+
+            <div id="paper-fields" hidden>
+              <label class="checkbox"
+                ><input id="add-instructions" type="checkbox" /> <span data-i18n="labelInstructions"></span
+              ></label>
+              <label data-i18n="labelPasswordHint" for="pw-hint"></label>
+              <input id="pw-hint" type="text" />
+              <label data-i18n="labelKeyLocation" for="key-location"></label>
+              <input id="key-location" type="text" />
+              <p class="muted warn" data-i18n="paperCleartextWarn"></p>
+            </div>
+          </details>
+
+          <button id="save-btn" class="btn-primary btn-lg" data-i18n="btnSave"></button>
           <p id="save-status" class="status" role="status"></p>
+          <div id="save-result" class="result" hidden>
+            <p class="result-title" data-i18n="savedTitle"></p>
+            <p id="save-result-note" class="result-note"></p>
+          </div>
         </section>
 
         <section class="card">
           <div class="card-head"><h2 data-i18n="restoreHeading"></h2></div>
-          <label data-i18n="labelImagesOrZip" for="restore-files"></label>
-          <input id="restore-files" type="file" accept="image/*,.zip" multiple />
-          <label data-i18n="labelKeyFile" for="restore-key"></label>
-          <input id="restore-key" type="file" accept=".key" />
-          <p class="muted" data-i18n="keyFileHint"></p>
-          <label data-i18n="labelPassword" for="restore-pw"></label>
-          <input id="restore-pw" type="password" autocomplete="current-password" />
-          <button id="restore-btn" class="btn-primary" data-i18n="btnRestore"></button>
+
+          <div id="restore-drop" class="dropzone" tabindex="0" role="button">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 4v12M7 11l5 5 5-5" />
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+            </svg>
+            <span class="dz-prompt">
+              <span class="dz-title" data-i18n="labelImagesOrZip"></span><br />
+              <span class="muted" data-i18n="dropPrompt"></span>
+            </span>
+            <span id="restore-dz-file" class="dz-file"></span>
+            <input id="restore-files" type="file" accept="image/*,.zip" multiple />
+          </div>
+
+          <input id="restore-pw" type="password" autocomplete="current-password" data-i18n-placeholder="labelPassword" />
+
+          <details class="advanced">
+            <summary data-i18n="advancedOptions"></summary>
+            <label data-i18n="labelKeyFile" for="restore-key"></label>
+            <input id="restore-key" type="file" accept=".key" />
+            <p class="muted" data-i18n="keyFileHint"></p>
+          </details>
+
+          <button id="restore-btn" class="btn-primary btn-lg" data-i18n="btnRestore"></button>
           <p id="restore-status" class="status" role="status"></p>
+          <div id="restore-result" class="result" hidden>
+            <p class="result-title" data-i18n="restoredTitle"></p>
+            <p id="restore-result-note" class="result-note"></p>
+          </div>
         </section>
       </div>
 
