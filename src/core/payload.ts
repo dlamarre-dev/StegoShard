@@ -27,9 +27,13 @@ export async function buildPayload(filename: string, content: Uint8Array): Promi
   return concatBytes(header, nameBytes, data);
 }
 
-/** Parse an envelope back into filename + original content. */
+/**
+ * Parse an envelope back into filename + original content. `maxContentBytes`
+ * bounds decompression of the (untrusted) content to guard against a gzip bomb.
+ */
 export async function parsePayload(
   bytes: Uint8Array,
+  maxContentBytes: number = Infinity,
 ): Promise<{ filename: string; content: Uint8Array }> {
   if (bytes.length < 3) throw new Error('payload: too short');
   const flags = bytes[0]!;
@@ -38,6 +42,7 @@ export async function parsePayload(
   if (bytes.length < nameEnd) throw new Error('payload: truncated filename');
   const filename = new TextDecoder().decode(bytes.slice(3, nameEnd));
   const stored = bytes.slice(nameEnd);
-  const content = flags & FLAG_COMPRESSED ? await gzipDecompress(stored) : stored;
+  const content =
+    flags & FLAG_COMPRESSED ? await gzipDecompress(stored, maxContentBytes) : stored;
   return { filename, content };
 }

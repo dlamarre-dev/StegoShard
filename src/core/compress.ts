@@ -5,23 +5,46 @@
  * can inflate with its standard library.
  */
 
+import { concatBytes } from './bytes';
+
+/**
+ * Pump `data` through a transform stream, streaming the output so it can be
+ * bounded — decompression of untrusted input must not be allowed to balloon
+ * memory (a gzip bomb). Throws if the output exceeds `maxBytes`.
+ */
 async function pipeThrough(
   data: Uint8Array,
   stream: GenericTransformStream,
+  maxBytes: number,
 ): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
-  void writer.write(data);
-  void writer.close();
-  const buf = await new Response(stream.readable).arrayBuffer();
-  return new Uint8Array(buf);
+  // Cancelling the reader (on overflow) errors the writable side; swallow those
+  // rejections so they don't surface as unhandled.
+  writer.write(data).catch(() => {});
+  writer.close().catch(() => {});
+  const reader = (stream.readable as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error('decompressed data exceeds the allowed size');
+    }
+    chunks.push(value);
+  }
+  return concatBytes(...chunks);
 }
 
 export function gzipCompress(data: Uint8Array): Promise<Uint8Array> {
-  return pipeThrough(data, new CompressionStream('gzip'));
+  return pipeThrough(data, new CompressionStream('gzip'), Infinity);
 }
 
-export function gzipDecompress(data: Uint8Array): Promise<Uint8Array> {
-  return pipeThrough(data, new DecompressionStream('gzip'));
+/** Inflate gzip data, refusing output larger than `maxBytes` (gzip-bomb guard). */
+export function gzipDecompress(data: Uint8Array, maxBytes: number = Infinity): Promise<Uint8Array> {
+  return pipeThrough(data, new DecompressionStream('gzip'), maxBytes);
 }
 
 /**

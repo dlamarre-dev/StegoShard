@@ -21,6 +21,11 @@ from .qr import decode_image
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
 
+# Bounds for extracting an untrusted .zip (zip-bomb / resource guard).
+_MAX_ZIP_ENTRIES = 154
+_MAX_ENTRY_BYTES = 25 * 1024 * 1024
+_MAX_TOTAL_BYTES = 300 * 1024 * 1024
+
 
 def _is_image(name: str) -> bool:
     return name.lower().endswith(_IMAGE_EXTS)
@@ -46,8 +51,21 @@ def _gather(paths: list[str]) -> tuple[list[bytes], bytes | None]:
                         add_file(f, fh.read())
         elif path.lower().endswith(".zip"):
             with zipfile.ZipFile(path) as zf:
-                for entry in zf.namelist():
-                    add_file(entry, zf.read(entry))
+                count = 0
+                total = 0
+                for info in zf.infolist():
+                    name = info.filename
+                    if not (name.lower().endswith(".key") or _is_image(name)):
+                        continue
+                    if info.file_size > _MAX_ENTRY_BYTES:
+                        raise ValueError("a .zip entry is too large")
+                    count += 1
+                    total += info.file_size
+                    if count > _MAX_ZIP_ENTRIES:
+                        raise ValueError("too many entries in the .zip")
+                    if total > _MAX_TOTAL_BYTES:
+                        raise ValueError("the .zip contents are too large")
+                    add_file(name, zf.read(info))
         else:
             with open(path, "rb") as fh:
                 add_file(os.path.basename(path), fh.read())

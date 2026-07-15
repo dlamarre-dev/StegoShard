@@ -42,3 +42,16 @@ The vault key is stored locally, wrapped by a password-derived key. A compromise
 title band, instruction sheet) are cleartext by design and must never contain secrets;
 the UI warns about this. See the format specification (`SPEC.md`, from Phase 1) for
 details.
+
+Notes and limitations:
+
+- **In-memory secrets.** Transient key buffers (the derived KEK and the unwrapped
+  DEK) are zeroized after use. Passwords are handled as JavaScript strings, which
+  are immutable and cannot be reliably wiped from memory.
+- **Session key scope.** While the vault is unlocked, a single DEK is held in
+  `chrome.storage.session` (volatile, cleared on lock and on browser close) and is
+  reused across all vaults, so a compromise of that in-memory session would expose
+  every vault, not just one.
+- **Untrusted input.** On restore, the images / `.key` / `.zip` are untrusted: the
+  decoders validate header and key-block parameters (including Argon2id cost) and
+  cap decompression (gzip and zip) before doing significant work.

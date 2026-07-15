@@ -48,11 +48,21 @@ describe('header encode/decode', () => {
     const bytes = encodeHeader(sampleHeader({ version: 99 }));
     expect(() => decodeHeader(bytes)).toThrow(/version/);
   });
+
+  it('rejects out-of-range k/m', () => {
+    const bytes = encodeHeader(sampleHeader({ k: 200, m: 100 })); // k+m > 256
+    expect(() => decodeHeader(bytes)).toThrow(/k\/m/);
+  });
+
+  it('rejects a blob length larger than k*shardLen', () => {
+    const bytes = encodeHeader(sampleHeader({ k: 4, shardLen: 100, blobLen: 999999 }));
+    expect(() => decodeHeader(bytes)).toThrow(/blob length/);
+  });
 });
 
 describe('image payload (header + shard)', () => {
   it('round-trips header and shard bytes', () => {
-    const h = sampleHeader({ shardLen: 5 });
+    const h = sampleHeader({ shardLen: 5, blobLen: 5 });
     const shard = Uint8Array.from([10, 20, 30, 40, 50]);
     const { header, shard: out } = decodeImagePayload(encodeImagePayload(h, shard));
     expect(header.shardIndex).toBe(3);

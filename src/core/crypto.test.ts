@@ -84,6 +84,21 @@ describe('key block serialization', () => {
     bytes[0] = bytes[0]! ^ 0xff;
     expect(() => parseKeyBlock(bytes)).toThrow(/magic/);
   });
+
+  it('rejects attacker-inflated Argon2id parameters (DoS guard)', async () => {
+    const { block } = await createKeyBlock('pw', TEST_PARAMS);
+    const bytes = serializeKeyBlock(block);
+    // memoryKiB is the u32 right after magic(4)+version(1)+iterations(4) => offset 9.
+    bytes[9] = 0xff;
+    bytes[10] = 0xff;
+    bytes[11] = 0xff;
+    bytes[12] = 0xff; // ~4 TiB
+    expect(() => parseKeyBlock(bytes)).toThrow(/out of range/);
+  });
+
+  it('rejects a truncated key block', () => {
+    expect(() => parseKeyBlock(new Uint8Array(10))).toThrow(/too short|magic/);
+  });
 });
 
 describe('change password', () => {

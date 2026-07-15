@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import io
 import struct
 from dataclasses import dataclass
 
@@ -14,9 +15,18 @@ HEADER_LEN = 33
 
 KEY_MAGIC = b"IVKY"
 KEY_BLOCK_VERSION = 1
+KEY_BLOCK_PREFIX_LEN = 44  # magic+ver+iter+mem+par+salt+iv+len (before wrapped)
 
 IV_LEN = 12
 FLAG_COMPRESSED = 0x01
+
+# Guards for untrusted input (mirror the TypeScript decoder).
+MAX_CONTENT_BYTES = 256 * 1024  # matches the export size limit; bounds gzip
+ARGON2_LIMITS = {
+    "iterations": (1, 16),
+    "memory_kib": (8, 1024 * 1024),  # <= 1 GiB
+    "parallelism": (1, 4),
+}
 
 
 @dataclass
@@ -47,6 +57,13 @@ def parse_header(payload: bytes) -> Header:
     profile = payload[20]
     shard_len, blob_len = struct.unpack(">II", payload[21:29])
     hash_ = payload[29:33]
+    # Validate untrusted parameters before any downstream allocation.
+    if k < 1 or m < 0 or k + m > 256:
+        raise ValueError(f"header: invalid k/m ({k}/{m})")
+    if shard_index >= k + m:
+        raise ValueError(f"header: shard index {shard_index} out of range")
+    if shard_len < 1 or blob_len < 1 or blob_len > k * shard_len:
+        raise ValueError("header: invalid shard/blob length")
     return Header(version, set_id, shard_index, k, m, codec_id, profile, shard_len, blob_len, hash_)
 
 
@@ -75,6 +92,8 @@ class KeyBlock:
 
 
 def parse_key_block(data: bytes) -> KeyBlock:
+    if len(data) < KEY_BLOCK_PREFIX_LEN:
+        raise ValueError("key block: too short")
     if data[0:4] != KEY_MAGIC:
         raise ValueError("key block: bad magic")
     version = data[4]
@@ -88,6 +107,15 @@ def parse_key_block(data: bytes) -> KeyBlock:
     wrapped = data[44 : 44 + wrapped_len]
     if len(wrapped) != wrapped_len:
         raise ValueError("key block: truncated")
+    # Reject attacker-controlled Argon2id parameters (DoS before authentication).
+    for name, value in (
+        ("iterations", iterations),
+        ("memory_kib", memory_kib),
+        ("parallelism", parallelism),
+    ):
+        low, high = ARGON2_LIMITS[name]
+        if not (low <= value <= high):
+            raise ValueError(f"key block: Argon2id {name} out of range ({value})")
     return KeyBlock(salt, iterations, memory_kib, parallelism, iv, wrapped)
 
 
@@ -112,5 +140,13 @@ def parse_envelope(envelope: bytes) -> tuple[str, bytes]:
     name_end = 3 + name_len
     filename = envelope[3:name_end].decode("utf-8")
     stored = envelope[name_end:]
-    content = gzip.decompress(stored) if flags & FLAG_COMPRESSED else stored
+    if flags & FLAG_COMPRESSED:
+        # Bounded inflate: read at most the cap + 1 byte to detect a gzip bomb
+        # without materializing the whole (possibly huge) output.
+        with gzip.GzipFile(fileobj=io.BytesIO(stored)) as gz:
+            content = gz.read(MAX_CONTENT_BYTES + 1)
+        if len(content) > MAX_CONTENT_BYTES:
+            raise ValueError("decompressed data exceeds the allowed size")
+    else:
+        content = stored
     return filename, content

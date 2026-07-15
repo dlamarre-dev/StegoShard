@@ -9,6 +9,7 @@ import {
   getCodec,
   exportVault,
   importVault,
+  MAX_IMAGES,
   PROFILE_DISK,
   decodeHeader,
   toHex,
@@ -80,6 +81,38 @@ export async function saveFileToDisk(
 
 const isZip = (name: string) => name.toLowerCase().endsWith('.zip');
 const isKey = (name: string) => name.toLowerCase().endsWith('.key');
+const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
+
+// Bounds for restoring from an untrusted .zip (zip-bomb / resource guard).
+// Generous enough for real photo sets, tight enough to reject an archive that
+// claims gigabytes.
+const MAX_ZIP_ENTRIES = MAX_IMAGES + 4; // images + a stray .key or two
+const MAX_ENTRY_BYTES = 25 * 1024 * 1024; // 25 MB per image (a large photo)
+const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // cumulative uncompressed
+
+/** Extract only image/.key entries from a zip, within the size/count budgets. */
+function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
+  let count = 0;
+  let total = 0;
+  const entries = unzipSync(zipBytes, {
+    filter: (f) => {
+      if (!(IMAGE_RE.test(f.name) || isKey(f.name))) return false;
+      if (f.originalSize > MAX_ENTRY_BYTES) throw new Error('restore: a .zip entry is too large');
+      count += 1;
+      total += f.originalSize;
+      if (count > MAX_ZIP_ENTRIES) throw new Error('restore: too many entries in the .zip');
+      if (total > MAX_TOTAL_BYTES) throw new Error('restore: .zip contents are too large');
+      return true;
+    },
+  });
+  const images: Uint8Array[] = [];
+  let keyBlock: Uint8Array | undefined;
+  for (const [name, bytes] of Object.entries(entries)) {
+    if (isKey(name)) keyBlock = bytes;
+    else if (IMAGE_RE.test(name)) images.push(bytes);
+  }
+  return keyBlock ? { images, keyBlock } : { images };
+}
 
 /**
  * Reconstruct the original file from image files, a .zip of them, or a mix.
@@ -95,11 +128,9 @@ export async function restoreFileFromDisk(
 
   for (const file of files) {
     if (isZip(file.name)) {
-      const entries = unzipSync(await blobBytes(file));
-      for (const [name, bytes] of Object.entries(entries)) {
-        if (isKey(name)) keyBlock = bytes;
-        else if (/\.(png|jpe?g|webp)$/i.test(name)) images.push(bytes);
-      }
+      const extracted = extractZip(await blobBytes(file));
+      images.push(...extracted.images);
+      if (extracted.keyBlock) keyBlock = extracted.keyBlock;
     } else if (isKey(file.name)) {
       keyBlock = await blobBytes(file);
     } else {

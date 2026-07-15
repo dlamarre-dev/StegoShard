@@ -39,6 +39,29 @@ export interface Argon2Params {
 }
 
 /**
+ * Sane bounds for Argon2id parameters. These come from an *untrusted* key block
+ * (it travels inside the images, or in a supplied .key file) and are used to run
+ * Argon2id BEFORE any authentication succeeds, so unbounded values are a
+ * memory-exhaustion DoS. Reject anything outside a generous-but-safe range.
+ */
+const ARGON2_LIMITS = {
+  iterations: { min: 1, max: 16 },
+  memoryKiB: { min: 8, max: 1024 * 1024 }, // ≤ 1 GiB
+  parallelism: { min: 1, max: 4 },
+} as const;
+
+/** Validate Argon2id parameters against ARGON2_LIMITS; throw on anything absurd. */
+export function validateArgon2Params(p: Argon2Params): void {
+  for (const key of ['iterations', 'memoryKiB', 'parallelism'] as const) {
+    const value = p[key];
+    const { min, max } = ARGON2_LIMITS[key];
+    if (!Number.isInteger(value) || value < min || value > max) {
+      throw new Error(`key block: Argon2id ${key} out of range (${value})`);
+    }
+  }
+}
+
+/**
  * Production defaults, calibrated toward ~0.25–1 s on typical hardware
  * (plan §4). Frozen in SPEC.md. Tests override these with cheaper values.
  */
@@ -68,10 +91,12 @@ export async function deriveKEK(
     hashLength: DEK_LEN,
     outputType: 'binary',
   });
-  return subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, [
+  const key = await subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, [
     'encrypt',
     'decrypt',
   ]);
+  raw.fill(0); // zeroize the transient KEK bytes
+  return key;
 }
 
 /** Generate a fresh, extractable DEK (needed so it can be wrapped). */
@@ -127,6 +152,7 @@ export async function wrapDEK(
 ): Promise<{ iv: Uint8Array; wrapped: Uint8Array }> {
   const rawDek = new Uint8Array(await subtle.exportKey('raw', dek));
   const { iv, ciphertext } = await encryptBytes(kek, rawDek);
+  rawDek.fill(0); // zeroize the transient plaintext DEK
   return { iv, wrapped: ciphertext };
 }
 
@@ -137,10 +163,12 @@ export async function unwrapDEK(
   kek: CryptoKey,
 ): Promise<CryptoKey> {
   const rawDek = await decryptBytes(kek, iv, wrapped);
-  return subtle.importKey('raw', rawDek as BufferSource, { name: 'AES-GCM' }, true, [
+  const key = await subtle.importKey('raw', rawDek as BufferSource, { name: 'AES-GCM' }, true, [
     'encrypt',
     'decrypt',
   ]);
+  rawDek.fill(0); // zeroize the transient plaintext DEK
+  return key;
 }
 
 // --- Wrapped DEK block: self-contained, password-protected key artifact ------
@@ -175,6 +203,8 @@ export function serializeKeyBlock(block: KeyBlock): Uint8Array {
 
 /** Parse a wrapped DEK block produced by serializeKeyBlock. */
 export function parseKeyBlock(bytes: Uint8Array): KeyBlock {
+  // Fixed prefix = magic(4)+ver(1)+iter(4)+mem(4)+par(1)+salt(16)+iv(12)+len(2).
+  if (bytes.length < 44) throw new Error('key block: too short');
   let o = 0;
   for (let i = 0; i < KEY_MAGIC.length; i++) {
     if (bytes[o + i] !== KEY_MAGIC[i]) throw new Error('key block: bad magic');
@@ -197,7 +227,9 @@ export function parseKeyBlock(bytes: Uint8Array): KeyBlock {
   o += 2;
   const wrapped = bytes.slice(o, o + wrappedLen);
   if (wrapped.length !== wrappedLen) throw new Error('key block: truncated');
-  return { salt, params: { iterations, memoryKiB, parallelism }, iv, wrapped };
+  const params = { iterations, memoryKiB, parallelism };
+  validateArgon2Params(params); // reject attacker-controlled DoS parameters
+  return { salt, params, iv, wrapped };
 }
 
 // --- High-level helpers ------------------------------------------------------

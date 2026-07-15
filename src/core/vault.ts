@@ -266,7 +266,7 @@ export async function importVault(
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
   const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
   const envelope = await decryptBytes(dek, iv, ciphertext);
-  return parsePayload(envelope);
+  return parsePayload(envelope, MAX_FILE_BYTES);
 }
 
 function sameSet(a: Uint8Array, b: Uint8Array): boolean {

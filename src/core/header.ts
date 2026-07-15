@@ -86,6 +86,14 @@ export function decodeHeader(bytes: Uint8Array): Header {
   const blobLen = readU32(bytes, o);
   o += 4;
   const hash = bytes.slice(o, o + HASH_LEN);
+
+  // Validate parameters from this (untrusted) header before any allocation or
+  // reconstruction downstream.
+  if (k < 1 || m < 0 || k + m > 256) throw new Error(`header: invalid k/m (${k}/${m})`);
+  if (shardIndex >= k + m) throw new Error(`header: shard index ${shardIndex} out of range`);
+  if (shardLen < 1) throw new Error('header: invalid shard length');
+  if (blobLen < 1 || blobLen > k * shardLen) throw new Error('header: invalid blob length');
+
   return { version, setId, shardIndex, k, m, codecId, profile, shardLen, blobLen, hash };
 }
 

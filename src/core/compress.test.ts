@@ -24,6 +24,11 @@ describe('compressOpportunistic', () => {
     expect(res.data.length).toBeLessThan(data.length);
   });
 
+  it('aborts decompression past the byte cap (gzip-bomb guard)', async () => {
+    const gz = await gzipCompress(new Uint8Array(50_000).fill(7));
+    await expect(gzipDecompress(gz, 1000)).rejects.toThrow(/exceeds/);
+  });
+
   it('skips compression for incompressible data', async () => {
     // Pseudo-random, deterministic bytes: gzip cannot shrink these.
     let s = 12345;

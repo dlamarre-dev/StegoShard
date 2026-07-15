@@ -41,6 +41,21 @@ interface CachedToken {
   expiresAt: number;
 }
 
+/** Whether a URL points at a Google-owned host (safe to send the token to). */
+function isGoogleHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === 'googleusercontent.com' ||
+      host.endsWith('.googleusercontent.com') ||
+      host === 'google.com' ||
+      host.endsWith('.google.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Request the optional identity + host permissions (must run in a user gesture). */
 async function ensurePermissions(): Promise<void> {
   // 'identity' is a valid optional permission but missing from the polyfill's
@@ -248,6 +263,9 @@ export async function restoreFromPhotos(
   const payloads: Uint8Array[] = [];
   for (const item of items) {
     if (!item.mediaFile?.baseUrl) continue;
+    // Only ever send the bearer token to a Google-owned host — never trust the
+    // API-supplied baseUrl blindly (defense-in-depth against token leakage).
+    if (!isGoogleHost(item.mediaFile.baseUrl)) continue;
     const resp = await fetch(`${item.mediaFile.baseUrl}=d`, {
       headers: { Authorization: `Bearer ${token}` },
     });
