@@ -17,7 +17,7 @@
  * keyfile / stego modes arrive in Phase 2.
  */
 
-import { concatBytes, readU16, writeU16 } from './bytes';
+import { concatBytes, readU16, toHex, writeU16 } from './bytes';
 import {
   decryptBytes,
   encryptBytes,
@@ -243,14 +243,40 @@ export async function importVault(
 ): Promise<{ filename: string; content: Uint8Array }> {
   if (payloads.length === 0) throw new Error('import: no images provided');
 
-  const decoded = payloads.map(decodeImagePayload);
-  const first = decoded[0]!.header;
+  // Decode defensively: silently drop images that are not valid ImageVault
+  // payloads (a foreign QR, a corrupt header) rather than aborting the restore.
+  const decoded: { header: Header; shard: Uint8Array }[] = [];
+  for (const payload of payloads) {
+    try {
+      decoded.push(decodeImagePayload(payload));
+    } catch {
+      // not an ImageVault image / unreadable header — skip it
+    }
+  }
+  if (decoded.length === 0) throw new Error('import: no valid ImageVault images found');
+
+  // Images from different vaults may be mixed in; use the majority set so one
+  // stray or first-listed foreign image cannot derail reconstruction.
+  const counts = new Map<string, number>();
+  for (const { header } of decoded) {
+    const key = toHex(header.setId);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let bestSet = '';
+  let bestCount = -1;
+  for (const [key, n] of counts) {
+    if (n > bestCount) {
+      bestCount = n;
+      bestSet = key;
+    }
+  }
+  const members = decoded.filter(({ header }) => toHex(header.setId) === bestSet);
+  const first = members[0]!.header;
   const { k, m, blobLen } = first;
 
-  // Place each shard at its global index; ignore foreign sets.
+  // Place each shard at its global index.
   const slots: (Uint8Array | null)[] = new Array(k + m).fill(null);
-  for (const { header, shard } of decoded) {
-    if (!sameSet(header.setId, first.setId)) continue;
+  for (const { header, shard } of members) {
     if (header.shardIndex < k + m) slots[header.shardIndex] = shard;
   }
 
@@ -267,10 +293,6 @@ export async function importVault(
   const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
   const envelope = await decryptBytes(dek, iv, ciphertext);
   return parsePayload(envelope, MAX_FILE_BYTES);
-}
-
-function sameSet(a: Uint8Array, b: Uint8Array): boolean {
-  return bytesEqual(a, b);
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {

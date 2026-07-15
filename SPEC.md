@@ -55,7 +55,8 @@ separate and additional.
   (luminance 255), scaled by an integer module size. The Disk profile is lossless
   (PNG), so rendering is a faithful byte round-trip.
 - **Decoding:** locate and decode the QR symbol; the recovered bytes are the §3
-  payload. (Reference tooling: `pyzbar` / OpenCV.)
+  payload. (The Python reference decoder uses `zxing-cpp`, which returns the raw
+  byte content — important for binary payloads.)
 
 Profiles: `DISK = 0`, `CLOUD = 1`, `PAPER = 2`. (Cloud and Paper profiles are
 defined here but exercised in later phases.)

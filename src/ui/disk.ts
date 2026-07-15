@@ -91,7 +91,7 @@ const MAX_ENTRY_BYTES = 25 * 1024 * 1024; // 25 MB per image (a large photo)
 const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // cumulative uncompressed
 
 /** Extract only image/.key entries from a zip, within the size/count budgets. */
-function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
+export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
   let count = 0;
   let total = 0;
   const entries = unzipSync(zipBytes, {

@@ -6,6 +6,7 @@ Mirrors src/core/vault.ts `importVault` and SPEC.md §1.
 from __future__ import annotations
 
 import hashlib
+import struct
 from dataclasses import dataclass
 
 from .crypto import decrypt_content, unwrap_dek
@@ -34,14 +35,28 @@ def decode_vault(
     if not payloads:
         raise ValueError("import: no images provided")
 
-    decoded = [split_payload(p) for p in payloads]
-    first = decoded[0][0]
+    # Decode defensively: drop images that are not valid ImageVault payloads
+    # (a foreign QR, a corrupt header) rather than aborting the whole restore.
+    decoded: list[tuple] = []
+    for payload in payloads:
+        try:
+            decoded.append(split_payload(payload))
+        except (ValueError, IndexError, struct.error):
+            continue
+    if not decoded:
+        raise ValueError("import: no valid ImageVault images found")
+
+    # Use the majority set so a stray/first-listed foreign image can't derail it.
+    counts: dict[bytes, int] = {}
+    for header, _shard in decoded:
+        counts[header.set_id] = counts.get(header.set_id, 0) + 1
+    best_set = max(counts, key=lambda s: counts[s])
+    members = [(h, s) for (h, s) in decoded if h.set_id == best_set]
+    first = members[0][0]
     k, m, blob_len = first.k, first.m, first.blob_len
 
     slots: list[bytes | None] = [None] * (k + m)
-    for header, shard in decoded:
-        if header.set_id != first.set_id:
-            continue
+    for header, shard in members:
         if 0 <= header.shard_index < k + m:
             slots[header.shard_index] = shard
 

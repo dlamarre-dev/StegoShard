@@ -108,6 +108,26 @@ describe('keyfile mode (external key block)', () => {
   });
 });
 
+describe('import robustness', () => {
+  it('ignores a foreign/corrupt image mixed into the set', async () => {
+    const key = await makeKey('pw');
+    const content = pseudoRandom(3000, 21);
+    const { imagePayloads } = await exportVault('a.bin', content, key);
+    const foreign = new Uint8Array(60); // bad magic → not an ImageVault payload
+    const out = await importVault([foreign, ...imagePayloads], 'pw');
+    expect([...out.content]).toEqual([...content]);
+  });
+
+  it('restores the majority set when two vaults are mixed', async () => {
+    const key = await makeKey('pw');
+    const a = await exportVault('a.bin', pseudoRandom(3000, 1), key);
+    const b = await exportVault('b.bin', pseudoRandom(3000, 2), key);
+    // One image from B + the full A set → A is the majority.
+    const out = await importVault([b.imagePayloads[0]!, ...a.imagePayloads], 'pw');
+    expect(out.filename).toBe('a.bin');
+  });
+});
+
 describe('estimateImages (accurate)', () => {
   it('matches the actual image count', async () => {
     const key = await makeKey('pw');
