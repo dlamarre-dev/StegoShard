@@ -6,7 +6,9 @@
  * per target here so the rest of the codebase stays browser-agnostic.
  */
 
-export type Target = 'chrome' | 'firefox';
+// Edge is Chromium — its build is identical to Chrome's; it is a separate
+// target only so packaging emits a clearly named artifact for the Edge store.
+export type Target = 'chrome' | 'edge' | 'firefox';
 
 // Bumped independently of the npm package version; surfaced in stores.
 const VERSION = '0.1.0';

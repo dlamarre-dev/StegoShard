@@ -8,11 +8,12 @@ Usage:
     python scripts/build.py all                # build + build:firefox + build:web
 
 Actions map to npm scripts:
-    build    -> build
+    build    -> build            (Chrome/Edge, dev)
+    edge     -> build:edge
     firefox  -> build:firefox
     web      -> build:web
-    package  -> package         (store zips for Chrome/Edge + Firefox)
-    all      -> build, build:firefox, build:web
+    package  -> package          (store zips + dist-release/ for chrome, edge, firefox)
+    all      -> build, build:edge, build:firefox, build:web
 """
 
 from __future__ import annotations
@@ -26,10 +27,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 ACTIONS: dict[str, list[str]] = {
     "build": ["build"],
+    "edge": ["build:edge"],
     "firefox": ["build:firefox"],
     "web": ["build:web"],
     "package": ["package"],
-    "all": ["build", "build:firefox", "build:web"],
+    "all": ["build", "build:edge", "build:firefox", "build:web"],
 }
 
 

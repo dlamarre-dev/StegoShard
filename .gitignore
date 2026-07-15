@@ -5,6 +5,7 @@ local/
 node_modules/
 dist/
 web-dist/
+dist-release/
 build/
 coverage/
 packages/

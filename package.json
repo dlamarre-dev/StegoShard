@@ -12,7 +12,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:firefox": "cross-env IMAGEVAULT_TARGET=firefox vite build",
+    "build:edge": "cross-env IMAGEVAULT_TARGET=edge vite build",
     "build:store": "tsc --noEmit && vite build --mode store",
+    "build:store:edge": "cross-env IMAGEVAULT_TARGET=edge vite build --mode store",
     "build:store:firefox": "cross-env IMAGEVAULT_TARGET=firefox vite build --mode store",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "dev:web": "vite --config vite.web.config.ts",
@@ -26,7 +28,7 @@
     "test:coverage": "vitest run --coverage",
     "fixtures": "tsx scripts/gen-fixtures.ts",
     "icons": "tsx scripts/gen-icons.ts",
-    "package": "npm run build:store && npm run build:store:firefox && tsx scripts/package.ts"
+    "package": "npm run build:store && npm run build:store:edge && npm run build:store:firefox && tsx scripts/package.ts"
   },
   "dependencies": {
     "fflate": "^0.8.3",

@@ -10,9 +10,12 @@ developer accounts and uploading is manual.
 npm run package
 ```
 
-Produces `packages/imagevault-chrome-<version>.zip` (Chrome + Edge) and
-`packages/imagevault-firefox-<version>.zip` (source maps excluded). Verify each
-by loading it unpacked before uploading.
+Produces one zip per target under `packages/` —
+`imagevault-chrome-<version>.zip`, `imagevault-edge-<version>.zip`, and
+`imagevault-firefox-<version>.zip` (source maps excluded). It also writes the
+identical, unzipped contents to `dist-release/<target>/` so you can load exactly
+what will be uploaded as an unpacked extension and test it before submitting.
+(Chrome and Edge builds are byte-identical Chromium builds.)
 
 ## Listing copy
 
@@ -45,7 +48,8 @@ Google Photos is opt-in and goes to the user's own account (see PRIVACY.md).
 ## Microsoft Edge Add-ons
 
 1. Register at [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge) (free).
-2. Upload the **same** Chrome zip; complete the listing; submit.
+2. Upload `imagevault-edge-<version>.zip` (identical to the Chrome build);
+   complete the listing; submit.
 
 ## Firefox Add-ons (AMO)
 
