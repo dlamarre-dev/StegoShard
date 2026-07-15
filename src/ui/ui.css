@@ -297,6 +297,28 @@ button {
   border-color: var(--accent);
 }
 
+/* Language selector on the legal pages — matches the ghost button. */
+.lang-select {
+  width: auto;
+  padding: 7px 10px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lang-select:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.lang-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: default;

@@ -12,69 +12,20 @@
     <header class="appbar">
       <div class="brand">
         <img class="logo" src="./icons/icon.svg" alt="" />
-        <div class="brand-name">ImageVault — Privacy Policy</div>
+        <div class="brand-name" id="legal-heading">ImageVault — Privacy Policy</div>
       </div>
-      <div class="appbar-actions"><a class="btn-ghost" href="./index.html">Home</a></div>
+      <div class="appbar-actions">
+        <select id="lang-select" class="lang-select" aria-label="Language"></select>
+        <a class="btn-ghost" id="home-link" href="./index.html">Home</a>
+      </div>
     </header>
 
     <main class="app">
       <section class="card">
-        <p class="muted">Last updated: 2026-07-13</p>
-        <p>
-          ImageVault is a zero-knowledge, offline-first tool. <strong>It does not collect,
-          transmit, or sell any personal data.</strong>
-        </p>
-
-        <h2>What ImageVault handles</h2>
-        <ul>
-          <li>
-            <strong>Your files and password</strong> are processed entirely on your device.
-            Files are encrypted locally (Argon2id + AES-256-GCM) before being turned into
-            images. Your password is never stored and never leaves your device.
-          </li>
-          <li>
-            <strong>At rest</strong>, only a password-wrapped key and non-sensitive
-            preferences are stored locally in the browser. The wrapped key is useless without
-            your password. Nothing is synced to any server.
-          </li>
-          <li>
-            ImageVault contains <strong>no analytics, no telemetry, and no tracking</strong>,
-            and makes no network requests for its core features (Disk and Paper).
-          </li>
-        </ul>
-
-        <h2>Google Photos (optional)</h2>
-        <p>
-          The Google Photos destination is opt-in and off unless you enable it. When enabled,
-          encrypted images are uploaded to <strong>your own Google account</strong> (into an
-          album the extension creates), and restoring downloads images you select with
-          Google's Picker. This happens directly between your browser and Google;
-          <strong>ImageVault operates no servers and receives none of this data.</strong> Your
-          use of Google Photos is governed by Google's own privacy policy. The extension only
-          ever handles already-encrypted images and cannot read your other photos.
-        </p>
-
-        <h2>Permissions</h2>
-        <ul>
-          <li><code>storage</code> — save the wrapped key and preferences locally.</li>
-          <li>
-            <code>identity</code> and the Google host permissions — optional, requested only
-            if you use Google Photos.
-          </li>
-        </ul>
-
-        <h2>Your control</h2>
-        <p>
-          Export, re-password, or erase your key at any time from the settings. Uninstalling
-          the extension removes all local data.
-        </p>
-
-        <h2>Contact</h2>
-        <p>
-          Questions or concerns:
-          <a href="https://github.com/dlamarre-dev/ImageVault">github.com/dlamarre-dev/ImageVault</a>.
-        </p>
+        <p class="muted" id="legal-updated"></p>
+        <div id="legal-body"></div>
       </section>
     </main>
+    <script type="module" src="./privacy.ts"></script>
   </body>
 </html>

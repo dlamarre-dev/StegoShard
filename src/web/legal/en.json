@@ -1,0 +1,212 @@
+{
+  "privacy": {
+    "title": "ImageVault — Privacy Policy",
+    "heading": "ImageVault — Privacy Policy",
+    "updatedLabel": "Last updated",
+    "home": "Home",
+    "intro": [
+      {
+        "p": [
+          "ImageVault is a zero-knowledge, offline-first tool. ",
+          {
+            "b": "It does not collect, transmit, or sell any personal data."
+          }
+        ]
+      }
+    ],
+    "sections": [
+      {
+        "h": "What ImageVault handles",
+        "blocks": [
+          {
+            "ul": [
+              [
+                {
+                  "b": "Your files and password"
+                },
+                " are processed entirely on your device. Files are encrypted locally (Argon2id + AES-256-GCM) before being turned into images. Your password is never stored and never leaves your device."
+              ],
+              [
+                {
+                  "b": "At rest"
+                },
+                ", only a password-wrapped key and non-sensitive preferences are stored locally in the browser. The wrapped key is useless without your password. Nothing is synced to any server."
+              ],
+              [
+                "ImageVault contains ",
+                {
+                  "b": "no analytics, no telemetry, and no tracking"
+                },
+                ", and makes no network requests for its core features (Disk and Paper)."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Google Photos (optional)",
+        "blocks": [
+          {
+            "p": [
+              "The Google Photos destination is opt-in and off unless you enable it. When enabled, encrypted images are uploaded to ",
+              {
+                "b": "your own Google account"
+              },
+              " (into an album the extension creates), and restoring downloads images you select with Google's Picker. This happens directly between your browser and Google; ",
+              {
+                "b": "ImageVault operates no servers and receives none of this data."
+              },
+              " Your use of Google Photos is governed by Google's own privacy policy. The extension only ever handles already-encrypted images and cannot read your other photos."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Permissions",
+        "blocks": [
+          {
+            "ul": [
+              [
+                {
+                  "code": "storage"
+                },
+                " — save the wrapped key and preferences locally."
+              ],
+              [
+                {
+                  "code": "identity"
+                },
+                " and the Google host permissions — optional, requested only if you use Google Photos."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Your control",
+        "blocks": [
+          {
+            "p": [
+              "Export, re-password, or erase your key at any time from the settings. Uninstalling the extension removes all local data."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Contact",
+        "blocks": [
+          {
+            "p": [
+              "Questions or concerns: ",
+              {
+                "a": "github.com/dlamarre-dev/ImageVault",
+                "href": "https://github.com/dlamarre-dev/ImageVault"
+              },
+              "."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "title": "ImageVault — Terms of Service",
+    "heading": "ImageVault — Terms of Service",
+    "updatedLabel": "Last updated",
+    "home": "Home",
+    "intro": [
+      {
+        "p": [
+          "ImageVault is free, open-source software provided under the ",
+          {
+            "a": "MIT License",
+            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+          },
+          ". By using the extension or the web app, you agree to these terms."
+        ]
+      }
+    ],
+    "sections": [
+      {
+        "h": "The service",
+        "blocks": [
+          {
+            "p": [
+              "ImageVault encrypts a file on your device and encodes it into images you can store on disk, print, or optionally upload to your own Google Photos. It runs entirely in your browser; there is no account and no server operated by us (see the ",
+              {
+                "a": "Privacy Policy",
+                "href": "./privacy.html"
+              },
+              ")."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "No warranty",
+        "blocks": [
+          {
+            "p": [
+              "The software is provided “as is”, without warranty of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose, and non-infringement. To the maximum extent permitted by law, the authors are not liable for any claim, damages, or loss arising from the use of the software."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Your responsibility",
+        "blocks": [
+          {
+            "ul": [
+              [
+                "You are responsible for your password and key. ",
+                {
+                  "b": "If you lose your password or key, your data is permanently unrecoverable"
+                },
+                " — no one can restore it for you."
+              ],
+              [
+                "Keep multiple copies of your images across independent locations. Do not rely on any single medium, and never treat Google Photos as your only copy."
+              ],
+              [
+                "Use ImageVault only for lawful purposes and only with data you are entitled to store."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Google Photos",
+        "blocks": [
+          {
+            "p": [
+              "The optional Google Photos destination interacts directly with your own Google account and is additionally governed by Google's terms and policies."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Changes",
+        "blocks": [
+          {
+            "p": [
+              "These terms may change; updates are published on this page. Continued use after a change constitutes acceptance."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Contact",
+        "blocks": [
+          {
+            "p": [
+              {
+                "a": "github.com/dlamarre-dev/ImageVault",
+                "href": "https://github.com/dlamarre-dev/ImageVault"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "privacy": {
+    "title": "ImageVault — Política de Privacidade",
+    "heading": "ImageVault — Política de Privacidade",
+    "updatedLabel": "Última atualização",
+    "home": "Início",
+    "intro": [
+      {
+        "p": [
+          "O ImageVault é uma ferramenta de conhecimento zero que funciona prioritariamente offline. ",
+          {
+            "b": "Não recolhe, transmite nem vende quaisquer dados pessoais."
+          }
+        ]
+      }
+    ],
+    "sections": [
+      {
+        "h": "O que o ImageVault trata",
+        "blocks": [
+          {
+            "ul": [
+              [
+                {
+                  "b": "Os seus ficheiros e a sua palavra-passe"
+                },
+                " são processados inteiramente no seu dispositivo. Os ficheiros são cifrados localmente (Argon2id + AES-256-GCM) antes de serem transformados em imagens. A sua palavra-passe nunca é armazenada e nunca sai do seu dispositivo."
+              ],
+              [
+                {
+                  "b": "Em repouso"
+                },
+                ", apenas uma chave protegida pela palavra-passe e preferências não sensíveis são armazenadas localmente no navegador. A chave protegida é inútil sem a sua palavra-passe. Nada é sincronizado com qualquer servidor."
+              ],
+              [
+                "O ImageVault não contém ",
+                {
+                  "b": "análises, telemetria nem rastreamento"
+                },
+                " e não efetua pedidos de rede para as suas funcionalidades principais (Disk e Paper)."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Google Photos (opcional)",
+        "blocks": [
+          {
+            "p": [
+              "O destino Google Photos é de adesão voluntária e está desativado a menos que o ative. Quando ativado, as imagens cifradas são carregadas para ",
+              {
+                "b": "a sua própria conta Google"
+              },
+              " (para um álbum que a extensão cria), e o restauro descarrega as imagens que selecionar com o Picker da Google. Isto ocorre diretamente entre o seu navegador e a Google; ",
+              {
+                "b": "o ImageVault não opera quaisquer servidores e não recebe nenhum destes dados."
+              },
+              " A sua utilização do Google Photos rege-se pela própria política de privacidade da Google. A extensão trata unicamente de imagens já cifradas e não consegue ler as suas outras fotografias."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Permissões",
+        "blocks": [
+          {
+            "ul": [
+              [
+                {
+                  "code": "storage"
+                },
+                " — guardar localmente a chave protegida e as preferências."
+              ],
+              [
+                {
+                  "code": "identity"
+                },
+                " e as permissões de host da Google — opcionais, solicitadas apenas se utilizar o Google Photos."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "O seu controlo",
+        "blocks": [
+          {
+            "p": [
+              "Exporte, redefina a palavra-passe ou elimine a sua chave a qualquer momento nas definições. A desinstalação da extensão remove todos os dados locais."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Contacto",
+        "blocks": [
+          {
+            "p": [
+              "Questões ou preocupações: ",
+              {
+                "a": "github.com/dlamarre-dev/ImageVault",
+                "href": "https://github.com/dlamarre-dev/ImageVault"
+              },
+              "."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "title": "ImageVault — Termos de Serviço",
+    "heading": "ImageVault — Termos de Serviço",
+    "updatedLabel": "Última atualização",
+    "home": "Início",
+    "intro": [
+      {
+        "p": [
+          "O ImageVault é software livre e de código aberto disponibilizado sob a ",
+          {
+            "a": "Licença MIT",
+            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+          },
+          ". Ao utilizar a extensão ou a aplicação web, aceita estes termos."
+        ]
+      }
+    ],
+    "sections": [
+      {
+        "h": "O serviço",
+        "blocks": [
+          {
+            "p": [
+              "O ImageVault cifra um ficheiro no seu dispositivo e codifica-o em imagens que pode guardar em disco, imprimir ou, opcionalmente, carregar para a sua própria conta Google Photos. Funciona inteiramente no seu navegador; não existe conta nem servidor operado por nós (consulte a ",
+              {
+                "a": "Política de Privacidade",
+                "href": "./privacy.html"
+              },
+              ")."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Sem garantia",
+        "blocks": [
+          {
+            "p": [
+              "O software é fornecido «tal como está», sem garantia de qualquer tipo, expressa ou implícita, incluindo, entre outras, as garantias de comercialização, adequação a um fim específico e não violação de direitos. Na medida máxima permitida por lei, os autores não são responsáveis por qualquer reclamação, dano ou perda resultante da utilização do software."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "A sua responsabilidade",
+        "blocks": [
+          {
+            "ul": [
+              [
+                "É responsável pela sua palavra-passe e pela sua chave. ",
+                {
+                  "b": "Se perder a sua palavra-passe ou a sua chave, os seus dados ficarão permanentemente irrecuperáveis"
+                },
+                " — ninguém os poderá restaurar por si."
+              ],
+              [
+                "Mantenha várias cópias das suas imagens em locais independentes. Não dependa de um único meio e nunca considere o Google Photos como a sua única cópia."
+              ],
+              [
+                "Utilize o ImageVault apenas para fins lícitos e apenas com dados que tenha o direito de armazenar."
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Google Photos",
+        "blocks": [
+          {
+            "p": [
+              "O destino opcional Google Photos interage diretamente com a sua própria conta Google e rege-se adicionalmente pelos termos e políticas da Google."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Alterações",
+        "blocks": [
+          {
+            "p": [
+              "Estes termos podem ser alterados; as atualizações são publicadas nesta página. A utilização continuada após uma alteração constitui aceitação."
+            ]
+          }
+        ]
+      },
+      {
+        "h": "Contacto",
+        "blocks": [
+          {
+            "p": [
+              {
+                "a": "github.com/dlamarre-dev/ImageVault",
+                "href": "https://github.com/dlamarre-dev/ImageVault"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,9 +2,11 @@
 
 ImageVault's UI strings live in `public/_locales/<code>/messages.json` and are
 resolved with `chrome.i18n` (see `src/ui/i18n.ts`). The browser locale is
-followed automatically — there is no in-app language switcher (plan §7). Missing
-keys fall back to the default locale (`en`), so a partially translated locale
-still works.
+followed automatically — there is no in-app language switcher for the main UI
+(plan §7). Missing keys fall back to the default locale (`en`), so a partially
+translated locale still works. The standalone web app bundles all eight
+catalogs at build time and selects one from `navigator.language` (see
+`src/web/i18n.ts`), so it stays in sync with the extension.
 
 ## Target locales (8)
 
@@ -25,6 +27,22 @@ The store `name` (`extName`, ≤ 75 chars) and `description` (`extDesc`, ≤ 132
 chars) are keyword-oriented rather than literal translations. Before publishing,
 do a short per-language keyword check (plan §7) and have a native speaker review
 the CJK locales.
+
+## Legal pages (Privacy Policy & Terms of Service)
+
+The web app's `privacy.html` and `terms.html` keep fixed URLs (already
+registered with search engines) but render in the reader's language. The prose
+for all eight locales lives as structured JSON in `src/web/legal/<code>.json`;
+`src/web/legal/render.ts` picks the locale (from a `?lang=` override or the
+browser, with any `zh-*` mapped to `zh_TW`), builds the page as real DOM nodes,
+and shows a visible language selector. `docs/PRIVACY.md` and `docs/TERMS.md`
+remain the **English source of truth**; the `en.json` catalog mirrors them.
+
+`src/web/legal/legal.test.ts` guards the catalogs: every locale must match the
+English structure exactly and preserve each `href` and `code` literal verbatim
+(URLs and permission names are never translated). The **ja and zh_TW** legal
+translations, like the UI strings, **need native review** before store
+submission.
 
 ## Store screenshots (not yet automated)
 
