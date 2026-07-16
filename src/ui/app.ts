@@ -1,5 +1,13 @@
 import browser from 'webextension-polyfill';
-import { estimateImages, PROFILE_CLOUD, PROFILE_DISK, PROFILE_PAPER, type KeyMode } from '@core';
+import {
+  estimateImages,
+  parseKeyBlock,
+  PROFILE_CLOUD,
+  PROFILE_DISK,
+  PROFILE_PAPER,
+  unlockKeyBlock,
+  type KeyMode,
+} from '@core';
 import { localizeDom } from './i18n';
 import { el, friendlyError, msg, pick, setStatus, show, wireDropzone } from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
@@ -39,11 +47,18 @@ const paperFields = el('paper-fields');
 const addInstructions = el<HTMLInputElement>('add-instructions');
 const pwHint = el<HTMLInputElement>('pw-hint');
 const keyLocation = el<HTMLInputElement>('key-location');
+const stegoFields = el('stego-fields');
+const coverDrop = el('cover-drop');
+const coverFile = el<HTMLInputElement>('cover-file');
+const coverDzFile = el('cover-dz-file');
+const stegoPw = el<HTMLInputElement>('stego-pw');
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
 const restoreDrop = el('restore-drop');
 const restoreDzFile = el('restore-dz-file');
 const restoreKey = el<HTMLInputElement>('restore-key');
+const keyDrop = el('key-drop');
+const keyDzFile = el('key-dz-file');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
 const restorePhotosBtn = el<HTMLButtonElement>('restore-photos-btn');
@@ -75,6 +90,11 @@ function reflectDestination(): void {
   show(bandFields, dest !== 'disk' || addBand.checked);
 }
 
+/** Show the cover-image + password inputs only for the stego key mode. */
+function reflectKeyMode(): void {
+  show(stegoFields, selectedKeyMode() === 'stego');
+}
+
 if (HAS_GOOGLE_PHOTOS) {
   show(el('dest-cloud-label'), true);
   show(el('cloud-note'), true);
@@ -92,6 +112,7 @@ async function loadPrefs(): Promise<void> {
   asZip.checked = prefs.asZip;
   addInstructions.checked = prefs.includeInstructions;
   reflectDestination();
+  reflectKeyMode();
 }
 
 function setPill(state: 'none' | 'locked' | 'unlocked'): void {
@@ -166,6 +187,7 @@ for (const radio of document.querySelectorAll('input[name="dest"]')) {
 }
 for (const radio of document.querySelectorAll('input[name="keymode"]')) {
   radio.addEventListener('change', () => {
+    reflectKeyMode();
     void savePrefs({ keyMode: selectedKeyMode() });
     void updateEstimate();
   });
@@ -198,7 +220,11 @@ wireDropzone(fileDrop, saveFile, () => {
   show(saveResult, false);
   void updateEstimate();
 });
-wireDropzone(restoreDrop, restoreFiles, () => reflectFile(restoreDrop, restoreDzFile, restoreFiles));
+wireDropzone(restoreDrop, restoreFiles, () =>
+  reflectFile(restoreDrop, restoreDzFile, restoreFiles),
+);
+wireDropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
+wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
 
 saveBtn.addEventListener('click', async () => {
   const session = await getSession();
@@ -211,6 +237,25 @@ saveBtn.addEventListener('click', async () => {
   const date = new Date().toISOString().slice(0, 10);
   const useLabel = addBand.checked;
   const title = useLabel ? bandTitle.value.trim() : '';
+
+  // Stego hides the *managed* key block in a cover photo. It must be keyed by
+  // the vault password (the same one that unwraps the block), so restore — which
+  // uses one password for both the stego extraction and the unwrap — works.
+  let stego: { cover: File; password: string } | undefined;
+  if (keyMode === 'stego') {
+    if (dest === 'cloud') return setStatus(saveStatus, msg('errStegoCloud'), true);
+    const cover = coverFile.files?.[0];
+    if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
+    if (!stegoPw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
+    try {
+      // Verify the typed password actually unlocks this device's key, so the
+      // stego image can never be keyed by a password that won't restore it.
+      await unlockKeyBlock(parseKeyBlock(session.keyBlock), stegoPw.value);
+    } catch {
+      return setStatus(saveStatus, msg('errWrongPassword'), true);
+    }
+    stego = { cover, password: stegoPw.value };
+  }
 
   saveBtn.disabled = true;
   show(saveResult, false);
@@ -233,6 +278,7 @@ saveBtn.addEventListener('click', async () => {
         includeInstructions: addInstructions.checked,
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
+        stego,
       });
       note = msg('statusSavedPdf', String(imageCount));
     } else {
@@ -241,8 +287,15 @@ saveBtn.addEventListener('click', async () => {
         keyMode,
         label,
         asZip: asZip.checked,
+        stego,
       });
-      note = msg(keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile', String(imageCount));
+      const savedKey =
+        keyMode === 'embedded'
+          ? 'statusSaved'
+          : keyMode === 'stego'
+            ? 'statusSavedStego'
+            : 'statusSavedKeyfile';
+      note = msg(savedKey, String(imageCount));
     }
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;

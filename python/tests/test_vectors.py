@@ -41,13 +41,19 @@ def test_argon2id_kek_matches_typescript(v):
     assert kek == _hx(v["kekHex"])
 
 
-def test_nfc_and_nfd_passwords_derive_different_keks():
-    """The format applies NO Unicode normalization; both stacks must agree."""
+def test_nfc_and_nfd_passwords_derive_same_kek():
+    """Passwords are NFC-normalized before hashing; both stacks must agree."""
     nfc = next(v for v in VECTORS["argon2id"] if v["name"] == "unicode-nfc")
     nfd = next(v for v in VECTORS["argon2id"] if v["name"] == "unicode-nfd")
-    assert unicodedata.normalize("NFC", nfc["password"]) == unicodedata.normalize("NFC", nfd["password"])
+    # Different raw bytes, same normalized text -> identical KEK.
     assert nfc["password"] != nfd["password"]
-    assert nfc["kekHex"] != nfd["kekHex"]
+    assert unicodedata.normalize("NFC", nfc["password"]) == unicodedata.normalize("NFC", nfd["password"])
+    assert nfc["kekHex"] == nfd["kekHex"]
+    # And derive_kek reproduces that shared KEK from either spelling.
+    kek_from_nfd = derive_kek(
+        nfd["password"], _hx(nfd["saltHex"]), nfd["iterations"], nfd["memoryKiB"], nfd["parallelism"]
+    )
+    assert kek_from_nfd == _hx(nfc["kekHex"])
 
 
 # ---- AES-256-GCM ---------------------------------------------------------------

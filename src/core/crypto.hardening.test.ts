@@ -225,14 +225,23 @@ describe('failure indistinguishability', () => {
 });
 
 describe('password edge cases', () => {
-  it('unlocks only the exact byte sequence: NFC vs NFD, case, whitespace', async () => {
-    const nfc = 'café pass'; // é precomposed
-    const nfd = 'café pass'; // e + combining acute — same rendering
+  it('unlocks across Unicode normalization forms but not case/whitespace changes', async () => {
+    const nfc = 'café pass'; // precomposed (NFC)
+    const nfd = 'café pass'; // e + combining acute (NFD) - same rendered text
+    expect(nfc).not.toBe(nfd); // genuinely different byte sequences
     expect(nfc.normalize('NFC')).toBe(nfd.normalize('NFC'));
 
+    // A vault created with the NFC form unlocks when the password is later
+    // typed in the NFD form (and vice versa) - the whole point of §5.1.
     const { block } = await createKeyBlock(nfc, FAST);
     await expect(unlockKeyBlock(block, nfc)).resolves.toBeTruthy();
-    for (const wrong of [nfd, 'CAFÉ PASS', ` ${nfc}`, `${nfc} `, nfc.slice(0, -1)]) {
+    await expect(unlockKeyBlock(block, nfd)).resolves.toBeTruthy();
+
+    const { block: block2 } = await createKeyBlock(nfd, FAST);
+    await expect(unlockKeyBlock(block2, nfc)).resolves.toBeTruthy();
+
+    // Normalization is NOT case-folding or trimming: those still fail.
+    for (const wrong of ['CAFÉ PASS', ` ${nfc}`, `${nfc} `, nfc.slice(0, -1)]) {
       await expect(unlockKeyBlock(block, wrong)).rejects.toBeInstanceOf(WrongPasswordError);
     }
   });

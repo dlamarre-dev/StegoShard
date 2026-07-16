@@ -18,6 +18,8 @@ _LAZY = {
     "MissingKeyError": "pipeline",
     "WrongPasswordError": "crypto",
     "decode_image": "qr",
+    "extract_key_block": "stego",
+    "extract_key_block_from_image": "stego",
 }
 
 __all__ = list(_LAZY)

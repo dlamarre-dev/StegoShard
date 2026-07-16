@@ -63,3 +63,32 @@ def test_missing_image_is_tolerated():
     # Drop one image; erasure coding still reconstructs (k data + m parity).
     restored = decode_vault(payloads[1:], manifest["password"])
     assert restored.content == expected
+
+
+def test_stego_key_image_round_trip():
+    """The key hidden in a cover photo is extracted with the password, then restores."""
+    from imagevault import extract_key_block_from_image
+
+    d = FIXTURES / "stego"
+    manifest = json.loads((d / "manifest.json").read_text())
+    payloads = []
+    for img in sorted(d.glob("page-*.png")):
+        payload = decode_image(img.read_bytes())
+        assert payload is not None
+        payloads.append(payload)
+    expected = (d / "expected.bin").read_bytes()
+
+    # Without the key image, a stego set cannot be restored.
+    with pytest.raises(MissingKeyError):
+        decode_vault(payloads, manifest["password"])
+
+    # A wrong password finds no key in the cover (indistinguishable from none).
+    cover = (d / "key.png").read_bytes()
+    assert extract_key_block_from_image(cover, "not the password") is None
+
+    # The right password extracts the key block and restores the file.
+    key_block = extract_key_block_from_image(cover, manifest["password"])
+    assert key_block is not None
+    restored = decode_vault(payloads, manifest["password"], key_block)
+    assert restored.filename == manifest["filename"]
+    assert restored.content == expected

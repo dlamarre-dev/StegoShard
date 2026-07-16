@@ -76,6 +76,18 @@ export function randomBytes(len: number): Uint8Array {
   return globalThis.crypto.getRandomValues(new Uint8Array(len));
 }
 
+/**
+ * Normalize a password to Unicode NFC before it is ever hashed. Different
+ * platforms/keyboards can emit the same text as different byte sequences
+ * (precomposed "é" vs. "e" + combining accent); NFC makes the KEK depend on the
+ * *text*, not on how it happened to be encoded, so a vault created on one device
+ * unlocks on another. Frozen in SPEC.md — both the extension and the Python
+ * reference decoder must normalize identically.
+ */
+export function normalizePassword(password: string): string {
+  return password.normalize('NFC');
+}
+
 /** Derive the KEK (an AES-GCM key) from a password and salt via Argon2id. */
 export async function deriveKEK(
   password: string,
@@ -83,7 +95,7 @@ export async function deriveKEK(
   params: Argon2Params = DEFAULT_ARGON2,
 ): Promise<CryptoKey> {
   const raw = await argon2id({
-    password,
+    password: normalizePassword(password),
     salt,
     parallelism: params.parallelism,
     iterations: params.iterations,
@@ -202,6 +214,20 @@ export function serializeKeyBlock(block: KeyBlock): Uint8Array {
   const lenField = new Uint8Array(2);
   writeU16(lenField, 0, block.wrapped.length);
   return concatBytes(KEY_MAGIC, head, block.salt, block.iv, lenField, block.wrapped);
+}
+
+/**
+ * Cheap structural check: do these bytes begin like a serialized key block
+ * (magic + supported version) and have exactly the fixed length? Used by the
+ * stego layer to decide, without throwing, whether a de-whitened candidate is
+ * a real key block or random noise from a wrong password.
+ */
+export function isSerializedKeyBlock(bytes: Uint8Array): boolean {
+  if (bytes.length !== KEY_BLOCK_LEN) return false;
+  for (let i = 0; i < KEY_MAGIC.length; i++) {
+    if (bytes[i] !== KEY_MAGIC[i]) return false;
+  }
+  return bytes[KEY_MAGIC.length] === KEY_BLOCK_VERSION;
 }
 
 /** Parse a wrapped DEK block produced by serializeKeyBlock. */

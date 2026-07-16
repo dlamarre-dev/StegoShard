@@ -459,5 +459,46 @@
   "errCamera": {
     "message": "Caméra indisponible ou accès refusé.",
     "description": "Web restore: camera could not be started."
+  },
+  "keyModeStego": {
+    "message": "Dans une photo",
+    "description": "Key mode: hide the key block in a cover photo (stego)."
+  },
+  "coverTitle": {
+    "message": "Photo de couverture (PNG ou JPG)",
+    "description": "Stego: cover-photo dropzone title."
+  },
+  "stegoWarning": {
+    "message": "La clé est cachée dans les pixels de cette photo. Conservez le PNG enregistré tel quel — le ré-enregistrer, le redimensionner ou l'envoyer en JPEG détruit la clé. Rangez-le séparément des images.",
+    "description": "Stego: warning to keep the PNG lossless and separate."
+  },
+  "labelKeyFileOrImage": {
+    "message": "Fichier clé (.key) ou photo-clé",
+    "description": "Restore: label for the .key file or stego key image input."
+  },
+  "labelStegoPassword": {
+    "message": "Mot de passe du coffre (verrouille la photo-clé)",
+    "description": "Extension stego: vault password that keys the cover photo."
+  },
+  "errNoCover": {
+    "message": "Choisissez une photo de couverture pour y cacher la clé.",
+    "description": "Stego: no cover photo chosen."
+  },
+  "errCoverTooSmall": {
+    "message": "Cette photo est trop petite pour contenir la clé. Choisissez-en une plus grande.",
+    "description": "Stego: cover photo too small to hold the key block."
+  },
+  "errStegoCloud": {
+    "message": "Cacher la clé dans une photo n'est pas disponible avec la destination infonuagique.",
+    "description": "Stego: not available with the cloud destination."
+  },
+  "statusSavedStego": {
+    "message": "$COUNT$ image(s) enregistrée(s). Votre clé est cachée dans la photo de couverture — conservez ce PNG et votre mot de passe pour restaurer.",
+    "description": "Status after saving with the key hidden in a cover photo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

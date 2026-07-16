@@ -14,6 +14,8 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import {
   createKeyBlock,
+  DEFAULT_ARGON2,
+  embedKeyBlockStego,
   serializeKeyBlock,
   exportVault,
   getCodec,
@@ -71,11 +73,33 @@ async function generate(name: string, keyMode: KeyMode, content: Uint8Array): Pr
     writePng(join(dir, `page-${String(i + 1).padStart(2, '0')}.png`), img);
   });
 
-  if (keyMode !== 'embedded') writeFileSync(join(dir, 'vault.key'), keyBlock);
+  if (keyMode === 'stego') {
+    // Hide the key block in a deterministic cover photo (a 128×128 gradient) and
+    // write it as a PNG. The reference decoder must extract it with the password.
+    // Uses the production Argon2id defaults — the stego cost is not stored, so a
+    // decoder assumes the defaults (SPEC §5.3).
+    const w = 128;
+    const h = 128;
+    const rgba = new Uint8Array(w * h * 4);
+    for (let p = 0; p < w * h; p++) {
+      rgba[p * 4] = (p * 7) & 0xff;
+      rgba[p * 4 + 1] = (p * 13) & 0xff;
+      rgba[p * 4 + 2] = (p * 29) & 0xff;
+      rgba[p * 4 + 3] = 255;
+    }
+    await embedKeyBlockStego(rgba, w, h, keyBlock, PASSWORD, DEFAULT_ARGON2);
+    writePng(join(dir, 'key.png'), { data: new Uint8ClampedArray(rgba), width: w, height: h });
+  } else if (keyMode !== 'embedded') {
+    writeFileSync(join(dir, 'vault.key'), keyBlock);
+  }
   writeFileSync(join(dir, 'expected.bin'), content);
   writeFileSync(
     join(dir, 'manifest.json'),
-    JSON.stringify({ password: PASSWORD, filename: FILENAME, keyMode, images: imagePayloads.length }, null, 2),
+    JSON.stringify(
+      { password: PASSWORD, filename: FILENAME, keyMode, images: imagePayloads.length },
+      null,
+      2,
+    ),
   );
   console.log(`fixture ${name}: ${imagePayloads.length} image(s), keyMode=${keyMode}`);
 }
@@ -83,4 +107,5 @@ async function generate(name: string, keyMode: KeyMode, content: Uint8Array): Pr
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
 await generate('keyfile', 'keyfile', content);
+await generate('stego', 'stego', content);
 console.log(`fixtures written to ${outRoot}`);

@@ -362,5 +362,46 @@
   "errCamera": {
     "message": "カメラを利用できないか、アクセスが拒否されました。",
     "description": "Web restore: camera could not be started."
+  },
+  "keyModeStego": {
+    "message": "写真の中に",
+    "description": "Key mode: hide the key block in a cover photo (stego)."
+  },
+  "coverTitle": {
+    "message": "カバー写真(PNG または JPG)",
+    "description": "Stego: cover-photo dropzone title."
+  },
+  "stegoWarning": {
+    "message": "鍵はこの写真のピクセルに隠されています。保存した PNG をそのまま保管してください。再保存・リサイズ・JPEG での送信は鍵を壊します。画像とは別に保管してください。",
+    "description": "Stego: warning to keep the PNG lossless and separate."
+  },
+  "labelKeyFileOrImage": {
+    "message": "鍵ファイル(.key)または鍵写真",
+    "description": "Restore: label for the .key file or stego key image input."
+  },
+  "labelStegoPassword": {
+    "message": "保管庫のパスワード(鍵写真を保護)",
+    "description": "Extension stego: vault password that keys the cover photo."
+  },
+  "errNoCover": {
+    "message": "鍵を隠すカバー写真を選んでください。",
+    "description": "Stego: no cover photo chosen."
+  },
+  "errCoverTooSmall": {
+    "message": "その写真は小さすぎて鍵を格納できません。より大きな写真を選んでください。",
+    "description": "Stego: cover photo too small to hold the key block."
+  },
+  "errStegoCloud": {
+    "message": "写真に鍵を隠す方式はクラウド保存先では利用できません。",
+    "description": "Stego: not available with the cloud destination."
+  },
+  "statusSavedStego": {
+    "message": "$COUNT$ 枚の画像を保存しました。鍵はカバー写真に隠されています。その PNG とパスワードを復元用に保管してください。",
+    "description": "Status after saving with the key hidden in a cover photo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

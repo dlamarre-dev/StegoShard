@@ -137,6 +137,12 @@ bytes after `wrappedDEK` (exactly `44 + wrappedLen` bytes total).
   Parameters are stored in the block so any decoder can reproduce the derivation.
   The extension's production defaults are `iterations = 3`, `memoryKiB = 65536`
   (64 MiB), `parallelism = 1`.
+- **Password normalization:** the password MUST be normalized to **Unicode NFC**
+  and encoded as **UTF-8** before it is fed to Argon2id. This makes the KEK
+  depend on the text, not on how a particular platform or keyboard happened to
+  encode it (e.g. precomposed `é` vs. `e` + combining accent), so a vault created
+  on one device unlocks on another. Every conforming decoder MUST normalize
+  identically.
 - **Wrapping:** `wrappedDEK = AES-256-GCM(KEK, rawDEK)` using `wrapIv`. The GCM tag
   is included in `wrappedDEK`, so a wrong password fails to unwrap (authenticated).
 - **salt:** 16 random bytes for the KDF.
@@ -154,11 +160,45 @@ Where the key block travels is chosen per save:
   block bytes of §5.1 (magic `"IVKY"`). Restore needs the images, the password,
   and this `.key` file. A leaked image then reveals nothing without the `.key`.
 - **stego** — like keyfile, but the key block is hidden in an ordinary-looking
-  cover image (added in a later phase). At the blob level it is identical to
-  keyfile (`KB_LEN = 0`); only the delivery of the key block differs.
+  cover image (§5.3). At the blob level it is identical to keyfile (`KB_LEN = 0`);
+  only the delivery of the key block differs.
 
 A decoder distinguishes the cases by `KB_LEN`: non-zero means the key block is
 embedded; zero means it must be supplied externally.
+
+### 5.3 Stego key block (deniable LSB embedding)
+
+The stego mode hides the §5.1 key block in the RGB least-significant bits of a
+cover image, keyed by the password so that — without the password — the carrier
+is indistinguishable from a photo's natural LSB noise. There is **no header,
+magic, or length field in the image**: the payload length is fixed at the
+92-byte key block (`KEY_BLOCK_LEN`), and extraction with a wrong password yields
+random bytes that fail the §5.1 magic check, reported identically to "no key
+here" (the deniability property).
+
+Carrier: the cover is treated as **RGBA**, 4 bytes/pixel. Only the R, G, B LSBs
+carry data (alpha is never touched); capacity `N = width × height × 3`. A cover
+MUST provide `N ≥ 736 × 16` LSBs or it is rejected. The carrier MUST be stored
+losslessly (PNG); any re-encoding (JPEG), resize, or re-save destroys the key.
+
+Derivation (all decoders MUST reproduce it bit-for-bit):
+
+1. `seed = Argon2id(NFC(password), STEGO_SALT, params)` → 32 bytes, where
+   `STEGO_SALT` is the fixed 16 bytes `49 56 4B 59 2D 73 74 65 67 6F 2D 76 31 00 00 00`
+   (`"IVKY-stego-v1"` padded with zeros) and `params` are the caller's Argon2id
+   cost parameters (the extension uses the §5.1 production defaults).
+2. `stream = AES-256-CTR(key = seed, counter = 0¹²⁸)` applied to zero bytes,
+   generating as many bytes as needed. The first `KEY_BLOCK_LEN` bytes are the
+   **whitening pad**; the remainder feeds position selection.
+3. **Whiten:** `whitened = keyBlock XOR pad`.
+4. **Positions:** treating the post-pad stream as big-endian `u32` values, pick
+   `KEY_BLOCK_LEN × 8 = 736` **distinct** positions in `[0, N)` in stream order,
+   rejecting any draw `≥ floor(2³² / N) × N` (removes modulo bias) and any
+   duplicate. Bit _i_ of `whitened` (MSB-first within each byte) is written to
+   the LSB of RGB channel byte `⌊pos/3⌋ × 4 + (pos mod 3)`.
+
+Extraction reverses steps 4→3 and validates the result against §5.1 (magic
+`"IVKY"`, supported version, exact 92-byte length); failure ⇒ treat as absent.
 
 ---
 

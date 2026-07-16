@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import unicodedata
+
 from argon2.low_level import ARGON2_VERSION, Type, hash_secret_raw
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -14,10 +16,15 @@ class WrongPasswordError(Exception):
     """Raised when the DEK cannot be unwrapped — almost always a wrong password."""
 
 
+def normalize_password(password: str) -> str:
+    """NFC-normalize the password before hashing (mirrors the extension, SPEC §5.1)."""
+    return unicodedata.normalize("NFC", password)
+
+
 def derive_kek(password: str, salt: bytes, iterations: int, memory_kib: int, parallelism: int) -> bytes:
     """Argon2id → 32-byte KEK. Version 0x13 matches the extension (hash-wasm)."""
     return hash_secret_raw(
-        secret=password.encode("utf-8"),
+        secret=normalize_password(password).encode("utf-8"),
         salt=salt,
         time_cost=iterations,
         memory_cost=memory_kib,

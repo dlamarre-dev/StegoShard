@@ -17,10 +17,15 @@ import {
 } from '@core';
 import { el, pick, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import { saveFileToDisk, restoreFileFromDisk } from '../ui/disk';
-import { localizeDom, msg, friendlyError } from './i18n';
+import { localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
 localizeDom();
+wireLanguageSelect(el<HTMLSelectElement>('lang-select'), () => {
+  // Re-render the strings that were set dynamically (localizeDom only handles
+  // static [data-i18n] nodes), so a mid-session switch is fully translated.
+  reflectCaptured(capturedCount());
+});
 
 type Dest = 'disk' | 'paper';
 
@@ -29,6 +34,10 @@ const fileDrop = el('file-drop');
 const dzFile = el('dz-file');
 const savePw = el<HTMLInputElement>('save-pw');
 const estimate = el('estimate');
+const stegoFields = el('stego-fields');
+const coverDrop = el('cover-drop');
+const coverFile = el<HTMLInputElement>('cover-file');
+const coverDzFile = el('cover-dz-file');
 const addBand = el<HTMLInputElement>('add-band');
 const bandFields = el('band-fields');
 const bandTitle = el<HTMLInputElement>('band-title');
@@ -88,6 +97,10 @@ async function updateEstimate(): Promise<void> {
   }
 }
 
+function reflectKeyMode(): void {
+  show(stegoFields, selectedKeyMode() === 'stego');
+}
+
 addBand.addEventListener('change', () => show(bandFields, addBand.checked));
 for (const r of document.querySelectorAll('input[name="dest"]')) {
   r.addEventListener('change', () => {
@@ -96,7 +109,10 @@ for (const r of document.querySelectorAll('input[name="dest"]')) {
   });
 }
 for (const r of document.querySelectorAll('input[name="keymode"]')) {
-  r.addEventListener('change', () => void updateEstimate());
+  r.addEventListener('change', () => {
+    reflectKeyMode();
+    void updateEstimate();
+  });
 }
 
 wireDropzone(fileDrop, saveFile, () => {
@@ -104,6 +120,7 @@ wireDropzone(fileDrop, saveFile, () => {
   show(saveResult, false);
   void updateEstimate();
 });
+wireDropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
 wireDropzone(restoreDrop, restoreFiles, () =>
   reflectFile(restoreDrop, restoreDzFile, restoreFiles),
 );
@@ -138,6 +155,9 @@ saveBtn.addEventListener('click', async () => {
 
   const keyMode = selectedKeyMode();
   const dest = selectedDest();
+  const cover = coverFile.files?.[0];
+  if (keyMode === 'stego' && !cover) return setStatus(saveStatus, msg('errNoCover'), true);
+  const stego = keyMode === 'stego' && cover ? { cover, password: savePw.value } : undefined;
   const date = new Date().toISOString().slice(0, 10);
   const useLabel = addBand.checked;
   const title = useLabel ? bandTitle.value.trim() : '';
@@ -157,6 +177,7 @@ saveBtn.addEventListener('click', async () => {
         includeInstructions: addInstructions.checked,
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
+        stego,
       });
       note = msg('statusSavedPdf', String(imageCount));
     } else {
@@ -165,8 +186,15 @@ saveBtn.addEventListener('click', async () => {
         keyMode,
         label,
         asZip: asZip.checked,
+        stego,
       });
-      note = msg(keyMode === 'embedded' ? 'statusSaved' : 'statusSavedKeyfile', String(imageCount));
+      const savedKey =
+        keyMode === 'embedded'
+          ? 'statusSaved'
+          : keyMode === 'stego'
+            ? 'statusSavedStego'
+            : 'statusSavedKeyfile';
+      note = msg(savedKey, String(imageCount));
     }
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
@@ -208,3 +236,4 @@ restoreBtn.addEventListener('click', async () => {
 });
 
 reflectDestination();
+reflectKeyMode();

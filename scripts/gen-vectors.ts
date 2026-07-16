@@ -22,7 +22,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argon2id } from 'hash-wasm';
 import { toHex, writeU16, concatBytes } from '../src/core/bytes';
-import { serializeKeyBlock, type Argon2Params } from '../src/core/crypto';
+import { normalizePassword, serializeKeyBlock, type Argon2Params } from '../src/core/crypto';
 import { buildPayload } from '../src/core/payload';
 
 const subtle = globalThis.crypto.subtle;
@@ -44,7 +44,8 @@ function pattern(len: number, seed: number): Uint8Array {
 
 async function kekHex(password: string, salt: Uint8Array, p: Argon2Params): Promise<string> {
   return argon2id({
-    password,
+    // Mirror deriveKEK: the KEK depends on NFC-normalized text, not raw bytes.
+    password: normalizePassword(password),
     salt,
     parallelism: p.parallelism,
     iterations: p.iterations,
@@ -108,8 +109,8 @@ const ARGON2_CASES: Omit<Argon2Vector, 'kekHex'>[] = [
     parallelism: 4,
   },
   {
-    // U+00E2 U+00F6 precomposed (NFC). Distinct from the NFD case below: the
-    // format applies NO Unicode normalization, both sides must agree on that.
+    // Precomposed (NFC) spelling. Shares salt/params with the NFD case below:
+    // after NFC normalization both derive the SAME KEK (SPEC §5.1).
     name: 'unicode-nfc',
     password: 'pâsswörd☕',
     saltHex: '101112131415161718191a1b1c1d1e1f',
@@ -118,8 +119,8 @@ const ARGON2_CASES: Omit<Argon2Vector, 'kekHex'>[] = [
     parallelism: 1,
   },
   {
-    // Same rendered text as unicode-nfc but decomposed (a + U+0302, o + U+0308):
-    // different UTF-8 bytes, therefore a DIFFERENT KEK. Locks in "no normalization".
+    // Same rendered text as unicode-nfc but typed decomposed (a + U+0302,
+    // o + U+0308): different raw UTF-8, but normalization makes the KEK match.
     name: 'unicode-nfd',
     password: 'pâsswörd☕',
     saltHex: '101112131415161718191a1b1c1d1e1f',

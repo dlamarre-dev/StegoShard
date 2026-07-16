@@ -362,5 +362,46 @@
   "errCamera": {
     "message": "相機無法使用或存取遭拒。",
     "description": "Web restore: camera could not be started."
+  },
+  "keyModeStego": {
+    "message": "藏在照片中",
+    "description": "Key mode: hide the key block in a cover photo (stego)."
+  },
+  "coverTitle": {
+    "message": "封面照片(PNG 或 JPG)",
+    "description": "Stego: cover-photo dropzone title."
+  },
+  "stegoWarning": {
+    "message": "金鑰隱藏在這張照片的像素中。請原封不動地保留儲存的 PNG——重新儲存、調整大小或以 JPEG 傳送都會破壞金鑰。請與圖像分開保存。",
+    "description": "Stego: warning to keep the PNG lossless and separate."
+  },
+  "labelKeyFileOrImage": {
+    "message": "金鑰檔案(.key)或金鑰照片",
+    "description": "Restore: label for the .key file or stego key image input."
+  },
+  "labelStegoPassword": {
+    "message": "保險庫密碼(鎖定金鑰照片)",
+    "description": "Extension stego: vault password that keys the cover photo."
+  },
+  "errNoCover": {
+    "message": "請選擇一張封面照片來隱藏金鑰。",
+    "description": "Stego: no cover photo chosen."
+  },
+  "errCoverTooSmall": {
+    "message": "該照片太小,無法容納金鑰。請選擇較大的照片。",
+    "description": "Stego: cover photo too small to hold the key block."
+  },
+  "errStegoCloud": {
+    "message": "雲端目的地不支援將金鑰隱藏在照片中。",
+    "description": "Stego: not available with the cloud destination."
+  },
+  "statusSavedStego": {
+    "message": "已儲存 $COUNT$ 張圖像。您的金鑰已隱藏在封面照片中——請保留該 PNG 與密碼以便還原。",
+    "description": "Status after saving with the key hidden in a cover photo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

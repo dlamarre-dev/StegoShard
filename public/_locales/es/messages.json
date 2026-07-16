@@ -362,5 +362,46 @@
   "errCamera": {
     "message": "Cámara no disponible o acceso denegado.",
     "description": "Web restore: camera could not be started."
+  },
+  "keyModeStego": {
+    "message": "En una foto",
+    "description": "Key mode: hide the key block in a cover photo (stego)."
+  },
+  "coverTitle": {
+    "message": "Foto de portada (PNG o JPG)",
+    "description": "Stego: cover-photo dropzone title."
+  },
+  "stegoWarning": {
+    "message": "La clave está oculta en los píxeles de esta foto. Conserve el PNG guardado tal cual — volver a guardarlo, redimensionarlo o enviarlo como JPEG destruye la clave. Guárdelo aparte de las imágenes.",
+    "description": "Stego: warning to keep the PNG lossless and separate."
+  },
+  "labelKeyFileOrImage": {
+    "message": "Archivo de clave (.key) o foto de clave",
+    "description": "Restore: label for the .key file or stego key image input."
+  },
+  "labelStegoPassword": {
+    "message": "Contraseña de la bóveda (bloquea la foto de clave)",
+    "description": "Extension stego: vault password that keys the cover photo."
+  },
+  "errNoCover": {
+    "message": "Elija una foto de portada para ocultar la clave.",
+    "description": "Stego: no cover photo chosen."
+  },
+  "errCoverTooSmall": {
+    "message": "Esa foto es demasiado pequeña para contener la clave. Elija una más grande.",
+    "description": "Stego: cover photo too small to hold the key block."
+  },
+  "errStegoCloud": {
+    "message": "Ocultar la clave en una foto no está disponible con el destino en la nube.",
+    "description": "Stego: not available with the cloud destination."
+  },
+  "statusSavedStego": {
+    "message": "$COUNT$ imagen(es) guardada(s). Su clave está oculta en la foto de portada: conserve ese PNG y su contraseña para restaurar.",
+    "description": "Status after saving with the key hidden in a cover photo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

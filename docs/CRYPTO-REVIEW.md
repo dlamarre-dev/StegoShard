@@ -108,8 +108,8 @@ bit-for-bit:
 Vector classes:
 
 - **Argon2id** (8 vectors): ASCII, mixed parameters (including `p=4`), NFC vs
-  NFD spellings of the same password (they MUST derive different KEKs — the
-  format applies no Unicode normalization), emoji, an embedded NUL, a 128-char
+  NFD spellings of the same password (they MUST derive the **same** KEK — the
+  password is NFC-normalized before hashing), emoji, an embedded NUL, a 128-char
   password.
 - **AES-256-GCM** (5 vectors): empty plaintext, 1 B, one block, a non-block
   multiple, 256 B — all asserting the `ciphertext‖tag` layout both directions.
@@ -146,13 +146,54 @@ position):
 - freshness: two exports of identical content share no 8-byte ciphertext
   window (fresh IV each time) and never reuse a set id.
 
+## 6a. Deniable stego key mode
+
+**Claim: without the password, a stego cover image is indistinguishable from a
+photo with natural LSB noise; the layer is not a cheap password oracle.**
+
+`src/core/stego.ts` hides the 92-byte key block in the RGB least-significant
+bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
+
+- **Password-keyed positions + whitening.** `Argon2id(NFC(password), fixed salt)`
+  seeds an AES-256-CTR stream that both XOR-whitens the payload and chooses the
+  ~736 carrier LSBs by unbiased rejection sampling. Carrier bits are therefore
+  uniform, and their locations are unknown without the password.
+- **No structure on the wire.** Fixed payload length, no magic/length/header in
+  the image. Wrong-password extraction yields random bytes that fail the §5.1
+  key-block magic check and is reported identically to "no key here"
+  (`extractKeyBlockStego` → `null`) — proven in `stego.test.ts` (wrong password,
+  untouched cover, and cross-password covers all return null).
+- **Argon2-gated, not a fast oracle.** Locating/de-whitening costs one Argon2id
+  derivation per guess — the same cost as unwrapping the key block — so the
+  stego layer does not cheapen a password search.
+- **Tested properties:** exact round-trip (incl. NFC/NFD password forms), only
+  LSBs touched, alpha never touched, sparse changes (≤ 736 bits), whitened
+  carrier is ~50/50 ones, capacity guard, wrong-length payload rejection.
+- **Cross-implementation:** the Python reference decoder
+  (`python/imagevault/stego.py`) extracts the key from a TS-generated stego PNG
+  and restores the vault (`python/tests/test_conformance.py::test_stego_key_image_round_trip`),
+  proving the derivation matches bit-for-bit.
+
+**Honest limits (stated in the module and docs):** LSB stego survives only
+lossless storage — the emitted PNG must be kept as-is; JPEG re-encoding,
+resizing, or re-saving destroys the key. An adversary holding the _original_
+cover can diff it against the carrier. This resists casual and statistical
+inspection, not a dedicated forensic adversary who already suspects a specific
+image and password. Deniability is a hiding property layered on top of the
+password-wrapped key block — it is defense-in-depth, not the vault's
+confidentiality boundary (that remains the §5.1 key block).
+
 ## 7. Known limitations and deliberate choices
 
-1. **No Unicode normalization of passwords.** `café` (NFC) and `café` (NFD)
-   are different passwords. Locked in by cross-implementation vectors so both
-   decoders agree forever. Trade-off: a password typed on a platform that
-   composes differently will not unlock; normalizing would tie the format to a
-   Unicode version.
+1. **Passwords are NFC-normalized before hashing.** `café` typed precomposed
+   (NFC) and decomposed (NFD) are the _same_ password, so a vault created on one
+   platform unlocks on another that composes text differently. Locked in by
+   cross-implementation vectors (both stacks call `.normalize('NFC')` /
+   `unicodedata.normalize("NFC", …)`). Trade-off: the behavior is tied to the
+   host's Unicode normalization tables; these are stable for NFC across Unicode
+   versions for assigned characters, so drift is not a practical concern.
+   Normalization is _only_ NFC — it is not case-folding or whitespace trimming,
+   so those variations still fail (proven in the hardening suite).
 2. **Empty passwords cannot exist.** hash-wasm rejects an empty Argon2id
    password, so no key block can ever be created with one; on the unlock path
    an empty password is normalized to the uniform `WrongPasswordError`.

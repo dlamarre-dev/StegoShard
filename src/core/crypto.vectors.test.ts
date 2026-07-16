@@ -23,6 +23,7 @@ import {
   IV_LEN,
   decryptBytes,
   exportDekRaw,
+  normalizePassword,
   parseKeyBlock,
   unlockKeyBlock,
   WrongPasswordError,
@@ -90,7 +91,8 @@ describe('frozen vectors: Argon2id KEK derivation', () => {
   for (const v of vectors.argon2id) {
     it(`reproduces ${v.name}`, async () => {
       const kek = await argon2id({
-        password: v.password,
+        // Mirror deriveKEK: NFC-normalize before hashing.
+        password: normalizePassword(v.password),
         salt: fromHex(v.saltHex),
         iterations: v.iterations,
         memorySize: v.memoryKiB,
@@ -102,12 +104,13 @@ describe('frozen vectors: Argon2id KEK derivation', () => {
     });
   }
 
-  it('NFC and NFD spellings of the same password derive different KEKs (no normalization)', () => {
+  it('NFC and NFD spellings of the same password derive the SAME KEK (normalized)', () => {
     const nfc = vectors.argon2id.find((v) => v.name === 'unicode-nfc')!;
     const nfd = vectors.argon2id.find((v) => v.name === 'unicode-nfd')!;
-    expect(nfc.password.normalize('NFC')).toBe(nfd.password.normalize('NFC'));
+    // Different raw bytes, same normalized text → identical KEK.
     expect(nfc.password).not.toBe(nfd.password);
-    expect(nfc.kekHex).not.toBe(nfd.kekHex);
+    expect(nfc.password.normalize('NFC')).toBe(nfd.password.normalize('NFC'));
+    expect(nfc.kekHex).toBe(nfd.kekHex);
   });
 });
 

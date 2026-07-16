@@ -6,6 +6,7 @@
 import {
   FileTooLargeError,
   MissingKeyError,
+  StegoCapacityError,
   TooManyImagesError,
   WrongPasswordError,
 } from '@core';
@@ -17,6 +18,7 @@ export function friendlyError(
 ): string {
   if (err instanceof WrongPasswordError) return translate('errWrongPassword');
   if (err instanceof MissingKeyError) return translate('errMissingKey');
+  if (err instanceof StegoCapacityError) return translate('errCoverTooSmall');
   if (err instanceof FileTooLargeError) {
     return translate('errFileTooLarge', [
       String(Math.ceil(err.size / 1024)),

@@ -32,7 +32,7 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
-import { downloadBlob, imageDataToPngBlob } from './image-io';
+import { downloadBlob, embedKeyImage, imageDataToPngBlob } from './image-io';
 import { wrapText } from './text-wrap';
 
 /** Public project page — printed so the data can be restored without the store. */
@@ -49,6 +49,8 @@ export interface PaperOptions {
   includeInstructions?: boolean | undefined;
   passwordHint?: string | undefined;
   keyLocation?: string | undefined;
+  /** For the 'stego' key mode: cover photo + the password that keys embedding. */
+  stego?: { cover: File; password: string } | undefined;
 }
 
 // --- Localized instruction copy ----------------------------------------------
@@ -472,8 +474,13 @@ export async function saveFileToPaper(
     `imagevault-${setHex}.pdf`,
   );
 
-  // For keyfile/stego modes the key block is not on paper — save it to disk too.
-  if (keyMode !== 'embedded') {
+  // For keyfile/stego modes the key block is not on paper — deliver it too:
+  // hidden in the cover photo (stego) or as a plain .key file (keyfile).
+  if (keyMode === 'stego') {
+    if (!options.stego) throw new Error('stego mode requires a cover image and password');
+    const png = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    downloadBlob(png, `imagevault-${setHex}-key.png`);
+  } else if (keyMode !== 'embedded') {
     downloadBlob(new Blob([keyBlock as BufferSource]), `imagevault-${setHex}.key`);
   }
 

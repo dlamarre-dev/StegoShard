@@ -20,6 +20,8 @@ import { unzipSync, zipSync } from 'fflate';
 import {
   decodeImageBytes,
   downloadBlob,
+  embedKeyImage,
+  extractKeyImage,
   imageWithLabelToPngBlob,
   type LabelBand,
 } from './image-io';
@@ -30,6 +32,11 @@ export interface SaveOptions {
   label?: { title?: string; date?: string } | undefined;
   /** Bundle all images (+ .key) into a single .zip instead of many files. */
   asZip?: boolean;
+  /**
+   * For the 'stego' key mode: the cover photo to hide the key block in, and the
+   * password that keys the embedding (the same one that unlocks the vault).
+   */
+  stego?: { cover: File; password: string } | undefined;
 }
 
 async function blobBytes(blob: Blob): Promise<Uint8Array> {
@@ -63,22 +70,41 @@ export async function saveFileToDisk(
       bytes: await blobBytes(await imageWithLabelToPngBlob(img, band)),
     });
   }
-  // Key block is external for keyfile/stego modes.
-  const keyName = `imagevault-${setHex}.key`;
-  const hasKeyFile = keyMode !== 'embedded';
+  // The key block is external for keyfile/stego modes. In stego mode it is
+  // hidden inside the user's cover photo (a lossless PNG); otherwise it is a
+  // plain .key file. Bundled into the .zip only for the .key case — the stego
+  // image is always delivered on its own so it can be stored as an innocuous
+  // photo, separate from the obviously-ImageVault set.
+  let externalKey: { name: string; bytes: Uint8Array } | undefined;
+  if (keyMode === 'stego') {
+    if (!options.stego) throw new Error('stego mode requires a cover image and password');
+    const png = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    externalKey = { name: `imagevault-${setHex}-key.png`, bytes: await blobBytes(png) };
+  } else if (keyMode !== 'embedded') {
+    externalKey = { name: `imagevault-${setHex}.key`, bytes: keyBlock };
+  }
 
   if (options.asZip) {
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
-    if (hasKeyFile) entries[keyName] = keyBlock;
+    if (externalKey && keyMode === 'keyfile') entries[externalKey.name] = externalKey.bytes;
     const zipped = zipSync(entries, { level: 0 }); // PNGs are already compressed
     downloadBlob(new Blob([zipped as BufferSource]), `imagevault-${setHex}.zip`);
+    if (externalKey && keyMode === 'stego') {
+      downloadBlob(
+        new Blob([externalKey.bytes as BufferSource], { type: 'image/png' }),
+        externalKey.name,
+      );
+    }
   } else {
     for (const p of pngs) {
       downloadBlob(new Blob([p.bytes as BufferSource], { type: 'image/png' }), p.name);
       await new Promise((r) => setTimeout(r, 150)); // avoid batch-blocking
     }
-    if (hasKeyFile) downloadBlob(new Blob([keyBlock as BufferSource]), keyName);
+    if (externalKey) {
+      const type = keyMode === 'stego' ? 'image/png' : 'application/octet-stream';
+      downloadBlob(new Blob([externalKey.bytes as BufferSource], { type }), externalKey.name);
+    }
   }
 
   return { imageCount: total, setId: setHex, keyMode };
@@ -122,9 +148,10 @@ export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlo
 
 /**
  * Reconstruct the original file from image files, a .zip of them, a printed
- * PDF (paper mode), or a mix. A `.key` file (loose or inside the zip) is used
- * when present. `extraPayloads` lets callers add already-decoded payloads
- * (e.g. live camera captures).
+ * PDF (paper mode), or a mix. The separate key, when needed, may be a `.key`
+ * file (loose or inside the zip) or a **stego cover image** that hides the key
+ * block — the latter is de-embedded with the restore password. `extraPayloads`
+ * lets callers add already-decoded payloads (e.g. live camera captures).
  */
 export async function restoreFileFromDisk(
   files: File[],
@@ -134,7 +161,14 @@ export async function restoreFileFromDisk(
 ): Promise<{ filename: string }> {
   const images: Uint8Array[] = [];
   const payloads: Uint8Array[] = [...extraPayloads];
-  let keyBlock: Uint8Array | undefined = keyFile ? await blobBytes(keyFile) : undefined;
+  // A key input that is an image is a stego carrier: extract the key block
+  // with the restore password (null → wrong password / no key hidden there).
+  let keyBlock: Uint8Array | undefined;
+  if (keyFile) {
+    keyBlock = isKey(keyFile.name)
+      ? await blobBytes(keyFile)
+      : ((await extractKeyImage(keyFile, password)) ?? undefined);
+  }
 
   for (const file of files) {
     if (isZip(file.name)) {

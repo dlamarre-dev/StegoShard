@@ -5,7 +5,13 @@
  * degrade the encoded bytes.
  */
 
-import { CODEC_QR_GRID, getCodec, type ImageDataLike } from '@core';
+import {
+  CODEC_QR_GRID,
+  embedKeyBlockStego,
+  extractKeyBlockStego,
+  getCodec,
+  type ImageDataLike,
+} from '@core';
 
 /** Optional human-readable label band drawn above the QR (cleartext — plan §1). */
 export interface LabelBand {
@@ -33,10 +39,7 @@ export async function imageDataToPngBlob(img: ImageDataLike): Promise<Blob> {
  * *outside* the QR area (its own white strip), so the QR's quiet zone is
  * untouched and decoding is unaffected. Everything in the band is cleartext.
  */
-export async function imageWithLabelToPngBlob(
-  img: ImageDataLike,
-  band?: LabelBand,
-): Promise<Blob> {
+export async function imageWithLabelToPngBlob(img: ImageDataLike, band?: LabelBand): Promise<Blob> {
   if (!band) return imageDataToPngBlob(img);
 
   const canvas = new OffscreenCanvas(img.width, img.height + BAND_HEIGHT);
@@ -112,6 +115,30 @@ export async function decodeImageBytes(bytes: Uint8Array): Promise<Uint8Array | 
     }
   }
   return null;
+}
+
+/**
+ * Hide a serialized key block inside a cover photo (deniable stego key mode).
+ * The cover is decoded at full resolution — no downscaling — and re-emitted as
+ * a lossless PNG so the carrier LSBs survive. Returns the PNG blob.
+ */
+export async function embedKeyImage(
+  cover: Blob,
+  keyBlock: Uint8Array,
+  password: string,
+): Promise<Blob> {
+  const img = await fileToImageData(cover); // full resolution (no cap)
+  await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
+  return imageDataToPngBlob(img);
+}
+
+/**
+ * Recover a key block hidden in a stego cover image. Returns null when the
+ * password is wrong or the image carries no key (deliberately indistinguishable).
+ */
+export async function extractKeyImage(file: Blob, password: string): Promise<Uint8Array | null> {
+  const img = await fileToImageData(file); // full resolution (no cap)
+  return extractKeyBlockStego(img.data, img.width, img.height, password);
 }
 
 /** Trigger a browser download for a blob. */

@@ -459,5 +459,46 @@
   "errCamera": {
     "message": "Camera unavailable or access denied.",
     "description": "Web restore: camera could not be started."
+  },
+  "keyModeStego": {
+    "message": "In a photo",
+    "description": "Key mode: hide the key block in a cover photo (stego)."
+  },
+  "coverTitle": {
+    "message": "Cover photo (PNG or JPG)",
+    "description": "Stego: cover-photo dropzone title."
+  },
+  "stegoWarning": {
+    "message": "The key is hidden in this photo's pixels. Keep the saved PNG exactly as-is — re-saving, resizing, or sending it as JPEG destroys the key. Store it apart from the images.",
+    "description": "Stego: warning to keep the PNG lossless and separate."
+  },
+  "labelKeyFileOrImage": {
+    "message": "Key file (.key) or key photo",
+    "description": "Restore: label for the .key file or stego key image input."
+  },
+  "labelStegoPassword": {
+    "message": "Vault password (locks the key photo)",
+    "description": "Extension stego: vault password that keys the cover photo."
+  },
+  "errNoCover": {
+    "message": "Choose a cover photo to hide the key in.",
+    "description": "Stego: no cover photo chosen."
+  },
+  "errCoverTooSmall": {
+    "message": "That photo is too small to hold the key. Choose a larger one.",
+    "description": "Stego: cover photo too small to hold the key block."
+  },
+  "errStegoCloud": {
+    "message": "Hiding the key in a photo isn't available with the cloud destination.",
+    "description": "Stego: not available with the cloud destination."
+  },
+  "statusSavedStego": {
+    "message": "Saved $COUNT$ image(s). Your key is hidden in the cover photo — keep that PNG and your password to restore.",
+    "description": "Status after saving with the key hidden in a cover photo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

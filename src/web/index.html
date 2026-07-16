@@ -22,6 +22,7 @@
         </div>
       </div>
       <div class="appbar-actions">
+        <select id="lang-select" class="lang-select" aria-label="Language"></select>
         <a class="btn-ghost" href="https://github.com/dlamarre-dev/ImageVault">GitHub</a>
       </div>
     </header>
@@ -94,11 +95,42 @@
                   data-i18n="keyModeKeyfile"
                 ></span
               ></label>
+              <label
+                ><input type="radio" name="keymode" value="stego" /><span
+                  data-i18n="keyModeStego"
+                ></span
+              ></label>
             </fieldset>
             <details class="why">
               <summary data-i18n="whyLabel"></summary>
               <p data-i18n="keyModeHelp"></p>
             </details>
+
+            <div id="stego-fields" hidden>
+              <div id="cover-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                <svg
+                  class="dz-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <circle cx="8.5" cy="9.5" r="1.5" />
+                  <path d="m4 18 5-5 4 4 3-3 4 4" />
+                </svg>
+                <span class="dz-prompt">
+                  <span class="dz-title" data-i18n="coverTitle"></span><br />
+                  <span class="muted" data-i18n="dropPrompt"></span>
+                </span>
+                <span id="cover-dz-file" class="dz-file"></span>
+                <input id="cover-file" type="file" accept="image/png,image/jpeg" />
+              </div>
+              <p class="muted warn" data-i18n="stegoWarning"></p>
+            </div>
 
             <label class="checkbox"
               ><input id="add-band" type="checkbox" /> <span data-i18n="labelAddBand"></span
@@ -208,11 +240,11 @@
                 <path d="M10.2 12.8 20 3M15 8l3 3" />
               </svg>
               <span class="dz-prompt">
-                <span class="dz-title" data-i18n="labelKeyFile"></span><br />
+                <span class="dz-title" data-i18n="labelKeyFileOrImage"></span><br />
                 <span class="muted" data-i18n="dropPrompt"></span>
               </span>
               <span id="key-dz-file" class="dz-file"></span>
-              <input id="restore-key" type="file" accept=".key" />
+              <input id="restore-key" type="file" accept=".key,image/png,image/jpeg" />
             </div>
             <p class="muted" data-i18n="keyFileHint"></p>
           </details>
