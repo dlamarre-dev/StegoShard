@@ -47,6 +47,9 @@
 body {
   margin: 0;
   min-height: 100vh;
+  /* Never scroll sideways: portrait phones must not wobble left/right even if
+     one string is unexpectedly wide. */
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -89,6 +92,7 @@ body {
 .brand-name {
   font-weight: 700;
   font-size: 1.05rem;
+  min-width: 0; /* allow ellipsis instead of pushing the bar wider */
 }
 .brand-name,
 .brand-tag {
@@ -139,6 +143,17 @@ body {
 @media (max-width: 760px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Tighter chrome on phones so the app bar and cards never crowd the edges. */
+@media (max-width: 480px) {
+  .appbar {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .app {
+    padding: 20px 16px 56px;
   }
 }
 
@@ -462,6 +477,18 @@ hr {
 .lead {
   color: var(--muted);
   margin: -2px 0 16px;
+}
+
+/* Product one-liner at the top of the web banner (moved out of the app bar so
+   its long sentence can wrap instead of forcing horizontal scroll on phones). */
+.banner-lead {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.banner .lead {
+  margin: 0;
 }
 
 /* Drag-and-drop file zone (primary action of the save flow). */
