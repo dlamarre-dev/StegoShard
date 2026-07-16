@@ -18,6 +18,10 @@ import { downscale, fileToImageData, imageDataToPng, decodeImageToPayload } from
 
 const codec = getCodec(CODEC_QR_GRID);
 
+// Multi-scale jsQR decodes of large rasters run several times slower under CI
+// coverage instrumentation than locally; give these headroom past the 5s default.
+const SLOW = { timeout: 60_000 };
+
 function makePayload(len: number, seed = 42): Uint8Array {
   const header: Header = {
     version: 1,
@@ -63,7 +67,7 @@ function simulatePhoto(img: ImageDataLike, factor: number, seed = 7): ImageDataL
 }
 
 describe('fast-png round-trip', () => {
-  it('encodes and decodes a QR image losslessly through PNG', () => {
+  it('encodes and decodes a QR image losslessly through PNG', SLOW, () => {
     const payload = makePayload(500);
     const img = codec.encode(payload, PROFILE_PAPER);
     const png = imageDataToPng(img);
@@ -73,7 +77,7 @@ describe('fast-png round-trip', () => {
     expect([...codec.decode(back)]).toEqual([...payload]);
   });
 
-  it('decodeImageToPayload reads a rendered PNG at natural size', () => {
+  it('decodeImageToPayload reads a rendered PNG at natural size', SLOW, () => {
     const payload = makePayload(400);
     const png = imageDataToPng(codec.encode(payload, PROFILE_PAPER));
     expect([...decodeImageToPayload(png, 'p.png')!]).toEqual([...payload]);
@@ -81,7 +85,7 @@ describe('fast-png round-trip', () => {
 });
 
 describe('downscale keeps the QR decodable (moiré/noise)', () => {
-  it('recovers the payload from a noisy 3× upscaled photo after downscaling', () => {
+  it('recovers the payload from a noisy 3× upscaled photo after downscaling', SLOW, () => {
     const payload = makePayload(300);
     const qr = codec.encode(payload, PROFILE_PAPER);
     const photo = simulatePhoto(qr, 3);
@@ -93,7 +97,7 @@ describe('downscale keeps the QR decodable (moiré/noise)', () => {
     expect([...recovered!]).toEqual([...payload]);
   });
 
-  it('a direct 2× downscale of a clean render still decodes', () => {
+  it('a direct 2× downscale of a clean render still decodes', SLOW, () => {
     const payload = makePayload(350);
     const qr = codec.encode(payload, PROFILE_PAPER);
     const big = simulatePhoto(qr, 2, 1);
@@ -101,7 +105,7 @@ describe('downscale keeps the QR decodable (moiré/noise)', () => {
     expect([...codec.decode(small)]).toEqual([...payload]);
   });
 
-  it('never upscales', () => {
+  it('never upscales', SLOW, () => {
     const payload = makePayload(100);
     const qr = codec.encode(payload, PROFILE_PAPER);
     const same = downscale(qr, qr.width * 4);
