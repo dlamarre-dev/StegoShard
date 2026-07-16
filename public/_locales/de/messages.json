@@ -151,7 +151,7 @@
     "message": "Alles in eine einzige .zip packen"
   },
   "labelImagesOrZip": {
-    "message": "Bilddateien oder eine .zip"
+    "message": "Bilddateien, eine .zip-Datei oder ein gedrucktes PDF"
   },
   "btnSave": {
     "message": "Verschlüsseln & Bilder herunterladen"
@@ -333,5 +333,34 @@
   },
   "webIntro": {
     "message": "Eine kostenlose, quelloffene Web-Version — ohne Installation, ohne Konto, und nichts verlässt Ihr Gerät. Speichern Sie eine Datei als Bilder oder stellen Sie sie wieder her. (Google Fotos erfordert die Browser-Erweiterung.)"
+  },
+  "btnScanCamera": {
+    "message": "Seiten mit der Kamera scannen",
+    "description": "Web restore: button that opens the live camera scanner."
+  },
+  "cameraTitle": {
+    "message": "Mit der Kamera scannen",
+    "description": "Web restore: camera scanner dialog title."
+  },
+  "cameraHint": {
+    "message": "Richten Sie die Kamera auf jedes Bild bzw. jede gedruckte Seite. Jeder neue Code wird automatisch hinzugefügt.",
+    "description": "Web restore: how the live camera scanner works."
+  },
+  "cameraDone": {
+    "message": "Fertig",
+    "description": "Web restore: close the camera scanner."
+  },
+  "cameraCount": {
+    "message": "$COUNT$ Bild(er) erfasst",
+    "description": "Web restore: number of QR payloads captured by the camera.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "Kamera nicht verfügbar oder Zugriff verweigert.",
+    "description": "Web restore: camera could not be started."
   }
 }

@@ -11,42 +11,90 @@
     "message": "Encrypt a file into resilient images — disk, paper, or cloud.",
     "description": "Short tagline shown in the popup."
   },
-  "optionsTitle": { "message": "ImageVault settings", "description": "Options page heading." },
-  "extShortName": { "message": "ImageVault", "description": "Product name shown in the app header." },
-  "pillLocked": { "message": "Locked", "description": "Header status pill when the vault is locked." },
-  "pillUnlocked": { "message": "Unlocked", "description": "Header status pill when the vault is unlocked." },
+  "optionsTitle": {
+    "message": "ImageVault settings",
+    "description": "Options page heading."
+  },
+  "extShortName": {
+    "message": "ImageVault",
+    "description": "Product name shown in the app header."
+  },
+  "pillLocked": {
+    "message": "Locked",
+    "description": "Header status pill when the vault is locked."
+  },
+  "pillUnlocked": {
+    "message": "Unlocked",
+    "description": "Header status pill when the vault is unlocked."
+  },
   "webIntro": {
     "message": "A free, open-source web version — no install, no account, and nothing leaves your device. Save a file as images or restore one. (Google Photos needs the browser extension.)",
     "description": "Intro banner on the web app."
   },
-
-  "unlockHeading": { "message": "Vault", "description": "Popup: unlock section heading." },
+  "unlockHeading": {
+    "message": "Vault",
+    "description": "Popup: unlock section heading."
+  },
   "unlockPrompt": {
     "message": "Enter your password to unlock saving.",
     "description": "Popup: prompt when the vault is locked."
   },
-  "btnUnlock": { "message": "Unlock", "description": "Popup: unlock button." },
-  "btnLock": { "message": "Lock", "description": "Popup: lock button." },
+  "btnUnlock": {
+    "message": "Unlock",
+    "description": "Popup: unlock button."
+  },
+  "btnLock": {
+    "message": "Lock",
+    "description": "Popup: lock button."
+  },
   "statusUnlocked": {
     "message": "Unlocked — you can save files.",
     "description": "Popup: status when unlocked."
   },
-  "noKeyTitle": { "message": "No vault key yet", "description": "Popup: shown when no key is set." },
+  "noKeyTitle": {
+    "message": "No vault key yet",
+    "description": "Popup: shown when no key is set."
+  },
   "noKeyBody": {
     "message": "Set up your vault key in the options page before saving files.",
     "description": "Popup: guidance when no key is set."
   },
-  "btnOpenOptions": { "message": "Open options", "description": "Popup: opens the options page." },
-
-  "saveHeading": { "message": "Save a file", "description": "Popup: save section heading." },
-  "restoreHeading": { "message": "Restore a file", "description": "Popup: restore section heading." },
-  "labelFile": { "message": "File", "description": "Popup: file input label (save)." },
-  "labelImages": { "message": "Image files", "description": "Popup: image files input label." },
-  "labelPassword": { "message": "Password", "description": "Popup: password input label." },
-
-  "destHeading": { "message": "Destination", "description": "Popup: destination selector heading." },
-  "destDisk": { "message": "Disk (PNG or .zip)", "description": "Popup: disk destination." },
-  "destPaper": { "message": "Paper (printable PDF)", "description": "Popup: paper destination." },
+  "btnOpenOptions": {
+    "message": "Open options",
+    "description": "Popup: opens the options page."
+  },
+  "saveHeading": {
+    "message": "Save a file",
+    "description": "Popup: save section heading."
+  },
+  "restoreHeading": {
+    "message": "Restore a file",
+    "description": "Popup: restore section heading."
+  },
+  "labelFile": {
+    "message": "File",
+    "description": "Popup: file input label (save)."
+  },
+  "labelImages": {
+    "message": "Image files",
+    "description": "Popup: image files input label."
+  },
+  "labelPassword": {
+    "message": "Password",
+    "description": "Popup: password input label."
+  },
+  "destHeading": {
+    "message": "Destination",
+    "description": "Popup: destination selector heading."
+  },
+  "destDisk": {
+    "message": "Disk (PNG or .zip)",
+    "description": "Popup: disk destination."
+  },
+  "destPaper": {
+    "message": "Paper (printable PDF)",
+    "description": "Popup: paper destination."
+  },
   "destCloud": {
     "message": "Google Photos (optional)",
     "description": "Popup: Google Photos destination."
@@ -58,7 +106,14 @@
   "statusSavedCloud": {
     "message": "Uploaded $COUNT$ image(s) to the album “$ALBUM$”. Keep your password safe.",
     "description": "Popup: status after uploading to Google Photos.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
   "btnRestorePhotos": {
     "message": "Restore from Google Photos",
@@ -95,9 +150,16 @@
   "statusSavedPdf": {
     "message": "Done. Downloaded a PDF with $COUNT$ page(s). Keep your password safe.",
     "description": "Popup: status after saving to PDF.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Key", "description": "Key-mode selector heading." },
+  "keyModeHeading": {
+    "message": "Key",
+    "description": "Key-mode selector heading."
+  },
   "keyModeEmbedded": {
     "message": "Keep it simple — one set of images",
     "description": "Embedded key mode (plain language)."
@@ -110,18 +172,38 @@
     "message": "With a separate key file, a leaked image reveals nothing on its own — but you must keep the .key too.",
     "description": "Key-mode explanation (shown under a Why? disclosure)."
   },
-  "dropTitle": { "message": "Drop your file here", "description": "File drop zone title." },
-  "dropPrompt": { "message": "or click to choose", "description": "File drop zone subtitle." },
-  "advancedOptions": { "message": "Advanced options", "description": "Disclosure for advanced save options." },
-  "whyLabel": { "message": "Why?", "description": "Info disclosure toggle." },
-  "savedTitle": { "message": "Saved", "description": "Success panel title after saving." },
-  "restoredTitle": { "message": "Restored", "description": "Success panel title after restoring." },
-
+  "dropTitle": {
+    "message": "Drop your file here",
+    "description": "File drop zone title."
+  },
+  "dropPrompt": {
+    "message": "or click to choose",
+    "description": "File drop zone subtitle."
+  },
+  "advancedOptions": {
+    "message": "Advanced options",
+    "description": "Disclosure for advanced save options."
+  },
+  "whyLabel": {
+    "message": "Why?",
+    "description": "Info disclosure toggle."
+  },
+  "savedTitle": {
+    "message": "Saved",
+    "description": "Success panel title after saving."
+  },
+  "restoredTitle": {
+    "message": "Restored",
+    "description": "Success panel title after restoring."
+  },
   "labelAddBand": {
     "message": "Add a readable label on the images",
     "description": "Popup: toggle for the readable band."
   },
-  "labelTitle": { "message": "Label title", "description": "Popup: readable band title input." },
+  "labelTitle": {
+    "message": "Label title",
+    "description": "Popup: readable band title input."
+  },
   "titlePlaceholder": {
     "message": "Name this vault — e.g. “Archive Alpha”. Avoid names like “Bitcoin keys”.",
     "description": "Popup: pedagogical placeholder for the label title."
@@ -130,8 +212,10 @@
     "message": "The label is not encrypted — never put a secret in it.",
     "description": "Popup: cleartext warning for the readable band."
   },
-
-  "labelKeyFile": { "message": "Key file (.key)", "description": "Popup: key file input label." },
+  "labelKeyFile": {
+    "message": "Key file (.key)",
+    "description": "Popup: key file input label."
+  },
   "keyFileHint": {
     "message": "Only needed for sets you saved as a separate .key file (skip if it is inside the .zip).",
     "description": "Popup: hint for the restore key file input."
@@ -141,12 +225,17 @@
     "description": "Popup: toggle to download one zip instead of many files."
   },
   "labelImagesOrZip": {
-    "message": "Image files or a .zip",
+    "message": "Image files, a .zip, or a printed PDF",
     "description": "Popup: restore input label (images or zip)."
   },
-
-  "btnSave": { "message": "Encrypt & download images", "description": "Popup: save button." },
-  "btnRestore": { "message": "Restore file", "description": "Popup: restore button." },
+  "btnSave": {
+    "message": "Encrypt & download images",
+    "description": "Popup: save button."
+  },
+  "btnRestore": {
+    "message": "Restore file",
+    "description": "Popup: restore button."
+  },
   "estimateImages": {
     "message": "Estimated images:",
     "description": "Popup: label before the estimated image count."
@@ -158,12 +247,20 @@
   "statusSaved": {
     "message": "Done. Downloaded $COUNT$ image(s). Keep your password safe — it cannot be recovered.",
     "description": "Popup: status after saving.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Done. Downloaded $COUNT$ image(s) and a .key file. Keep the .key and your password safe.",
     "description": "Popup: status after saving in keyfile mode.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusRestoring": {
     "message": "Decoding images and restoring…",
@@ -172,15 +269,24 @@
   "statusRestored": {
     "message": "Restored $NAME$ and downloaded it.",
     "description": "Popup: status after restoring.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-
-  "errNoFile": { "message": "Choose a file first.", "description": "Validation error." },
+  "errNoFile": {
+    "message": "Choose a file first.",
+    "description": "Validation error."
+  },
   "errNoImages": {
     "message": "Choose the image files to restore from.",
     "description": "Validation error."
   },
-  "errNoPassword": { "message": "Enter a password.", "description": "Validation error." },
+  "errNoPassword": {
+    "message": "Enter a password.",
+    "description": "Validation error."
+  },
   "errWrongPassword": {
     "message": "Wrong password. Please try again.",
     "description": "Shown when restore or unlock fails."
@@ -196,15 +302,31 @@
   "errFileTooLarge": {
     "message": "File too large ($SIZE$ KB). This vault targets small secrets (max $LIMIT$ KB).",
     "description": "Shown when the file exceeds the size limit.",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "This file would need $COUNT$ images (max $LIMIT$). Try a smaller file.",
     "description": "Shown when the vault would exceed the image ceiling.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-
-  "optKeyHeading": { "message": "Vault key", "description": "Options: key section heading." },
+  "optKeyHeading": {
+    "message": "Vault key",
+    "description": "Options: key section heading."
+  },
   "optKeyBodyNew": {
     "message": "Create a vault key. Every file you save is encrypted with it.",
     "description": "Options: shown when no key exists."
@@ -213,7 +335,10 @@
     "message": "A vault key is set up on this device.",
     "description": "Options: shown when a key exists."
   },
-  "labelNewPassword": { "message": "New password", "description": "Options: new password input." },
+  "labelNewPassword": {
+    "message": "New password",
+    "description": "Options: new password input."
+  },
   "labelConfirmPassword": {
     "message": "Confirm password",
     "description": "Options: confirm password input."
@@ -222,47 +347,117 @@
     "message": "Current password",
     "description": "Options: current password input."
   },
-  "btnCreateKey": { "message": "Create key", "description": "Options: create key button." },
+  "btnCreateKey": {
+    "message": "Create key",
+    "description": "Options: create key button."
+  },
   "passwordHint": {
     "message": "Your password cannot be recovered. If you forget it, your vaults are lost — consider exporting your key.",
     "description": "Options: password warning."
   },
-  "errPasswordMismatch": { "message": "Passwords do not match.", "description": "Validation error." },
+  "errPasswordMismatch": {
+    "message": "Passwords do not match.",
+    "description": "Validation error."
+  },
   "errPasswordTooShort": {
     "message": "Use at least 8 characters.",
     "description": "Validation error."
   },
-  "statusKeyCreated": { "message": "Vault key created.", "description": "Options: success." },
-
-  "changePwHeading": { "message": "Change password", "description": "Options: heading." },
-  "btnChangePw": { "message": "Change password", "description": "Options: button." },
-  "statusPwChanged": { "message": "Password changed.", "description": "Options: success." },
-
-  "exportHeading": { "message": "Export key", "description": "Options: heading." },
+  "statusKeyCreated": {
+    "message": "Vault key created.",
+    "description": "Options: success."
+  },
+  "changePwHeading": {
+    "message": "Change password",
+    "description": "Options: heading."
+  },
+  "btnChangePw": {
+    "message": "Change password",
+    "description": "Options: button."
+  },
+  "statusPwChanged": {
+    "message": "Password changed.",
+    "description": "Options: success."
+  },
+  "exportHeading": {
+    "message": "Export key",
+    "description": "Options: heading."
+  },
   "exportBody": {
     "message": "Download the wrapped key (.key) to transfer or back it up. It stays password-protected.",
     "description": "Options: export explanation."
   },
-  "btnExportKey": { "message": "Export .key", "description": "Options: export button." },
-  "statusKeyExported": { "message": "Key exported.", "description": "Options: success." },
-
-  "importHeading": { "message": "Import key", "description": "Options: heading." },
+  "btnExportKey": {
+    "message": "Export .key",
+    "description": "Options: export button."
+  },
+  "statusKeyExported": {
+    "message": "Key exported.",
+    "description": "Options: success."
+  },
+  "importHeading": {
+    "message": "Import key",
+    "description": "Options: heading."
+  },
   "importBody": {
     "message": "Import a .key file from another device. This replaces the current key.",
     "description": "Options: import explanation."
   },
-  "btnImportKey": { "message": "Import key", "description": "Options: import button." },
-  "statusKeyImported": { "message": "Key imported.", "description": "Options: success." },
-
-  "eraseHeading": { "message": "Erase key", "description": "Options: heading." },
+  "btnImportKey": {
+    "message": "Import key",
+    "description": "Options: import button."
+  },
+  "statusKeyImported": {
+    "message": "Key imported.",
+    "description": "Options: success."
+  },
+  "eraseHeading": {
+    "message": "Erase key",
+    "description": "Options: heading."
+  },
   "eraseBody": {
     "message": "Permanently delete the vault key from this device. Files already saved become unrecoverable unless you kept an exported .key. This cannot be undone.",
     "description": "Options: erase explanation."
   },
-  "btnEraseKey": { "message": "Erase key", "description": "Options: erase button." },
+  "btnEraseKey": {
+    "message": "Erase key",
+    "description": "Options: erase button."
+  },
   "confirmErase": {
     "message": "Really erase the vault key? Saved files will be unrecoverable without an exported .key.",
     "description": "Options: erase confirmation."
   },
-  "statusKeyErased": { "message": "Vault key erased.", "description": "Options: success." }
+  "statusKeyErased": {
+    "message": "Vault key erased.",
+    "description": "Options: success."
+  },
+  "btnScanCamera": {
+    "message": "Scan pages with the camera",
+    "description": "Web restore: button that opens the live camera scanner."
+  },
+  "cameraTitle": {
+    "message": "Scan with the camera",
+    "description": "Web restore: camera scanner dialog title."
+  },
+  "cameraHint": {
+    "message": "Point the camera at each image or printed page. Every new code is added automatically.",
+    "description": "Web restore: how the live camera scanner works."
+  },
+  "cameraDone": {
+    "message": "Done",
+    "description": "Web restore: close the camera scanner."
+  },
+  "cameraCount": {
+    "message": "$COUNT$ image(s) captured",
+    "description": "Web restore: number of QR payloads captured by the camera.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "Camera unavailable or access denied.",
+    "description": "Web restore: camera could not be started."
+  }
 }

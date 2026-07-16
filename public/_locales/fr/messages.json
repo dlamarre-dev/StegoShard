@@ -11,42 +11,90 @@
     "message": "Chiffrez un fichier en images résilientes — disque, papier ou cloud.",
     "description": "Short tagline shown in the popup."
   },
-  "optionsTitle": { "message": "Paramètres d'ImageVault", "description": "Options page heading." },
-  "extShortName": { "message": "ImageVault", "description": "Product name shown in the app header." },
-  "pillLocked": { "message": "Verrouillé", "description": "Header status pill when the vault is locked." },
-  "pillUnlocked": { "message": "Déverrouillé", "description": "Header status pill when the vault is unlocked." },
+  "optionsTitle": {
+    "message": "Paramètres d'ImageVault",
+    "description": "Options page heading."
+  },
+  "extShortName": {
+    "message": "ImageVault",
+    "description": "Product name shown in the app header."
+  },
+  "pillLocked": {
+    "message": "Verrouillé",
+    "description": "Header status pill when the vault is locked."
+  },
+  "pillUnlocked": {
+    "message": "Déverrouillé",
+    "description": "Header status pill when the vault is unlocked."
+  },
   "webIntro": {
     "message": "Une version web libre et open source — sans installation, sans compte, et rien ne quitte votre appareil. Sauvegardez un fichier en images ou restaurez-le. (Google Photos nécessite l'extension.)",
     "description": "Intro banner on the web app."
   },
-
-  "unlockHeading": { "message": "Coffre", "description": "Popup: unlock section heading." },
+  "unlockHeading": {
+    "message": "Coffre",
+    "description": "Popup: unlock section heading."
+  },
   "unlockPrompt": {
     "message": "Saisissez votre mot de passe pour permettre la sauvegarde.",
     "description": "Popup: prompt when the vault is locked."
   },
-  "btnUnlock": { "message": "Déverrouiller", "description": "Popup: unlock button." },
-  "btnLock": { "message": "Verrouiller", "description": "Popup: lock button." },
+  "btnUnlock": {
+    "message": "Déverrouiller",
+    "description": "Popup: unlock button."
+  },
+  "btnLock": {
+    "message": "Verrouiller",
+    "description": "Popup: lock button."
+  },
   "statusUnlocked": {
     "message": "Déverrouillé — vous pouvez sauvegarder des fichiers.",
     "description": "Popup: status when unlocked."
   },
-  "noKeyTitle": { "message": "Aucune clé de coffre", "description": "Popup: shown when no key is set." },
+  "noKeyTitle": {
+    "message": "Aucune clé de coffre",
+    "description": "Popup: shown when no key is set."
+  },
   "noKeyBody": {
     "message": "Créez votre clé de coffre dans les paramètres avant de sauvegarder.",
     "description": "Popup: guidance when no key is set."
   },
-  "btnOpenOptions": { "message": "Ouvrir les paramètres", "description": "Popup: opens the options page." },
-
-  "saveHeading": { "message": "Sauvegarder un fichier", "description": "Popup: save section heading." },
-  "restoreHeading": { "message": "Restaurer un fichier", "description": "Popup: restore section heading." },
-  "labelFile": { "message": "Fichier", "description": "Popup: file input label (save)." },
-  "labelImages": { "message": "Fichiers image", "description": "Popup: image files input label." },
-  "labelPassword": { "message": "Mot de passe", "description": "Popup: password input label." },
-
-  "destHeading": { "message": "Destination", "description": "Popup: destination selector heading." },
-  "destDisk": { "message": "Disque (PNG ou .zip)", "description": "Popup: disk destination." },
-  "destPaper": { "message": "Papier (PDF imprimable)", "description": "Popup: paper destination." },
+  "btnOpenOptions": {
+    "message": "Ouvrir les paramètres",
+    "description": "Popup: opens the options page."
+  },
+  "saveHeading": {
+    "message": "Sauvegarder un fichier",
+    "description": "Popup: save section heading."
+  },
+  "restoreHeading": {
+    "message": "Restaurer un fichier",
+    "description": "Popup: restore section heading."
+  },
+  "labelFile": {
+    "message": "Fichier",
+    "description": "Popup: file input label (save)."
+  },
+  "labelImages": {
+    "message": "Fichiers image",
+    "description": "Popup: image files input label."
+  },
+  "labelPassword": {
+    "message": "Mot de passe",
+    "description": "Popup: password input label."
+  },
+  "destHeading": {
+    "message": "Destination",
+    "description": "Popup: destination selector heading."
+  },
+  "destDisk": {
+    "message": "Disque (PNG ou .zip)",
+    "description": "Popup: disk destination."
+  },
+  "destPaper": {
+    "message": "Papier (PDF imprimable)",
+    "description": "Popup: paper destination."
+  },
   "destCloud": {
     "message": "Google Photos (optionnel)",
     "description": "Popup: Google Photos destination."
@@ -58,7 +106,14 @@
   "statusSavedCloud": {
     "message": "$COUNT$ image(s) téléversée(s) dans l'album « $ALBUM$ ». Conservez votre mot de passe.",
     "description": "Popup: status after uploading to Google Photos.",
-    "placeholders": { "count": { "content": "$1" }, "album": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "album": {
+        "content": "$2"
+      }
+    }
   },
   "btnRestorePhotos": {
     "message": "Restaurer depuis Google Photos",
@@ -95,9 +150,16 @@
   "statusSavedPdf": {
     "message": "Terminé. PDF de $COUNT$ page(s) téléchargé. Conservez votre mot de passe.",
     "description": "Popup: status after saving to PDF.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
-  "keyModeHeading": { "message": "Clé", "description": "Key-mode selector heading." },
+  "keyModeHeading": {
+    "message": "Clé",
+    "description": "Key-mode selector heading."
+  },
   "keyModeEmbedded": {
     "message": "Simple — un seul jeu d'images",
     "description": "Embedded key mode (plain language)."
@@ -110,18 +172,38 @@
     "message": "Avec un fichier clé séparé, une image qui fuit ne révèle rien à elle seule — mais vous devez aussi conserver le .key.",
     "description": "Key-mode explanation (shown under a Why? disclosure)."
   },
-  "dropTitle": { "message": "Déposez votre fichier ici", "description": "File drop zone title." },
-  "dropPrompt": { "message": "ou cliquez pour choisir", "description": "File drop zone subtitle." },
-  "advancedOptions": { "message": "Options avancées", "description": "Disclosure for advanced save options." },
-  "whyLabel": { "message": "Pourquoi ?", "description": "Info disclosure toggle." },
-  "savedTitle": { "message": "Enregistré", "description": "Success panel title after saving." },
-  "restoredTitle": { "message": "Restauré", "description": "Success panel title after restoring." },
-
+  "dropTitle": {
+    "message": "Déposez votre fichier ici",
+    "description": "File drop zone title."
+  },
+  "dropPrompt": {
+    "message": "ou cliquez pour choisir",
+    "description": "File drop zone subtitle."
+  },
+  "advancedOptions": {
+    "message": "Options avancées",
+    "description": "Disclosure for advanced save options."
+  },
+  "whyLabel": {
+    "message": "Pourquoi ?",
+    "description": "Info disclosure toggle."
+  },
+  "savedTitle": {
+    "message": "Enregistré",
+    "description": "Success panel title after saving."
+  },
+  "restoredTitle": {
+    "message": "Restauré",
+    "description": "Success panel title after restoring."
+  },
   "labelAddBand": {
     "message": "Ajouter une étiquette lisible sur les images",
     "description": "Popup: toggle for the readable band."
   },
-  "labelTitle": { "message": "Titre de l'étiquette", "description": "Popup: readable band title input." },
+  "labelTitle": {
+    "message": "Titre de l'étiquette",
+    "description": "Popup: readable band title input."
+  },
   "titlePlaceholder": {
     "message": "Nommez ce coffre — ex. « Archive Alpha ». Évitez « Clés Bitcoin ».",
     "description": "Popup: pedagogical placeholder for the label title."
@@ -130,8 +212,10 @@
     "message": "L'étiquette n'est pas chiffrée — n'y mettez jamais de secret.",
     "description": "Popup: cleartext warning for the readable band."
   },
-
-  "labelKeyFile": { "message": "Fichier clé (.key)", "description": "Popup: key file input label." },
+  "labelKeyFile": {
+    "message": "Fichier clé (.key)",
+    "description": "Popup: key file input label."
+  },
   "keyFileHint": {
     "message": "Requis seulement pour les jeux sauvegardés avec un fichier .key séparé (ignorez-le s'il est dans le .zip).",
     "description": "Popup: hint for the restore key file input."
@@ -141,12 +225,17 @@
     "description": "Popup: toggle to download one zip instead of many files."
   },
   "labelImagesOrZip": {
-    "message": "Fichiers image ou un .zip",
+    "message": "Fichiers image, un .zip ou un PDF imprimé",
     "description": "Popup: restore input label (images or zip)."
   },
-
-  "btnSave": { "message": "Chiffrer et télécharger les images", "description": "Popup: save button." },
-  "btnRestore": { "message": "Restaurer le fichier", "description": "Popup: restore button." },
+  "btnSave": {
+    "message": "Chiffrer et télécharger les images",
+    "description": "Popup: save button."
+  },
+  "btnRestore": {
+    "message": "Restaurer le fichier",
+    "description": "Popup: restore button."
+  },
   "estimateImages": {
     "message": "Images estimées :",
     "description": "Popup: label before the estimated image count."
@@ -158,12 +247,20 @@
   "statusSaved": {
     "message": "Terminé. $COUNT$ image(s) téléchargée(s). Conservez votre mot de passe : il est irrécupérable.",
     "description": "Popup: status after saving.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusSavedKeyfile": {
     "message": "Terminé. $COUNT$ image(s) et un fichier .key téléchargés. Conservez le .key et votre mot de passe.",
     "description": "Popup: status after saving in keyfile mode.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "statusRestoring": {
     "message": "Décodage des images et restauration…",
@@ -172,15 +269,24 @@
   "statusRestored": {
     "message": "$NAME$ restauré et téléchargé.",
     "description": "Popup: status after restoring.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
-
-  "errNoFile": { "message": "Choisissez d'abord un fichier.", "description": "Validation error." },
+  "errNoFile": {
+    "message": "Choisissez d'abord un fichier.",
+    "description": "Validation error."
+  },
   "errNoImages": {
     "message": "Choisissez les fichiers image à restaurer.",
     "description": "Validation error."
   },
-  "errNoPassword": { "message": "Saisissez un mot de passe.", "description": "Validation error." },
+  "errNoPassword": {
+    "message": "Saisissez un mot de passe.",
+    "description": "Validation error."
+  },
   "errWrongPassword": {
     "message": "Mot de passe incorrect. Réessayez.",
     "description": "Shown when restore or unlock fails."
@@ -196,15 +302,31 @@
   "errFileTooLarge": {
     "message": "Fichier trop volumineux ($SIZE$ Ko). Ce coffre vise les petits secrets (max $LIMIT$ Ko).",
     "description": "Shown when the file exceeds the size limit.",
-    "placeholders": { "size": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "errTooManyImages": {
     "message": "Ce fichier nécessiterait $COUNT$ images (max $LIMIT$). Essayez un fichier plus petit.",
     "description": "Shown when the vault would exceed the image ceiling.",
-    "placeholders": { "count": { "content": "$1" }, "limit": { "content": "$2" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
-
-  "optKeyHeading": { "message": "Clé de coffre", "description": "Options: key section heading." },
+  "optKeyHeading": {
+    "message": "Clé de coffre",
+    "description": "Options: key section heading."
+  },
   "optKeyBodyNew": {
     "message": "Créez une clé de coffre. Chaque fichier sauvegardé est chiffré avec elle.",
     "description": "Options: shown when no key exists."
@@ -213,7 +335,10 @@
     "message": "Une clé de coffre est configurée sur cet appareil.",
     "description": "Options: shown when a key exists."
   },
-  "labelNewPassword": { "message": "Nouveau mot de passe", "description": "Options: new password input." },
+  "labelNewPassword": {
+    "message": "Nouveau mot de passe",
+    "description": "Options: new password input."
+  },
   "labelConfirmPassword": {
     "message": "Confirmer le mot de passe",
     "description": "Options: confirm password input."
@@ -222,47 +347,117 @@
     "message": "Mot de passe actuel",
     "description": "Options: current password input."
   },
-  "btnCreateKey": { "message": "Créer la clé", "description": "Options: create key button." },
+  "btnCreateKey": {
+    "message": "Créer la clé",
+    "description": "Options: create key button."
+  },
   "passwordHint": {
     "message": "Votre mot de passe est irrécupérable. Si vous l'oubliez, vos coffres sont perdus — pensez à exporter votre clé.",
     "description": "Options: password warning."
   },
-  "errPasswordMismatch": { "message": "Les mots de passe ne correspondent pas.", "description": "Validation error." },
+  "errPasswordMismatch": {
+    "message": "Les mots de passe ne correspondent pas.",
+    "description": "Validation error."
+  },
   "errPasswordTooShort": {
     "message": "Utilisez au moins 8 caractères.",
     "description": "Validation error."
   },
-  "statusKeyCreated": { "message": "Clé de coffre créée.", "description": "Options: success." },
-
-  "changePwHeading": { "message": "Changer le mot de passe", "description": "Options: heading." },
-  "btnChangePw": { "message": "Changer le mot de passe", "description": "Options: button." },
-  "statusPwChanged": { "message": "Mot de passe changé.", "description": "Options: success." },
-
-  "exportHeading": { "message": "Exporter la clé", "description": "Options: heading." },
+  "statusKeyCreated": {
+    "message": "Clé de coffre créée.",
+    "description": "Options: success."
+  },
+  "changePwHeading": {
+    "message": "Changer le mot de passe",
+    "description": "Options: heading."
+  },
+  "btnChangePw": {
+    "message": "Changer le mot de passe",
+    "description": "Options: button."
+  },
+  "statusPwChanged": {
+    "message": "Mot de passe changé.",
+    "description": "Options: success."
+  },
+  "exportHeading": {
+    "message": "Exporter la clé",
+    "description": "Options: heading."
+  },
   "exportBody": {
     "message": "Téléchargez la clé enveloppée (.key) pour la transférer ou la sauvegarder. Elle reste protégée par mot de passe.",
     "description": "Options: export explanation."
   },
-  "btnExportKey": { "message": "Exporter .key", "description": "Options: export button." },
-  "statusKeyExported": { "message": "Clé exportée.", "description": "Options: success." },
-
-  "importHeading": { "message": "Importer une clé", "description": "Options: heading." },
+  "btnExportKey": {
+    "message": "Exporter .key",
+    "description": "Options: export button."
+  },
+  "statusKeyExported": {
+    "message": "Clé exportée.",
+    "description": "Options: success."
+  },
+  "importHeading": {
+    "message": "Importer une clé",
+    "description": "Options: heading."
+  },
   "importBody": {
     "message": "Importez un fichier .key d'un autre appareil. Cela remplace la clé actuelle.",
     "description": "Options: import explanation."
   },
-  "btnImportKey": { "message": "Importer la clé", "description": "Options: import button." },
-  "statusKeyImported": { "message": "Clé importée.", "description": "Options: success." },
-
-  "eraseHeading": { "message": "Effacer la clé", "description": "Options: heading." },
+  "btnImportKey": {
+    "message": "Importer la clé",
+    "description": "Options: import button."
+  },
+  "statusKeyImported": {
+    "message": "Clé importée.",
+    "description": "Options: success."
+  },
+  "eraseHeading": {
+    "message": "Effacer la clé",
+    "description": "Options: heading."
+  },
   "eraseBody": {
     "message": "Supprimez définitivement la clé de coffre de cet appareil. Les fichiers déjà sauvegardés deviennent irrécupérables sauf si vous avez exporté un .key. Action irréversible.",
     "description": "Options: erase explanation."
   },
-  "btnEraseKey": { "message": "Effacer la clé", "description": "Options: erase button." },
+  "btnEraseKey": {
+    "message": "Effacer la clé",
+    "description": "Options: erase button."
+  },
   "confirmErase": {
     "message": "Effacer vraiment la clé de coffre ? Les fichiers sauvegardés seront irrécupérables sans un .key exporté.",
     "description": "Options: erase confirmation."
   },
-  "statusKeyErased": { "message": "Clé de coffre effacée.", "description": "Options: success." }
+  "statusKeyErased": {
+    "message": "Clé de coffre effacée.",
+    "description": "Options: success."
+  },
+  "btnScanCamera": {
+    "message": "Scanner les pages avec la caméra",
+    "description": "Web restore: button that opens the live camera scanner."
+  },
+  "cameraTitle": {
+    "message": "Scanner avec la caméra",
+    "description": "Web restore: camera scanner dialog title."
+  },
+  "cameraHint": {
+    "message": "Pointez la caméra vers chaque image ou page imprimée. Chaque nouveau code est ajouté automatiquement.",
+    "description": "Web restore: how the live camera scanner works."
+  },
+  "cameraDone": {
+    "message": "Terminé",
+    "description": "Web restore: close the camera scanner."
+  },
+  "cameraCount": {
+    "message": "$COUNT$ image(s) capturée(s)",
+    "description": "Web restore: number of QR payloads captured by the camera.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "Caméra indisponible ou accès refusé.",
+    "description": "Web restore: camera could not be started."
+  }
 }

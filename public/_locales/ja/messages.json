@@ -151,7 +151,7 @@
     "message": "すべてを 1 つの .zip にまとめる"
   },
   "labelImagesOrZip": {
-    "message": "画像ファイルまたは .zip"
+    "message": "画像ファイル、.zip、または印刷済みPDF"
   },
   "btnSave": {
     "message": "暗号化して画像をダウンロード"
@@ -333,5 +333,34 @@
   },
   "webIntro": {
     "message": "無料でオープンソースのウェブ版です。インストールも登録も不要で、データが端末の外に出ることはありません。ファイルを画像として保存したり、復元したりできます。（Google フォトはブラウザ拡張機能が必要です。）"
+  },
+  "btnScanCamera": {
+    "message": "カメラでページをスキャン",
+    "description": "Web restore: button that opens the live camera scanner."
+  },
+  "cameraTitle": {
+    "message": "カメラでスキャン",
+    "description": "Web restore: camera scanner dialog title."
+  },
+  "cameraHint": {
+    "message": "カメラを各画像または印刷ページに向けてください。新しいコードは自動的に追加されます。",
+    "description": "Web restore: how the live camera scanner works."
+  },
+  "cameraDone": {
+    "message": "完了",
+    "description": "Web restore: close the camera scanner."
+  },
+  "cameraCount": {
+    "message": "$COUNT$ 枚の画像を取り込みました",
+    "description": "Web restore: number of QR payloads captured by the camera.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "カメラを利用できないか、アクセスが拒否されました。",
+    "description": "Web restore: camera could not be started."
   }
 }

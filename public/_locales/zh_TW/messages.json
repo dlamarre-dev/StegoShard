@@ -151,7 +151,7 @@
     "message": "全部打包成單一 .zip"
   },
   "labelImagesOrZip": {
-    "message": "圖像檔案或一個 .zip"
+    "message": "圖像檔案、.zip 或列印的 PDF"
   },
   "btnSave": {
     "message": "加密並下載圖像"
@@ -333,5 +333,34 @@
   },
   "webIntro": {
     "message": "免費的開放原始碼網頁版本 — 無需安裝、無需帳號，任何資料都不會離開您的裝置。可將檔案儲存為圖片或還原。（Google 相簿需要瀏覽器擴充功能。）"
+  },
+  "btnScanCamera": {
+    "message": "使用相機掃描頁面",
+    "description": "Web restore: button that opens the live camera scanner."
+  },
+  "cameraTitle": {
+    "message": "使用相機掃描",
+    "description": "Web restore: camera scanner dialog title."
+  },
+  "cameraHint": {
+    "message": "將相機對準每張圖像或列印頁面。每個新代碼都會自動加入。",
+    "description": "Web restore: how the live camera scanner works."
+  },
+  "cameraDone": {
+    "message": "完成",
+    "description": "Web restore: close the camera scanner."
+  },
+  "cameraCount": {
+    "message": "已擷取 $COUNT$ 張圖像",
+    "description": "Web restore: number of QR payloads captured by the camera.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "相機無法使用或存取遭拒。",
+    "description": "Web restore: camera could not be started."
   }
 }

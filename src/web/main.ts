@@ -18,6 +18,7 @@ import {
 import { el, pick, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import { saveFileToDisk, restoreFileFromDisk } from '../ui/disk';
 import { localizeDom, msg, friendlyError } from './i18n';
+import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
 localizeDom();
 
@@ -46,6 +47,9 @@ const restoreFiles = el<HTMLInputElement>('restore-files');
 const restoreDrop = el('restore-drop');
 const restoreDzFile = el('restore-dz-file');
 const restoreKey = el<HTMLInputElement>('restore-key');
+const keyDrop = el('key-drop');
+const keyDzFile = el('key-dz-file');
+const cameraCaptured = el('camera-captured');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
 const restoreStatus = el('restore-status');
@@ -100,7 +104,27 @@ wireDropzone(fileDrop, saveFile, () => {
   show(saveResult, false);
   void updateEstimate();
 });
-wireDropzone(restoreDrop, restoreFiles, () => reflectFile(restoreDrop, restoreDzFile, restoreFiles));
+wireDropzone(restoreDrop, restoreFiles, () =>
+  reflectFile(restoreDrop, restoreDzFile, restoreFiles),
+);
+wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
+
+function reflectCaptured(count: number): void {
+  show(cameraCaptured, count > 0);
+  cameraCaptured.textContent = count > 0 ? msg('cameraCount', String(count)) : '';
+}
+wireCamera(
+  {
+    button: 'camera-btn',
+    modal: 'camera-modal',
+    video: 'camera-video',
+    count: 'camera-count',
+    done: 'camera-done',
+    close: 'camera-close',
+    errorStatus: 'restore-status',
+  },
+  reflectCaptured,
+);
 
 async function makeKey(password: string): Promise<VaultKey> {
   const { dek, block } = await createKeyBlock(password);
@@ -156,17 +180,26 @@ saveBtn.addEventListener('click', async () => {
 
 restoreBtn.addEventListener('click', async () => {
   const files = restoreFiles.files ? Array.from(restoreFiles.files) : [];
-  if (files.length === 0) return setStatus(restoreStatus, msg('errNoImages'), true);
+  if (files.length === 0 && capturedCount() === 0) {
+    return setStatus(restoreStatus, msg('errNoImages'), true);
+  }
   if (!restorePw.value) return setStatus(restoreStatus, msg('errNoPassword'), true);
 
   restoreBtn.disabled = true;
   show(restoreResult, false);
   setStatus(restoreStatus, msg('statusRestoring'));
   try {
-    const { filename } = await restoreFileFromDisk(files, restorePw.value, restoreKey.files?.[0]);
+    const { filename } = await restoreFileFromDisk(
+      files,
+      restorePw.value,
+      restoreKey.files?.[0],
+      capturedPayloads(),
+    );
     setStatus(restoreStatus, '');
     restoreResultNote.textContent = msg('statusRestored', filename);
     show(restoreResult, true);
+    clearCaptured();
+    reflectCaptured(0);
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {

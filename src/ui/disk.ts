@@ -17,7 +17,12 @@ import {
   type VaultKey,
 } from '@core';
 import { unzipSync, zipSync } from 'fflate';
-import { decodeImageBytes, downloadBlob, imageWithLabelToPngBlob, type LabelBand } from './image-io';
+import {
+  decodeImageBytes,
+  downloadBlob,
+  imageWithLabelToPngBlob,
+  type LabelBand,
+} from './image-io';
 
 export interface SaveOptions {
   keyMode: KeyMode;
@@ -81,6 +86,7 @@ export async function saveFileToDisk(
 
 const isZip = (name: string) => name.toLowerCase().endsWith('.zip');
 const isKey = (name: string) => name.toLowerCase().endsWith('.key');
+const isPdf = (name: string) => name.toLowerCase().endsWith('.pdf');
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
 
 // Bounds for restoring from an untrusted .zip (zip-bomb / resource guard).
@@ -115,15 +121,19 @@ export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlo
 }
 
 /**
- * Reconstruct the original file from image files, a .zip of them, or a mix.
- * A `.key` file (loose or inside the zip) is used when present.
+ * Reconstruct the original file from image files, a .zip of them, a printed
+ * PDF (paper mode), or a mix. A `.key` file (loose or inside the zip) is used
+ * when present. `extraPayloads` lets callers add already-decoded payloads
+ * (e.g. live camera captures).
  */
 export async function restoreFileFromDisk(
   files: File[],
   password: string,
   keyFile?: File,
+  extraPayloads: Uint8Array[] = [],
 ): Promise<{ filename: string }> {
   const images: Uint8Array[] = [];
+  const payloads: Uint8Array[] = [...extraPayloads];
   let keyBlock: Uint8Array | undefined = keyFile ? await blobBytes(keyFile) : undefined;
 
   for (const file of files) {
@@ -133,12 +143,15 @@ export async function restoreFileFromDisk(
       if (extracted.keyBlock) keyBlock = extracted.keyBlock;
     } else if (isKey(file.name)) {
       keyBlock = await blobBytes(file);
+    } else if (isPdf(file.name)) {
+      // Lazy: keeps pdf-lib out of the initial bundle (only paper users pay).
+      const { extractPdfPayloads } = await import('./pdf-restore');
+      payloads.push(...(await extractPdfPayloads(await blobBytes(file))));
     } else {
       images.push(await blobBytes(file));
     }
   }
 
-  const payloads: Uint8Array[] = [];
   for (const bytes of images) {
     const payload = await decodeImageBytes(bytes);
     // A single unreadable image is fine — erasure coding tolerates losses.
