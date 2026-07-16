@@ -297,20 +297,27 @@ button {
   border-color: var(--accent);
 }
 
-/* Language selector on the legal pages — matches the ghost button. */
+/* Language selector — readable in both themes. The dropdown list is painted
+   by the OS from the control's own colors, so set an explicit surface + text
+   (not the faint --muted) and declare color-scheme so the native popup follows
+   the app theme instead of defaulting to a white system menu. */
 .lang-select {
   width: auto;
   padding: 7px 10px;
-  background: transparent;
-  color: var(--muted);
+  background: var(--surface-2);
+  color: var(--text);
+  color-scheme: light dark;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
-.lang-select:hover {
+.lang-select option {
+  background: var(--surface);
   color: var(--text);
+}
+.lang-select:hover {
   border-color: var(--accent);
 }
 .lang-select:focus-visible {
@@ -539,9 +546,24 @@ hr {
   margin: 8px 0 0;
   font-weight: 600;
 }
+/* Keep the whole scanner inside the viewport: the modal never grows past the
+   screen, its body scrolls only if it must, and the video is capped so the
+   hint, counter, and Done button stay visible without scrolling. */
+.camera-modal {
+  max-height: 92vh;
+  max-height: 92dvh;
+}
+.camera-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .camera-frame video {
   display: block;
   width: 100%;
+  max-height: 52vh;
+  max-height: 52dvh;
+  object-fit: contain;
   border-radius: var(--radius-sm);
   background: #000;
 }
@@ -549,7 +571,11 @@ hr {
   outline: 3px solid var(--accent);
 }
 .camera-body .btn-primary {
-  margin-top: 10px;
+  margin-top: 4px;
+}
+.camera-body .muted,
+.camera-body .status {
+  margin: 0;
 }
 
 /* Segmented control (destination picker) built from radios. */

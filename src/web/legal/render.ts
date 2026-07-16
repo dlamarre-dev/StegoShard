@@ -130,43 +130,52 @@ function blockToNode(block: Block): Node {
  * @param date   the "last updated" date (kept in the entry point, not the prose)
  */
 export function renderLegal(docKey: DocKey, date: string): void {
-  const locale = pickLocale();
-  const doc = (CATALOGS[locale] ?? CATALOGS.en!)[docKey];
-  const active = LOCALES.find((l) => l.code === locale) ?? LOCALES[0]!;
-
-  document.documentElement.lang = active.htmlLang;
-  document.title = doc.title;
-  el('legal-heading').textContent = doc.heading;
-
   const home = el<HTMLAnchorElement>('home-link');
-  home.textContent = doc.home;
-
-  el('legal-updated').textContent = `${doc.updatedLabel}: ${date}`;
-
   const body = el('legal-body');
-  body.replaceChildren();
-  for (const block of doc.intro) body.appendChild(blockToNode(block));
-  for (const section of doc.sections) {
-    const h = document.createElement('h2');
-    h.textContent = section.h;
-    body.appendChild(h);
-    for (const block of section.blocks) body.appendChild(blockToNode(block));
-  }
-
   const select = el<HTMLSelectElement>('lang-select');
+
+  // Build the language options once; `paint` only updates the selected value.
   select.replaceChildren();
   for (const loc of LOCALES) {
     const opt = document.createElement('option');
     opt.value = loc.code;
     opt.textContent = loc.name;
-    opt.selected = loc.code === locale;
     select.appendChild(opt);
   }
-  // Reloading with an explicit ?lang= keeps the choice on refresh and is
-  // shareable, and re-runs the whole render from a clean slate.
+
+  /** Render the document in `locale`, live — no page reload. */
+  function paint(locale: string): void {
+    const doc = (CATALOGS[locale] ?? CATALOGS.en!)[docKey];
+    const active = LOCALES.find((l) => l.code === locale) ?? LOCALES[0]!;
+
+    document.documentElement.lang = active.htmlLang;
+    document.title = doc.title;
+    el('legal-heading').textContent = doc.heading;
+    // A back arrow makes returning to the app one obvious click, regardless of
+    // how many times the language was toggled.
+    home.textContent = `← ${doc.home}`;
+    el('legal-updated').textContent = `${doc.updatedLabel}: ${date}`;
+
+    body.replaceChildren();
+    for (const block of doc.intro) body.appendChild(blockToNode(block));
+    for (const section of doc.sections) {
+      const h = document.createElement('h2');
+      h.textContent = section.h;
+      body.appendChild(h);
+      for (const block of section.blocks) body.appendChild(blockToNode(block));
+    }
+    select.value = locale;
+  }
+
+  // Switch live and keep the URL shareable, but with replaceState so toggling
+  // languages never piles up history entries — one Back press returns to the
+  // app the visitor came from.
   select.addEventListener('change', () => {
     const params = new URLSearchParams(location.search);
     params.set('lang', select.value);
-    location.search = params.toString();
+    history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
+    paint(select.value);
   });
+
+  paint(pickLocale());
 }
