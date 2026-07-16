@@ -279,6 +279,7 @@ saveBtn.addEventListener('click', async () => {
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
         stego,
+        locale: browser.i18n.getUILanguage(),
       });
       note = msg('statusSavedPdf', String(imageCount));
     } else {

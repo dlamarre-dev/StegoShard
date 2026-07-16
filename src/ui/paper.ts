@@ -51,6 +51,8 @@ export interface PaperOptions {
   keyLocation?: string | undefined;
   /** For the 'stego' key mode: cover photo + the password that keys embedding. */
   stego?: { cover: File; password: string } | undefined;
+  /** Active UI locale, so the instruction sheet matches the chosen language. */
+  locale?: string | undefined;
 }
 
 // --- Localized instruction copy ----------------------------------------------
@@ -234,9 +236,13 @@ const INSTRUCTIONS: Record<string, InstructionCopy> = {
   },
 };
 
-/** The browser locale's copy first, then English as the durable fallback. */
-function instructionLangs(): InstructionCopy[] {
-  const tag = (navigator.language || 'en').toLowerCase();
+/**
+ * The chosen UI locale's copy first, then English as the durable fallback.
+ * `locale` is the app's active language (from the switcher / extension UI
+ * language); it falls back to the browser language, then English.
+ */
+function instructionLangs(locale?: string): InstructionCopy[] {
+  const tag = (locale || navigator.language || 'en').toLowerCase().replace('_', '-');
   let key = 'en';
   if (tag.startsWith('zh')) {
     const traditional = ['tw', 'hk', 'mo', 'hant'].some((t) => tag.includes(t));
@@ -384,7 +390,7 @@ async function addInstructionSheet(
   const page = pdf.addPage([A4.w, A4.h]);
   let y = A4.h - MARGIN;
 
-  for (const copy of instructionLangs()) {
+  for (const copy of instructionLangs(options.locale)) {
     y = (await text.block(page, copy.heading, MARGIN, y, 16, { bold: true })) - 8;
     y = await text.block(page, copy.intro, MARGIN, y, 11);
     y -= 4;
@@ -436,7 +442,7 @@ export async function saveFileToPaper(
   // renderings (e.g. a CJK title) embed a single image reused across pages.
   const title = options.title ? await text.prepare(options.title, 15, { bold: true }) : undefined;
   const footers: PreparedText[] = [];
-  for (const line of [...instructionLangs().map((c) => c.footer), PROJECT_URL]) {
+  for (const line of [...instructionLangs(options.locale).map((c) => c.footer), PROJECT_URL]) {
     footers.push(await text.prepare(line, 8));
   }
   const footerHeight = footers.reduce((n, f) => n + f.height + 2, 0);

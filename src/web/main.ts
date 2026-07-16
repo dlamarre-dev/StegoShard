@@ -17,13 +17,20 @@ import {
 } from '@core';
 import { el, pick, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import { saveFileToDisk, restoreFileFromDisk } from '../ui/disk';
-import { localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
+import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
 localizeDom();
 wireLanguageSelect(el<HTMLSelectElement>('lang-select'), () => {
-  // Re-render the strings that were set dynamically (localizeDom only handles
-  // static [data-i18n] nodes), so a mid-session switch is fully translated.
+  // localizeDom only retranslates static [data-i18n] nodes. Status lines and
+  // result panels were filled at action time with the then-current language;
+  // clear them so no stale wrong-language text lingers after a switch (the next
+  // save/restore re-renders them in the new language). Dynamic labels that
+  // should persist (the camera capture count) are re-rendered explicitly.
+  setStatus(saveStatus, '');
+  setStatus(restoreStatus, '');
+  show(saveResult, false);
+  show(restoreResult, false);
   reflectCaptured(capturedCount());
 });
 
@@ -178,6 +185,7 @@ saveBtn.addEventListener('click', async () => {
         passwordHint: pwHint.value.trim() || undefined,
         keyLocation: keyLocation.value.trim() || undefined,
         stego,
+        locale: currentLocale(),
       });
       note = msg('statusSavedPdf', String(imageCount));
     } else {
