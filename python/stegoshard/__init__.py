@@ -1,4 +1,4 @@
-"""ImageVault reference decoder — a standalone implementation of the ImageVault
+"""StegoShard reference decoder — a standalone implementation of the StegoShard
 format (see SPEC.md), so a vault can be restored without the browser extension.
 
 Public API (lazily imported so the pure modules — gf256, reedsolomon, format —

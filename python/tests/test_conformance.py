@@ -12,8 +12,8 @@ import pathlib
 
 import pytest
 
-from imagevault import WrongPasswordError, decode_image, decode_vault
-from imagevault.pipeline import MissingKeyError
+from stegoshard import WrongPasswordError, decode_image, decode_vault
+from stegoshard.pipeline import MissingKeyError
 
 FIXTURES = pathlib.Path(__file__).parent / "_fixtures"
 
@@ -67,7 +67,7 @@ def test_missing_image_is_tolerated():
 
 def test_stego_key_image_round_trip():
     """The key hidden in a cover photo is extracted with the password, then restores."""
-    from imagevault import extract_key_block_from_image
+    from stegoshard import extract_key_block_from_image
 
     d = FIXTURES / "stego"
     manifest = json.loads((d / "manifest.json").read_text())
@@ -97,7 +97,7 @@ def test_stego_key_image_round_trip():
 def test_stego_jpeg_key_image_round_trip():
     """A key hidden in a baseline JPEG's DCT coefficients (TS embed) is extracted
     by the pure-Python coefficient reader and restores the file (SPEC §5.4)."""
-    from imagevault import extract_key_block_from_image
+    from stegoshard import extract_key_block_from_image
 
     d = FIXTURES / "stego-jpeg"
     manifest = json.loads((d / "manifest.json").read_text())

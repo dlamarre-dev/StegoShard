@@ -35,7 +35,7 @@ def decode_vault(
     if not payloads:
         raise ValueError("import: no images provided")
 
-    # Decode defensively: drop images that are not valid ImageVault payloads
+    # Decode defensively: drop images that are not valid StegoShard payloads
     # (a foreign QR, a corrupt header) rather than aborting the whole restore.
     decoded: list[tuple] = []
     for payload in payloads:
@@ -44,7 +44,7 @@ def decode_vault(
         except (ValueError, IndexError, struct.error):
             continue
     if not decoded:
-        raise ValueError("import: no valid ImageVault images found")
+        raise ValueError("import: no valid StegoShard images found")
 
     # Use the majority set so a stray/first-listed foreign image can't derail it.
     counts: dict[bytes, int] = {}

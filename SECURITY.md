@@ -1,13 +1,13 @@
 # Security Policy
 
-ImageVault is a cryptographic tool. We take security reports seriously and appreciate
+StegoShard is a cryptographic tool. We take security reports seriously and appreciate
 responsible disclosure.
 
 ## Reporting a vulnerability
 
 **Please do not open a public issue for security vulnerabilities.**
 
-Report privately via GitHub's **[Security Advisories](https://github.com/dlamarre-dev/ImageVault/security/advisories/new)**
+Report privately via GitHub's **[Security Advisories](https://github.com/dlamarre-dev/StegoShard/security/advisories/new)**
 ("Report a vulnerability"). This keeps the report confidential until a fix is available.
 
 Please include:

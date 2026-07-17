@@ -1,13 +1,13 @@
 {
   "privacy": {
-    "title": "ImageVault — プライバシーポリシー",
-    "heading": "ImageVault — プライバシーポリシー",
+    "title": "StegoShard — プライバシーポリシー",
+    "heading": "StegoShard — プライバシーポリシー",
     "updatedLabel": "最終更新日",
     "home": "ホーム",
     "intro": [
       {
         "p": [
-          "ImageVault は、ゼロ知識かつオフラインファーストのツールです。",
+          "StegoShard は、ゼロ知識かつオフラインファーストのツールです。",
           {
             "b": "個人データの収集、送信、販売は一切行いません。"
           }
@@ -16,7 +16,7 @@
     ],
     "sections": [
       {
-        "h": "ImageVault が扱う情報",
+        "h": "StegoShard が扱う情報",
         "blocks": [
           {
             "ul": [
@@ -33,7 +33,7 @@
                 "は、パスワードでラップされた鍵と機密性のない設定のみがブラウザーにローカルで保存されます。ラップされた鍵は、パスワードがなければ役に立ちません。いかなるサーバーにもデータは同期されません。"
               ],
               [
-                "ImageVault には",
+                "StegoShard には",
                 {
                   "b": "アナリティクス、テレメトリー、トラッキングは一切含まれておらず"
                 },
@@ -54,7 +54,7 @@
               },
               "（拡張機能が作成するアルバム）にアップロードされ、復元時には Google の Picker で選択した画像がダウンロードされます。これはお客様のブラウザーと Google の間で直接行われます。",
               {
-                "b": "ImageVault はサーバーを一切運用しておらず、これらのデータを受け取ることもありません。"
+                "b": "StegoShard はサーバーを一切運用しておらず、これらのデータを受け取ることもありません。"
               },
               " お客様による Google フォトの利用は、Google 自身のプライバシーポリシーに準拠します。拡張機能が扱うのは常に暗号化済みの画像のみであり、お客様の他の写真を読み取ることはできません。"
             ]
@@ -99,8 +99,8 @@
             "p": [
               "ご質問やご懸念がある場合: ",
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               },
               "。"
             ]
@@ -110,17 +110,17 @@
     ]
   },
   "terms": {
-    "title": "ImageVault — 利用規約",
-    "heading": "ImageVault — 利用規約",
+    "title": "StegoShard — 利用規約",
+    "heading": "StegoShard — 利用規約",
     "updatedLabel": "最終更新日",
     "home": "ホーム",
     "intro": [
       {
         "p": [
-          "ImageVault は、",
+          "StegoShard は、",
           {
             "a": "MIT ライセンス",
-            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+            "href": "https://github.com/dlamarre-dev/StegoShard/blob/main/LICENSE"
           },
           "の下で提供される、無料のオープンソースソフトウェアです。拡張機能またはウェブアプリを使用することにより、お客様は本規約に同意したものとみなされます。"
         ]
@@ -132,7 +132,7 @@
         "blocks": [
           {
             "p": [
-              "ImageVault は、お客様のデバイス上でファイルを暗号化し、ディスクへの保存、印刷、または任意でお客様ご自身の Google フォトへのアップロードが可能な画像へとエンコードします。すべてお客様のブラウザー内で動作し、アカウントも当社が運用するサーバーも存在しません（",
+              "StegoShard は、お客様のデバイス上でファイルを暗号化し、ディスクへの保存、印刷、または任意でお客様ご自身の Google フォトへのアップロードが可能な画像へとエンコードします。すべてお客様のブラウザー内で動作し、アカウントも当社が運用するサーバーも存在しません（",
               {
                 "a": "プライバシーポリシー",
                 "href": "./privacy.html"
@@ -168,7 +168,7 @@
                 "画像の複数のコピーを、それぞれ独立した場所に保管してください。単一の媒体に依存せず、Google フォトを唯一のコピーとして扱うことは決してしないでください。"
               ],
               [
-                "ImageVault は、適法な目的にのみ、かつお客様が保存する権利を有するデータについてのみ使用してください。"
+                "StegoShard は、適法な目的にのみ、かつお客様が保存する権利を有するデータについてのみ使用してください。"
               ]
             ]
           }
@@ -200,8 +200,8 @@
           {
             "p": [
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               }
             ]
           }

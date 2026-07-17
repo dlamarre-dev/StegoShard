@@ -5,7 +5,7 @@
  *
  * Run with: npm run package  (builds all targets in store mode first, then this)
  * Outputs:
- *   packages/imagevault-<target>-<version>.zip
+ *   packages/stegoshard-<target>-<version>.zip
  *   dist-release/<target>/            (identical contents, source maps excluded)
  */
 
@@ -50,7 +50,7 @@ function pack(target: Target): void {
 
   // 1) Zip for store upload.
   const zipped = zipSync(entries, { level: 9 });
-  writeFileSync(resolve(OUT, `imagevault-${target}-${version}.zip`), zipped);
+  writeFileSync(resolve(OUT, `stegoshard-${target}-${version}.zip`), zipped);
 
   // 2) Unzipped mirror for local testing (identical to the zip's contents).
   const releaseDir = resolve(RELEASE, target);
@@ -61,7 +61,7 @@ function pack(target: Target): void {
     writeFileSync(dest, bytes);
   }
 
-  console.log(`${target}: packages/imagevault-${target}-${version}.zip + dist-release/${target}/`);
+  console.log(`${target}: packages/stegoshard-${target}-${version}.zip + dist-release/${target}/`);
 }
 
 mkdirSync(OUT, { recursive: true });

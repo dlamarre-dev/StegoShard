@@ -21,8 +21,8 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from imagevault.crypto import WrongPasswordError, decrypt_content, derive_kek, unwrap_dek
-from imagevault.format import parse_envelope, parse_key_block, parse_vault_blob
+from stegoshard.crypto import WrongPasswordError, decrypt_content, derive_kek, unwrap_dek
+from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
 
 VECTORS_PATH = pathlib.Path(__file__).parents[2] / "tests" / "vectors" / "crypto-vectors.json"
 VECTORS = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))

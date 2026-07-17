@@ -3,7 +3,7 @@
  * (see .env.example). Nothing sensitive is committed.
  */
 
-export const GOOGLE_CLIENT_ID: string = import.meta.env.IMAGEVAULT_GOOGLE_CLIENT_ID ?? '';
+export const GOOGLE_CLIENT_ID: string = import.meta.env.STEGOSHARD_GOOGLE_CLIENT_ID ?? '';
 
 /** Whether the optional Google Photos destination is available in this build. */
 export const HAS_GOOGLE_PHOTOS: boolean = GOOGLE_CLIENT_ID.length > 0;

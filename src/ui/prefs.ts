@@ -6,7 +6,7 @@
 import browser from 'webextension-polyfill';
 import type { KeyMode } from '@core';
 
-const PREFS_KEY = 'imagevault.prefs';
+const PREFS_KEY = 'stegoshard.prefs';
 
 export type Destination = 'disk' | 'paper' | 'cloud';
 

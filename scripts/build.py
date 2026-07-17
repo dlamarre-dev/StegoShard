@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run ImageVault's build / package npm scripts from one place.
+"""Run StegoShard's build / package npm scripts from one place.
 
 Usage:
     python scripts/build.py build              # npm run build (Chrome/Edge, dev)
@@ -43,7 +43,7 @@ def run_script(name: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Build or package the ImageVault extension via npm.",
+        description="Build or package the StegoShard extension via npm.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

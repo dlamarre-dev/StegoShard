@@ -1,11 +1,11 @@
-# ImageVault
+# StegoShard
 
 > Encrypt a file and encode it into **robust, error-corrected images** you can store
 > **anywhere** — on disk, on paper, or in the cloud. A cross-browser WebExtension
 > (Chrome, Edge, Firefox) for **small, high-value secrets**: password exports, keys,
 > seed phrases, configs, `.env` files, notes.
 
-ImageVault is a **resilient, support-agnostic vault**, not a stealth steganography tool.
+StegoShard is a **resilient, support-agnostic vault**, not a stealth steganography tool.
 Your file is encrypted (zero-knowledge) and then encoded into a set of **openly
 artificial images** designed to survive recompression and printing, spread across the
 set with **cross-image error correction** (erasure coding). Store them where you like:
@@ -117,10 +117,10 @@ npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print
 
 The password is taken (in order) from `--password` (which prints a warning — it is
 visible in your shell history and the process list), `--password-file`, the
-`IMAGEVAULT_PASSWORD` environment variable, or an interactive hidden prompt.
+`STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
 **Packaging.** `npm run build:cli` bundles the CLI into a single self-contained
-`dist-cli/imagevault.js` (shebang included) for `npx imagevault …`. From that bundle,
+`dist-cli/stegoshard.js` (shebang included) for `npx stegoshard …`. From that bundle,
 `deno compile` produces standalone per-OS executables (see the `Release CLI binaries`
 workflow) — pure JS + WASM, no npm resolution, and baked-in `--allow-read --allow-write`
 permissions with **no network access**, so "nothing leaves your device" is enforced by

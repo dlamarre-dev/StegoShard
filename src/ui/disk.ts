@@ -67,7 +67,7 @@ export async function saveFileToDisk(
       : undefined;
     const index = String(i + 1).padStart(2, '0');
     pngs.push({
-      name: `imagevault-${setHex}-${index}.png`,
+      name: `stegoshard-${setHex}-${index}.png`,
       bytes: await blobBytes(await imageWithLabelToPngBlob(img, band)),
     });
   }
@@ -75,7 +75,7 @@ export async function saveFileToDisk(
   // hidden inside the user's cover photo (a lossless PNG); otherwise it is a
   // plain .key file. Bundled into the .zip only for the .key case — the stego
   // image is always delivered on its own so it can be stored as an innocuous
-  // photo, separate from the obviously-ImageVault set.
+  // photo, separate from the obviously-StegoShard set.
   let externalKey: { name: string; bytes: Uint8Array; mime: string } | undefined;
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
@@ -87,7 +87,7 @@ export async function saveFileToDisk(
     };
   } else if (keyMode !== 'embedded') {
     externalKey = {
-      name: `imagevault-${setHex}.key`,
+      name: `stegoshard-${setHex}.key`,
       bytes: keyBlock,
       mime: 'application/octet-stream',
     };
@@ -98,7 +98,7 @@ export async function saveFileToDisk(
     for (const p of pngs) entries[p.name] = p.bytes;
     if (externalKey && keyMode === 'keyfile') entries[externalKey.name] = externalKey.bytes;
     const zipped = zipSync(entries, { level: 0 }); // PNGs are already compressed
-    downloadBlob(new Blob([zipped as BufferSource]), `imagevault-${setHex}.zip`);
+    downloadBlob(new Blob([zipped as BufferSource]), `stegoshard-${setHex}.zip`);
     if (externalKey && keyMode === 'stego') {
       downloadBlob(
         new Blob([externalKey.bytes as BufferSource], { type: externalKey.mime }),

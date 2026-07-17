@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault: Geheimnisse als QR-/Papier-Bilder verschlüsseln & sichern"
+    "message": "StegoShard: Geheimnisse als QR-/Papier-Bilder verschlüsseln & sichern"
   },
   "extDesc": {
     "message": "Verschlüssle eine Datei in robuste, fehlerkorrigierte Bilder für Festplatte, Ausdruck oder Cloud."
@@ -9,10 +9,10 @@
     "message": "Verschlüssle eine Datei in widerstandsfähige Bilder — Festplatte, Papier oder Cloud."
   },
   "optionsTitle": {
-    "message": "ImageVault-Einstellungen"
+    "message": "StegoShard-Einstellungen"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "Gesperrt"
@@ -95,7 +95,7 @@
     "message": "Dies läuft in einem eigenen Tab, damit es offen bleibt, während du deine Bilder auswählst. Gib dein Passwort ein, starte, wähle die Tresor-Bilder im Picker und komm dann hierher zurück."
   },
   "statusPickerOpen": {
-    "message": "Wähle deine ImageVault-Bilder im geöffneten Fenster und komm dann zurück…"
+    "message": "Wähle deine StegoShard-Bilder im geöffneten Fenster und komm dann zurück…"
   },
   "labelInstructions": {
     "message": "Ein Anleitungsblatt beilegen"

@@ -1,5 +1,5 @@
 /**
- * Web app entry — a standalone, install-free version of ImageVault's offline
+ * Web app entry — a standalone, install-free version of StegoShard's offline
  * core (Disk + Paper). It reuses the exact same core, codec, and disk/paper
  * flows as the extension; it just generates a fresh vault key per save (the
  * wrapped key travels with the images or as a .key file) instead of a managed

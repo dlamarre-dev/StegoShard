@@ -5,7 +5,7 @@ import { builtinModules } from 'node:module';
 
 /**
  * Build the CLI into a single self-contained ESM bundle with a shebang, so it
- * can be published to npm (`npx imagevault`) and fed to `deno compile` for
+ * can be published to npm (`npx stegoshard`) and fed to `deno compile` for
  * standalone per-OS binaries. All npm deps are bundled (hash-wasm inlines its
  * WASM as base64, as in the web build); only Node's own builtins stay external —
  * both Node and Deno (via its node: compat, included by `deno compile`) provide
@@ -27,7 +27,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/cli/main.ts'),
       formats: ['es'],
-      fileName: () => 'imagevault.js',
+      fileName: () => 'stegoshard.js',
     },
     rollupOptions: {
       external: nodeBuiltins,

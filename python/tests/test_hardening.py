@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from imagevault.format import KEY_MAGIC, MAGIC, parse_header, parse_key_block
+from stegoshard.format import KEY_MAGIC, MAGIC, parse_header, parse_key_block
 
 
 def _key_block(memory_kib: int) -> bytes:

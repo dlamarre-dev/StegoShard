@@ -33,7 +33,7 @@ const HOST_PERMISSIONS = [
   'https://photospicker.googleapis.com/*',
   'https://*.googleusercontent.com/*',
 ];
-const TOKEN_KEY = 'imagevault.gphotos_token';
+const TOKEN_KEY = 'stegoshard.gphotos_token';
 const BATCH_CREATE_MAX = 50;
 
 interface CachedToken {
@@ -165,7 +165,7 @@ export async function saveToPhotos(
   });
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
   const setHex = toHex(setId);
-  const albumTitle = `ImageVault ${options.title || setHex}`;
+  const albumTitle = `StegoShard ${options.title || setHex}`;
   const albumId = await createAlbum(token, albumTitle);
 
   const created: { fileName: string; uploadToken: string; description: string }[] = [];
@@ -178,7 +178,7 @@ export async function saveToPhotos(
       total: imagePayloads.length,
     });
     const png = new Uint8Array(await blob.arrayBuffer());
-    const fileName = `imagevault-${setHex}-${String(i + 1).padStart(2, '0')}.png`;
+    const fileName = `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`;
     const uploadToken = await uploadBytes(token, png, fileName);
     created.push({ fileName, uploadToken, description: `page ${i + 1}/${imagePayloads.length}` });
   }
@@ -188,7 +188,7 @@ export async function saveToPhotos(
 
   // Keyfile/stego key blocks still go to disk (they are not photos).
   if (keyMode !== 'embedded') {
-    downloadBlob(new Blob([keyBlock as BufferSource]), `imagevault-${setHex}.key`);
+    downloadBlob(new Blob([keyBlock as BufferSource]), `stegoshard-${setHex}.key`);
   }
   return { imageCount: imagePayloads.length, albumTitle };
 }
@@ -273,7 +273,7 @@ export async function restoreFromPhotos(
     const payload = await decodeImageBytes(new Uint8Array(await resp.arrayBuffer()));
     if (payload) payloads.push(payload);
   }
-  if (payloads.length === 0) throw new Error('no readable ImageVault images were selected');
+  if (payloads.length === 0) throw new Error('no readable StegoShard images were selected');
 
   const { filename, content } = await importVault(payloads, password, { keyBlock });
   downloadBlob(new Blob([content as BufferSource]), filename);

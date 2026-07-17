@@ -6,7 +6,7 @@ proves it. The format itself is frozen in [SPEC.md](../SPEC.md) (§5–§6).
 
 Scope: `src/core/crypto.ts` (primitives + key block), `src/core/vault.ts`
 (blob assembly), and the independent Python reference decoder
-(`python/imagevault/crypto.py`, `format.py`).
+(`python/stegoshard/crypto.py`, `format.py`).
 
 ## 1. Design summary
 
@@ -174,7 +174,7 @@ bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
   LSBs touched, alpha never touched, sparse changes (≤ 736 bits), whitened
   carrier is ~50/50 ones, capacity guard, wrong-length payload rejection.
 - **Cross-implementation:** the Python reference decoder
-  (`python/imagevault/stego.py`) extracts the key from a TS-generated stego PNG
+  (`python/stegoshard/stego.py`) extracts the key from a TS-generated stego PNG
   and restores the vault (`python/tests/test_conformance.py::test_stego_key_image_round_trip`),
   proving the derivation matches bit-for-bit.
 

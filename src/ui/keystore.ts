@@ -25,8 +25,8 @@ import {
   type VaultKey,
 } from '@core';
 
-const LOCAL_KEY = 'imagevault.keyBlock'; // wrapped DEK, at rest
-const SESSION_KEY = 'imagevault.session'; // unlocked DEK, volatile
+const LOCAL_KEY = 'stegoshard.keyBlock'; // wrapped DEK, at rest
+const SESSION_KEY = 'stegoshard.session'; // unlocked DEK, volatile
 
 async function readStoredBlock(): Promise<Uint8Array | null> {
   const record = await browser.storage.local.get(LOCAL_KEY);

@@ -1,9 +1,9 @@
 /**
- * ImageVault CLI — encrypt a file into resilient QR images (and back) from a
+ * StegoShard CLI — encrypt a file into resilient QR images (and back) from a
  * terminal. Reuses the exact `@core` format as the extension and web app, so
  * vaults are interchangeable across all three (and the Python decoder).
  *
- * Commands: `save`, `restore`, `estimate`. Run `imagevault --help` for usage.
+ * Commands: `save`, `restore`, `estimate`. Run `stegoshard --help` for usage.
  */
 
 import { readFileSync } from 'node:fs';
@@ -18,12 +18,12 @@ import {
 } from './commands';
 import type { KeyMode } from '@core';
 
-const USAGE = `ImageVault — encrypt a file into resilient QR images, and restore it.
+const USAGE = `StegoShard — encrypt a file into resilient QR images, and restore it.
 
 Usage:
-  imagevault save <file> [options]
-  imagevault restore <images|folder|zip|pdf ...> [options]
-  imagevault estimate <file> [--paper]
+  stegoshard save <file> [options]
+  stegoshard restore <images|folder|zip|pdf ...> [options]
+  stegoshard estimate <file> [--paper]
 
 Save options:
   --out <dir>            Output directory (default: current directory)
@@ -46,14 +46,14 @@ Restore options:
 Password (any command that needs one), in order of precedence:
   --password <pw>        Discouraged: visible in shell history / process list
   --password-file <path> Read the password from a file (first line)
-  IMAGEVAULT_PASSWORD    Environment variable
+  STEGOSHARD_PASSWORD    Environment variable
   interactive prompt     Asked (hidden) when none of the above is set
 
 Examples:
-  imagevault save secret.txt --out ./vault
-  imagevault save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
-  imagevault save notes.txt --paper --instructions --locale fr --out ./print
-  imagevault restore ./vault --out ./restored
+  stegoshard save secret.txt --out ./vault
+  stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
+  stegoshard save notes.txt --paper --instructions --locale fr --out ./print
+  stegoshard restore ./vault --out ./restored
 `;
 
 function fail(message: string, code = 1): never {
@@ -65,7 +65,7 @@ function fail(message: string, code = 1): never {
 function promptHidden(question: string): Promise<string> {
   const stdin = process.stdin;
   if (!stdin.isTTY) {
-    // Piped input: read all of stdin as the password (e.g. `echo pw | imagevault`).
+    // Piped input: read all of stdin as the password (e.g. `echo pw | stegoshard`).
     return new Promise((resolve) => {
       let data = '';
       stdin.setEncoding('utf8');
@@ -111,14 +111,14 @@ async function resolvePassword(values: Record<string, unknown>): Promise<string>
   if (typeof values.password === 'string') {
     process.stderr.write(
       'Warning: --password is visible in your shell history and the process list; ' +
-        'prefer IMAGEVAULT_PASSWORD, --password-file, or the interactive prompt.\n',
+        'prefer STEGOSHARD_PASSWORD, --password-file, or the interactive prompt.\n',
     );
     return values.password;
   }
   if (typeof values['password-file'] === 'string') {
     return readFileSync(values['password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
   }
-  if (process.env.IMAGEVAULT_PASSWORD) return process.env.IMAGEVAULT_PASSWORD;
+  if (process.env.STEGOSHARD_PASSWORD) return process.env.STEGOSHARD_PASSWORD;
   const pw = await promptHidden('Password: ');
   if (!pw) fail('no password provided');
   return pw;
@@ -218,7 +218,7 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  fail(`unknown command "${command}" (try: imagevault --help)`, 2);
+  fail(`unknown command "${command}" (try: stegoshard --help)`, 2);
 }
 
 main(process.argv.slice(2))

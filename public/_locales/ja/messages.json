@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault：秘密を暗号化しQR・紙の画像でバックアップ"
+    "message": "StegoShard：秘密を暗号化しQR・紙の画像でバックアップ"
   },
   "extDesc": {
     "message": "ファイルを暗号化し、誤り訂正付きの堅牢な画像に変換。ディスク保存・印刷・クラウドに対応。"
@@ -9,10 +9,10 @@
     "message": "ファイルを堅牢な画像に暗号化 — ディスク・紙・クラウド。"
   },
   "optionsTitle": {
-    "message": "ImageVault の設定"
+    "message": "StegoShard の設定"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "ロック中"
@@ -95,7 +95,7 @@
     "message": "画像を選んでいる間も開いたままにするため、これは専用のタブで実行されます。パスワードを入力して開始し、ピッカーで金庫の画像を選択したら、ここに戻ってください。"
   },
   "statusPickerOpen": {
-    "message": "開いたウィンドウで ImageVault の画像を選び、ここに戻ってください…"
+    "message": "開いたウィンドウで StegoShard の画像を選び、ここに戻ってください…"
   },
   "labelInstructions": {
     "message": "説明シートを含める"

@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault : chiffrez et sauvegardez vos secrets en images QR / papier",
+    "message": "StegoShard : chiffrez et sauvegardez vos secrets en images QR / papier",
     "description": "Extension name (max 75 chars), keyword-oriented (plan §7)."
   },
   "extDesc": {
@@ -12,11 +12,11 @@
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
-    "message": "Paramètres d'ImageVault",
+    "message": "Paramètres d'StegoShard",
     "description": "Options page heading."
   },
   "extShortName": {
-    "message": "ImageVault",
+    "message": "StegoShard",
     "description": "Product name shown in the app header."
   },
   "pillLocked": {
@@ -128,7 +128,7 @@
     "description": "Photos restore page: intro."
   },
   "statusPickerOpen": {
-    "message": "Sélectionnez vos images ImageVault dans la fenêtre ouverte, puis revenez ici…",
+    "message": "Sélectionnez vos images StegoShard dans la fenêtre ouverte, puis revenez ici…",
     "description": "Popup: status while the picker is open."
   },
   "labelInstructions": {

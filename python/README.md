@@ -1,6 +1,6 @@
-# ImageVault reference decoder (Python)
+# StegoShard reference decoder (Python)
 
-A standalone, dependency-light implementation of the ImageVault format
+A standalone, dependency-light implementation of the StegoShard format
 ([SPEC.md](../SPEC.md)). It restores a vault from its images **without the browser
 extension** — the long-term survival guarantee: as long as you keep the images
 (or a printout), your password, and this open-source script, your data is
@@ -25,12 +25,12 @@ libraries needed): `zxing-cpp`, `Pillow`, `argon2-cffi`, `cryptography`.
 
 ```bash
 # Images on disk (a folder, a .zip, or a list of files):
-python -m imagevault.decode ./my-vault-images/ --out ./restored
-python -m imagevault.decode imagevault-abcd1234.zip
-python -m imagevault.decode page-01.png page-02.png page-03.png
+python -m stegoshard.decode ./my-vault-images/ --out ./restored
+python -m stegoshard.decode stegoshard-abcd1234.zip
+python -m stegoshard.decode page-01.png page-02.png page-03.png
 
 # Keyfile-mode sets need the separate .key (also auto-detected inside a zip/folder):
-python -m imagevault.decode ./images/ --key imagevault-abcd1234.key
+python -m stegoshard.decode ./images/ --key stegoshard-abcd1234.key
 ```
 
 The password is prompted unless you pass `--password`. Restoring tolerates

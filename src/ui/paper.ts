@@ -164,7 +164,7 @@ export async function saveFileToPaper(
 
   downloadBlob(
     new Blob([pdfBytes as BufferSource], { type: 'application/pdf' }),
-    `imagevault-${setHex}.pdf`,
+    `stegoshard-${setHex}.pdf`,
   );
 
   // For keyfile/stego modes the key block is not on paper — deliver it too:
@@ -177,7 +177,7 @@ export async function saveFileToPaper(
       stegoKeyName(options.stego.cover.name, key.ext, setHex),
     );
   } else if (keyMode !== 'embedded') {
-    downloadBlob(new Blob([keyBlock as BufferSource]), `imagevault-${setHex}.key`);
+    downloadBlob(new Blob([keyBlock as BufferSource]), `stegoshard-${setHex}.key`);
   }
 
   return { imageCount: imagePayloads.length, setId: setHex, keyMode };

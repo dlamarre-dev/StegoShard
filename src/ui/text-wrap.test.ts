@@ -19,7 +19,7 @@ describe('wrapText', () => {
   });
 
   it('breaks an over-long single word (URL) instead of overflowing', () => {
-    const url = 'https://github.com/dlamarre-dev/ImageVault';
+    const url = 'https://github.com/dlamarre-dev/StegoShard';
     const lines = wrapText(url, 20, byLength);
     expect(lines.every((l) => l.length <= 20)).toBe(true);
     expect(lines.join('')).toBe(url);

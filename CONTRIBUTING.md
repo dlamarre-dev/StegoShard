@@ -1,6 +1,6 @@
-# Contributing to ImageVault
+# Contributing to StegoShard
 
-Thanks for your interest in contributing. ImageVault is a security-sensitive project, so
+Thanks for your interest in contributing. StegoShard is a security-sensitive project, so
 the contribution process is a little stricter than average — especially for anything
 touching cryptography, the image codec, or erasure coding.
 

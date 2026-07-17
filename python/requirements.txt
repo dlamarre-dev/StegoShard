@@ -1,4 +1,4 @@
-# ImageVault reference decoder dependencies (common PyPI packages, offline-capable).
+# StegoShard reference decoder dependencies (common PyPI packages, offline-capable).
 zxing-cpp>=2.2.0      # binary-safe QR decoding (returns raw bytes)
 Pillow>=10.0.0        # image loading / downscaling
 argon2-cffi>=23.1.0   # Argon2id KEK derivation

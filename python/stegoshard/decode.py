@@ -1,7 +1,7 @@
 """Command-line reference decoder.
 
 Usage:
-    python -m imagevault.decode IMAGES... --password PW [--key FILE] [--out DIR]
+    python -m stegoshard.decode IMAGES... --password PW [--key FILE] [--out DIR]
 
 IMAGES may be image files, directories, or .zip archives. A .key file (loose,
 or inside a .zip/directory) is picked up automatically for keyfile-mode sets.
@@ -74,7 +74,7 @@ def _gather(paths: list[str]) -> tuple[list[bytes], bytes | None]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="ImageVault reference decoder")
+    parser = argparse.ArgumentParser(description="StegoShard reference decoder")
     parser.add_argument("inputs", nargs="+", help="image files, directories, or .zip archives")
     parser.add_argument("--password", help="vault password (prompted if omitted)")
     parser.add_argument("--key", help="path to a .key file (keyfile-mode sets)")

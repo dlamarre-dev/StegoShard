@@ -1,6 +1,6 @@
-# ImageVault format specification — v1
+# StegoShard format specification — v1
 
-This document is the **stable, versioned interface** for the ImageVault on-image
+This document is the **stable, versioned interface** for the StegoShard on-image
 format. It describes everything needed to decode a vault **without the extension**,
 so the data survives even if the extension disappears. Any conforming
 implementation (including the Python reference decoder, Phase 3) must interoperate
@@ -346,7 +346,7 @@ The TypeScript core in `src/core/` is the reference encoder/decoder:
 | Vault blob & flow  | `vault.ts`                      |
 | QR-grid codec      | `codec/qr-grid.ts`              |
 
-A standalone **Python reference decoder** in `python/imagevault/` implements this
+A standalone **Python reference decoder** in `python/stegoshard/` implements this
 same specification independently (GF(2^8) + Reed-Solomon, header, key block,
 Argon2id + AES-GCM, gzip, QR decode). It restores a vault without the extension
 and runs in CI as a cross-implementation conformance test: the extension encodes

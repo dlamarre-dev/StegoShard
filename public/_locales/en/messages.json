@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault: encrypt & back up secrets as QR / paper images",
+    "message": "StegoShard: encrypt & back up secrets as QR / paper images",
     "description": "Extension name (max 75 chars), keyword-oriented (plan §7)."
   },
   "extDesc": {
@@ -12,11 +12,11 @@
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
-    "message": "ImageVault settings",
+    "message": "StegoShard settings",
     "description": "Options page heading."
   },
   "extShortName": {
-    "message": "ImageVault",
+    "message": "StegoShard",
     "description": "Product name shown in the app header."
   },
   "pillLocked": {
@@ -128,7 +128,7 @@
     "description": "Photos restore page: intro."
   },
   "statusPickerOpen": {
-    "message": "Pick your ImageVault images in the window that opened, then come back…",
+    "message": "Pick your StegoShard images in the window that opened, then come back…",
     "description": "Popup: status while the picker is open."
   },
   "labelInstructions": {

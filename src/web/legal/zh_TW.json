@@ -1,13 +1,13 @@
 {
   "privacy": {
-    "title": "ImageVault — 隱私權政策",
-    "heading": "ImageVault — 隱私權政策",
+    "title": "StegoShard — 隱私權政策",
+    "heading": "StegoShard — 隱私權政策",
     "updatedLabel": "最後更新",
     "home": "首頁",
     "intro": [
       {
         "p": [
-          "ImageVault 是一款零知識、離線優先的工具。",
+          "StegoShard 是一款零知識、離線優先的工具。",
           {
             "b": "它不會收集、傳輸或販售任何個人資料。"
           }
@@ -16,7 +16,7 @@
     ],
     "sections": [
       {
-        "h": "ImageVault 處理的內容",
+        "h": "StegoShard 處理的內容",
         "blocks": [
           {
             "ul": [
@@ -33,7 +33,7 @@
                 "，僅有以密碼包裝的金鑰與非敏感偏好設定會儲存在瀏覽器本機中。沒有您的密碼，該包裝金鑰毫無用處。不會有任何資料同步到任何伺服器。"
               ],
               [
-                "ImageVault 不含",
+                "StegoShard 不含",
                 {
                   "b": "任何分析、遙測或追蹤"
                 },
@@ -54,7 +54,7 @@
               },
               "（存入擴充功能所建立的相簿），還原時則會下載您透過 Google 的 Picker 所選取的圖片。這一切都直接在您的瀏覽器與 Google 之間進行；",
               {
-                "b": "ImageVault 不營運任何伺服器，也不會收到任何這些資料。"
+                "b": "StegoShard 不營運任何伺服器，也不會收到任何這些資料。"
               },
               " 您使用 Google 相簿受 Google 本身的隱私權政策所規範。此擴充功能僅會處理已加密的圖片，無法讀取您的其他相片。"
             ]
@@ -99,8 +99,8 @@
             "p": [
               "如有問題或疑慮：",
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               },
               "。"
             ]
@@ -110,17 +110,17 @@
     ]
   },
   "terms": {
-    "title": "ImageVault — 服務條款",
-    "heading": "ImageVault — 服務條款",
+    "title": "StegoShard — 服務條款",
+    "heading": "StegoShard — 服務條款",
     "updatedLabel": "最後更新",
     "home": "首頁",
     "intro": [
       {
         "p": [
-          "ImageVault 是依據 ",
+          "StegoShard 是依據 ",
           {
             "a": "MIT 授權條款",
-            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+            "href": "https://github.com/dlamarre-dev/StegoShard/blob/main/LICENSE"
           },
           " 提供的免費開放原始碼軟體。使用此擴充功能或網頁應用程式，即表示您同意本條款。"
         ]
@@ -132,7 +132,7 @@
         "blocks": [
           {
             "p": [
-              "ImageVault 會在您的裝置上加密檔案，並將其編碼為圖片，讓您可以儲存於磁碟、列印，或選擇性地上傳至您自己的 Google 相簿。它完全在您的瀏覽器中運作；沒有帳戶，也沒有由我們營運的伺服器（請參閱",
+              "StegoShard 會在您的裝置上加密檔案，並將其編碼為圖片，讓您可以儲存於磁碟、列印，或選擇性地上傳至您自己的 Google 相簿。它完全在您的瀏覽器中運作；沒有帳戶，也沒有由我們營運的伺服器（請參閱",
               {
                 "a": "隱私權政策",
                 "href": "./privacy.html"
@@ -168,7 +168,7 @@
                 "請在多個獨立的位置保存您圖片的多份副本。切勿依賴任何單一媒介，也切勿將 Google 相簿視為您唯一的副本。"
               ],
               [
-                "請僅將 ImageVault 用於合法目的，且僅用於您有權儲存的資料。"
+                "請僅將 StegoShard 用於合法目的，且僅用於您有權儲存的資料。"
               ]
             ]
           }
@@ -200,8 +200,8 @@
           {
             "p": [
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               }
             ]
           }

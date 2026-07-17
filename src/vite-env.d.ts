@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   /** OAuth client id for the optional Google Photos destination (may be empty). */
-  readonly IMAGEVAULT_GOOGLE_CLIENT_ID?: string;
+  readonly STEGOSHARD_GOOGLE_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault: cifra y respalda secretos como imágenes QR / papel"
+    "message": "StegoShard: cifra y respalda secretos como imágenes QR / papel"
   },
   "extDesc": {
     "message": "Cifra un archivo en imágenes robustas con corrección de errores para guardar en disco, imprimir o subir a la nube."
@@ -9,10 +9,10 @@
     "message": "Cifra un archivo en imágenes resilientes — disco, papel o nube."
   },
   "optionsTitle": {
-    "message": "Ajustes de ImageVault"
+    "message": "Ajustes de StegoShard"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "Bloqueado"
@@ -95,7 +95,7 @@
     "message": "Esto se ejecuta en su propia pestaña para seguir abierta mientras eliges tus imágenes. Introduce tu contraseña, inicia, selecciona las imágenes de la caja fuerte en el selector y vuelve aquí."
   },
   "statusPickerOpen": {
-    "message": "Elige tus imágenes de ImageVault en la ventana abierta y vuelve aquí…"
+    "message": "Elige tus imágenes de StegoShard en la ventana abierta y vuelve aquí…"
   },
   "labelInstructions": {
     "message": "Incluir una hoja de instrucciones"

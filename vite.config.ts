@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { buildManifest, type Target } from './src/manifest.config';
 
-const target = (process.env.IMAGEVAULT_TARGET ?? 'chrome') as Target;
+const target = (process.env.STEGOSHARD_TARGET ?? 'chrome') as Target;
 
 /**
  * Emits manifest.json for the selected browser target. The manifest is derived
@@ -14,7 +14,7 @@ const target = (process.env.IMAGEVAULT_TARGET ?? 'chrome') as Target;
  */
 function manifestPlugin(googlePhotos: boolean): Plugin {
   return {
-    name: 'imagevault-manifest',
+    name: 'stegoshard-manifest',
     generateBundle() {
       this.emitFile({
         type: 'asset',
@@ -26,15 +26,15 @@ function manifestPlugin(googlePhotos: boolean): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, resolve(__dirname), 'IMAGEVAULT_');
-  const googlePhotos = Boolean(env.IMAGEVAULT_GOOGLE_CLIENT_ID);
+  const env = loadEnv(mode, resolve(__dirname), 'STEGOSHARD_');
+  const googlePhotos = Boolean(env.STEGOSHARD_GOOGLE_CLIENT_ID);
   return {
     root: 'src',
     publicDir: resolve(__dirname, 'public'),
-    // Load .env from the project root and expose IMAGEVAULT_* to the app (e.g. the
+    // Load .env from the project root and expose STEGOSHARD_* to the app (e.g. the
     // optional Google Photos client id). Absent → the feature stays disabled.
     envDir: resolve(__dirname),
-    envPrefix: ['VITE_', 'IMAGEVAULT_'],
+    envPrefix: ['VITE_', 'STEGOSHARD_'],
     resolve: {
       alias: {
         '@core': fileURLToPath(new URL('./src/core', import.meta.url)),

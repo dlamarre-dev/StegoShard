@@ -1,13 +1,13 @@
 {
   "privacy": {
-    "title": "ImageVault — Privacy Policy",
-    "heading": "ImageVault — Privacy Policy",
+    "title": "StegoShard — Privacy Policy",
+    "heading": "StegoShard — Privacy Policy",
     "updatedLabel": "Last updated",
     "home": "Home",
     "intro": [
       {
         "p": [
-          "ImageVault is a zero-knowledge, offline-first tool. ",
+          "StegoShard is a zero-knowledge, offline-first tool. ",
           {
             "b": "It does not collect, transmit, or sell any personal data."
           }
@@ -16,7 +16,7 @@
     ],
     "sections": [
       {
-        "h": "What ImageVault handles",
+        "h": "What StegoShard handles",
         "blocks": [
           {
             "ul": [
@@ -33,7 +33,7 @@
                 ", only a password-wrapped key and non-sensitive preferences are stored locally in the browser. The wrapped key is useless without your password. Nothing is synced to any server."
               ],
               [
-                "ImageVault contains ",
+                "StegoShard contains ",
                 {
                   "b": "no analytics, no telemetry, and no tracking"
                 },
@@ -54,7 +54,7 @@
               },
               " (into an album the extension creates), and restoring downloads images you select with Google's Picker. This happens directly between your browser and Google; ",
               {
-                "b": "ImageVault operates no servers and receives none of this data."
+                "b": "StegoShard operates no servers and receives none of this data."
               },
               " Your use of Google Photos is governed by Google's own privacy policy. The extension only ever handles already-encrypted images and cannot read your other photos."
             ]
@@ -99,8 +99,8 @@
             "p": [
               "Questions or concerns: ",
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               },
               "."
             ]
@@ -110,17 +110,17 @@
     ]
   },
   "terms": {
-    "title": "ImageVault — Terms of Service",
-    "heading": "ImageVault — Terms of Service",
+    "title": "StegoShard — Terms of Service",
+    "heading": "StegoShard — Terms of Service",
     "updatedLabel": "Last updated",
     "home": "Home",
     "intro": [
       {
         "p": [
-          "ImageVault is free, open-source software provided under the ",
+          "StegoShard is free, open-source software provided under the ",
           {
             "a": "MIT License",
-            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+            "href": "https://github.com/dlamarre-dev/StegoShard/blob/main/LICENSE"
           },
           ". By using the extension or the web app, you agree to these terms."
         ]
@@ -132,7 +132,7 @@
         "blocks": [
           {
             "p": [
-              "ImageVault encrypts a file on your device and encodes it into images you can store on disk, print, or optionally upload to your own Google Photos. It runs entirely in your browser; there is no account and no server operated by us (see the ",
+              "StegoShard encrypts a file on your device and encodes it into images you can store on disk, print, or optionally upload to your own Google Photos. It runs entirely in your browser; there is no account and no server operated by us (see the ",
               {
                 "a": "Privacy Policy",
                 "href": "./privacy.html"
@@ -168,7 +168,7 @@
                 "Keep multiple copies of your images across independent locations. Do not rely on any single medium, and never treat Google Photos as your only copy."
               ],
               [
-                "Use ImageVault only for lawful purposes and only with data you are entitled to store."
+                "Use StegoShard only for lawful purposes and only with data you are entitled to store."
               ]
             ]
           }
@@ -200,8 +200,8 @@
           {
             "p": [
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               }
             ]
           }

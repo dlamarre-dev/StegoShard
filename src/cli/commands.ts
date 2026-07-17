@@ -109,7 +109,7 @@ async function externalKey(
     return { name: basename(cover), bytes: key.bytes, mimicPath: cover };
   }
   if (keyMode !== 'embedded') {
-    return { name: `imagevault-${setHex}.key`, bytes: keyBlock };
+    return { name: `stegoshard-${setHex}.key`, bytes: keyBlock };
   }
   return undefined;
 }
@@ -141,7 +141,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
       keyLocation: opts.keyLocation,
       fontPath: opts.fontPath,
     });
-    files.push(writeOut(opts.outDir, `imagevault-${setHex}.pdf`, built.pdf));
+    files.push(writeOut(opts.outDir, `stegoshard-${setHex}.pdf`, built.pdf));
     if (ext) files.push(writeExternalKey(opts.outDir, ext));
     return {
       files,
@@ -155,7 +155,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
 
   // Disk: one PNG per image, or a single .zip.
   const pngs = imagePayloads.map((payload, i) => ({
-    name: `imagevault-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
+    name: `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
     bytes: imageDataToPng(codec.encode(payload, PROFILE_DISK)),
   }));
 
@@ -163,7 +163,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
     if (ext && keyMode === 'keyfile') entries[ext.name] = ext.bytes;
-    files.push(writeOut(opts.outDir, `imagevault-${setHex}.zip`, zipSync(entries, { level: 0 })));
+    files.push(writeOut(opts.outDir, `stegoshard-${setHex}.zip`, zipSync(entries, { level: 0 })));
     // The stego image is always delivered on its own (an innocuous photo).
     if (ext && keyMode === 'stego') files.push(writeExternalKey(opts.outDir, ext));
   } else {
@@ -202,7 +202,7 @@ export async function runRestore(opts: RestoreOptions): Promise<RestoreResult> {
   }
 
   if (gathered.payloads.length === 0) {
-    throw new Error('no readable ImageVault images found in the inputs');
+    throw new Error('no readable StegoShard images found in the inputs');
   }
 
   const { filename, content } = await importVault(gathered.payloads, opts.password, { keyBlock });

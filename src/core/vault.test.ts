@@ -125,7 +125,7 @@ describe('import robustness', () => {
     const key = await makeKey('pw');
     const content = pseudoRandom(3000, 21);
     const { imagePayloads } = await exportVault('a.bin', content, key);
-    const foreign = new Uint8Array(60); // bad magic → not an ImageVault payload
+    const foreign = new Uint8Array(60); // bad magic → not an StegoShard payload
     const out = await importVault([foreign, ...imagePayloads], 'pw');
     expect([...out.content]).toEqual([...content]);
   });

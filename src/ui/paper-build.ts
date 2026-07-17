@@ -13,7 +13,7 @@ import type { ImageDataLike } from '@core';
 import { wrapText } from './text-wrap';
 
 /** Public project page — printed so the data can be restored without the store. */
-export const PROJECT_URL = 'https://github.com/dlamarre-dev/ImageVault';
+export const PROJECT_URL = 'https://github.com/dlamarre-dev/StegoShard';
 
 export const A4 = { w: 595.28, h: 841.89 };
 export const MARGIN = 42;
@@ -43,7 +43,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     heading: 'How to restore this vault',
     intro: 'These pages hold an encrypted file, encoded as error-corrected QR images.',
     steps: [
-      '1. Get ImageVault (browser extension or CLI) or the Python reference decoder from the project page below.',
+      '1. Get StegoShard (browser extension or CLI) or the Python reference decoder from the project page below.',
       '2. Scan or photograph every page, then import the image files (or the PDF).',
       '3. Enter your password. The original file is restored.',
     ],
@@ -54,14 +54,14 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Keep it safe: print with a laser printer, store away from light and moisture, and keep copies in separate places.',
     warning: 'This sheet is not encrypted. Never write your password here.',
-    footer: 'Restore: ImageVault + your password, with enough pages.',
+    footer: 'Restore: StegoShard + your password, with enough pages.',
     page: 'Page',
   },
   fr: {
     heading: 'Comment restaurer ce coffre',
     intro: "Ces pages contiennent un fichier chiffré, encodé en images QR corrigées d'erreurs.",
     steps: [
-      '1. Procurez-vous ImageVault (extension ou CLI) ou le décodeur Python de référence sur la page du projet ci-dessous.',
+      '1. Procurez-vous StegoShard (extension ou CLI) ou le décodeur Python de référence sur la page du projet ci-dessous.',
       '2. Numérisez ou photographiez chaque page, puis importez les fichiers image (ou le PDF).',
       '3. Saisissez votre mot de passe. Le fichier original est restauré.',
     ],
@@ -73,7 +73,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       "À conserver : imprimez au laser, à l'abri de la lumière et de l'humidité, et gardez des copies en lieux distincts.",
     warning: "Cette feuille n'est pas chiffrée. N'y écrivez jamais votre mot de passe.",
-    footer: 'Restaurer : ImageVault + votre mot de passe, avec assez de pages.',
+    footer: 'Restaurer : StegoShard + votre mot de passe, avec assez de pages.',
     page: 'Page',
   },
   de: {
@@ -81,7 +81,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     intro:
       'Diese Seiten enthalten eine verschlüsselte Datei, kodiert als fehlerkorrigierte QR-Bilder.',
     steps: [
-      '1. Holen Sie sich ImageVault (Erweiterung oder CLI) oder den Python-Referenzdecoder von der unten angegebenen Projektseite.',
+      '1. Holen Sie sich StegoShard (Erweiterung oder CLI) oder den Python-Referenzdecoder von der unten angegebenen Projektseite.',
       '2. Scannen oder fotografieren Sie jede Seite und importieren Sie dann die Bilddateien (oder das PDF).',
       '3. Geben Sie Ihr Passwort ein. Die Originaldatei wird wiederhergestellt.',
     ],
@@ -93,7 +93,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Sicher aufbewahren: mit einem Laserdrucker drucken, vor Licht und Feuchtigkeit schützen und Kopien an getrennten Orten aufbewahren.',
     warning: 'Dieses Blatt ist nicht verschlüsselt. Schreiben Sie hier niemals Ihr Passwort auf.',
-    footer: 'Wiederherstellung: ImageVault + Ihr Passwort, mit genügend Seiten.',
+    footer: 'Wiederherstellung: StegoShard + Ihr Passwort, mit genügend Seiten.',
     page: 'Seite',
   },
   es: {
@@ -101,7 +101,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     intro:
       'Estas páginas contienen un archivo cifrado, codificado como imágenes QR con corrección de errores.',
     steps: [
-      '1. Obtenga ImageVault (extensión o CLI) o el decodificador Python de referencia en la página del proyecto indicada abajo.',
+      '1. Obtenga StegoShard (extensión o CLI) o el decodificador Python de referencia en la página del proyecto indicada abajo.',
       '2. Escanee o fotografíe cada página y luego importe los archivos de imagen (o el PDF).',
       '3. Introduzca su contraseña. El archivo original se restaurará.',
     ],
@@ -113,7 +113,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Consérvelo bien: imprima con láser, guárdelo lejos de la luz y la humedad, y mantenga copias en lugares separados.',
     warning: 'Esta hoja no está cifrada. Nunca escriba aquí su contraseña.',
-    footer: 'Restaurar: ImageVault + su contraseña, con suficientes páginas.',
+    footer: 'Restaurar: StegoShard + su contraseña, con suficientes páginas.',
     page: 'Página',
   },
   it: {
@@ -121,7 +121,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     intro:
       'Queste pagine contengono un file cifrato, codificato in immagini QR con correzione degli errori.',
     steps: [
-      '1. Procurati ImageVault (estensione o CLI) o il decodificatore Python di riferimento dalla pagina del progetto qui sotto.',
+      '1. Procurati StegoShard (estensione o CLI) o il decodificatore Python di riferimento dalla pagina del progetto qui sotto.',
       '2. Scansiona o fotografa ogni pagina, poi importa i file immagine (o il PDF).',
       '3. Inserisci la tua password. Il file originale viene ripristinato.',
     ],
@@ -133,7 +133,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Conservalo con cura: stampa con stampante laser, tieni al riparo da luce e umidità e conserva copie in luoghi separati.',
     warning: 'Questo foglio non è cifrato. Non scrivere mai qui la tua password.',
-    footer: 'Ripristino: ImageVault + la tua password, con abbastanza pagine.',
+    footer: 'Ripristino: StegoShard + la tua password, con abbastanza pagine.',
     page: 'Pagina',
   },
   pt: {
@@ -141,7 +141,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     intro:
       'Estas páginas contêm um arquivo criptografado, codificado como imagens QR com correção de erros.',
     steps: [
-      '1. Obtenha o ImageVault (extensão ou CLI) ou o decodificador Python de referência na página do projeto abaixo.',
+      '1. Obtenha o StegoShard (extensão ou CLI) ou o decodificador Python de referência na página do projeto abaixo.',
       '2. Digitalize ou fotografe cada página e depois importe os arquivos de imagem (ou o PDF).',
       '3. Digite sua senha. O arquivo original será restaurado.',
     ],
@@ -153,7 +153,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       'Guarde com cuidado: imprima a laser, mantenha longe de luz e umidade e guarde cópias em locais separados.',
     warning: 'Esta folha não é criptografada. Nunca escreva sua senha aqui.',
-    footer: 'Restaurar: ImageVault + sua senha, com páginas suficientes.',
+    footer: 'Restaurar: StegoShard + sua senha, com páginas suficientes.',
     page: 'Página',
   },
   ja: {
@@ -161,7 +161,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     intro:
       'これらのページには、誤り訂正付きQR画像として符号化された暗号化ファイルが含まれています。',
     steps: [
-      '1. 下記のプロジェクトページから ImageVault(拡張機能または CLI)または Python リファレンスデコーダーを入手します。',
+      '1. 下記のプロジェクトページから StegoShard(拡張機能または CLI)または Python リファレンスデコーダーを入手します。',
       '2. すべてのページをスキャンまたは撮影し、画像ファイル(または PDF)を読み込みます。',
       '3. パスワードを入力すると、元のファイルが復元されます。',
     ],
@@ -172,14 +172,14 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation:
       '保管上の注意: レーザープリンターで印刷し、光と湿気を避けて保管し、複数の場所にコピーを保管してください。',
     warning: 'この用紙は暗号化されていません。ここにパスワードを書かないでください。',
-    footer: '復元: ImageVault + パスワード、十分なページ数が必要です。',
+    footer: '復元: StegoShard + パスワード、十分なページ数が必要です。',
     page: 'ページ',
   },
   zh_CN: {
     heading: '如何恢复此保险库',
     intro: '这些页面包含一个加密文件，以带纠错的二维码图像编码。',
     steps: [
-      '1. 从下方的项目页面获取 ImageVault（浏览器扩展或 CLI）或 Python 参考解码器。',
+      '1. 从下方的项目页面获取 StegoShard（浏览器扩展或 CLI）或 Python 参考解码器。',
       '2. 扫描或拍摄每一页，然后导入图像文件（或 PDF）。',
       '3. 输入您的密码，即可恢复原始文件。',
     ],
@@ -189,14 +189,14 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     passwordHint: '密码提示:',
     preservation: '妥善保存：使用激光打印机打印，避光防潮存放，并在不同地点保留副本。',
     warning: '本页未加密。切勿在此写下您的密码。',
-    footer: '恢复：ImageVault + 您的密码，以及足够的页面。',
+    footer: '恢复：StegoShard + 您的密码，以及足够的页面。',
     page: '页',
   },
   zh_TW: {
     heading: '如何還原此保險庫',
     intro: '這些頁面包含一個加密檔案，以帶錯誤更正的 QR 圖像編碼。',
     steps: [
-      '1. 從下方的專案頁面取得 ImageVault（瀏覽器擴充功能或 CLI）或 Python 參考解碼器。',
+      '1. 從下方的專案頁面取得 StegoShard（瀏覽器擴充功能或 CLI）或 Python 參考解碼器。',
       '2. 掃描或拍攝每一頁，然後匯入圖像檔案（或 PDF）。',
       '3. 輸入您的密碼，即可還原原始檔案。',
     ],
@@ -206,7 +206,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     passwordHint: '密碼提示:',
     preservation: '妥善保存：使用雷射印表機列印，避光防潮存放，並在不同地點保留副本。',
     warning: '本頁未加密。切勿在此寫下您的密碼。',
-    footer: '還原：ImageVault + 您的密碼，以及足夠的頁面。',
+    footer: '還原：StegoShard + 您的密碼，以及足夠的頁面。',
     page: '頁',
   },
 };

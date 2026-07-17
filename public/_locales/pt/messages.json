@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault: cifre e faça backup de segredos como imagens QR / papel"
+    "message": "StegoShard: cifre e faça backup de segredos como imagens QR / papel"
   },
   "extDesc": {
     "message": "Cifre um arquivo em imagens robustas com correção de erros para guardar no disco, imprimir ou enviar à nuvem."
@@ -9,10 +9,10 @@
     "message": "Cifre um arquivo em imagens resilientes — disco, papel ou nuvem."
   },
   "optionsTitle": {
-    "message": "Configurações do ImageVault"
+    "message": "Configurações do StegoShard"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "Bloqueado"
@@ -95,7 +95,7 @@
     "message": "Isto roda em sua própria aba para permanecer aberta enquanto você escolhe suas imagens. Digite sua senha, inicie, selecione as imagens do cofre no seletor e volte aqui."
   },
   "statusPickerOpen": {
-    "message": "Escolha suas imagens do ImageVault na janela aberta e volte aqui…"
+    "message": "Escolha suas imagens do StegoShard na janela aberta e volte aqui…"
   },
   "labelInstructions": {
     "message": "Incluir uma folha de instruções"

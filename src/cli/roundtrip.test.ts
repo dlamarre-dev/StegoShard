@@ -157,9 +157,9 @@ describe('CLI round-trips', () => {
       cover,
     });
     // The stego key image reuses the cover's own filename (deniability), not a
-    // "-key" name; the vault images are the imagevault-*.png set.
+    // "-key" name; the vault images are the stegoshard-*.png set.
     const keyImage = files.find((f) => f.endsWith('cover.png'))!;
-    const images = files.filter((f) => /imagevault-.*\.png$/.test(f));
+    const images = files.filter((f) => /stegoshard-.*\.png$/.test(f));
 
     // Wrong password against the stego image → cannot restore.
     await expect(
@@ -192,7 +192,7 @@ describe('CLI round-trips', () => {
     // Output keeps the cover's format and filename.
     const keyImage = files.find((f) => f.endsWith('photo.jpg'))!;
     expect(keyImage).toBeTruthy();
-    const images = files.filter((f) => /imagevault-.*\.png$/.test(f));
+    const images = files.filter((f) => /stegoshard-.*\.png$/.test(f));
 
     const { outPath } = await runRestore({
       inputs: images,

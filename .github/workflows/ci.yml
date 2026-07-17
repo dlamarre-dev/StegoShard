@@ -54,10 +54,10 @@ jobs:
           curl -fsSL https://deno.land/install.sh | sh -s v2.1.4
           export PATH="$HOME/.deno/bin:$PATH"
           echo "deno smoke: save + restore a vault with the bundled CLI" > /tmp/iv-secret.txt
-          IMAGEVAULT_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
-            dist-cli/imagevault.js save /tmp/iv-secret.txt --out /tmp/iv-out
-          IMAGEVAULT_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
-            dist-cli/imagevault.js restore /tmp/iv-out --out /tmp/iv-restored
+          STEGOSHARD_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
+            dist-cli/stegoshard.js save /tmp/iv-secret.txt --out /tmp/iv-out
+          STEGOSHARD_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
+            dist-cli/stegoshard.js restore /tmp/iv-out --out /tmp/iv-restored
           diff /tmp/iv-secret.txt /tmp/iv-restored/iv-secret.txt
           echo "Deno round-trip OK"
 

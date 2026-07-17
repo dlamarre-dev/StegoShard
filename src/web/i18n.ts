@@ -47,7 +47,7 @@ const CATALOGS: Record<string, Catalog> = {
   zh_TW: zhTW as Catalog,
 };
 
-const STORAGE_KEY = 'imagevault.lang';
+const STORAGE_KEY = 'stegoshard.lang';
 
 /**
  * Resolve a locale code from an explicit choice and the browser language. Any

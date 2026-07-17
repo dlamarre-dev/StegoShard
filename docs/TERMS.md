@@ -1,13 +1,13 @@
-# ImageVault terms of service
+# StegoShard terms of service
 
 _Last updated: 2026-07-14_
 
-ImageVault is free, open-source software provided under the [MIT License](../LICENSE).
+StegoShard is free, open-source software provided under the [MIT License](../LICENSE).
 By using the extension or the web app, you agree to these terms.
 
 ## The service
 
-ImageVault encrypts a file on your device and encodes it into images you can store
+StegoShard encrypts a file on your device and encodes it into images you can store
 on disk, print, or optionally upload to your own Google Photos. It runs entirely in
 your browser; there is no account and no server operated by us (see the
 [Privacy Policy](PRIVACY.md)).
@@ -25,7 +25,7 @@ for any claim, damages, or loss arising from the use of the software.
   your data is permanently unrecoverable** — no one can restore it for you.
 - Keep multiple copies of your images across independent locations. Do not rely on any
   single medium, and never treat Google Photos as your only copy.
-- Use ImageVault only for lawful purposes and only with data you are entitled to store.
+- Use StegoShard only for lawful purposes and only with data you are entitled to store.
 
 ## Google Photos
 
@@ -39,4 +39,4 @@ constitutes acceptance.
 
 ## Contact
 
-<https://github.com/dlamarre-dev/ImageVault>
+<https://github.com/dlamarre-dev/StegoShard>

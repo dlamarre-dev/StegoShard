@@ -1,7 +1,7 @@
 /**
  * Restore-from-PDF: pull the QR images back out of a PDF and decode them.
  *
- * Covers the PDFs ImageVault's paper mode generates (FlateDecode RGB/Gray
+ * Covers the PDFs StegoShard's paper mode generates (FlateDecode RGB/Gray
  * image XObjects) plus the common scanner output (DCTDecode = plain JPEG).
  * Anything else (exotic color spaces, JBIG2, CCITT) is skipped — a lost page
  * is tolerated by the erasure coding, and foreign images simply fail to decode.

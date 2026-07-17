@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault：將機密加密並以 QR／紙本圖像備份"
+    "message": "StegoShard：將機密加密並以 QR／紙本圖像備份"
   },
   "extDesc": {
     "message": "把檔案加密成具備錯誤更正的穩健圖像，可存於磁碟、列印或上傳雲端。"
@@ -9,10 +9,10 @@
     "message": "把檔案加密成穩健圖像 — 磁碟、紙本或雲端。"
   },
   "optionsTitle": {
-    "message": "ImageVault 設定"
+    "message": "StegoShard 設定"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "已鎖定"
@@ -95,7 +95,7 @@
     "message": "此頁在自己的分頁中執行，讓您挑選圖像時保持開啟。輸入密碼並開始，在選取器中選擇保險庫的圖像，然後回到這裡。"
   },
   "statusPickerOpen": {
-    "message": "在開啟的視窗中選擇您的 ImageVault 圖像，然後回到這裡…"
+    "message": "在開啟的視窗中選擇您的 StegoShard 圖像，然後回到這裡…"
   },
   "labelInstructions": {
     "message": "附上說明頁"

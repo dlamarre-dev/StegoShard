@@ -1,12 +1,12 @@
 {
-  "name": "imagevault",
+  "name": "stegoshard",
   "version": "0.0.0",
   "private": true,
   "description": "Encrypt a file and encode it into robust, error-corrected images you can store anywhere: disk, paper, or the cloud.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "imagevault": "dist-cli/imagevault.js"
+    "stegoshard": "dist-cli/stegoshard.js"
   },
   "files": [
     "dist-cli"
@@ -19,12 +19,12 @@
     "cli": "tsx src/cli/main.ts",
     "build": "tsc --noEmit && vite build",
     "build:cli": "tsc --noEmit && vite build --config vite.cli.config.ts",
-    "package:cli": "deno compile --allow-read --allow-write --no-prompt --output imagevault dist-cli/imagevault.js",
-    "build:firefox": "cross-env IMAGEVAULT_TARGET=firefox vite build",
-    "build:edge": "cross-env IMAGEVAULT_TARGET=edge vite build",
+    "package:cli": "deno compile --allow-read --allow-write --no-prompt --output stegoshard dist-cli/stegoshard.js",
+    "build:firefox": "cross-env STEGOSHARD_TARGET=firefox vite build",
+    "build:edge": "cross-env STEGOSHARD_TARGET=edge vite build",
     "build:store": "tsc --noEmit && vite build --mode store",
-    "build:store:edge": "cross-env IMAGEVAULT_TARGET=edge vite build --mode store",
-    "build:store:firefox": "cross-env IMAGEVAULT_TARGET=firefox vite build --mode store",
+    "build:store:edge": "cross-env STEGOSHARD_TARGET=edge vite build --mode store",
+    "build:store:firefox": "cross-env STEGOSHARD_TARGET=firefox vite build --mode store",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
     "dev:web": "vite --config vite.web.config.ts",
     "typecheck": "tsc --noEmit",

@@ -243,17 +243,17 @@ export async function importVault(
 ): Promise<{ filename: string; content: Uint8Array }> {
   if (payloads.length === 0) throw new Error('import: no images provided');
 
-  // Decode defensively: silently drop images that are not valid ImageVault
+  // Decode defensively: silently drop images that are not valid StegoShard
   // payloads (a foreign QR, a corrupt header) rather than aborting the restore.
   const decoded: { header: Header; shard: Uint8Array }[] = [];
   for (const payload of payloads) {
     try {
       decoded.push(decodeImagePayload(payload));
     } catch {
-      // not an ImageVault image / unreadable header — skip it
+      // not an StegoShard image / unreadable header — skip it
     }
   }
-  if (decoded.length === 0) throw new Error('import: no valid ImageVault images found');
+  if (decoded.length === 0) throw new Error('import: no valid StegoShard images found');
 
   // Images from different vaults may be mixed in; use the majority set so one
   // stray or first-listed foreign image cannot derail reconstruction.

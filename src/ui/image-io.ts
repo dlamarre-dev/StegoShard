@@ -34,7 +34,7 @@ const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
  */
 export function stegoKeyName(coverName: string | undefined, ext: string, setHex: string): string {
   const trimmed = coverName?.trim();
-  return trimmed ? trimmed : `imagevault-${setHex}-key.${ext}`;
+  return trimmed ? trimmed : `stegoshard-${setHex}-key.${ext}`;
 }
 
 /** Optional human-readable label band drawn above the QR (cleartext — plan §1). */

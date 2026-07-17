@@ -95,7 +95,7 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
   exportBtn.addEventListener('click', async () => {
     try {
       const keyBlock = await exportKeyBlock();
-      downloadBlob(new Blob([keyBlock as BufferSource]), 'imagevault.key');
+      downloadBlob(new Blob([keyBlock as BufferSource]), 'stegoshard.key');
       setStatus(exportStatus, msg('statusKeyExported'));
     } catch (e) {
       setStatus(exportStatus, friendlyError(e), true);

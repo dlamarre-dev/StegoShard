@@ -1,13 +1,13 @@
 {
   "privacy": {
-    "title": "ImageVault — Política de Privacidade",
-    "heading": "ImageVault — Política de Privacidade",
+    "title": "StegoShard — Política de Privacidade",
+    "heading": "StegoShard — Política de Privacidade",
     "updatedLabel": "Última atualização",
     "home": "Início",
     "intro": [
       {
         "p": [
-          "O ImageVault é uma ferramenta de conhecimento zero que funciona prioritariamente offline. ",
+          "O StegoShard é uma ferramenta de conhecimento zero que funciona prioritariamente offline. ",
           {
             "b": "Não recolhe, transmite nem vende quaisquer dados pessoais."
           }
@@ -16,7 +16,7 @@
     ],
     "sections": [
       {
-        "h": "O que o ImageVault trata",
+        "h": "O que o StegoShard trata",
         "blocks": [
           {
             "ul": [
@@ -33,7 +33,7 @@
                 ", apenas uma chave protegida pela palavra-passe e preferências não sensíveis são armazenadas localmente no navegador. A chave protegida é inútil sem a sua palavra-passe. Nada é sincronizado com qualquer servidor."
               ],
               [
-                "O ImageVault não contém ",
+                "O StegoShard não contém ",
                 {
                   "b": "análises, telemetria nem rastreamento"
                 },
@@ -54,7 +54,7 @@
               },
               " (para um álbum que a extensão cria), e o restauro descarrega as imagens que selecionar com o Picker da Google. Isto ocorre diretamente entre o seu navegador e a Google; ",
               {
-                "b": "o ImageVault não opera quaisquer servidores e não recebe nenhum destes dados."
+                "b": "o StegoShard não opera quaisquer servidores e não recebe nenhum destes dados."
               },
               " A sua utilização do Google Photos rege-se pela própria política de privacidade da Google. A extensão trata unicamente de imagens já cifradas e não consegue ler as suas outras fotografias."
             ]
@@ -99,8 +99,8 @@
             "p": [
               "Questões ou preocupações: ",
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               },
               "."
             ]
@@ -110,17 +110,17 @@
     ]
   },
   "terms": {
-    "title": "ImageVault — Termos de Serviço",
-    "heading": "ImageVault — Termos de Serviço",
+    "title": "StegoShard — Termos de Serviço",
+    "heading": "StegoShard — Termos de Serviço",
     "updatedLabel": "Última atualização",
     "home": "Início",
     "intro": [
       {
         "p": [
-          "O ImageVault é software livre e de código aberto disponibilizado sob a ",
+          "O StegoShard é software livre e de código aberto disponibilizado sob a ",
           {
             "a": "Licença MIT",
-            "href": "https://github.com/dlamarre-dev/ImageVault/blob/main/LICENSE"
+            "href": "https://github.com/dlamarre-dev/StegoShard/blob/main/LICENSE"
           },
           ". Ao utilizar a extensão ou a aplicação web, aceita estes termos."
         ]
@@ -132,7 +132,7 @@
         "blocks": [
           {
             "p": [
-              "O ImageVault cifra um ficheiro no seu dispositivo e codifica-o em imagens que pode guardar em disco, imprimir ou, opcionalmente, carregar para a sua própria conta Google Photos. Funciona inteiramente no seu navegador; não existe conta nem servidor operado por nós (consulte a ",
+              "O StegoShard cifra um ficheiro no seu dispositivo e codifica-o em imagens que pode guardar em disco, imprimir ou, opcionalmente, carregar para a sua própria conta Google Photos. Funciona inteiramente no seu navegador; não existe conta nem servidor operado por nós (consulte a ",
               {
                 "a": "Política de Privacidade",
                 "href": "./privacy.html"
@@ -168,7 +168,7 @@
                 "Mantenha várias cópias das suas imagens em locais independentes. Não dependa de um único meio e nunca considere o Google Photos como a sua única cópia."
               ],
               [
-                "Utilize o ImageVault apenas para fins lícitos e apenas com dados que tenha o direito de armazenar."
+                "Utilize o StegoShard apenas para fins lícitos e apenas com dados que tenha o direito de armazenar."
               ]
             ]
           }
@@ -200,8 +200,8 @@
           {
             "p": [
               {
-                "a": "github.com/dlamarre-dev/ImageVault",
-                "href": "https://github.com/dlamarre-dev/ImageVault"
+                "a": "github.com/dlamarre-dev/StegoShard",
+                "href": "https://github.com/dlamarre-dev/StegoShard"
               }
             ]
           }

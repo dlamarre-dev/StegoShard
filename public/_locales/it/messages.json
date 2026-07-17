@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "ImageVault: cifra e salva i segreti come immagini QR / carta"
+    "message": "StegoShard: cifra e salva i segreti come immagini QR / carta"
   },
   "extDesc": {
     "message": "Cifra un file in immagini robuste e con correzione d'errore da salvare su disco, stampare o caricare nel cloud."
@@ -9,10 +9,10 @@
     "message": "Cifra un file in immagini resilienti — disco, carta o cloud."
   },
   "optionsTitle": {
-    "message": "Impostazioni di ImageVault"
+    "message": "Impostazioni di StegoShard"
   },
   "extShortName": {
-    "message": "ImageVault"
+    "message": "StegoShard"
   },
   "pillLocked": {
     "message": "Bloccato"
@@ -95,7 +95,7 @@
     "message": "Questo viene eseguito in una scheda dedicata per restare aperto mentre scegli le immagini. Inserisci la password, avvia, seleziona le immagini della cassaforte nel selettore, poi torna qui."
   },
   "statusPickerOpen": {
-    "message": "Scegli le immagini di ImageVault nella finestra aperta, poi torna qui…"
+    "message": "Scegli le immagini di StegoShard nella finestra aperta, poi torna qui…"
   },
   "labelInstructions": {
     "message": "Includi un foglio di istruzioni"

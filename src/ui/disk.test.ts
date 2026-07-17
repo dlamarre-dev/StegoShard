@@ -9,7 +9,7 @@ describe('extractZip', () => {
     const zip = zipSync({
       'page-01.png': enc('img1'),
       'page-02.jpg': enc('img2'),
-      'imagevault.key': enc('KEYDATA'),
+      'stegoshard.key': enc('KEYDATA'),
       'readme.txt': enc('ignored'),
     });
     const { images, keyBlock } = extractZip(zip);

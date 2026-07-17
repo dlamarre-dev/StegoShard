@@ -5,11 +5,11 @@ import { resolve } from 'node:path';
 /**
  * Build for the standalone web app (GitHub Pages). Reuses the same core and
  * disk/paper flows as the extension. `base` targets the project Pages path
- * (https://<user>.github.io/ImageVault/).
+ * (https://<user>.github.io/StegoShard/).
  */
 export default defineConfig({
   root: 'src/web',
-  base: '/ImageVault/',
+  base: '/StegoShard/',
   publicDir: resolve(__dirname, 'public'),
   resolve: {
     alias: {

@@ -1,6 +1,6 @@
 # Store submission guide
 
-How to package and submit ImageVault to the Chrome Web Store, Microsoft Edge
+How to package and submit StegoShard to the Chrome Web Store, Microsoft Edge
 Add-ons, and Firefox Add-ons (AMO). Building and zipping is automated; creating
 developer accounts and uploading is manual.
 
@@ -11,8 +11,8 @@ npm run package
 ```
 
 Produces one zip per target under `packages/` —
-`imagevault-chrome-<version>.zip`, `imagevault-edge-<version>.zip`, and
-`imagevault-firefox-<version>.zip` (source maps excluded). It also writes the
+`stegoshard-chrome-<version>.zip`, `stegoshard-edge-<version>.zip`, and
+`stegoshard-firefox-<version>.zip` (source maps excluded). It also writes the
 identical, unzipped contents to `dist-release/<target>/` so you can load exactly
 what will be uploaded as an unpacked extension and test it before submitting.
 (Chrome and Edge builds are byte-identical Chromium builds.)
@@ -41,20 +41,20 @@ Google Photos is opt-in and goes to the user's own account (see PRIVACY.md).
 ## Chrome Web Store
 
 1. Register at the [Developer Dashboard](https://chrome.google.com/webstore/devconsole) (one-time US$5 fee).
-2. Upload `imagevault-chrome-<version>.zip`.
+2. Upload `stegoshard-chrome-<version>.zip`.
 3. Fill in listing, screenshots, privacy policy URL, and the permission
    justifications above. Submit for review.
 
 ## Microsoft Edge Add-ons
 
 1. Register at [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge) (free).
-2. Upload `imagevault-edge-<version>.zip` (identical to the Chrome build);
+2. Upload `stegoshard-edge-<version>.zip` (identical to the Chrome build);
    complete the listing; submit.
 
 ## Firefox Add-ons (AMO)
 
 1. Sign in at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/).
-2. Upload `imagevault-firefox-<version>.zip`.
+2. Upload `stegoshard-firefox-<version>.zip`.
 3. AMO reviews source. Because the code is bundled, provide build instructions
    (Node version, `npm ci`, `npm run build:firefox`) and a link to this public
    repo. `browser_specific_settings.gecko` is already set.
@@ -62,7 +62,7 @@ Google Photos is opt-in and goes to the user's own account (see PRIVACY.md).
 ## Google Photos: from "test users only" to everyone
 
 > **Status (deferred): the public launch ships WITHOUT Google Photos.** The
-> `npm run package` build uses `--mode store` (empty `IMAGEVAULT_GOOGLE_CLIENT_ID`
+> `npm run package` build uses `--mode store` (empty `STEGOSHARD_GOOGLE_CLIENT_ID`
 > via `.env.store`), which hides the Google Photos destination and omits its
 > optional permissions from the manifest. Disk, Paper, ZIP, and the web app are
 > fully public and need none of this.
@@ -77,12 +77,12 @@ Google Photos is opt-in and goes to the user's own account (see PRIVACY.md).
 > **To resume later (custom-domain path):**
 > 1. Buy a domain (or use one you own) and set it as the GitHub Pages **custom
 >    domain** (add a `CNAME` file to the deployed site and the DNS records;
->    change the web build's `base` from `/ImageVault/` to `/`).
+>    change the web build's `base` from `/StegoShard/` to `/`).
 > 2. Verify it in Search Console as a **Domain** property (DNS TXT record).
 > 3. Point the consent-screen homepage/privacy/terms URLs at the custom domain
 >    and set it as the **Authorized domain**.
 > 4. Rebuild the store package with the real client id (drop `--mode store`, or
->    set `IMAGEVAULT_GOOGLE_CLIENT_ID` for that build) and resubmit for
+>    set `STEGOSHARD_GOOGLE_CLIENT_ID` for that build) and resubmit for
 >    verification (steps below).
 >
 > Meanwhile you can keep using Google Photos yourself: your local `.env` has the
@@ -99,9 +99,9 @@ use it, publish the consent screen and pass **OAuth verification**:
 1. **Prerequisites (host them first).** Google requires a public homepage, a
    privacy policy, and a terms-of-service page on a domain you control. The
    GitHub Pages site provides all three:
-   - Homepage: `https://dlamarre-dev.github.io/ImageVault/`
-   - Privacy policy: `https://dlamarre-dev.github.io/ImageVault/privacy.html`
-   - Terms of service: `https://dlamarre-dev.github.io/ImageVault/terms.html`
+   - Homepage: `https://dlamarre-dev.github.io/StegoShard/`
+   - Privacy policy: `https://dlamarre-dev.github.io/StegoShard/privacy.html`
+   - Terms of service: `https://dlamarre-dev.github.io/StegoShard/terms.html`
    - Add that domain under **APIs & Services → OAuth consent screen →
      Authorized domains**, and verify ownership in Google Search Console.
 2. **Complete the consent screen**: app name, logo (`public/icons/icon-128.png`),
@@ -119,7 +119,7 @@ needs Google's consent-screen review but **not** a third-party CASA security
 assessment. Review typically takes a few days to a few weeks.
 
 Until verification completes, ship the extension with Google Photos usable by
-test users only, or leave the `IMAGEVAULT_GOOGLE_CLIENT_ID` unset in the store
+test users only, or leave the `STEGOSHARD_GOOGLE_CLIENT_ID` unset in the store
 build so the destination is hidden. **Disk and Paper need none of this** — the
 extension (and the web app) are fully usable without Google Photos.
 

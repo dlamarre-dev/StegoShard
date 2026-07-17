@@ -13,7 +13,7 @@ export type Target = 'chrome' | 'edge' | 'firefox';
 // Bumped independently of the npm package version; surfaced in stores.
 const VERSION = '0.1.0';
 
-const HOMEPAGE = 'https://github.com/dlamarre-dev/ImageVault';
+const HOMEPAGE = 'https://github.com/dlamarre-dev/StegoShard';
 
 const ICONS = {
   '16': 'icons/icon-16.png',
@@ -71,7 +71,7 @@ export function buildManifest(target: Target, options: ManifestOptions = {}): Re
       },
       browser_specific_settings: {
         gecko: {
-          id: 'imagevault@dlamarre-dev.github.io',
+          id: 'stegoshard@dlamarre-dev.github.io',
           strict_min_version: '128.0',
         },
       },
