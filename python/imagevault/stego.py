@@ -96,6 +96,51 @@ def extract_key_block(
     return None
 
 
+JPEG_MIN_CAPACITY = PAYLOAD_BITS * 2  # matches src/core/stego.ts
+
+
+def extract_key_block_jpeg(
+    jpeg_bytes: bytes,
+    password: str,
+    iterations: int = 3,
+    memory_kib: int = 64 * 1024,
+    parallelism: int = 1,
+) -> bytes | None:
+    """Recover a key block hidden in a baseline JPEG's DCT coefficients (SPEC §5.4).
+
+    Mirrors src/core/stego.ts embedKeyBlockStegoJpeg: the carriers are the AC
+    coefficients with |coef| >= 2, in scan order; the payload bit is the LSB of
+    each coefficient's magnitude. Returns None for a wrong password, no key, or a
+    non-baseline JPEG.
+    """
+    from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+
+    try:
+        carriers = eligible_coefficients(decode(jpeg_bytes))
+    except JpegUnsupported:
+        return None
+    capacity = len(carriers)
+    if capacity < JPEG_MIN_CAPACITY:
+        return None
+
+    stream = _keystream(password, _stream_len(), iterations, memory_kib, parallelism)
+    pad = stream[:KEY_BLOCK_LEN]
+    positions = _pick_positions(stream, KEY_BLOCK_LEN, capacity, PAYLOAD_BITS)
+
+    out = bytearray(KEY_BLOCK_LEN)
+    for i, pos in enumerate(positions):
+        block, k = carriers[pos]
+        if abs(block[k]) & 1:
+            out[i >> 3] |= 1 << (7 - (i & 7))
+    for j in range(KEY_BLOCK_LEN):
+        out[j] ^= pad[j]
+
+    result = bytes(out)
+    if len(result) == KEY_BLOCK_LEN and result[:4] == KEY_MAGIC and result[4] == KEY_BLOCK_VERSION:
+        return result
+    return None
+
+
 def extract_key_block_from_image(
     image_bytes: bytes,
     password: str,
@@ -103,7 +148,11 @@ def extract_key_block_from_image(
     memory_kib: int = 64 * 1024,
     parallelism: int = 1,
 ) -> bytes | None:
-    """Decode a stego cover image (PNG/etc.) to RGBA and extract the key block."""
+    """Extract the key from a stego cover, sniffing PNG (spatial LSB) vs baseline
+    JPEG (DCT coefficients)."""
+    if image_bytes[:2] == b"\xff\xd8":  # JPEG
+        return extract_key_block_jpeg(image_bytes, password, iterations, memory_kib, parallelism)
+
     import io
 
     from PIL import Image

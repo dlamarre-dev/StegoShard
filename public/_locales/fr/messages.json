@@ -469,7 +469,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "La clé est cachée dans les pixels de cette photo. Conservez le PNG enregistré tel quel — le ré-enregistrer, le redimensionner ou l'envoyer en JPEG détruit la clé. Rangez-le séparément des images.",
+    "message": "La clé est cachée dans cette photo. Conservez le fichier enregistré tel quel — le ré-enregistrer, le redimensionner ou le recompresser détruit la clé. Une couverture JPEG reste un JPEG de même taille et nom ; un PNG reste un PNG. Rangez-le séparément des images.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -500,5 +500,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "Image de couverture non prise en charge. Utilisez un JPEG baseline ou un PNG (JPEG progressif et HEIC non pris en charge).",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

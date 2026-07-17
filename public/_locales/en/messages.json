@@ -469,7 +469,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "The key is hidden in this photo's pixels. Keep the saved PNG exactly as-is — re-saving, resizing, or sending it as JPEG destroys the key. Store it apart from the images.",
+    "message": "The key is hidden inside this photo. Keep the saved file exactly as-is — re-saving, resizing, or re-compressing it destroys the key. A JPEG cover stays a JPEG of the same size and name; a PNG stays a PNG. Store it apart from the images.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -500,5 +500,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "Unsupported cover image. Use a baseline JPEG or a PNG (progressive JPEG and HEIC aren't supported).",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

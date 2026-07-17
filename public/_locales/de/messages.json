@@ -372,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "Der Schlüssel steckt in den Pixeln dieses Fotos. Bewahren Sie das gespeicherte PNG unverändert auf — erneutes Speichern, Skalieren oder Senden als JPEG zerstört den Schlüssel. Getrennt von den Bildern aufbewahren.",
+    "message": "Der Schlüssel steckt in diesem Foto. Bewahren Sie die gespeicherte Datei unverändert auf — erneutes Speichern, Skalieren oder Neukomprimieren zerstört den Schlüssel. Ein JPEG-Cover bleibt ein JPEG gleicher Größe und gleichen Namens; ein PNG bleibt ein PNG. Getrennt von den Bildern aufbewahren.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -403,5 +403,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "Titelbild nicht unterstützt. Verwenden Sie ein Baseline-JPEG oder ein PNG (progressives JPEG und HEIC werden nicht unterstützt).",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

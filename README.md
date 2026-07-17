@@ -104,9 +104,12 @@ npm run cli -- estimate secret.txt                     # how many images it will
 Key modes and paper output mirror the apps:
 
 ```bash
-# Deniable stego: the key is hidden in the pixels of an ordinary photo.
+# Deniable stego: the key is hidden inside an ordinary photo. A baseline JPEG
+# cover stays a JPEG of the same size, metadata, and filename (the key rides in
+# its DCT coefficients); a PNG cover stays a PNG. The key image is named after
+# the cover, so restore points --key at that file.
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
-npm run cli -- restore ./vault --key ./vault/imagevault-*-key.png --out ./restored
+npm run cli -- restore ./vault --key ./vault/cat.jpg --out ./restored
 
 # Printable PDF with a localized instruction sheet.
 npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print

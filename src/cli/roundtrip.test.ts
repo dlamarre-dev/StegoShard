@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
+import jpeg from 'jpeg-js';
 import { runEstimate, runRestore, runSave } from './commands';
 
 // Production Argon2 (64 MiB) runs on every save; give these room under CI.
@@ -45,6 +46,24 @@ function writeCover(dir: string): string {
   }
   const path = join(dir, 'cover.png');
   writeFileSync(path, encodePng({ width: w, height: h, data, channels: 4, depth: 8 }));
+  return path;
+}
+
+/** A textured baseline JPEG cover (jpeg-js) with plenty of DCT carriers. */
+function writeJpegCover(dir: string): string {
+  const w = 128;
+  const h = 128;
+  const data = Buffer.alloc(w * h * 4);
+  let s = 99 >>> 0;
+  for (let i = 0; i < w * h; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    data[i * 4] = (s >>> 24) & 0xff;
+    data[i * 4 + 1] = (s >>> 16) & 0xff;
+    data[i * 4 + 2] = (s >>> 8) & 0xff;
+    data[i * 4 + 3] = 255;
+  }
+  const path = join(dir, 'photo.jpg');
+  writeFileSync(path, jpeg.encode({ data, width: w, height: h }, 85).data);
   return path;
 }
 
@@ -137,8 +156,10 @@ describe('CLI round-trips', () => {
       keyMode: 'stego',
       cover,
     });
-    const keyImage = files.find((f) => f.endsWith('-key.png'))!;
-    const images = files.filter((f) => f.endsWith('.png') && f !== keyImage);
+    // The stego key image reuses the cover's own filename (deniability), not a
+    // "-key" name; the vault images are the imagevault-*.png set.
+    const keyImage = files.find((f) => f.endsWith('cover.png'))!;
+    const images = files.filter((f) => /imagevault-.*\.png$/.test(f));
 
     // Wrong password against the stego image → cannot restore.
     await expect(
@@ -148,6 +169,34 @@ describe('CLI round-trips', () => {
     const { outPath } = await runRestore({
       inputs: images,
       outDir: join(dir, 'r2'),
+      password: PW,
+      keyPath: keyImage,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
+  it('stego with a JPEG cover stays a same-named JPEG and restores', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(1200, 13);
+    const input = writeSecret(dir, content);
+    const cover = writeJpegCover(dir); // named photo.jpg
+    const { files } = await runSave({
+      inputFile: input,
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      keyMode: 'stego',
+      cover,
+    });
+    // Output keeps the cover's format and filename.
+    const keyImage = files.find((f) => f.endsWith('photo.jpg'))!;
+    expect(keyImage).toBeTruthy();
+    const images = files.filter((f) => /imagevault-.*\.png$/.test(f));
+
+    const { outPath } = await runRestore({
+      inputs: images,
+      outDir: join(dir, 'r'),
       password: PW,
       keyPath: keyImage,
     });

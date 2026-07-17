@@ -4,7 +4,7 @@
  * All file I/O is Node `fs`; all crypto/codec work is the shared `@core`.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { zipSync } from 'fflate';
 import {
@@ -43,6 +43,23 @@ function writeOut(dir: string, name: string, bytes: Uint8Array): string {
   return path;
 }
 
+/** Write the external key artifact, copying the cover's timestamps when stego. */
+function writeExternalKey(
+  dir: string,
+  ext: { name: string; bytes: Uint8Array; mimicPath?: string },
+): string {
+  const path = writeOut(dir, ext.name, ext.bytes);
+  if (ext.mimicPath) {
+    try {
+      const s = statSync(ext.mimicPath);
+      utimesSync(path, s.atime, s.mtime); // make the key image look untouched
+    } catch {
+      // timestamp mimicry is best-effort
+    }
+  }
+  return path;
+}
+
 async function makeKey(password: string): Promise<VaultKey> {
   const { dek, block } = await createKeyBlock(password, DEFAULT_ARGON2);
   return { dek, keyBlock: serializeKeyBlock(block) };
@@ -74,18 +91,22 @@ export interface SaveResult {
   fontWarning?: string;
 }
 
-/** Produce the external key artifact (stego PNG or .key) for non-embedded modes. */
+/**
+ * Produce the external key artifact for non-embedded modes. Stego keeps the
+ * cover's format and reuses its **filename** (to blend into a photo library);
+ * `mimicPath` is the cover whose mtime/atime the output should copy.
+ */
 async function externalKey(
   keyMode: KeyMode,
   keyBlock: Uint8Array,
   setHex: string,
   password: string,
   cover: string | undefined,
-): Promise<{ name: string; bytes: Uint8Array } | undefined> {
+): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
   if (keyMode === 'stego') {
     if (!cover) throw new Error('stego mode requires a --cover image');
-    const bytes = await embedKeyImage(read(cover), basename(cover), keyBlock, password);
-    return { name: `imagevault-${setHex}-key.png`, bytes };
+    const key = await embedKeyImage(read(cover), basename(cover), keyBlock, password);
+    return { name: basename(cover), bytes: key.bytes, mimicPath: cover };
   }
   if (keyMode !== 'embedded') {
     return { name: `imagevault-${setHex}.key`, bytes: keyBlock };
@@ -121,7 +142,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
       fontPath: opts.fontPath,
     });
     files.push(writeOut(opts.outDir, `imagevault-${setHex}.pdf`, built.pdf));
-    if (ext) files.push(writeOut(opts.outDir, ext.name, ext.bytes));
+    if (ext) files.push(writeExternalKey(opts.outDir, ext));
     return {
       files,
       imageCount: imagePayloads.length,
@@ -144,10 +165,10 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
     if (ext && keyMode === 'keyfile') entries[ext.name] = ext.bytes;
     files.push(writeOut(opts.outDir, `imagevault-${setHex}.zip`, zipSync(entries, { level: 0 })));
     // The stego image is always delivered on its own (an innocuous photo).
-    if (ext && keyMode === 'stego') files.push(writeOut(opts.outDir, ext.name, ext.bytes));
+    if (ext && keyMode === 'stego') files.push(writeExternalKey(opts.outDir, ext));
   } else {
     for (const p of pngs) files.push(writeOut(opts.outDir, p.name, p.bytes));
-    if (ext) files.push(writeOut(opts.outDir, ext.name, ext.bytes));
+    if (ext) files.push(writeExternalKey(opts.outDir, ext));
   }
 
   return { files, imageCount: imagePayloads.length, setId: setHex, keyMode };

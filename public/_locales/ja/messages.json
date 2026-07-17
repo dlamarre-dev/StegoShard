@@ -372,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "鍵はこの写真のピクセルに隠されています。保存した PNG をそのまま保管してください。再保存・リサイズ・JPEG での送信は鍵を壊します。画像とは別に保管してください。",
+    "message": "鍵はこの写真の中に隠されています。保存したファイルをそのまま保管してください。再保存・リサイズ・再圧縮すると鍵は失われます。JPEG のカバーは同じサイズ・名前の JPEG のまま、PNG は PNG のままです。画像とは別に保管してください。",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -403,5 +403,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "対応していないカバー画像です。ベースライン JPEG または PNG を使用してください(プログレッシブ JPEG と HEIC は非対応)。",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

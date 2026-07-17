@@ -7,11 +7,35 @@
 
 import {
   CODEC_QR_GRID,
+  JpegUnsupportedError,
+  StegoCoverFormatError,
   embedKeyBlockStego,
+  embedKeyBlockStegoJpeg,
   extractKeyBlockStego,
+  extractKeyBlockStegoJpeg,
   getCodec,
+  isJpeg,
   type ImageDataLike,
 } from '@core';
+
+/** A produced stego key image: raw bytes plus how to name/serve it. */
+export interface StegoKeyImage {
+  bytes: Uint8Array;
+  mime: string;
+  ext: 'jpg' | 'png';
+}
+
+const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
+
+/**
+ * Default filename for a stego key image. To blend into a camera roll it reuses
+ * the cover's own filename; a synthetic fallback is used only when the cover has
+ * no usable name. (Restore takes the key image explicitly, so the name is free.)
+ */
+export function stegoKeyName(coverName: string | undefined, ext: string, setHex: string): string {
+  const trimmed = coverName?.trim();
+  return trimmed ? trimmed : `imagevault-${setHex}-key.${ext}`;
+}
 
 /** Optional human-readable label band drawn above the QR (cleartext — plan §1). */
 export interface LabelBand {
@@ -118,27 +142,49 @@ export async function decodeImageBytes(bytes: Uint8Array): Promise<Uint8Array | 
 }
 
 /**
- * Hide a serialized key block inside a cover photo (deniable stego key mode).
- * The cover is decoded at full resolution — no downscaling — and re-emitted as
- * a lossless PNG so the carrier LSBs survive. Returns the PNG blob.
+ * Hide a serialized key block inside a cover photo (deniable stego key mode),
+ * **keeping the cover's format**: a baseline JPEG stays a JPEG of ~the same size
+ * (embedded in DCT coefficients); a PNG stays a PNG (spatial LSB). Any other
+ * cover (progressive/HEIC/WebP…) is refused with StegoCoverFormatError — we
+ * never transcode, which would change the file's size/appearance.
  */
 export async function embedKeyImage(
   cover: Blob,
   keyBlock: Uint8Array,
   password: string,
-): Promise<Blob> {
-  const img = await fileToImageData(cover); // full resolution (no cap)
-  await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
-  return imageDataToPngBlob(img);
+): Promise<StegoKeyImage> {
+  const bytes = new Uint8Array(await cover.arrayBuffer());
+  if (isJpeg(bytes)) {
+    try {
+      const out = await embedKeyBlockStegoJpeg(bytes, keyBlock, password);
+      return { bytes: out, mime: 'image/jpeg', ext: 'jpg' };
+    } catch (err) {
+      if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
+      throw err;
+    }
+  }
+  if (isPngBytes(bytes)) {
+    const img = await fileToImageData(cover); // full resolution (no cap)
+    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
+    const blob = await imageDataToPngBlob(img);
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png', ext: 'png' };
+  }
+  throw new StegoCoverFormatError();
 }
 
 /**
- * Recover a key block hidden in a stego cover image. Returns null when the
- * password is wrong or the image carries no key (deliberately indistinguishable).
+ * Recover a key block hidden in a stego cover image (JPEG or PNG). Returns null
+ * when the password is wrong or the image carries no key (indistinguishable),
+ * or when the format is unsupported.
  */
 export async function extractKeyImage(file: Blob, password: string): Promise<Uint8Array | null> {
-  const img = await fileToImageData(file); // full resolution (no cap)
-  return extractKeyBlockStego(img.data, img.width, img.height, password);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (isJpeg(bytes)) return extractKeyBlockStegoJpeg(bytes, password);
+  if (isPngBytes(bytes)) {
+    const img = await fileToImageData(file); // full resolution (no cap)
+    return extractKeyBlockStego(img.data, img.width, img.height, password);
+  }
+  return null;
 }
 
 /** Trigger a browser download for a blob. */

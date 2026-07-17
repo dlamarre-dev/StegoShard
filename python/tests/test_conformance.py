@@ -92,3 +92,28 @@ def test_stego_key_image_round_trip():
     restored = decode_vault(payloads, manifest["password"], key_block)
     assert restored.filename == manifest["filename"]
     assert restored.content == expected
+
+
+def test_stego_jpeg_key_image_round_trip():
+    """A key hidden in a baseline JPEG's DCT coefficients (TS embed) is extracted
+    by the pure-Python coefficient reader and restores the file (SPEC §5.4)."""
+    from imagevault import extract_key_block_from_image
+
+    d = FIXTURES / "stego-jpeg"
+    manifest = json.loads((d / "manifest.json").read_text())
+    payloads = []
+    for img in sorted(d.glob("page-*.png")):
+        payload = decode_image(img.read_bytes())
+        assert payload is not None
+        payloads.append(payload)
+    expected = (d / "expected.bin").read_bytes()
+
+    cover = (d / "key.jpg").read_bytes()
+    assert cover[:2] == b"\xff\xd8"  # a real JPEG, not a PNG
+    assert extract_key_block_from_image(cover, "not the password") is None
+
+    key_block = extract_key_block_from_image(cover, manifest["password"])
+    assert key_block is not None
+    restored = decode_vault(payloads, manifest["password"], key_block)
+    assert restored.filename == manifest["filename"]
+    assert restored.content == expected

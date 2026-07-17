@@ -19,7 +19,7 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
-import { downloadBlob, embedKeyImage, imageDataToPngBlob } from './image-io';
+import { downloadBlob, embedKeyImage, imageDataToPngBlob, stegoKeyName } from './image-io';
 import { wrapText } from './text-wrap';
 import {
   A4,
@@ -171,8 +171,11 @@ export async function saveFileToPaper(
   // hidden in the cover photo (stego) or as a plain .key file (keyfile).
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const png = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
-    downloadBlob(png, `imagevault-${setHex}-key.png`);
+    const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    downloadBlob(
+      new Blob([key.bytes as BufferSource], { type: key.mime }),
+      stegoKeyName(options.stego.cover.name, key.ext, setHex),
+    );
   } else if (keyMode !== 'embedded') {
     downloadBlob(new Blob([keyBlock as BufferSource]), `imagevault-${setHex}.key`);
   }

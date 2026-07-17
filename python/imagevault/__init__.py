@@ -19,6 +19,7 @@ _LAZY = {
     "WrongPasswordError": "crypto",
     "decode_image": "qr",
     "extract_key_block": "stego",
+    "extract_key_block_jpeg": "stego",
     "extract_key_block_from_image": "stego",
 }
 

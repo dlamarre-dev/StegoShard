@@ -372,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "金鑰隱藏在這張照片的像素中。請原封不動地保留儲存的 PNG——重新儲存、調整大小或以 JPEG 傳送都會破壞金鑰。請與圖像分開保存。",
+    "message": "金鑰隱藏在這張照片中。請原封不動地保留儲存的檔案——重新儲存、調整大小或重新壓縮都會破壞金鑰。JPEG 封面維持相同大小與名稱的 JPEG，PNG 維持 PNG。請與圖像分開保存。",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -403,5 +403,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "不支援的封面圖像。請使用 baseline JPEG 或 PNG(不支援漸進式 JPEG 與 HEIC)。",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

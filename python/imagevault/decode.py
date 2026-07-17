@@ -82,9 +82,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     images, key_block = _gather(args.inputs)
-    if args.key:
-        with open(args.key, "rb") as fh:
-            key_block = fh.read()
     if not images:
         print("no images found in the inputs", file=sys.stderr)
         return 2
@@ -96,6 +93,24 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     password = args.password or getpass.getpass("Password: ")
+
+    # --key may be a raw .key file, or a stego cover image (PNG/JPEG) that hides
+    # the key — the latter needs the password to extract.
+    if args.key:
+        with open(args.key, "rb") as fh:
+            raw = fh.read()
+        if raw[:2] == b"\xff\xd8" or raw[:8] == b"\x89PNG\r\n\x1a\n":
+            from .stego import extract_key_block_from_image
+
+            key_block = extract_key_block_from_image(raw, password)
+            if key_block is None:
+                print(
+                    "no key found in the image (wrong password or not a stego cover)",
+                    file=sys.stderr,
+                )
+                return 1
+        else:
+            key_block = raw
     try:
         restored = decode_vault(payloads, password, key_block)
     except WrongPasswordError:

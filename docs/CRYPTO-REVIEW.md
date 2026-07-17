@@ -178,14 +178,35 @@ bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
   and restores the vault (`python/tests/test_conformance.py::test_stego_key_image_round_trip`),
   proving the derivation matches bit-for-bit.
 
-**Honest limits (stated in the module and docs):** LSB stego survives only
-lossless storage — the emitted PNG must be kept as-is; JPEG re-encoding,
-resizing, or re-saving destroys the key. An adversary holding the _original_
-cover can diff it against the carrier. This resists casual and statistical
-inspection, not a dedicated forensic adversary who already suspects a specific
-image and password. Deniability is a hiding property layered on top of the
-password-wrapped key block — it is defense-in-depth, not the vault's
-confidentiality boundary (that remains the §5.1 key block).
+**JPEG covers (§5.4).** A PNG in a phone's photo library is itself an anomaly
+(and ~3–10× the size of a JPEG), so `src/core/jpeg-coeff.ts` +
+`embedKeyBlockStegoJpeg` keep a **baseline JPEG** cover a JPEG: the key rides in
+the LSB of the magnitude of AC coefficients with `|coef| ≥ 2`, using the _same_
+password-keyed selection and whitening as the PNG path. Two invariants
+(`stego.jpeg.test.ts`, `jpeg-coeff.test.ts`): keeping `|coef| ≥ 2` means an LSB
+flip never crosses a Huffman size category, so the file size and category
+histogram are unchanged and the eligible set is invariant (bit-exact extraction);
+and every non-scan segment (EXIF, quant/Huffman tables) is copied verbatim, so
+metadata and filename can mimic the original exactly. Non-baseline covers
+(progressive/arithmetic JPEG, HEIC) are **rejected, never transcoded** — a
+re-quantization would change the weight and reintroduce the anomaly. The Python
+reference decoder ships an independent pure-Python baseline reader
+(`jpeg_coeff.py`) and restores a TS-embedded JPEG key end-to-end
+(`test_stego_jpeg_key_image_round_trip`).
+
+**Honest limits (stated in the module and docs):** the PNG (spatial-LSB) carrier
+survives only lossless storage. Both carriers resist the **cheap heuristics** a
+camera-roll triage uses — wrong format, wrong size, visual diff, first-order
+histogram — but neither is indistinguishable to **dedicated statistical
+steganalysis** (within-category chi-square, calibration, ML detectors), which JPEG
+coefficient-LSB (JSteg-style) is in fact known to be detectable by. State-of-the-art
+undetectable schemes (J-UNIWARD + Syndrome-Trellis Codes) are out of scope: no
+deterministic cross-implementation build exists, they are float-heavy and
+unauditable, and the gain is marginal at our 736-bit (very low) embedding rate.
+An adversary holding the _original_ cover can diff it against the carrier.
+Deniability is a hiding property layered on top of the password-wrapped key
+block — defense-in-depth, not the vault's confidentiality boundary (that remains
+the §5.1 key block).
 
 ## 7. Known limitations and deliberate choices
 

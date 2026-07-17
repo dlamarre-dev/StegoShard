@@ -12,10 +12,12 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
+import jpeg from 'jpeg-js';
 import {
   createKeyBlock,
   DEFAULT_ARGON2,
   embedKeyBlockStego,
+  embedKeyBlockStegoJpeg,
   serializeKeyBlock,
   exportVault,
   getCodec,
@@ -56,7 +58,26 @@ async function makeKey(): Promise<VaultKey> {
   return { dek, keyBlock: serializeKeyBlock(block) };
 }
 
-async function generate(name: string, keyMode: KeyMode, content: Uint8Array): Promise<void> {
+/** A deterministic textured baseline JPEG (enough |coef|≥2 carriers for stego). */
+function makeJpegCover(w: number, h: number): Uint8Array {
+  const data = Buffer.alloc(w * h * 4);
+  let s = 0x5a5a5a5a >>> 0;
+  for (let i = 0; i < w * h; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    data[i * 4] = (s >>> 24) & 0xff;
+    data[i * 4 + 1] = (s >>> 16) & 0xff;
+    data[i * 4 + 2] = (s >>> 8) & 0xff;
+    data[i * 4 + 3] = 255;
+  }
+  return new Uint8Array(jpeg.encode({ data, width: w, height: h }, 85).data);
+}
+
+async function generate(
+  name: string,
+  keyMode: KeyMode,
+  content: Uint8Array,
+  coverJpeg = false,
+): Promise<void> {
   const dir = join(outRoot, name);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -87,8 +108,16 @@ async function generate(name: string, keyMode: KeyMode, content: Uint8Array): Pr
       rgba[p * 4 + 2] = (p * 29) & 0xff;
       rgba[p * 4 + 3] = 255;
     }
-    await embedKeyBlockStego(rgba, w, h, keyBlock, PASSWORD, DEFAULT_ARGON2);
-    writePng(join(dir, 'key.png'), { data: new Uint8ClampedArray(rgba), width: w, height: h });
+    if (coverJpeg) {
+      // Hide the key in a baseline JPEG's DCT coefficients (SPEC §5.4). The
+      // Python reference decoder must extract it with only the password.
+      const cover = makeJpegCover(128, 128);
+      const key = await embedKeyBlockStegoJpeg(cover, keyBlock, PASSWORD, DEFAULT_ARGON2);
+      writeFileSync(join(dir, 'key.jpg'), key);
+    } else {
+      await embedKeyBlockStego(rgba, w, h, keyBlock, PASSWORD, DEFAULT_ARGON2);
+      writePng(join(dir, 'key.png'), { data: new Uint8ClampedArray(rgba), width: w, height: h });
+    }
   } else if (keyMode !== 'embedded') {
     writeFileSync(join(dir, 'vault.key'), keyBlock);
   }
@@ -108,4 +137,5 @@ const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
 await generate('keyfile', 'keyfile', content);
 await generate('stego', 'stego', content);
+await generate('stego-jpeg', 'stego', content, true);
 console.log(`fixtures written to ${outRoot}`);

@@ -43,6 +43,7 @@ import {
   isSerializedKeyBlock,
   normalizePassword,
 } from './crypto';
+import { decode as decodeJpeg, encode as encodeJpeg, eligibleCoefficients } from './jpeg-coeff';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -67,6 +68,19 @@ export class StegoCapacityError extends Error {
   constructor(readonly capacityBits: number) {
     super(`cover image too small for a deniable key block (need ${MIN_CAPACITY} LSBs)`);
     this.name = 'StegoCapacityError';
+  }
+}
+
+/**
+ * Thrown when a stego cover is not a supported format: only baseline JPEG and
+ * PNG can carry the key. Progressive/arithmetic JPEG, HEIC, WebP, etc. are
+ * refused (no silent transcode — that would change the file's size/appearance
+ * and defeat the deniability goal).
+ */
+export class StegoCoverFormatError extends Error {
+  constructor() {
+    super('unsupported cover image: use a baseline JPEG or a PNG');
+    this.name = 'StegoCoverFormatError';
   }
 }
 
@@ -208,5 +222,80 @@ export async function extractKeyBlockStego(
 
   // Wrong password → random bytes → fails the magic check → reported as "no
   // key" (indistinguishable from an image that never held one).
+  return isSerializedKeyBlock(out) ? out : null;
+}
+
+// --- JPEG DCT-coefficient variant (SPEC §5.4) --------------------------------
+//
+// Same keyed selection + whitening as the RGBA path, but the carrier is the set
+// of eligible AC coefficients (|coef| ≥ 2) of a baseline JPEG, and the payload
+// bit lives in the LSB of each coefficient's magnitude. Keeping |coef| ≥ 2 means
+// an LSB flip never crosses a Huffman size-category boundary → the re-encoded
+// scan is the same size and the eligible set is invariant (bit-exact extraction).
+
+/** Eligible coefficients are far sparser than pixel LSBs; require a smaller margin. */
+const JPEG_MIN_CAPACITY = PAYLOAD_BITS * 2;
+
+/**
+ * Hide the key block in a **baseline JPEG's** DCT coefficients and return new
+ * JPEG bytes (only the entropy scan changes; all other segments are verbatim).
+ * Throws JpegUnsupportedError (non-baseline cover) or StegoCapacityError.
+ */
+export async function embedKeyBlockStegoJpeg(
+  jpegBytes: Uint8Array,
+  keyBlock: Uint8Array,
+  password: string,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<Uint8Array> {
+  if (keyBlock.length !== PAYLOAD_LEN) {
+    throw new RangeError(`stego: key block must be ${PAYLOAD_LEN} bytes`);
+  }
+  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  const carriers = eligibleCoefficients(model);
+  if (carriers.count < JPEG_MIN_CAPACITY) throw new StegoCapacityError(carriers.count);
+
+  const stream = await keystream(password, streamLen(), params);
+  const pad = stream.subarray(0, PAYLOAD_LEN);
+  const reader = new StreamReader(stream.subarray(PAYLOAD_LEN));
+  const positions = pickPositions(reader, carriers.count, PAYLOAD_BITS);
+
+  for (let i = 0; i < PAYLOAD_BITS; i++) {
+    const bit = ((keyBlock[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
+    carriers.setLsb(positions[i]!, bit);
+  }
+  stream.fill(0);
+  return encodeJpeg(model);
+}
+
+/**
+ * Recover a key block hidden in a baseline JPEG's coefficients, or null when the
+ * password is wrong / the image carries no key (indistinguishable). A cover that
+ * is not a decodable baseline JPEG also returns null.
+ */
+export async function extractKeyBlockStegoJpeg(
+  jpegBytes: Uint8Array,
+  password: string,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<Uint8Array | null> {
+  let carriers: ReturnType<typeof eligibleCoefficients>;
+  try {
+    carriers = eligibleCoefficients(decodeJpeg(jpegBytes));
+  } catch {
+    return null; // not a baseline JPEG → no key here
+  }
+  if (carriers.count < JPEG_MIN_CAPACITY) return null;
+
+  const stream = await keystream(password, streamLen(), params);
+  const pad = stream.subarray(0, PAYLOAD_LEN);
+  const reader = new StreamReader(stream.subarray(PAYLOAD_LEN));
+  const positions = pickPositions(reader, carriers.count, PAYLOAD_BITS);
+
+  const out = new Uint8Array(PAYLOAD_LEN);
+  for (let i = 0; i < PAYLOAD_BITS; i++) {
+    if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+  }
+  for (let j = 0; j < PAYLOAD_LEN; j++) out[j]! ^= pad[j]!;
+  stream.fill(0);
+
   return isSerializedKeyBlock(out) ? out : null;
 }

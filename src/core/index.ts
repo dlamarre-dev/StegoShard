@@ -12,6 +12,7 @@ export * from './compress';
 export * from './payload';
 export * from './crypto';
 export * from './stego';
+export * from './jpeg-coeff';
 export * from './header';
 export * from './erasure';
 export * from './vault';

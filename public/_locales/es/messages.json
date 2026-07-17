@@ -372,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "La clave está oculta en los píxeles de esta foto. Conserve el PNG guardado tal cual — volver a guardarlo, redimensionarlo o enviarlo como JPEG destruye la clave. Guárdelo aparte de las imágenes.",
+    "message": "La clave está oculta en esta foto. Conserve el archivo guardado tal cual: volver a guardarlo, redimensionarlo o recomprimirlo destruye la clave. Una portada JPEG sigue siendo un JPEG del mismo tamaño y nombre; un PNG sigue siendo un PNG. Guárdelo aparte de las imágenes.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -403,5 +403,9 @@
         "content": "$1"
       }
     }
+  },
+  "errCoverFormat": {
+    "message": "Imagen de portada no compatible. Use un JPEG baseline o un PNG (JPEG progresivo y HEIC no son compatibles).",
+    "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   }
 }

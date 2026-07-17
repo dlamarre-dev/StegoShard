@@ -160,8 +160,8 @@ Where the key block travels is chosen per save:
   block bytes of §5.1 (magic `"IVKY"`). Restore needs the images, the password,
   and this `.key` file. A leaked image then reveals nothing without the `.key`.
 - **stego** — like keyfile, but the key block is hidden in an ordinary-looking
-  cover image (§5.3). At the blob level it is identical to keyfile (`KB_LEN = 0`);
-  only the delivery of the key block differs.
+  cover image (§5.3 for a PNG cover, §5.4 for a JPEG cover). At the blob level it
+  is identical to keyfile (`KB_LEN = 0`); only the delivery of the key block differs.
 
 A decoder distinguishes the cases by `KB_LEN`: non-zero means the key block is
 embedded; zero means it must be supplied externally.
@@ -176,10 +176,16 @@ magic, or length field in the image**: the payload length is fixed at the
 random bytes that fail the §5.1 magic check, reported identically to "no key
 here" (the deniability property).
 
+This §5.3 defines the **PNG (spatial-LSB)** carrier. A **JPEG** cover uses the
+DCT-coefficient carrier of §5.4 instead; a decoder picks the carrier from the
+cover's magic bytes (PNG `89 50` → §5.3, JPEG `FF D8` → §5.4). The keyed
+selection and whitening (steps 1–4 below) are shared by both.
+
 Carrier: the cover is treated as **RGBA**, 4 bytes/pixel. Only the R, G, B LSBs
 carry data (alpha is never touched); capacity `N = width × height × 3`. A cover
-MUST provide `N ≥ 736 × 16` LSBs or it is rejected. The carrier MUST be stored
-losslessly (PNG); any re-encoding (JPEG), resize, or re-save destroys the key.
+MUST provide `N ≥ 736 × 16` LSBs or it is rejected. The PNG carrier MUST be
+stored losslessly; re-encoding it to JPEG, resizing, or re-saving destroys the
+key (for a JPEG cover, use §5.4).
 
 Derivation (all decoders MUST reproduce it bit-for-bit):
 
@@ -199,6 +205,37 @@ Derivation (all decoders MUST reproduce it bit-for-bit):
 
 Extraction reverses steps 4→3 and validates the result against §5.1 (magic
 `"IVKY"`, supported version, exact 92-byte length); failure ⇒ treat as absent.
+
+### 5.4 JPEG stego key block (deniable DCT embedding)
+
+When the cover is a **baseline JPEG**, the key block is hidden in its quantized
+DCT coefficients so the carrier stays a JPEG of the same size and metadata — a
+`.png` in a phone's photo library would itself be an anomaly. Only baseline
+sequential Huffman (SOF0), 8-bit, is supported; progressive (SOF2), arithmetic
+coding, and other formats (HEIC, WebP) MUST be rejected — never transcoded, which
+would change the file's size/appearance and defeat deniability.
+
+The keyed selection, whitening pad, MSB-first bit order, and §5.1 validation are
+**identical to §5.3** — only the carrier differs:
+
+- **Carrier set:** every quantized **AC** coefficient (zig-zag indices 1..63; the
+  DC coefficient is never used) whose value satisfies **|coef| ≥ 2**, enumerated
+  in a fixed order: component order as in SOF, then interleaved MCU/block order,
+  then zig-zag index. Capacity `N` = the number of such coefficients; a cover with
+  `N < 736 × 2` is rejected.
+- **Embedding:** bit _i_ of `whitened` is written to the **LSB of the magnitude**
+  of the selected coefficient, preserving its sign. Because `|coef| ≥ 2` and the
+  LSB pair `{2m, 2m+1}` never straddles a Huffman size-category boundary, the flip
+  never changes the coefficient's size category or the zero-run structure: the
+  re-emitted entropy scan is the same length (± a few byte-stuffing bytes), the
+  size-category histogram is unchanged, and the eligible set is invariant (so the
+  extractor recomputes exactly the same carriers). Every non-scan segment
+  (APPn/EXIF, DQT, DHT, SOF, DRI) is copied verbatim.
+
+Extraction decodes the JPEG to coefficients, rebuilds the same carrier set and
+key-derived positions, reads each carrier's magnitude LSB, de-whitens, and
+validates against §5.1; any failure (wrong password, no key, non-baseline JPEG)
+⇒ treat as absent.
 
 ---
 

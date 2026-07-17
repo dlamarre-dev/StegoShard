@@ -23,6 +23,7 @@ import {
   embedKeyImage,
   extractKeyImage,
   imageWithLabelToPngBlob,
+  stegoKeyName,
   type LabelBand,
 } from './image-io';
 
@@ -75,13 +76,21 @@ export async function saveFileToDisk(
   // plain .key file. Bundled into the .zip only for the .key case — the stego
   // image is always delivered on its own so it can be stored as an innocuous
   // photo, separate from the obviously-ImageVault set.
-  let externalKey: { name: string; bytes: Uint8Array } | undefined;
+  let externalKey: { name: string; bytes: Uint8Array; mime: string } | undefined;
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const png = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
-    externalKey = { name: `imagevault-${setHex}-key.png`, bytes: await blobBytes(png) };
+    const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    externalKey = {
+      name: stegoKeyName(options.stego.cover.name, key.ext, setHex),
+      bytes: key.bytes,
+      mime: key.mime,
+    };
   } else if (keyMode !== 'embedded') {
-    externalKey = { name: `imagevault-${setHex}.key`, bytes: keyBlock };
+    externalKey = {
+      name: `imagevault-${setHex}.key`,
+      bytes: keyBlock,
+      mime: 'application/octet-stream',
+    };
   }
 
   if (options.asZip) {
@@ -92,7 +101,7 @@ export async function saveFileToDisk(
     downloadBlob(new Blob([zipped as BufferSource]), `imagevault-${setHex}.zip`);
     if (externalKey && keyMode === 'stego') {
       downloadBlob(
-        new Blob([externalKey.bytes as BufferSource], { type: 'image/png' }),
+        new Blob([externalKey.bytes as BufferSource], { type: externalKey.mime }),
         externalKey.name,
       );
     }
@@ -102,8 +111,10 @@ export async function saveFileToDisk(
       await new Promise((r) => setTimeout(r, 150)); // avoid batch-blocking
     }
     if (externalKey) {
-      const type = keyMode === 'stego' ? 'image/png' : 'application/octet-stream';
-      downloadBlob(new Blob([externalKey.bytes as BufferSource], { type }), externalKey.name);
+      downloadBlob(
+        new Blob([externalKey.bytes as BufferSource], { type: externalKey.mime }),
+        externalKey.name,
+      );
     }
   }
 

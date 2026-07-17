@@ -11,11 +11,22 @@ import { decode as decodePng, encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
 import {
   CODEC_QR_GRID,
+  JpegUnsupportedError,
+  StegoCoverFormatError,
   type ImageDataLike,
   embedKeyBlockStego,
+  embedKeyBlockStegoJpeg,
   extractKeyBlockStego,
+  extractKeyBlockStegoJpeg,
   getCodec,
+  isJpeg as isJpegBytes,
 } from '@core';
+
+/** A produced stego key image: raw bytes plus how to name it. */
+export interface StegoKeyImage {
+  bytes: Uint8Array;
+  ext: 'jpg' | 'png';
+}
 
 /** Encode RGBA pixels to lossless PNG bytes. */
 export function imageDataToPng(img: ImageDataLike): Uint8Array {
@@ -158,24 +169,46 @@ export function decodePixelsToPayload(img: ImageDataLike): Uint8Array | null {
   return null;
 }
 
-/** Hide a key block in a cover photo → lossless PNG bytes (stego key mode). */
+const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
+
+/**
+ * Hide a key block in a cover photo, keeping its format: a baseline JPEG stays a
+ * JPEG (DCT coefficients, ~same size), a PNG stays a PNG (spatial LSB). Any other
+ * cover is refused with StegoCoverFormatError (no transcoding).
+ */
 export async function embedKeyImage(
   coverBytes: Uint8Array,
   coverName: string,
   keyBlock: Uint8Array,
   password: string,
-): Promise<Uint8Array> {
-  const img = fileToImageData(coverBytes, coverName);
-  await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
-  return imageDataToPng(img);
+): Promise<StegoKeyImage> {
+  if (isJpegBytes(coverBytes)) {
+    try {
+      const out = await embedKeyBlockStegoJpeg(coverBytes, keyBlock, password);
+      return { bytes: out, ext: 'jpg' };
+    } catch (err) {
+      if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
+      throw err;
+    }
+  }
+  if (isPngBytes(coverBytes)) {
+    const img = fileToImageData(coverBytes, coverName);
+    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
+    return { bytes: imageDataToPng(img), ext: 'png' };
+  }
+  throw new StegoCoverFormatError();
 }
 
-/** Recover a key block hidden in a stego cover image, or null if absent. */
+/** Recover a key block hidden in a stego cover image (JPEG or PNG), or null. */
 export async function extractKeyImage(
   bytes: Uint8Array,
   filename: string,
   password: string,
 ): Promise<Uint8Array | null> {
-  const img = fileToImageData(bytes, filename);
-  return extractKeyBlockStego(img.data, img.width, img.height, password);
+  if (isJpegBytes(bytes)) return extractKeyBlockStegoJpeg(bytes, password);
+  if (isPngBytes(bytes)) {
+    const img = fileToImageData(bytes, filename);
+    return extractKeyBlockStego(img.data, img.width, img.height, password);
+  }
+  return null;
 }
