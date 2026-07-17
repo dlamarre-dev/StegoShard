@@ -68,6 +68,42 @@ describe('JPEG stego round-trip', () => {
     expect([...out!]).toEqual([...kb]);
   });
 
+  it('is byte-faithful: header verbatim, camera entropy kept, minimal logical change', async () => {
+    const kb = await keyBlockBytes('pw');
+    const cover = noisyJpeg(W, H);
+    const stego = await embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST);
+
+    // Same length (± the odd byte-stuffing byte).
+    expect(Math.abs(stego.length - cover.length)).toBeLessThan(16);
+
+    const model = (b: Uint8Array) => decodeJpeg(b);
+    const mc = model(cover);
+    const ms = model(stego);
+
+    // Everything before the entropy scan is byte-for-byte identical (EXIF etc.).
+    expect(mc.scanStart).toBe(ms.scanStart);
+    expect([...cover.subarray(0, mc.scanStart)]).toEqual([...stego.subarray(0, ms.scanStart)]);
+
+    // The entropy stream is the SAME (camera's own Huffman coding), not
+    // re-serialized: unstuffing both, they differ in only the flipped coefficient
+    // bytes — the theoretical minimum (≤ payload bits), never a full re-encode.
+    const unstuff = (b: Uint8Array, s: number, e: number): number[] => {
+      const o: number[] = [];
+      for (let i = s; i < e; i++) {
+        o.push(b[i]!);
+        if (b[i] === 0xff && b[i + 1] === 0x00) i++;
+      }
+      return o;
+    };
+    const lc = unstuff(cover, mc.scanStart, mc.scanEnd);
+    const ls = unstuff(stego, ms.scanStart, ms.scanEnd);
+    expect(ls.length).toBe(lc.length); // same size category ⇒ same bit length
+    let logicalDiff = 0;
+    for (let i = 0; i < lc.length; i++) if (lc[i] !== ls[i]) logicalDiff++;
+    expect(logicalDiff).toBeGreaterThan(0);
+    expect(logicalDiff).toBeLessThanOrEqual(92 * 8); // ≤ 736 payload bits
+  });
+
   it('only eligible AC coefficients change, by ±1 in magnitude', async () => {
     const kb = await keyBlockBytes('pw');
     const cover = noisyJpeg(W, H);

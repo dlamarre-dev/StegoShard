@@ -43,7 +43,13 @@ import {
   isSerializedKeyBlock,
   normalizePassword,
 } from './crypto';
-import { decode as decodeJpeg, encode as encodeJpeg, eligibleCoefficients } from './jpeg-coeff';
+import {
+  decode as decodeJpeg,
+  encode as encodeJpeg,
+  eligibleCoefficients,
+  eligibleInPlace,
+  applyScanToggles,
+} from './jpeg-coeff';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -251,18 +257,33 @@ export async function embedKeyBlockStegoJpeg(
     throw new RangeError(`stego: key block must be ${PAYLOAD_LEN} bytes`);
   }
   const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
-  const carriers = eligibleCoefficients(model);
-  if (carriers.count < JPEG_MIN_CAPACITY) throw new StegoCapacityError(carriers.count);
 
   const stream = await keystream(password, streamLen(), params);
   const pad = stream.subarray(0, PAYLOAD_LEN);
+  const bitAt = (i: number): number => ((keyBlock[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
+
+  if (model.restartInterval === 0) {
+    // Byte-faithful in-place edit: toggle only the carrier LSB bits whose value
+    // must change, leaving every other byte of the original JPEG untouched.
+    const carriers = eligibleInPlace(model);
+    if (carriers.count < JPEG_MIN_CAPACITY) throw new StegoCapacityError(carriers.count);
+    const reader = new StreamReader(stream.subarray(PAYLOAD_LEN));
+    const positions = pickPositions(reader, carriers.count, PAYLOAD_BITS);
+    const toggles: number[] = [];
+    for (let i = 0; i < PAYLOAD_BITS; i++) {
+      const p = positions[i]!;
+      if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
+    }
+    stream.fill(0);
+    return applyScanToggles(model, toggles);
+  }
+
+  // Rare restart-marker files: fall back to a full re-encode of the scan.
+  const carriers = eligibleCoefficients(model);
+  if (carriers.count < JPEG_MIN_CAPACITY) throw new StegoCapacityError(carriers.count);
   const reader = new StreamReader(stream.subarray(PAYLOAD_LEN));
   const positions = pickPositions(reader, carriers.count, PAYLOAD_BITS);
-
-  for (let i = 0; i < PAYLOAD_BITS; i++) {
-    const bit = ((keyBlock[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
-    carriers.setLsb(positions[i]!, bit);
-  }
+  for (let i = 0; i < PAYLOAD_BITS; i++) carriers.setLsb(positions[i]!, bitAt(i));
   stream.fill(0);
   return encodeJpeg(model);
 }

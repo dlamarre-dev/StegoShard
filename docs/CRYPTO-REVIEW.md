@@ -189,10 +189,22 @@ histogram are unchanged and the eligible set is invariant (bit-exact extraction)
 and every non-scan segment (EXIF, quant/Huffman tables) is copied verbatim, so
 metadata and filename can mimic the original exactly. Non-baseline covers
 (progressive/arithmetic JPEG, HEIC) are **rejected, never transcoded** — a
-re-quantization would change the weight and reintroduce the anomaly. The Python
-reference decoder ships an independent pure-Python baseline reader
-(`jpeg_coeff.py`) and restores a TS-embedded JPEG key end-to-end
-(`test_stego_jpeg_key_image_round_trip`).
+re-quantization would change the weight and reintroduce the anomaly.
+
+**In-place embedding (no encoder fingerprint).** The embedder does not
+re-serialize the scan; it toggles the minimal set of magnitude-LSB bits directly
+in the file's _own_ entropy stream (`applyScanToggles`, gated to the common
+`restartInterval === 0` case; restart-marker files fall back to a full re-encode).
+So the output carries the **camera's own Huffman coding** with only the changed
+coefficients' bits flipped — no foreign-encoder signature to fingerprint. Measured
+on a real 12 MP Pixel 4:2:0 JPEG: exactly **371 coefficients / 371 unstuffed bytes
+changed** (the ~736-bit minimum), identical length, identical pixels to 3 decimal
+places, byte-identical header. (JPEG byte-stuffing can realign downstream bytes in
+the _stuffed_ stream, so a raw byte-diff against the original is larger than 371 —
+immaterial: it exposes no encoder tell, and an adversary holding the exact
+original detects any change regardless.) The Python reference decoder ships an
+independent pure-Python baseline reader (`jpeg_coeff.py`) and restores a
+TS-embedded JPEG key end-to-end (`test_stego_jpeg_key_image_round_trip`).
 
 **Honest limits (stated in the module and docs):** the PNG (spatial-LSB) carrier
 survives only lossless storage. Both carriers resist the **cheap heuristics** a

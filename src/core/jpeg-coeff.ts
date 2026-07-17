@@ -37,6 +37,12 @@ interface Component {
   acTableId: number;
   /** One Int16Array(64) per 8×8 block, in interleaved MCU decode order. */
   blocks: Int16Array[];
+  /**
+   * Parallel to `blocks`: for each block, the **logical bit index** (in the
+   * unstuffed entropy stream) of each AC coefficient's mantissa LSB, or -1.
+   * Enables byte-faithful in-place editing (toggle just that bit).
+   */
+  bitpos: Int32Array[];
 }
 
 export interface JpegModel {
@@ -82,6 +88,8 @@ function buildHuff(bits: number[], values: number[]): HuffTable {
 class BitReader {
   private byte = 0;
   private bits = 0;
+  /** Count of data bits read from the unstuffed stream so far (for bit offsets). */
+  logical = 0;
   /** Set when a marker (non-stuffed FF xx) is hit; the scan segment has ended. */
   marker = 0;
   constructor(
@@ -116,6 +124,7 @@ class BitReader {
   readBit(): number {
     if (this.bits === 0) this.fill();
     this.bits--;
+    this.logical++;
     return (this.byte >> this.bits) & 1;
   }
 
@@ -194,7 +203,7 @@ export function decode(bytes: Uint8Array): JpegModel {
         const v = bytes[p + 1]! & 15;
         maxH = Math.max(maxH, h);
         maxV = Math.max(maxV, v);
-        comps.push({ id, h, v, dcTableId: 0, acTableId: 0, blocks: [] });
+        comps.push({ id, h, v, dcTableId: 0, acTableId: 0, blocks: [], bitpos: [] });
       }
       frame = { width, height, comps, maxH, maxV };
     } else if (marker === 0xc2) {
@@ -276,6 +285,7 @@ function decodeScan(
         for (let by = 0; by < comp.v; by++) {
           for (let bx = 0; bx < comp.h; bx++) {
             const block = new Int16Array(64);
+            const bitpos = new Int32Array(64).fill(-1);
             // DC
             const t = decodeHuffSym(br, dc);
             const diff = t === 0 ? 0 : extend(br.readBits(t), t);
@@ -297,9 +307,11 @@ function decodeScan(
               k += r;
               if (k >= 64) break;
               block[k] = extend(br.readBits(s), s);
+              bitpos[k] = br.logical - 1; // logical index of this coefficient's LSB
               k++;
             }
             comp.blocks.push(block);
+            comp.bitpos.push(bitpos);
           }
         }
       }
@@ -565,4 +577,77 @@ export function eligibleCoefficients(model: JpegModel): {
       block[k] = v < 0 ? -newMag : newMag;
     },
   };
+}
+
+/**
+ * In-place accessors for the same eligible carriers, exposing each coefficient's
+ * current magnitude LSB and the logical bit index of that LSB in the entropy
+ * stream. Used by the byte-faithful embed path (`applyScanToggles`).
+ */
+export function eligibleInPlace(model: JpegModel): {
+  count: number;
+  get(i: number): number;
+  bitPos(i: number): number;
+} {
+  const refs: { mag: number; pos: number }[] = [];
+  for (const comp of model.components) {
+    for (let bi = 0; bi < comp.blocks.length; bi++) {
+      const block = comp.blocks[bi]!;
+      const bp = comp.bitpos[bi]!;
+      for (let k = 1; k < 64; k++) {
+        if (Math.abs(block[k]!) >= 2) refs.push({ mag: Math.abs(block[k]!) & 1, pos: bp[k]! });
+      }
+    }
+  }
+  return {
+    count: refs.length,
+    get: (i) => refs[i]!.mag,
+    bitPos: (i) => refs[i]!.pos,
+  };
+}
+
+/**
+ * Byte-faithful embed: return the original JPEG with **only** the given entropy
+ * bits toggled — every other byte is identical, so there is no re-serialization
+ * fingerprint and a diff against the original shows the theoretical minimum. Bit
+ * indices are logical (unstuffed) positions from `eligibleInPlace`. Toggling a
+ * mantissa LSB flips the coefficient's magnitude LSB regardless of sign, and
+ * (because |coef| ≥ 2 keeps the same Huffman size category) never changes any
+ * code length, so all other bit positions stay valid.
+ *
+ * Only valid for `restartInterval === 0` (a single entropy segment); the caller
+ * falls back to a full re-encode for the rare restart-marker files.
+ */
+export function applyScanToggles(model: JpegModel, positions: number[]): Uint8Array {
+  const scan = model.bytes.subarray(model.scanStart, model.scanEnd);
+
+  // Unstuff: drop the 0x00 that follows every 0xFF (valid in a no-restart scan).
+  const logical = new Uint8Array(scan.length);
+  let n = 0;
+  for (let i = 0; i < scan.length; i++) {
+    const b = scan[i]!;
+    logical[n++] = b;
+    if (b === 0xff && scan[i + 1] === 0x00) i++;
+  }
+
+  for (const pos of positions) logical[pos >> 3]! ^= 0x80 >> (pos & 7);
+
+  // Re-stuff: a 0x00 after every 0xFF. Size the output by counting 0xFF bytes.
+  let ffCount = 0;
+  for (let i = 0; i < n; i++) if (logical[i] === 0xff) ffCount++;
+  const restuffed = new Uint8Array(n + ffCount);
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const b = logical[i]!;
+    restuffed[m++] = b;
+    if (b === 0xff) restuffed[m++] = 0x00;
+  }
+
+  const head = model.bytes.subarray(0, model.scanStart);
+  const tail = model.bytes.subarray(model.scanEnd);
+  const out = new Uint8Array(head.length + restuffed.length + tail.length);
+  out.set(head, 0);
+  out.set(restuffed, head.length);
+  out.set(tail, head.length + restuffed.length);
+  return out;
 }
