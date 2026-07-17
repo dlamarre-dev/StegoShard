@@ -89,6 +89,42 @@ install and nothing leaving your device), built with `npm run build:web` / `npm 
 dev:web` and deployed to GitHub Pages. It doubles as an extension-independent recovery
 tool.
 
+## Command-line tool
+
+A headless **CLI** runs the exact same `@core` format as the extension and web app, so
+vaults are interchangeable across all of them (and the Python decoder). It can both
+**create** and **restore** vaults — unlike the decode-only Python reference decoder.
+
+```bash
+npm run cli -- save secret.txt --out ./vault           # → PNG images
+npm run cli -- restore ./vault --out ./restored        # ← images / folder / .zip / .pdf
+npm run cli -- estimate secret.txt                     # how many images it will take
+```
+
+Key modes and paper output mirror the apps:
+
+```bash
+# Deniable stego: the key is hidden in the pixels of an ordinary photo.
+npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
+npm run cli -- restore ./vault --key ./vault/imagevault-*-key.png --out ./restored
+
+# Printable PDF with a localized instruction sheet.
+npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print
+```
+
+The password is taken (in order) from `--password` (which prints a warning — it is
+visible in your shell history and the process list), `--password-file`, the
+`IMAGEVAULT_PASSWORD` environment variable, or an interactive hidden prompt.
+
+**Packaging.** `npm run build:cli` bundles the CLI into a single self-contained
+`dist-cli/imagevault.js` (shebang included) for `npx imagevault …`. From that bundle,
+`deno compile` produces standalone per-OS executables (see the `Release CLI binaries`
+workflow) — pure JS + WASM, no npm resolution, and baked-in `--allow-read --allow-write`
+permissions with **no network access**, so "nothing leaves your device" is enforced by
+the runtime. Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
+CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
+none is found — nothing is ever downloaded.
+
 Load `dist/chrome/` as an unpacked extension
 (`chrome://extensions` → Developer mode → Load unpacked), or `dist/firefox/` in Firefox
 (`about:debugging` → This Firefox → Load Temporary Add-on → pick its `manifest.json`).

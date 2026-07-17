@@ -9,6 +9,7 @@ export default [
     ignores: [
       'dist/**',
       'web-dist/**',
+      'dist-cli/**',
       'dist-release/**',
       'coverage/**',
       'node_modules/**',

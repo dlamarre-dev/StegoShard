@@ -5,7 +5,11 @@ local/
 node_modules/
 dist/
 web-dist/
+dist-cli/
 dist-release/
+# deno compile output
+/imagevault
+/imagevault-*
 build/
 coverage/
 packages/

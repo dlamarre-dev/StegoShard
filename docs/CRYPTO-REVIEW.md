@@ -55,7 +55,11 @@ probabilistic bound, not on a nonce counter.
 - The KEK is imported **non-extractable**; the transient raw KEK bytes are
   zeroized (`fill(0)`) immediately after import (`deriveKEK`).
 - The raw DEK exists transiently during wrap/unwrap and is zeroized in both
-  paths (`wrapDEK`, `unwrapDEK`).
+  paths (`wrapDEK`, `unwrapDEK`). The wrap path zeroizes a **`.slice()` copy** of
+  the exported key bytes, never the buffer `exportKey` returns directly: the Web
+  Crypto spec says that buffer is a fresh copy, but a runtime that instead aliases
+  it to the live `CryptoKey` (observed under Deno) would otherwise see the
+  zeroization corrupt the key. Copying keeps the zeroization safe on every runtime.
 - **JavaScript caveat, stated plainly:** `fill(0)` is best-effort. The VM may
   have copied buffers (GC compaction, WASM heap in hash-wasm, `postMessage`
   structured clones), and those copies cannot be scrubbed from JS. True memory

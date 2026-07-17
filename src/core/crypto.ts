@@ -116,9 +116,11 @@ export async function generateDEK(): Promise<CryptoKey> {
   return subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 }
 
-/** Export a DEK to raw bytes (for holding it in volatile session storage). */
+/** Export a DEK to raw bytes (for holding it in volatile session storage).
+ *  Returns an independent copy so a caller that zeroizes it can never alias
+ *  live key material (see the note in wrapDEK). */
 export async function exportDekRaw(dek: CryptoKey): Promise<Uint8Array> {
-  return new Uint8Array(await subtle.exportKey('raw', dek));
+  return new Uint8Array((await subtle.exportKey('raw', dek)).slice(0));
 }
 
 /** Re-import a raw DEK exported by exportDekRaw. */
@@ -165,9 +167,15 @@ export async function wrapDEK(
   dek: CryptoKey,
   kek: CryptoKey,
 ): Promise<{ iv: Uint8Array; wrapped: Uint8Array }> {
-  const rawDek = new Uint8Array(await subtle.exportKey('raw', dek));
-  const { iv, ciphertext } = await encryptBytes(kek, rawDek);
-  rawDek.fill(0); // zeroize the transient plaintext DEK
+  // Copy into a private buffer before zeroizing. Per the Web Crypto spec
+  // exportKey returns a fresh ArrayBuffer, but some runtimes (observed under
+  // Deno) hand back memory that still aliases the live CryptoKey — filling that
+  // would corrupt the DEK itself. `.slice()` guarantees an independent copy, so
+  // the zeroization can never scribble on key material.
+  const rawDek = (await subtle.exportKey('raw', dek)).slice(0);
+  const view = new Uint8Array(rawDek);
+  const { iv, ciphertext } = await encryptBytes(kek, view);
+  view.fill(0); // zeroize the transient plaintext DEK (our private copy)
   return { iv, wrapped: ciphertext };
 }
 
