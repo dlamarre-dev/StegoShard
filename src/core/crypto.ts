@@ -196,7 +196,7 @@ export async function unwrapDEK(
 
 // --- Wrapped DEK block: self-contained, password-protected key artifact ------
 
-const KEY_MAGIC = Uint8Array.from([0x49, 0x56, 0x4b, 0x59]); // "IVKY"
+const KEY_MAGIC = Uint8Array.from([0x53, 0x53, 0x4b, 0x59]); // "SSKY" (StegoShard KeY)
 const KEY_BLOCK_VERSION = 1;
 
 export interface KeyBlock {

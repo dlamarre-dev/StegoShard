@@ -17,8 +17,8 @@ KEY_BLOCK_LEN = 92
 PAYLOAD_BITS = KEY_BLOCK_LEN * 8
 MIN_CAPACITY = PAYLOAD_BITS * 16
 
-# Fixed application salt: "IVKY-stego-v1" padded to 16 bytes (SPEC §5.3).
-STEGO_SALT = b"IVKY-stego-v1\x00\x00\x00"
+# Fixed application salt: ASCII "StegoShard-stego" (exactly 16 bytes) (SPEC §5.3).
+STEGO_SALT = b"StegoShard-stego"
 
 
 def _keystream(password: str, length: int, iterations: int, memory_kib: int, parallelism: int) -> bytes:

@@ -73,7 +73,7 @@ describes the whole set — there is no separate manifest image.
 
 | Offset | Size | Field         | Notes                                   |
 | -----: | ---: | ------------- | --------------------------------------- |
-|      0 |    4 | `MAGIC`       | ASCII `"IVLT"` = `49 56 4C 54`          |
+|      0 |    4 | `MAGIC`       | ASCII `"SSHD"` = `53 53 48 44`          |
 |      4 |    1 | `VERSION`     | format version, `1`                     |
 |      5 |    8 | `SET_ID`      | random per-vault identifier             |
 |     13 |    2 | `SHARD_INDEX` | u16, global shard index `0 … k+m-1`     |
@@ -124,7 +124,7 @@ The DEK is wrapped (encrypted) by a **KEK** derived from the password with
 Argon2id. The key block is self-contained and password-protected.
 
 ```
-[ MAGIC 4 = "IVKY" = 49 56 4B 59 ][ VER 1 = 1 ]
+[ MAGIC 4 = "SSKY" = 53 53 4B 59 ][ VER 1 = 1 ]
 [ iterations u32 ][ memoryKiB u32 ][ parallelism u8 ]      (Argon2id parameters)
 [ salt 16 ]
 [ wrapIv 12 ][ wrappedLen u16 ][ wrappedDEK (wrappedLen bytes) ]
@@ -157,7 +157,7 @@ Where the key block travels is chosen per save:
   images. The images plus the password are self-sufficient. `KB_LEN > 0`.
 - **keyfile** — the key block is _not_ in the images (`KB_LEN = 0`); it is saved
   separately as a **`.key` file** whose contents are exactly the serialized key
-  block bytes of §5.1 (magic `"IVKY"`). Restore needs the images, the password,
+  block bytes of §5.1 (magic `"SSKY"`). Restore needs the images, the password,
   and this `.key` file. A leaked image then reveals nothing without the `.key`.
 - **stego** — like keyfile, but the key block is hidden in an ordinary-looking
   cover image (§5.3 for a PNG cover, §5.4 for a JPEG cover). At the blob level it
@@ -190,8 +190,8 @@ key (for a JPEG cover, use §5.4).
 Derivation (all decoders MUST reproduce it bit-for-bit):
 
 1. `seed = Argon2id(NFC(password), STEGO_SALT, params)` → 32 bytes, where
-   `STEGO_SALT` is the fixed 16 bytes `49 56 4B 59 2D 73 74 65 67 6F 2D 76 31 00 00 00`
-   (`"IVKY-stego-v1"` padded with zeros) and `params` are the caller's Argon2id
+   `STEGO_SALT` is the fixed 16 bytes `53 74 65 67 6F 53 68 61 72 64 2D 73 74 65 67 6F`
+   (ASCII `"StegoShard-stego"`) and `params` are the caller's Argon2id
    cost parameters (the extension uses the §5.1 production defaults).
 2. `stream = AES-256-CTR(key = seed, counter = 0¹²⁸)` applied to zero bytes,
    generating as many bytes as needed. The first `KEY_BLOCK_LEN` bytes are the
@@ -204,7 +204,7 @@ Derivation (all decoders MUST reproduce it bit-for-bit):
    the LSB of RGB channel byte `⌊pos/3⌋ × 4 + (pos mod 3)`.
 
 Extraction reverses steps 4→3 and validates the result against §5.1 (magic
-`"IVKY"`, supported version, exact 92-byte length); failure ⇒ treat as absent.
+`"SSKY"`, supported version, exact 92-byte length); failure ⇒ treat as absent.
 
 ### 5.4 JPEG stego key block (deniable DCT embedding)
 
@@ -317,8 +317,8 @@ If fewer than `k` shards survive, reconstruction is impossible.
 | Name             | Value                                                       |
 | ---------------- | ----------------------------------------------------------- |
 | `FORMAT_VERSION` | 1                                                           |
-| Header magic     | `"IVLT"`                                                    |
-| Key block magic  | `"IVKY"`                                                    |
+| Header magic     | `"SSHD"`                                                    |
+| Key block magic  | `"SSKY"`                                                    |
 | Header length    | 33 bytes                                                    |
 | Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                        |
 | KDF              | Argon2id, 32-byte output, salt 16 bytes                     |

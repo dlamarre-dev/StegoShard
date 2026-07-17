@@ -9,11 +9,11 @@ from dataclasses import dataclass
 
 from .reedsolomon import reconstruct_data
 
-MAGIC = b"IVLT"
+MAGIC = b"SSHD"  # StegoShard
 FORMAT_VERSION = 1
 HEADER_LEN = 33
 
-KEY_MAGIC = b"IVKY"
+KEY_MAGIC = b"SSKY"  # StegoShard KeY
 KEY_BLOCK_VERSION = 1
 KEY_BLOCK_PREFIX_LEN = 44  # magic+ver+iter+mem+par+salt+iv+len (before wrapped)
 

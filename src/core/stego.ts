@@ -58,10 +58,10 @@ const subtle = globalThis.crypto.subtle;
  * own random salt, this cannot be stored in the image (that would be a
  * detectable structure), so it is a constant — acceptable because the stego
  * layer is defense-in-depth for hiding, not the vault's confidentiality (that
- * is the password-wrapped key block). "IVKY-stego-v1" padded to 16 bytes.
+ * is the password-wrapped key block). ASCII "StegoShard-stego" (exactly 16 bytes).
  */
 export const STEGO_SALT = Uint8Array.from([
-  0x49, 0x56, 0x4b, 0x59, 0x2d, 0x73, 0x74, 0x65, 0x67, 0x6f, 0x2d, 0x76, 0x31, 0x00, 0x00, 0x00,
+  0x53, 0x74, 0x65, 0x67, 0x6f, 0x53, 0x68, 0x61, 0x72, 0x64, 0x2d, 0x73, 0x74, 0x65, 0x67, 0x6f,
 ]);
 
 const PAYLOAD_LEN = KEY_BLOCK_LEN; // fixed 92 bytes

@@ -4,7 +4,7 @@
  * "manifest image" to protect.
  *
  * Fixed layout (33 bytes, big-endian), frozen in SPEC.md:
- *   [ MAGIC 4 = "IVLT" ][ VERSION 1 ][ SET_ID 8 ][ SHARD_INDEX u16 ]
+ *   [ MAGIC 4 = "SSHD" ][ VERSION 1 ][ SET_ID 8 ][ SHARD_INDEX u16 ]
  *   [ K u16 ][ M u16 ][ CODEC_ID u8 ][ PROFILE u8 ][ SHARD_LEN u32 ]
  *   [ BLOB_LEN u32 ][ HASH_GLOBAL 4 ]
  *
@@ -14,7 +14,7 @@
 
 import { concatBytes, readU16, readU32, writeU16, writeU32 } from './bytes';
 
-export const MAGIC = Uint8Array.from([0x49, 0x56, 0x4c, 0x54]); // "IVLT"
+export const MAGIC = Uint8Array.from([0x53, 0x53, 0x48, 0x44]); // "SSHD" (StegoShard)
 export const FORMAT_VERSION = 1;
 export const SET_ID_LEN = 8;
 export const HASH_LEN = 4;
