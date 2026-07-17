@@ -32,6 +32,8 @@ export interface InstructionCopy {
   preservation: string;
   warning: string;
   footer: string;
+  /** The word "Page", for the per-page "Page x / N" line. */
+  page: string;
 }
 
 /** Instruction-sheet copy for every app locale (plus both Chinese scripts).
@@ -53,6 +55,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       'Keep it safe: print with a laser printer, store away from light and moisture, and keep copies in separate places.',
     warning: 'This sheet is not encrypted. Never write your password here.',
     footer: 'Restore: ImageVault + your password, with enough pages.',
+    page: 'Page',
   },
   fr: {
     heading: 'Comment restaurer ce coffre',
@@ -71,6 +74,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       "À conserver : imprimez au laser, à l'abri de la lumière et de l'humidité, et gardez des copies en lieux distincts.",
     warning: "Cette feuille n'est pas chiffrée. N'y écrivez jamais votre mot de passe.",
     footer: 'Restaurer : ImageVault + votre mot de passe, avec assez de pages.',
+    page: 'Page',
   },
   de: {
     heading: 'So stellen Sie diesen Tresor wieder her',
@@ -90,6 +94,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       'Sicher aufbewahren: mit einem Laserdrucker drucken, vor Licht und Feuchtigkeit schützen und Kopien an getrennten Orten aufbewahren.',
     warning: 'Dieses Blatt ist nicht verschlüsselt. Schreiben Sie hier niemals Ihr Passwort auf.',
     footer: 'Wiederherstellung: ImageVault + Ihr Passwort, mit genügend Seiten.',
+    page: 'Seite',
   },
   es: {
     heading: 'Cómo restaurar esta bóveda',
@@ -109,6 +114,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       'Consérvelo bien: imprima con láser, guárdelo lejos de la luz y la humedad, y mantenga copias en lugares separados.',
     warning: 'Esta hoja no está cifrada. Nunca escriba aquí su contraseña.',
     footer: 'Restaurar: ImageVault + su contraseña, con suficientes páginas.',
+    page: 'Página',
   },
   it: {
     heading: 'Come ripristinare questa cassaforte',
@@ -128,6 +134,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       'Conservalo con cura: stampa con stampante laser, tieni al riparo da luce e umidità e conserva copie in luoghi separati.',
     warning: 'Questo foglio non è cifrato. Non scrivere mai qui la tua password.',
     footer: 'Ripristino: ImageVault + la tua password, con abbastanza pagine.',
+    page: 'Pagina',
   },
   pt: {
     heading: 'Como restaurar este cofre',
@@ -147,6 +154,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       'Guarde com cuidado: imprima a laser, mantenha longe de luz e umidade e guarde cópias em locais separados.',
     warning: 'Esta folha não é criptografada. Nunca escreva sua senha aqui.',
     footer: 'Restaurar: ImageVault + sua senha, com páginas suficientes.',
+    page: 'Página',
   },
   ja: {
     heading: 'この保管庫を復元する方法',
@@ -165,6 +173,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
       '保管上の注意: レーザープリンターで印刷し、光と湿気を避けて保管し、複数の場所にコピーを保管してください。',
     warning: 'この用紙は暗号化されていません。ここにパスワードを書かないでください。',
     footer: '復元: ImageVault + パスワード、十分なページ数が必要です。',
+    page: 'ページ',
   },
   zh_CN: {
     heading: '如何恢复此保险库',
@@ -181,6 +190,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation: '妥善保存：使用激光打印机打印，避光防潮存放，并在不同地点保留副本。',
     warning: '本页未加密。切勿在此写下您的密码。',
     footer: '恢复：ImageVault + 您的密码，以及足够的页面。',
+    page: '页',
   },
   zh_TW: {
     heading: '如何還原此保險庫',
@@ -197,6 +207,7 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     preservation: '妥善保存：使用雷射印表機列印，避光防潮存放，並在不同地點保留副本。',
     warning: '本頁未加密。切勿在此寫下您的密碼。',
     footer: '還原：ImageVault + 您的密碼，以及足夠的頁面。',
+    page: '頁',
   },
 };
 
@@ -318,6 +329,9 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
 
   if (input.includeInstructions) await addInstructionSheet(pdf, text, input);
 
+  // The per-page "Page x / N" line uses the primary (chosen) locale's word.
+  const pageWord = instructionLangs(input.locale)[0]!.page;
+
   // Per-page furniture is identical on every page — prepare it once.
   const title = input.title ? await text.prepare(input.title, 15, { bold: true }) : undefined;
   const footers: PreparedText[] = [];
@@ -337,7 +351,7 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
       title.draw(page, MARGIN, y);
       y -= title.height + 4;
     }
-    const meta = [input.date, `Page ${i + 1} / ${total}`].filter(Boolean).join('    ');
+    const meta = [input.date, `${pageWord} ${i + 1} / ${total}`].filter(Boolean).join('    ');
     y = (await text.block(page, meta, MARGIN, y, 10)) - 4;
 
     const footerTop = MARGIN + footerHeight;
