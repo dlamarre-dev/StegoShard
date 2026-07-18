@@ -312,26 +312,68 @@ If fewer than `k` shards survive, reconstruction is impossible.
 
 ---
 
-## 8. Constants summary
+## 8. Binary (non-image) output
 
-| Name             | Value                                                       |
-| ---------------- | ----------------------------------------------------------- |
-| `FORMAT_VERSION` | 1                                                           |
-| Header magic     | `"SSHD"`                                                    |
-| Key block magic  | `"SSKY"`                                                    |
-| Header length    | 33 bytes                                                    |
-| Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                        |
-| KDF              | Argon2id, 32-byte output, salt 16 bytes                     |
-| KDF defaults     | iterations 3, memory 64 MiB, parallelism 1                  |
-| GF polynomial    | `0x11D`, generator `0x02`                                   |
-| Parity           | `m = max(ceil(k·0.3), 2)`                                   |
-| Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767) |
-| Limits           | file ≤ 256 KiB, images ≤ 150                                |
-| Compression      | gzip (RFC 1952), opportunistic                              |
+Instead of erasure-coding the vault blob (§6) into QR images, an implementation
+MAY write it to a single **container file**. This trades the images' loss
+tolerance and camera-restore for a compact artifact and a much larger size
+budget (no per-image ceiling). The blob is unchanged — the container is pure
+packaging around the already-authenticated bytes, so it adds no secrecy.
+
+Two variants:
+
+```
+branded    [ MAGIC "SSBN" = 53 53 42 4E ][ VERSION u8 = 1 ][ vault blob (§6) ]
+disguised  [ SQLite header 100 (see below) ][ vault blob (§6) ]
+```
+
+- **Branded** (`.ssbn`) is self-labelling: easy for the owner to recognize; it
+  makes no attempt to hide.
+- **Disguised** (`.db`) prepends a **complete, valid 100-byte SQLite 3 database
+  header** (not merely the 16-byte magic string) so `file(1)`/libmagic — which
+  validates the page-size field and reads the rest of the header — reports a
+  genuine `SQLite 3.x database`. The header is a fixed constant: magic
+  `"SQLite format 3\0"`, 4096-byte pages, UTF-8 text encoding, schema format 4,
+  change counter 1, SQLite version 3.45.0. This defeats **type/extension triage
+  only** — the bytes after the header are ciphertext, not a valid b-tree, so a
+  tool that actually opens it fails immediately (see `docs/CRYPTO-REVIEW.md` §6b).
+
+The **external key** (keyfile mode, `KB_LEN = 0`) MAY be delivered the same way:
+the 92-byte key block (§5.1) wrapped in a branded or disguised container. Stego
+key delivery (§5.3/§5.4) is unchanged — the key stays a cover image.
+
+**Restore.** Detect the variant by magic and strip it to recover the blob; bytes
+matching neither variant are treated as a bare blob, letting AES-GCM be the final
+arbiter. Then decrypt exactly as §6/§5. The gzip guard (§4) uses the binary size
+cap (below), which also bounds decompression on this path.
+
+Canonical filenames used by the reference implementations: branded
+`stegoshard-vault.ssbn` / `stegoshard-key.ssbn`; disguised `cache.db` /
+`settings.db`.
 
 ---
 
-## 9. Reference implementation
+## 9. Constants summary
+
+| Name             | Value                                                         |
+| ---------------- | ------------------------------------------------------------- |
+| `FORMAT_VERSION` | 1                                                             |
+| Header magic     | `"SSHD"`                                                      |
+| Key block magic  | `"SSKY"`                                                      |
+| Binary magic     | `"SSBN"` (branded); 100-byte SQLite header (disguised) (§8)   |
+| Header length    | 33 bytes                                                      |
+| Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                          |
+| KDF              | Argon2id, 32-byte output, salt 16 bytes                       |
+| KDF defaults     | iterations 3, memory 64 MiB, parallelism 1                    |
+| GF polynomial    | `0x11D`, generator `0x02`                                     |
+| Parity           | `m = max(ceil(k·0.3), 2)`                                     |
+| Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)   |
+| Limits           | file ≤ 1 MiB (images/PDF) or ≤ 100 MiB (binary); images ≤ 150 |
+| Compression      | gzip (RFC 1952), opportunistic                                |
+
+---
+
+## 10. Reference implementation
 
 The TypeScript core in `src/core/` is the reference encoder/decoder:
 

@@ -90,7 +90,9 @@ it failed.**
 - **Seeded fuzzing** (reproducible): 2 000 random buffers and 150 multi-byte
   mutations of a valid block; a throw is the only accepted outcome.
 - Related decoder guards outside the crypto layer: bounded gzip inflation
-  (256 KiB cap), header `k`/`m`/length validation — see SPEC §3–§4 tests.
+  (1 MiB cap on the image/PDF path, 100 MiB on the binary path — the export size
+  limits double as the decompression-bomb ceiling), header `k`/`m`/length
+  validation — see SPEC §3–§4 tests.
 
 Timing side channels are not unit-testable in this environment; the relevant
 surfaces are constant-time by construction (GCM tag check inside
@@ -219,6 +221,31 @@ An adversary holding the _original_ cover can diff it against the carrier.
 Deniability is a hiding property layered on top of the password-wrapped key
 block — defense-in-depth, not the vault's confidentiality boundary (that remains
 the §5.1 key block).
+
+## 6b. Disguised binary container (SPEC §8)
+
+**Claim: the disguised binary variant reads as an ordinary SQLite database to
+file-type triage — and nothing more.**
+
+The binary output (SPEC §8) wraps the vault blob (§6) in a single file. The blob
+is already an authenticated AES-256-GCM ciphertext, so neither variant changes
+the confidentiality boundary — the container is packaging. The **disguised**
+variant prepends a **complete, valid 100-byte SQLite 3 header** — not just the
+16-byte magic string. This matters: modern libmagic (`file` 5.46, verified)
+validates the page-size field at offset 16 and reads the rest of the header, so a
+bare magic reads as `data`, whereas the full header makes `file` report a genuine
+`SQLite 3.x database, ... UTF-8, ...`. Extension filters and folder listings are
+fooled a fortiori.
+
+**Honest limits (stated in the module and docs):** this defeats **type/extension
+triage only**. The bytes after the 100-byte header are high-entropy ciphertext,
+not a valid b-tree, so a tool that actually _opens_ the file as SQLite fails
+immediately (`file is not a database` / malformed page). Anyone who inspects
+rather than lists it sees a file that claims to be SQLite but is not. The disguise
+is a layer against a casual glance, never a claim of indistinguishability from a
+real database. The **branded** variant makes no attempt to hide (it is
+self-labelling by design). Both are defense-in-depth on top of the
+password-wrapped key block, exactly like the stego carriers (§6a).
 
 ## 7. Known limitations and deliberate choices
 

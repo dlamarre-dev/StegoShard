@@ -4,11 +4,11 @@
  */
 
 import browser from 'webextension-polyfill';
-import type { KeyMode } from '@core';
+import type { BinaryVariant, KeyMode } from '@core';
 
 const PREFS_KEY = 'stegoshard.prefs';
 
-export type Destination = 'disk' | 'paper' | 'cloud';
+export type Destination = 'disk' | 'paper' | 'cloud' | 'binary';
 
 export interface Prefs {
   destination: Destination;
@@ -17,6 +17,7 @@ export interface Prefs {
   title: string;
   asZip: boolean;
   includeInstructions: boolean;
+  binaryVariant: BinaryVariant;
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -26,6 +27,7 @@ const DEFAULT_PREFS: Prefs = {
   title: '',
   asZip: true,
   includeInstructions: false,
+  binaryVariant: 'branded',
 };
 
 export async function getPrefs(): Promise<Prefs> {

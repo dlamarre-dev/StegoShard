@@ -15,5 +15,6 @@ export * from './stego';
 export * from './jpeg-coeff';
 export * from './header';
 export * from './erasure';
+export * from './binary-container';
 export * from './vault';
 export * from './codec';

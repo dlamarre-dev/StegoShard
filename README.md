@@ -113,7 +113,16 @@ npm run cli -- restore ./vault --key ./vault/cat.jpg --out ./restored
 
 # Printable PDF with a localized instruction sheet.
 npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print
+
+# Binary (non-image) output: one opaque file instead of QR images, for larger
+# secrets (up to 100 MB, no image-count ceiling). --disguise gives it a valid
+# SQLite header so file-type triage reads it as an ordinary .db (SPEC §8).
+npm run cli -- save archive.zip --binary --disguise --out ./vault
+npm run cli -- restore ./vault/cache.db --out ./restored
 ```
+
+Images and PDF are capped at 1 MB (a warning shows the resulting image count
+past 256 KB); the binary output raises that to 100 MB.
 
 The password is taken (in order) from `--password` (which prints a warning — it is
 visible in your shell history and the process list), `--password-file`, the

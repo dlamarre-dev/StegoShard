@@ -504,5 +504,68 @@
   "errCoverFormat": {
     "message": "Unsupported cover image. Use a baseline JPEG or a PNG (progressive JPEG and HEIC aren't supported).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
+  },
+  "destBinary": {
+    "message": "File (no images)",
+    "description": "Popup: binary (single file) destination."
+  },
+  "binaryVariantHeading": {
+    "message": "File type",
+    "description": "Popup: label for the binary file-type selector."
+  },
+  "binaryVariantBranded": {
+    "message": "StegoShard file (.ssbn)",
+    "description": "Popup: branded binary variant option."
+  },
+  "binaryVariantDisguised": {
+    "message": "Disguised as a database (.db)",
+    "description": "Popup: disguised binary variant option."
+  },
+  "binaryVariantHelpBranded": {
+    "message": "A single opaque file with a StegoShard name — easy to find later, and it makes no attempt to hide.",
+    "description": "Popup: help text for the branded binary variant."
+  },
+  "binaryVariantHelpDisguised": {
+    "message": "Adds a SQLite-database header so a folder listing reads it as an ordinary app database. An extra layer against a casual glance — not against a tool that actually opens it.",
+    "description": "Popup: help text for the disguised binary variant."
+  },
+  "sizeWarnImages": {
+    "message": "Large secret (~$SIZE$ KiB) → $COUNT$ images. Consider the single-file option below.",
+    "description": "Popup: warning when a large secret would sprawl into many images.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusSavedBinary": {
+    "message": "Done. Downloaded a $VARIANT$. Keep your password safe — it cannot be recovered.",
+    "description": "Popup: status after saving a binary vault (embedded key).",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryKeyfile": {
+    "message": "Done. Downloaded a $VARIANT$ and a separate key file. Keep both and your password safe.",
+    "description": "Popup: status after saving a binary vault in keyfile mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryStego": {
+    "message": "Done. Downloaded a $VARIANT$. Your key is hidden in the cover photo — keep that image and your password.",
+    "description": "Popup: status after saving a binary vault in stego mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
   }
 }

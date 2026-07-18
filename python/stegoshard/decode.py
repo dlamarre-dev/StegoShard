@@ -5,6 +5,9 @@ Usage:
 
 IMAGES may be image files, directories, or .zip archives. A .key file (loose,
 or inside a .zip/directory) is picked up automatically for keyfile-mode sets.
+A single binary container file (SPEC §8, e.g. *.ssbn or a disguised *.db) is
+also accepted in place of images. --key may be a .key file, a stego cover image,
+or a binary key container.
 """
 
 from __future__ import annotations
@@ -15,8 +18,9 @@ import os
 import sys
 import zipfile
 
+from .binary_container import unwrap_binary
 from .crypto import WrongPasswordError
-from .pipeline import MissingKeyError, decode_vault
+from .pipeline import MissingKeyError, decode_vault, decode_vault_binary
 from .qr import decode_image
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
@@ -29,6 +33,37 @@ _MAX_TOTAL_BYTES = 300 * 1024 * 1024
 
 def _is_image(name: str) -> bool:
     return name.lower().endswith(_IMAGE_EXTS)
+
+
+def _find_binary_vault(paths: list[str]) -> bytes | None:
+    """Return the bytes of the first input that is a binary container (SPEC §8)."""
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        with open(path, "rb") as fh:
+            head = fh.read(128)  # covers the disguised variant's 100-byte header
+        try:
+            is_container = unwrap_binary(head) is not None
+        except ValueError:
+            is_container = True  # our magic, unsupported version — still ours
+        if is_container:
+            with open(path, "rb") as fh:
+                return fh.read()
+    return None
+
+
+def _resolve_key(path: str, password: str) -> bytes | None:
+    """A --key input may be a raw .key, a binary key container, or a stego image."""
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    unwrapped = unwrap_binary(raw)
+    if unwrapped:
+        return unwrapped[0]
+    if raw[:2] == b"\xff\xd8" or raw[:8] == b"\x89PNG\r\n\x1a\n":
+        from .stego import extract_key_block_from_image
+
+        return extract_key_block_from_image(raw, password)
+    return raw  # raw .key
 
 
 def _gather(paths: list[str]) -> tuple[list[bytes], bytes | None]:
@@ -75,49 +110,50 @@ def _gather(paths: list[str]) -> tuple[list[bytes], bytes | None]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="StegoShard reference decoder")
-    parser.add_argument("inputs", nargs="+", help="image files, directories, or .zip archives")
+    parser.add_argument(
+        "inputs", nargs="+", help="images, directories, .zip archives, or a binary container"
+    )
     parser.add_argument("--password", help="vault password (prompted if omitted)")
-    parser.add_argument("--key", help="path to a .key file (keyfile-mode sets)")
+    parser.add_argument("--key", help="a .key file, stego image, or binary key container")
     parser.add_argument("--out", default=".", help="output directory (default: current)")
     args = parser.parse_args(argv)
 
-    images, key_block = _gather(args.inputs)
-    if not images:
-        print("no images found in the inputs", file=sys.stderr)
-        return 2
+    # A binary container (SPEC §8) short-circuits the image pipeline.
+    binary_vault = _find_binary_vault(args.inputs)
 
-    payloads = [p for p in (decode_image(img) for img in images) if p is not None]
-    print(f"decoded {len(payloads)} of {len(images)} image(s)", file=sys.stderr)
-    if not payloads:
-        print("no readable QR codes found", file=sys.stderr)
-        return 1
+    if binary_vault is None:
+        images, key_block = _gather(args.inputs)
+        if not images:
+            print("no images found in the inputs", file=sys.stderr)
+            return 2
+        payloads = [p for p in (decode_image(img) for img in images) if p is not None]
+        print(f"decoded {len(payloads)} of {len(images)} image(s)", file=sys.stderr)
+        if not payloads:
+            print("no readable QR codes found", file=sys.stderr)
+            return 1
+    else:
+        key_block = None
 
     password = args.password or getpass.getpass("Password: ")
 
-    # --key may be a raw .key file, or a stego cover image (PNG/JPEG) that hides
-    # the key — the latter needs the password to extract.
     if args.key:
-        with open(args.key, "rb") as fh:
-            raw = fh.read()
-        if raw[:2] == b"\xff\xd8" or raw[:8] == b"\x89PNG\r\n\x1a\n":
-            from .stego import extract_key_block_from_image
-
-            key_block = extract_key_block_from_image(raw, password)
-            if key_block is None:
-                print(
-                    "no key found in the image (wrong password or not a stego cover)",
-                    file=sys.stderr,
-                )
-                return 1
-        else:
-            key_block = raw
+        key_block = _resolve_key(args.key, password)
+        if key_block is None:
+            print(
+                "no key found in the image (wrong password or not a stego cover)",
+                file=sys.stderr,
+            )
+            return 1
     try:
-        restored = decode_vault(payloads, password, key_block)
+        if binary_vault is not None:
+            restored = decode_vault_binary(binary_vault, password, key_block)
+        else:
+            restored = decode_vault(payloads, password, key_block)
     except WrongPasswordError:
         print("wrong password", file=sys.stderr)
         return 1
     except MissingKeyError:
-        print("this set needs a separate .key file (use --key)", file=sys.stderr)
+        print("this vault needs a separate key (use --key)", file=sys.stderr)
         return 1
 
     os.makedirs(args.out, exist_ok=True)

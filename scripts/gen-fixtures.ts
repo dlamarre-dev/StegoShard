@@ -14,15 +14,20 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import jpeg from 'jpeg-js';
 import {
+  type BinaryVariant,
+  binaryKeyName,
+  binaryVaultName,
   createKeyBlock,
   DEFAULT_ARGON2,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
   serializeKeyBlock,
   exportVault,
+  exportVaultBinary,
   getCodec,
   decodeHeader,
   PROFILE_DISK,
+  wrapBinary,
   type KeyMode,
   type VaultKey,
 } from '../src/core/index';
@@ -133,9 +138,47 @@ async function generate(
   console.log(`fixture ${name}: ${imagePayloads.length} image(s), keyMode=${keyMode}`);
 }
 
+/** Binary-container fixture (SPEC §8): a single file the Python decoder must
+ * restore via decode_vault_binary, plus a matching key container in keyfile mode. */
+async function generateBinary(
+  name: string,
+  keyMode: KeyMode,
+  variant: BinaryVariant,
+  content: Uint8Array,
+): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const key = await makeKey();
+  const { container, keyBlock } = await exportVaultBinary(FILENAME, content, key, {
+    keyMode,
+    variant,
+  });
+  const vaultName = binaryVaultName(variant);
+  writeFileSync(join(dir, vaultName), container);
+  let keyName: string | undefined;
+  if (keyMode === 'keyfile') {
+    keyName = binaryKeyName(variant);
+    writeFileSync(join(dir, keyName), wrapBinary(keyBlock, variant));
+  }
+  writeFileSync(join(dir, 'expected.bin'), content);
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify(
+      { password: PASSWORD, filename: FILENAME, keyMode, variant, vault: vaultName, key: keyName },
+      null,
+      2,
+    ),
+  );
+  console.log(`fixture ${name}: binary ${variant}, keyMode=${keyMode}`);
+}
+
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
 await generate('keyfile', 'keyfile', content);
 await generate('stego', 'stego', content);
 await generate('stego-jpeg', 'stego', content, true);
+await generateBinary('binary-branded', 'embedded', 'branded', content);
+await generateBinary('binary-disguised', 'keyfile', 'disguised', content);
 console.log(`fixtures written to ${outRoot}`);
