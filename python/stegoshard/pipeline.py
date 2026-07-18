@@ -9,8 +9,11 @@ import hashlib
 import struct
 from dataclasses import dataclass
 
+from .binary_container import unwrap_binary
 from .crypto import decrypt_content, unwrap_dek
 from .format import (
+    MAX_CONTENT_BYTES,
+    MAX_CONTENT_BYTES_BINARY,
     decode_blob,
     parse_envelope,
     parse_key_block,
@@ -64,12 +67,28 @@ def decode_vault(
     if hashlib.sha256(blob).digest()[:4] != first.hash:
         raise ValueError("import: reconstructed blob failed its integrity check")
 
+    return _decode_vault_blob(blob, password, key_block, MAX_CONTENT_BYTES)
+
+
+def _decode_vault_blob(
+    blob: bytes, password: str, key_block: bytes | None, max_content_bytes: int
+) -> RestoredFile:
     embedded_kb, iv, ciphertext = parse_vault_blob(blob)
     kb_bytes = embedded_kb if len(embedded_kb) > 0 else key_block
     if not kb_bytes:
-        raise MissingKeyError("this image set needs a separate .key file to restore")
+        raise MissingKeyError("this vault needs a separate key to restore")
 
     dek = unwrap_dek(parse_key_block(kb_bytes), password)
     envelope = decrypt_content(dek, iv, ciphertext)
-    filename, content = parse_envelope(envelope)
+    filename, content = parse_envelope(envelope, max_content_bytes)
     return RestoredFile(filename, content)
+
+
+def decode_vault_binary(
+    container: bytes, password: str, key_block: bytes | None = None
+) -> RestoredFile:
+    """Restore from a binary container file (SPEC §8). Bytes matching neither
+    variant are treated as a bare blob, letting AES-GCM be the arbiter."""
+    unwrapped = unwrap_binary(container)
+    blob = unwrapped[0] if unwrapped else container
+    return _decode_vault_blob(blob, password, key_block, MAX_CONTENT_BYTES_BINARY)

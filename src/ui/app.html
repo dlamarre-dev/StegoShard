@@ -91,11 +91,17 @@
               <label
                 ><input type="radio" name="dest" value="paper" /><span data-i18n="destPaper"></span
               ></label>
+              <label
+                ><input type="radio" name="dest" value="binary" /><span
+                  data-i18n="destBinary"
+                ></span
+              ></label>
               <label id="dest-cloud-label" hidden
                 ><input type="radio" name="dest" value="cloud" /><span data-i18n="destCloud"></span
               ></label>
             </fieldset>
             <p id="cloud-note" class="muted" data-i18n="cloudNote" hidden></p>
+            <p id="size-warn" class="muted warn" hidden></p>
 
             <label class="muted" data-i18n="keyModeHeading"></label>
             <fieldset class="segmented">
@@ -159,6 +165,15 @@
             <label id="zip-field" class="checkbox"
               ><input id="as-zip" type="checkbox" checked /> <span data-i18n="labelAsZip"></span
             ></label>
+
+            <div id="binary-fields" hidden>
+              <label class="muted" data-i18n="binaryVariantHeading" for="binary-variant"></label>
+              <select id="binary-variant">
+                <option value="branded" data-i18n="binaryVariantBranded"></option>
+                <option value="disguised" data-i18n="binaryVariantDisguised"></option>
+              </select>
+              <p class="muted" id="binary-variant-help" data-i18n="binaryVariantHelpBranded"></p>
+            </div>
 
             <div id="paper-fields" hidden>
               <label class="checkbox"

@@ -28,6 +28,7 @@ import {
   unlockKeyBlock,
 } from './crypto';
 import type { KeyMode } from './types';
+import { type BinaryVariant, unwrapBinary, wrapBinary } from './binary-container';
 import { buildPayload, parsePayload } from './payload';
 import { decodeBlob, encodeShards, parityCount } from './erasure';
 import {
@@ -42,8 +43,18 @@ import {
 import { SET_ID_LEN } from './header';
 import { getCodec } from './codec';
 
-/** Hard limit on the source file — this vault targets small secrets (plan §5). */
-export const MAX_FILE_BYTES = 256 * 1024;
+/** Hard limit on the source file for the image/PDF paths (plan §5). */
+export const MAX_FILE_BYTES = 1024 * 1024;
+/**
+ * Above this the image/PDF output starts to sprawl; front-ends warn and show the
+ * projected image count so the user can switch to binary output before saving.
+ */
+export const WARN_FILE_BYTES = 256 * 1024;
+/**
+ * Binary (non-image) output has no per-image ceiling, so it tolerates far larger
+ * secrets. This bound doubles as the decompression-bomb guard on that path.
+ */
+export const MAX_FILE_BYTES_BINARY = 100 * 1024 * 1024;
 /** Independent safety ceiling on the number of images (plan §5). */
 export const MAX_IMAGES = 150;
 
@@ -126,7 +137,11 @@ async function sha256Short(data: Uint8Array): Promise<Uint8Array> {
 }
 
 /** vault blob = [ KB_LEN u16 ][ keyBlock ][ IV 12 ][ ciphertext ] */
-function serializeVaultBlob(keyBlock: Uint8Array, iv: Uint8Array, ciphertext: Uint8Array): Uint8Array {
+function serializeVaultBlob(
+  keyBlock: Uint8Array,
+  iv: Uint8Array,
+  ciphertext: Uint8Array,
+): Uint8Array {
   const lenField = new Uint8Array(2);
   writeU16(lenField, 0, keyBlock.length);
   return concatBytes(lenField, keyBlock, iv, ciphertext);
@@ -182,6 +197,39 @@ export async function estimateImages(
   return { k, m, images: k + m };
 }
 
+/**
+ * Build the encrypted vault blob — the container shared by every output path.
+ * The image path erasure-codes it; the binary path wraps it in a container file.
+ */
+async function buildVaultBlob(
+  filename: string,
+  content: Uint8Array,
+  key: VaultKey,
+  keyMode: KeyMode,
+): Promise<Uint8Array> {
+  const envelope = await buildPayload(filename, content);
+  const { iv, ciphertext } = await encryptBytes(key.dek, envelope);
+  // Embed the key block, or leave it out (KB_LEN=0) so it can be delivered
+  // separately (keyfile/stego/binary-key modes).
+  const embeddedKeyBlock = isEmbedded(keyMode) ? key.keyBlock : new Uint8Array(0);
+  return serializeVaultBlob(embeddedKeyBlock, iv, ciphertext);
+}
+
+/** Reverse of buildVaultBlob: blob (+ external key) → original file. */
+async function decodeVaultBlob(
+  blob: Uint8Array,
+  password: string,
+  opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
+): Promise<{ filename: string; content: Uint8Array }> {
+  const { keyBlock, iv, ciphertext } = parseVaultBlob(blob);
+  // Embedded key block travels in the blob; otherwise the caller must supply it.
+  const kbBytes = keyBlock.length > 0 ? keyBlock : opts.keyBlock;
+  if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
+  const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
+  const envelope = await decryptBytes(dek, iv, ciphertext);
+  return parsePayload(envelope, opts.maxContentBytes);
+}
+
 export async function exportVault(
   filename: string,
   content: Uint8Array,
@@ -195,12 +243,7 @@ export async function exportVault(
   const codecId = options.codecId ?? CODEC_QR_GRID;
   const keyMode = options.keyMode ?? 'embedded';
 
-  const envelope = await buildPayload(filename, content);
-  const { iv, ciphertext } = await encryptBytes(key.dek, envelope);
-  // Embed the key block, or leave it out (KB_LEN=0) so it can be delivered
-  // separately as a .key file (keyfile/stego modes).
-  const embeddedKeyBlock = isEmbedded(keyMode) ? key.keyBlock : new Uint8Array(0);
-  const blob = serializeVaultBlob(embeddedKeyBlock, iv, ciphertext);
+  const blob = await buildVaultBlob(filename, content, key, keyMode);
 
   const k = Math.max(1, Math.ceil(blob.length / dataPerShard(codecId, profile)));
   const m = parityCount(k);
@@ -286,13 +329,46 @@ export async function importVault(
     throw new Error('import: reconstructed blob failed its integrity check');
   }
 
-  const { keyBlock, iv, ciphertext } = parseVaultBlob(blob);
-  // Embedded key block travels in the blob; otherwise the caller must supply it.
-  const kbBytes = keyBlock.length > 0 ? keyBlock : opts.keyBlock;
-  if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
-  const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
-  const envelope = await decryptBytes(dek, iv, ciphertext);
-  return parsePayload(envelope, MAX_FILE_BYTES);
+  return decodeVaultBlob(blob, password, {
+    keyBlock: opts.keyBlock,
+    maxContentBytes: MAX_FILE_BYTES,
+  });
+}
+
+/**
+ * Export the vault as a single binary container file (SPEC §8) instead of
+ * images. Returns the container bytes and the serialized key block (save it
+ * separately for keyfile/stego/binary-key modes). The 100 MiB cap applies here;
+ * there is no image-count ceiling on this path.
+ */
+export async function exportVaultBinary(
+  filename: string,
+  content: Uint8Array,
+  key: VaultKey,
+  options: { keyMode?: KeyMode; variant?: BinaryVariant } = {},
+): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
+  if (content.length > MAX_FILE_BYTES_BINARY) {
+    throw new FileTooLargeError(content.length, MAX_FILE_BYTES_BINARY);
+  }
+  const keyMode = options.keyMode ?? 'embedded';
+  const variant = options.variant ?? 'branded';
+  const blob = await buildVaultBlob(filename, content, key, keyMode);
+  return { container: wrapBinary(blob, variant), keyMode, keyBlock: key.keyBlock };
+}
+
+/** Restore a file from a binary container produced by exportVaultBinary. */
+export async function importVaultBinary(
+  container: Uint8Array,
+  password: string,
+  opts: { keyBlock?: Uint8Array | undefined } = {},
+): Promise<{ filename: string; content: Uint8Array }> {
+  // Strip the container; bytes matching neither variant are treated as a bare
+  // blob, letting AES-GCM be the final arbiter of whether they are ours.
+  const blob = unwrapBinary(container)?.payload ?? container;
+  return decodeVaultBlob(blob, password, {
+    keyBlock: opts.keyBlock,
+    maxContentBytes: MAX_FILE_BYTES_BINARY,
+  });
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {

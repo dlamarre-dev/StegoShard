@@ -14,6 +14,7 @@ from typing import Any
 
 _LAZY = {
     "decode_vault": "pipeline",
+    "decode_vault_binary": "pipeline",
     "RestoredFile": "pipeline",
     "MissingKeyError": "pipeline",
     "WrongPasswordError": "crypto",
@@ -21,6 +22,8 @@ _LAZY = {
     "extract_key_block": "stego",
     "extract_key_block_jpeg": "stego",
     "extract_key_block_from_image": "stego",
+    "unwrap_binary": "binary_container",
+    "wrap_binary": "binary_container",
 }
 
 __all__ = list(_LAZY)

@@ -6,13 +6,20 @@
  */
 
 import {
+  type BinaryVariant,
+  binaryKeyName,
+  binaryVaultName,
   getCodec,
   exportVault,
+  exportVaultBinary,
   importVault,
+  importVaultBinary,
   MAX_IMAGES,
   PROFILE_DISK,
   decodeHeader,
   toHex,
+  unwrapBinary,
+  wrapBinary,
   type KeyMode,
   type VaultKey,
 } from '@core';
@@ -121,6 +128,44 @@ export async function saveFileToDisk(
   return { imageCount: total, setId: setHex, keyMode };
 }
 
+/**
+ * Save the vault as a single binary container file (SPEC §8) instead of images.
+ * In keyfile mode the key is delivered as a matching container; in stego mode it
+ * stays a cover image. No image-count ceiling applies (up to 100 MiB).
+ */
+export async function saveFileToBinary(
+  file: File,
+  key: VaultKey,
+  options: { keyMode: KeyMode; variant: BinaryVariant; stego?: SaveOptions['stego'] },
+): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
+  const content = new Uint8Array(await file.arrayBuffer());
+  const { container, keyBlock, keyMode } = await exportVaultBinary(file.name, content, key, {
+    keyMode: options.keyMode,
+    variant: options.variant,
+  });
+  downloadBlob(
+    new Blob([container as BufferSource], { type: 'application/octet-stream' }),
+    binaryVaultName(options.variant),
+  );
+
+  if (keyMode === 'stego') {
+    if (!options.stego) throw new Error('stego mode requires a cover image and password');
+    const stegoKey = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    downloadBlob(
+      new Blob([stegoKey.bytes as BufferSource], { type: stegoKey.mime }),
+      stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
+    );
+  } else if (keyMode === 'keyfile') {
+    downloadBlob(
+      new Blob([wrapBinary(keyBlock, options.variant) as BufferSource], {
+        type: 'application/octet-stream',
+      }),
+      binaryKeyName(options.variant),
+    );
+  }
+  return { keyMode, variant: options.variant };
+}
+
 const isZip = (name: string) => name.toLowerCase().endsWith('.zip');
 const isKey = (name: string) => name.toLowerCase().endsWith('.key');
 const isPdf = (name: string) => name.toLowerCase().endsWith('.pdf');
@@ -172,13 +217,30 @@ export async function restoreFileFromDisk(
 ): Promise<{ filename: string }> {
   const images: Uint8Array[] = [];
   const payloads: Uint8Array[] = [...extraPayloads];
-  // A key input that is an image is a stego carrier: extract the key block
-  // with the restore password (null → wrong password / no key hidden there).
+  // A key input can be a raw .key, a binary key container (branded/disguised),
+  // or a stego cover image (de-embedded with the restore password).
   let keyBlock: Uint8Array | undefined;
   if (keyFile) {
-    keyBlock = isKey(keyFile.name)
-      ? await blobBytes(keyFile)
-      : ((await extractKeyImage(keyFile, password)) ?? undefined);
+    const bytes = await blobBytes(keyFile);
+    const unwrapped = unwrapBinary(bytes);
+    keyBlock = unwrapped
+      ? unwrapped.payload
+      : isKey(keyFile.name)
+        ? bytes
+        : ((await extractKeyImage(keyFile, password)) ?? undefined);
+  }
+
+  // A single binary vault container short-circuits the image pipeline. (Camera
+  // captures arrive as extraPayloads and are always images, so skip the probe.)
+  if (extraPayloads.length === 0) {
+    for (const file of files) {
+      const bytes = await blobBytes(file);
+      if (unwrapBinary(bytes)) {
+        const { filename, content } = await importVaultBinary(bytes, password, { keyBlock });
+        downloadBlob(new Blob([content as BufferSource]), filename);
+        return { filename };
+      }
+    }
   }
 
   for (const file of files) {

@@ -4,24 +4,41 @@
  * All file I/O is Node `fs`; all crypto/codec work is the shared `@core`.
  */
 
-import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join } from 'node:path';
 import { zipSync } from 'fflate';
 import {
+  type BinaryVariant,
   CODEC_QR_GRID,
   DEFAULT_ARGON2,
   MissingKeyError,
   PROFILE_DISK,
   PROFILE_PAPER,
+  WARN_FILE_BYTES,
   WrongPasswordError,
+  binaryKeyName,
+  binaryVaultName,
   createKeyBlock,
   decodeHeader,
   estimateImages,
   exportVault,
+  exportVaultBinary,
   getCodec,
   importVault,
+  importVaultBinary,
   serializeKeyBlock,
   toHex,
+  unwrapBinary,
+  wrapBinary,
   type ImageDataLike,
   type KeyMode,
   type VaultKey,
@@ -71,6 +88,8 @@ export interface SaveOptions {
   password: string;
   paper: boolean;
   zip: boolean;
+  /** When set, output a single binary container file instead of images/PDF. */
+  binary?: BinaryVariant | undefined;
   keyMode: KeyMode;
   cover?: string | undefined; // stego cover image path
   title?: string | undefined;
@@ -87,8 +106,12 @@ export interface SaveResult {
   imageCount: number;
   setId: string;
   keyMode: KeyMode;
+  /** Set when the vault was written as a single binary container. */
+  binary?: BinaryVariant;
   effectiveLocale?: string;
   fontWarning?: string;
+  /** A soft warning to surface (e.g. a large image count). */
+  sizeWarning?: string;
 }
 
 /**
@@ -117,6 +140,26 @@ async function externalKey(
 export async function runSave(opts: SaveOptions): Promise<SaveResult> {
   const content = read(opts.inputFile);
   const key = await makeKey(opts.password);
+
+  // Binary (non-image) output: a single container file, no image-count ceiling.
+  if (opts.binary) {
+    const variant = opts.binary;
+    const { container, keyBlock, keyMode } = await exportVaultBinary(
+      basename(opts.inputFile),
+      content,
+      key,
+      { keyMode: opts.keyMode, variant },
+    );
+    const files = [writeOut(opts.outDir, binaryVaultName(variant), container)];
+    if (keyMode === 'stego') {
+      const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
+      if (ext) files.push(writeExternalKey(opts.outDir, ext));
+    } else if (keyMode === 'keyfile') {
+      files.push(writeOut(opts.outDir, binaryKeyName(variant), wrapBinary(keyBlock, variant)));
+    }
+    return { files, imageCount: 0, setId: '', keyMode, binary: variant };
+  }
+
   const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
 
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(
@@ -129,6 +172,12 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
   const setHex = toHex(setId);
   const files: string[] = [];
   const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
+  // Large secrets sprawl into many images; nudge toward --binary before writing.
+  const sizeWarning =
+    content.length > WARN_FILE_BYTES
+      ? `Large secret (${Math.round(content.length / 1024)} KiB) → ${imagePayloads.length} image(s). ` +
+        `Consider --binary for a single file.`
+      : undefined;
 
   if (opts.paper) {
     const encodeQr = (p: Uint8Array): ImageDataLike => codec.encode(p, PROFILE_PAPER);
@@ -150,6 +199,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
       keyMode,
       effectiveLocale: built.effectiveLocale,
       ...(built.fontWarning ? { fontWarning: built.fontWarning } : {}),
+      ...(sizeWarning ? { sizeWarning } : {}),
     };
   }
 
@@ -171,7 +221,13 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
     if (ext) files.push(writeExternalKey(opts.outDir, ext));
   }
 
-  return { files, imageCount: imagePayloads.length, setId: setHex, keyMode };
+  return {
+    files,
+    imageCount: imagePayloads.length,
+    setId: setHex,
+    keyMode,
+    ...(sizeWarning ? { sizeWarning } : {}),
+  };
 }
 
 export interface RestoreOptions {
@@ -190,16 +246,46 @@ export interface RestoreResult {
 
 const isKeyFile = (n: string) => /\.key$/i.test(n);
 
+/** Peek a file's first bytes to see whether it is a binary container (SPEC §8). */
+function isBinaryContainerFile(path: string): boolean {
+  try {
+    if (!statSync(path).isFile()) return false;
+    const fd = openSync(path, 'r');
+    // Enough to cover the disguised variant's 100-byte SQLite header.
+    const buf = Buffer.alloc(128);
+    const n = readSync(fd, buf, 0, 128, 0);
+    closeSync(fd);
+    return unwrapBinary(new Uint8Array(buf.subarray(0, n))) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve an external key block from a .key file, a stego image, or a binary
+ * key container (branded/disguised). */
+async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8Array | undefined> {
+  const bytes = read(keyPath);
+  const unwrapped = unwrapBinary(bytes); // branded/disguised key container
+  if (unwrapped) return unwrapped.payload;
+  if (isKeyFile(keyPath)) return bytes; // raw .key (92 bytes)
+  return (await extractKeyImage(bytes, basename(keyPath), password)) ?? undefined; // stego image
+}
+
 export async function runRestore(opts: RestoreOptions): Promise<RestoreResult> {
+  const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
+  if (binaryVaultPath) {
+    const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
+    const { filename, content } = await importVaultBinary(read(binaryVaultPath), opts.password, {
+      keyBlock,
+    });
+    const outName = basename(filename) || 'restored.bin';
+    const outPath = writeOut(opts.outDir, outName, content);
+    return { outPath, filename, seen: 1, decoded: 1 };
+  }
+
   const gathered = await gatherInputs(opts.inputs);
   let keyBlock = gathered.keyBlock;
-
-  if (opts.keyPath) {
-    const bytes = read(opts.keyPath);
-    keyBlock = isKeyFile(opts.keyPath)
-      ? bytes
-      : ((await extractKeyImage(bytes, basename(opts.keyPath), opts.password)) ?? undefined);
-  }
+  if (opts.keyPath) keyBlock = await resolveKeyBlock(opts.keyPath, opts.password);
 
   if (gathered.payloads.length === 0) {
     throw new Error('no readable StegoShard images found in the inputs');

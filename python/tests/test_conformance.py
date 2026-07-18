@@ -117,3 +117,43 @@ def test_stego_jpeg_key_image_round_trip():
     restored = decode_vault(payloads, manifest["password"], key_block)
     assert restored.filename == manifest["filename"]
     assert restored.content == expected
+
+
+def test_binary_branded_round_trip():
+    """A branded binary container (TS embed) restores via the reference decoder
+    (SPEC §8)."""
+    from stegoshard import decode_vault_binary, unwrap_binary
+
+    d = FIXTURES / "binary-branded"
+    manifest = json.loads((d / "manifest.json").read_text())
+    container = (d / manifest["vault"]).read_bytes()
+    expected = (d / "expected.bin").read_bytes()
+
+    assert unwrap_binary(container)[1] == "branded"
+    restored = decode_vault_binary(container, manifest["password"])
+    assert restored.filename == manifest["filename"]
+    assert restored.content == expected
+
+
+def test_binary_disguised_needs_key_container():
+    """A disguised (SQLite-header) vault plus its key container round-trips; the
+    vault alone is rejected (SPEC §8)."""
+    from stegoshard import decode_vault_binary, unwrap_binary
+    from stegoshard.pipeline import MissingKeyError
+
+    d = FIXTURES / "binary-disguised"
+    manifest = json.loads((d / "manifest.json").read_text())
+    container = (d / manifest["vault"]).read_bytes()
+    expected = (d / "expected.bin").read_bytes()
+
+    # The file carries a genuine SQLite header so file-type triage is fooled.
+    assert container[:16] == b"SQLite format 3\x00"
+    assert unwrap_binary(container)[1] == "disguised"
+
+    with pytest.raises(MissingKeyError):
+        decode_vault_binary(container, manifest["password"])
+
+    key_container = (d / manifest["key"]).read_bytes()
+    key_block = unwrap_binary(key_container)[0]
+    restored = decode_vault_binary(container, manifest["password"], key_block)
+    assert restored.content == expected

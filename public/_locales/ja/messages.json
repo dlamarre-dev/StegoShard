@@ -407,5 +407,68 @@
   "errCoverFormat": {
     "message": "対応していないカバー画像です。ベースライン JPEG または PNG を使用してください(プログレッシブ JPEG と HEIC は非対応)。",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
+  },
+  "destBinary": {
+    "message": "ファイル（画像なし）",
+    "description": "Popup: binary (single file) destination."
+  },
+  "binaryVariantHeading": {
+    "message": "ファイルの種類",
+    "description": "Popup: label for the binary file-type selector."
+  },
+  "binaryVariantBranded": {
+    "message": "StegoShard ファイル（.ssbn）",
+    "description": "Popup: branded binary variant option."
+  },
+  "binaryVariantDisguised": {
+    "message": "データベースに偽装（.db）",
+    "description": "Popup: disguised binary variant option."
+  },
+  "binaryVariantHelpBranded": {
+    "message": "StegoShard の名前が付いた単一の不透明なファイル。後で見つけやすく、隠す意図はありません。",
+    "description": "Popup: help text for the branded binary variant."
+  },
+  "binaryVariantHelpDisguised": {
+    "message": "SQLite データベースのヘッダーを付け、フォルダ上では通常のアプリのデータベースとして表示されます。ざっと見る相手への追加の一枚。実際に開くツールに対しては防げません。",
+    "description": "Popup: help text for the disguised binary variant."
+  },
+  "sizeWarnImages": {
+    "message": "大きなデータ（約 $SIZE$ KiB）→ $COUNT$ 枚の画像になります。下の単一ファイルの選択肢もご検討ください。",
+    "description": "Popup: warning when a large secret would sprawl into many images.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusSavedBinary": {
+    "message": "完了。$VARIANT$ をダウンロードしました。パスワードは復元できません。大切に保管してください。",
+    "description": "Popup: status after saving a binary vault (embedded key).",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryKeyfile": {
+    "message": "完了。$VARIANT$ と別のキーファイルをダウンロードしました。両方とパスワードを保管してください。",
+    "description": "Popup: status after saving a binary vault in keyfile mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryStego": {
+    "message": "完了。$VARIANT$ をダウンロードしました。キーはカバー写真に隠されています。その画像とパスワードを保管してください。",
+    "description": "Popup: status after saving a binary vault in stego mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
   }
 }

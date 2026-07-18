@@ -407,5 +407,68 @@
   "errCoverFormat": {
     "message": "不支援的封面圖像。請使用 baseline JPEG 或 PNG(不支援漸進式 JPEG 與 HEIC)。",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
+  },
+  "destBinary": {
+    "message": "檔案（不使用影像）",
+    "description": "Popup: binary (single file) destination."
+  },
+  "binaryVariantHeading": {
+    "message": "檔案類型",
+    "description": "Popup: label for the binary file-type selector."
+  },
+  "binaryVariantBranded": {
+    "message": "StegoShard 檔案（.ssbn）",
+    "description": "Popup: branded binary variant option."
+  },
+  "binaryVariantDisguised": {
+    "message": "偽裝成資料庫（.db）",
+    "description": "Popup: disguised binary variant option."
+  },
+  "binaryVariantHelpBranded": {
+    "message": "一個帶有 StegoShard 名稱的不透明檔案，日後容易尋找，並不試圖隱藏。",
+    "description": "Popup: help text for the branded binary variant."
+  },
+  "binaryVariantHelpDisguised": {
+    "message": "加入 SQLite 資料庫標頭，讓資料夾清單將它視為一般應用程式資料庫。可多擋一層隨意瀏覽，但擋不住真正開啟它的工具。",
+    "description": "Popup: help text for the disguised binary variant."
+  },
+  "sizeWarnImages": {
+    "message": "秘密較大（約 $SIZE$ KiB）→ $COUNT$ 張影像。可考慮下方的單一檔案選項。",
+    "description": "Popup: warning when a large secret would sprawl into many images.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusSavedBinary": {
+    "message": "完成。已下載 $VARIANT$。請妥善保管密碼，密碼無法復原。",
+    "description": "Popup: status after saving a binary vault (embedded key).",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryKeyfile": {
+    "message": "完成。已下載 $VARIANT$ 與另一個金鑰檔案。請保管兩者以及密碼。",
+    "description": "Popup: status after saving a binary vault in keyfile mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryStego": {
+    "message": "完成。已下載 $VARIANT$。您的金鑰藏在封面照片中，請保管該影像與密碼。",
+    "description": "Popup: status after saving a binary vault in stego mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
   }
 }

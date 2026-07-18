@@ -1,10 +1,12 @@
 import browser from 'webextension-polyfill';
 import {
+  type BinaryVariant,
   estimateImages,
   parseKeyBlock,
   PROFILE_CLOUD,
   PROFILE_DISK,
   PROFILE_PAPER,
+  WARN_FILE_BYTES,
   unlockKeyBlock,
   type KeyMode,
 } from '@core';
@@ -12,7 +14,7 @@ import { localizeDom } from './i18n';
 import { el, friendlyError, msg, pick, setStatus, show, wireDropzone } from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
 import { type Destination, getPrefs, savePrefs } from './prefs';
-import { restoreFileFromDisk, saveFileToDisk } from './disk';
+import { restoreFileFromDisk, saveFileToBinary, saveFileToDisk } from './disk';
 import { HAS_GOOGLE_PHOTOS } from './config';
 import { saveToPhotos } from './google-photos';
 import { wireKeyManager } from './keymanager';
@@ -43,6 +45,10 @@ const bandFields = el('band-fields');
 const bandTitle = el<HTMLInputElement>('band-title');
 const asZip = el<HTMLInputElement>('as-zip');
 const zipField = el('zip-field');
+const binaryFields = el('binary-fields');
+const binaryVariant = el<HTMLSelectElement>('binary-variant');
+const binaryVariantHelp = el('binary-variant-help');
+const sizeWarn = el('size-warn');
 const paperFields = el('paper-fields');
 const addInstructions = el<HTMLInputElement>('add-instructions');
 const pwHint = el<HTMLInputElement>('pw-hint');
@@ -81,13 +87,25 @@ function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputEleme
   chip.textContent = file ? file.name : '';
 }
 
+const selectedVariant = () => binaryVariant.value as BinaryVariant;
+
 /** Show the option controls that match the chosen destination. */
 function reflectDestination(): void {
   const dest = selectedDest();
   show(zipField, dest === 'disk');
+  show(binaryFields, dest === 'binary');
   show(paperFields, dest === 'paper');
+  // A label band is drawn onto images; it makes no sense for binary output.
   show(addBandLabel, dest === 'disk');
-  show(bandFields, dest !== 'disk' || addBand.checked);
+  show(bandFields, (dest !== 'disk' && dest !== 'binary') || addBand.checked);
+  reflectVariant();
+}
+
+/** Update the binary-variant help text to match the chosen variant. */
+function reflectVariant(): void {
+  binaryVariantHelp.textContent = msg(
+    selectedVariant() === 'branded' ? 'binaryVariantHelpBranded' : 'binaryVariantHelpDisguised',
+  );
 }
 
 /** Show the cover-image + password inputs only for the stego key mode. */
@@ -111,6 +129,7 @@ async function loadPrefs(): Promise<void> {
   bandTitle.value = prefs.title;
   asZip.checked = prefs.asZip;
   addInstructions.checked = prefs.includeInstructions;
+  binaryVariant.value = prefs.binaryVariant;
   reflectDestination();
   reflectKeyMode();
 }
@@ -192,17 +211,28 @@ for (const radio of document.querySelectorAll('input[name="keymode"]')) {
     void updateEstimate();
   });
 }
+binaryVariant.addEventListener('change', () => {
+  reflectVariant();
+  void savePrefs({ binaryVariant: selectedVariant() });
+});
 
 async function updateEstimate(): Promise<void> {
   const file = saveFile.files?.[0];
   if (!file) {
     estimate.textContent = '—';
+    show(sizeWarn, false);
+    return;
+  }
+  const dest = selectedDest();
+  if (dest === 'binary') {
+    // A single file, whatever the size — show that instead of an image count.
+    estimate.textContent = '1';
+    show(sizeWarn, false);
     return;
   }
   estimate.textContent = '…';
   try {
     const content = new Uint8Array(await file.arrayBuffer());
-    const dest = selectedDest();
     const profile =
       dest === 'paper' ? PROFILE_PAPER : dest === 'cloud' ? PROFILE_CLOUD : PROFILE_DISK;
     const { images } = await estimateImages(file.name, content, {
@@ -210,8 +240,19 @@ async function updateEstimate(): Promise<void> {
       profile,
     });
     estimate.textContent = String(images);
+    // Large secrets sprawl into many images; nudge toward the binary option.
+    if (content.length > WARN_FILE_BYTES) {
+      sizeWarn.textContent = msg('sizeWarnImages', [
+        String(Math.round(content.length / 1024)),
+        String(images),
+      ]);
+      show(sizeWarn, true);
+    } else {
+      show(sizeWarn, false);
+    }
   } catch {
     estimate.textContent = '—';
+    show(sizeWarn, false);
   }
 }
 
@@ -282,6 +323,22 @@ saveBtn.addEventListener('click', async () => {
         locale: browser.i18n.getUILanguage(),
       });
       note = msg('statusSavedPdf', String(imageCount));
+    } else if (dest === 'binary') {
+      const { variant } = await saveFileToBinary(file, session, {
+        keyMode,
+        variant: selectedVariant(),
+        stego,
+      });
+      const savedKey =
+        keyMode === 'embedded'
+          ? 'statusSavedBinary'
+          : keyMode === 'stego'
+            ? 'statusSavedBinaryStego'
+            : 'statusSavedBinaryKeyfile';
+      note = msg(
+        savedKey,
+        msg(variant === 'branded' ? 'binaryVariantBranded' : 'binaryVariantDisguised'),
+      );
     } else {
       const label = useLabel ? { title, date } : undefined;
       const { imageCount } = await saveFileToDisk(file, session, {

@@ -21,7 +21,8 @@ IV_LEN = 12
 FLAG_COMPRESSED = 0x01
 
 # Guards for untrusted input (mirror the TypeScript decoder).
-MAX_CONTENT_BYTES = 256 * 1024  # matches the export size limit; bounds gzip
+MAX_CONTENT_BYTES = 1024 * 1024  # image/PDF export cap; bounds gzip on that path
+MAX_CONTENT_BYTES_BINARY = 100 * 1024 * 1024  # binary (non-image) export cap
 ARGON2_LIMITS = {
     "iterations": (1, 16),
     "memory_kib": (8, 1024 * 1024),  # <= 1 GiB
@@ -135,7 +136,7 @@ def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes]:
     return key_block, iv, ciphertext
 
 
-def parse_envelope(envelope: bytes) -> tuple[str, bytes]:
+def parse_envelope(envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES) -> tuple[str, bytes]:
     if len(envelope) < 3:
         raise ValueError("payload: too short")
     flags = envelope[0]
@@ -147,8 +148,8 @@ def parse_envelope(envelope: bytes) -> tuple[str, bytes]:
         # Bounded inflate: read at most the cap + 1 byte to detect a gzip bomb
         # without materializing the whole (possibly huge) output.
         with gzip.GzipFile(fileobj=io.BytesIO(stored)) as gz:
-            content = gz.read(MAX_CONTENT_BYTES + 1)
-        if len(content) > MAX_CONTENT_BYTES:
+            content = gz.read(max_content_bytes + 1)
+        if len(content) > max_content_bytes:
             raise ValueError("decompressed data exceeds the allowed size")
     else:
         content = stored

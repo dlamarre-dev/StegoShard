@@ -203,6 +203,79 @@ describe('CLI round-trips', () => {
     expect([...readFileSync(outPath)]).toEqual([...content]);
   });
 
+  it('binary branded: single .ssbn file → restore', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(5000, 31);
+    const input = writeSecret(dir, content);
+    const { files, binary, imageCount } = await runSave({
+      inputFile: input,
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      binary: 'branded',
+      keyMode: 'embedded',
+    });
+    expect(binary).toBe('branded');
+    expect(imageCount).toBe(0);
+    const vault = files.find((f) => f.endsWith('.ssbn'))!;
+    expect(vault).toBeTruthy();
+    const { outPath } = await runRestore({
+      inputs: [vault],
+      outDir: join(dir, 'r'),
+      password: PW,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
+  it('binary disguised keyfile: .db vault + .db key → restore', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(2000, 37);
+    const input = writeSecret(dir, content);
+    const { files } = await runSave({
+      inputFile: input,
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      binary: 'disguised',
+      keyMode: 'keyfile',
+    });
+    const vault = files.find((f) => f.endsWith('cache.db'))!;
+    const keyFile = files.find((f) => f.endsWith('settings.db'))!;
+    expect(vault).toBeTruthy();
+    expect(keyFile).toBeTruthy();
+
+    // Vault alone → MissingKeyError.
+    await expect(
+      runRestore({ inputs: [vault], outDir: join(dir, 'r1'), password: PW }),
+    ).rejects.toBeTruthy();
+
+    const { outPath } = await runRestore({
+      inputs: [vault],
+      outDir: join(dir, 'r2'),
+      password: PW,
+      keyPath: keyFile,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
+  it('warns when a secret over 256 KiB is saved as images', SLOW, async () => {
+    const dir = tmp();
+    // Incompressible content over the warn threshold, but few enough images.
+    const content = pattern(300 * 1024, 41);
+    const input = writeSecret(dir, content);
+    const { sizeWarning } = await runSave({
+      inputFile: input,
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: true,
+      keyMode: 'embedded',
+    });
+    expect(sizeWarning).toMatch(/binary/);
+  });
+
   it('estimate matches the actual image count', SLOW, async () => {
     const dir = tmp();
     const content = pattern(4000, 21);

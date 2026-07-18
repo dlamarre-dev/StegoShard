@@ -504,5 +504,68 @@
   "errCoverFormat": {
     "message": "Image de couverture non prise en charge. Utilisez un JPEG baseline ou un PNG (JPEG progressif et HEIC non pris en charge).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
+  },
+  "destBinary": {
+    "message": "Fichier (sans images)",
+    "description": "Popup: binary (single file) destination."
+  },
+  "binaryVariantHeading": {
+    "message": "Type de fichier",
+    "description": "Popup: label for the binary file-type selector."
+  },
+  "binaryVariantBranded": {
+    "message": "Fichier StegoShard (.ssbn)",
+    "description": "Popup: branded binary variant option."
+  },
+  "binaryVariantDisguised": {
+    "message": "Déguisé en base de données (.db)",
+    "description": "Popup: disguised binary variant option."
+  },
+  "binaryVariantHelpBranded": {
+    "message": "Un seul fichier opaque portant un nom StegoShard — facile à retrouver, sans chercher à se cacher.",
+    "description": "Popup: help text for the branded binary variant."
+  },
+  "binaryVariantHelpDisguised": {
+    "message": "Ajoute un en-tête de base SQLite pour qu'un dossier l'affiche comme une base d'application ordinaire. Une couche de plus contre un coup d'œil — pas contre un outil qui l'ouvre vraiment.",
+    "description": "Popup: help text for the disguised binary variant."
+  },
+  "sizeWarnImages": {
+    "message": "Secret volumineux (~$SIZE$ Kio) → $COUNT$ images. Envisagez l'option fichier unique ci-dessous.",
+    "description": "Popup: warning when a large secret would sprawl into many images.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusSavedBinary": {
+    "message": "Terminé. $VARIANT$ téléchargé. Conservez votre mot de passe : il est irrécupérable.",
+    "description": "Popup: status after saving a binary vault (embedded key).",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryKeyfile": {
+    "message": "Terminé. $VARIANT$ et un fichier de clé distinct téléchargés. Conservez les deux et votre mot de passe.",
+    "description": "Popup: status after saving a binary vault in keyfile mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryStego": {
+    "message": "Terminé. $VARIANT$ téléchargé. Votre clé est cachée dans la photo de couverture — conservez cette image et votre mot de passe.",
+    "description": "Popup: status after saving a binary vault in stego mode.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
   }
 }

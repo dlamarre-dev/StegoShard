@@ -29,6 +29,8 @@ Save options:
   --out <dir>            Output directory (default: current directory)
   --paper                Produce a printable PDF (high-ECC) instead of PNGs
   --zip                  Bundle the PNG set into a single .zip (disk mode)
+  --binary               Output one opaque file instead of images (up to 100 MB)
+  --disguise             With --binary: give it a SQLite-database header (.db)
   --key-mode <mode>      embedded | keyfile | stego   (default: embedded)
   --cover <image>        Cover photo for --key-mode stego (key hidden in it)
   --title <text>         Human-readable label / PDF title
@@ -41,7 +43,7 @@ Save options:
 
 Restore options:
   --out <dir>            Output directory (default: current directory)
-  --key <file|image>     A .key file, or a stego cover image holding the key
+  --key <file|image>     A .key file, a stego image, or a binary key container
 
 Password (any command that needs one), in order of precedence:
   --password <pw>        Discouraged: visible in shell history / process list
@@ -53,6 +55,7 @@ Examples:
   stegoshard save secret.txt --out ./vault
   stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
   stegoshard save notes.txt --paper --instructions --locale fr --out ./print
+  stegoshard save archive.zip --binary --disguise --out ./vault
   stegoshard restore ./vault --out ./restored
 `;
 
@@ -140,6 +143,8 @@ async function main(argv: string[]): Promise<number> {
       out: { type: 'string' },
       paper: { type: 'boolean' },
       zip: { type: 'boolean' },
+      binary: { type: 'boolean' },
+      disguise: { type: 'boolean' },
       'key-mode': { type: 'string' },
       cover: { type: 'string' },
       title: { type: 'string' },
@@ -164,6 +169,9 @@ async function main(argv: string[]): Promise<number> {
     if (!KEY_MODES.includes(keyMode)) fail(`save: invalid --key-mode "${keyMode}"`);
     if (keyMode === 'stego' && !values.cover)
       fail('save: --key-mode stego requires --cover <image>');
+    if (values.binary && values.paper) fail('save: --binary and --paper are mutually exclusive');
+    if (values.disguise && !values.binary) fail('save: --disguise requires --binary');
+    const binary = values.binary ? (values.disguise ? 'disguised' : 'branded') : undefined;
 
     const password = await resolvePassword(values);
     const opts: SaveOptions = {
@@ -172,6 +180,7 @@ async function main(argv: string[]): Promise<number> {
       password,
       paper: Boolean(values.paper),
       zip: Boolean(values.zip),
+      binary,
       keyMode,
       cover: values.cover as string | undefined,
       title: values.title as string | undefined,
@@ -187,9 +196,11 @@ async function main(argv: string[]): Promise<number> {
 
     const res = await runSave(opts);
     if (res.fontWarning) process.stderr.write(`${res.fontWarning}\n`);
-    process.stdout.write(
-      `Saved ${res.imageCount} image(s) [${res.keyMode}] to:\n${res.files.map((f) => `  ${f}`).join('\n')}\n`,
-    );
+    if (res.sizeWarning) process.stderr.write(`Warning: ${res.sizeWarning}\n`);
+    const what = res.binary
+      ? `binary vault (${res.binary}) [${res.keyMode}]`
+      : `${res.imageCount} image(s) [${res.keyMode}]`;
+    process.stdout.write(`Saved ${what} to:\n${res.files.map((f) => `  ${f}`).join('\n')}\n`);
     if (res.keyMode !== 'embedded') {
       process.stdout.write('Keep the separate key artifact AND your password to restore.\n');
     }
