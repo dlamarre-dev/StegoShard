@@ -22,12 +22,17 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: stegoshard-linux-x64
+            upx: true
           - os: macos-latest
             target: aarch64-apple-darwin
             name: stegoshard-macos-arm64
+            # No UPX on macOS: it breaks the Mach-O signature and Gatekeeper
+            # then refuses to run the binary. Shipped uncompressed.
+            upx: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: stegoshard-windows-x64.exe
+            upx: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +52,15 @@ jobs:
           --target ${{ matrix.target }}
           --output ${{ matrix.name }}
           dist-cli/stegoshard.js
+      # UPX shrinks the ~90 MB deno binary (runtime + V8) to ~25-35 MB. It
+      # self-decompresses at launch. Skipped on macOS (see the matrix note).
+      - name: Compress with UPX
+        if: matrix.upx
+        uses: crazy-max/ghaction-upx@v3
+        with:
+          install: true
+          files: ${{ matrix.name }}
+          args: --best --lzma
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}

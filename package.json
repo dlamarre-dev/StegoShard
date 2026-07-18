@@ -19,6 +19,7 @@
     "cli": "tsx src/cli/main.ts",
     "build": "tsc --noEmit && vite build",
     "build:cli": "tsc --noEmit && vite build --config vite.cli.config.ts",
+    "prepublishOnly": "npm run build:cli",
     "package:cli": "deno compile --allow-read --allow-write --no-prompt --output stegoshard dist-cli/stegoshard.js",
     "build:firefox": "cross-env STEGOSHARD_TARGET=firefox vite build",
     "build:edge": "cross-env STEGOSHARD_TARGET=edge vite build",

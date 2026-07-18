@@ -128,12 +128,20 @@ The password is taken (in order) from `--password` (which prints a warning — i
 visible in your shell history and the process list), `--password-file`, the
 `STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
-**Packaging.** `npm run build:cli` bundles the CLI into a single self-contained
-`dist-cli/stegoshard.js` (shebang included) for `npx stegoshard …`. From that bundle,
-`deno compile` produces standalone per-OS executables (see the `Release CLI binaries`
-workflow) — pure JS + WASM, no npm resolution, and baked-in `--allow-read --allow-write`
-permissions with **no network access**, so "nothing leaves your device" is enforced by
-the runtime. Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
+**Packaging.** Two ways to install, depending on whether you already have Node:
+
+- **npm (small, recommended).** `npm i -g stegoshard` (or `npx stegoshard …`) pulls the
+  minified `dist-cli/stegoshard.js` bundle plus its pure-JS/WASM deps — a few MB. Needs
+  Node ≥ 20. `npm run build:cli` produces that self-contained, shebang-included bundle.
+- **Standalone binary (larger, zero-dependency).** From the same bundle, `deno compile`
+  produces per-OS executables (see the `Release CLI binaries` workflow). These embed the
+  Deno/V8 runtime, so they are tens of MB even though the app code is tiny; the Linux and
+  Windows binaries are UPX-compressed (~25-35 MB), the macOS one is shipped uncompressed
+  (UPX breaks its Gatekeeper signature). They resolve nothing at run time and have baked-in
+  `--allow-read --allow-write` permissions with **no network access**, so "nothing leaves
+  your device" is enforced by the runtime.
+
+Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
 none is found — nothing is ever downloaded.
 
