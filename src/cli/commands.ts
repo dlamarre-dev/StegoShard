@@ -33,6 +33,8 @@ import {
   estimateImages,
   exportVault,
   exportVaultBinary,
+  galleryDecode,
+  galleryEncode,
   getCodec,
   importVault,
   importVaultBinary,
@@ -44,8 +46,14 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
-import { embedKeyImage, extractKeyImage, imageDataToPng } from './node-image-io';
-import { gatherInputs } from './inputs';
+import {
+  embedKeyImage,
+  extractKeyImage,
+  fileToGalleryCover,
+  galleryImageToFile,
+  imageDataToPng,
+} from './node-image-io';
+import { gatherImageFiles, gatherInputs } from './inputs';
 import { buildCliPaperPdf } from './paper';
 
 export { WrongPasswordError, MissingKeyError };
@@ -300,6 +308,61 @@ export async function runRestore(opts: RestoreOptions): Promise<RestoreResult> {
   const outName = basename(filename) || 'restored.bin';
   const outPath = writeOut(opts.outDir, outName, content);
   return { outPath, filename, seen: gathered.seen, decoded: gathered.decoded };
+}
+
+// --- Gallery Mode (SPEC §9) --------------------------------------------------
+
+export interface GallerySaveOptions {
+  secretFile: string;
+  /** Cover photo paths and/or directories to draw covers from. */
+  covers: string[];
+  outDir: string;
+  password: string;
+}
+
+export interface GallerySaveResult {
+  files: string[];
+  k: number;
+  m: number;
+  decoys: number;
+  setId: string;
+}
+
+export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+  const content = read(opts.secretFile);
+  const coverPaths = gatherImageFiles(opts.covers);
+  if (coverPaths.length === 0) throw new Error('gallery: no cover images found in the given paths');
+  const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
+
+  const res = await galleryEncode(basename(opts.secretFile), content, opts.password, covers);
+
+  const used = new Set<string>();
+  const files = res.images.map((img) => {
+    const f = galleryImageToFile(img);
+    let name = f.name;
+    // Two covers can share a basename; disambiguate so nothing is overwritten.
+    for (let n = 2; used.has(name); n++) name = f.name.replace(/(\.[^.]+)?$/, `-${n}$1`);
+    used.add(name);
+    return writeOut(opts.outDir, name, f.bytes);
+  });
+  return { files, k: res.k, m: res.m, decoys: res.decoys, setId: toHex(res.setId) };
+}
+
+export interface GalleryRestoreResult {
+  outPath: string;
+  filename: string;
+  seen: number;
+}
+
+export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
+  const coverPaths = gatherImageFiles(opts.inputs);
+  if (coverPaths.length === 0) throw new Error('gallery: no images found in the inputs');
+  const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
+
+  const { filename, content } = await galleryDecode(covers, opts.password);
+  const outName = basename(filename) || 'restored.bin';
+  const outPath = writeOut(opts.outDir, outName, content);
+  return { outPath, filename, seen: covers.length };
 }
 
 export async function runEstimate(

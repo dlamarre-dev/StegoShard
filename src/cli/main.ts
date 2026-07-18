@@ -12,11 +12,13 @@ import {
   MissingKeyError,
   WrongPasswordError,
   runEstimate,
+  runGalleryRestore,
+  runGallerySave,
   runRestore,
   runSave,
   type SaveOptions,
 } from './commands';
-import type { KeyMode } from '@core';
+import { GalleryRestoreError, type KeyMode } from '@core';
 
 const USAGE = `StegoShard — encrypt a file into resilient QR images, and restore it.
 
@@ -24,6 +26,8 @@ Usage:
   stegoshard save <file> [options]
   stegoshard restore <images|folder|zip|pdf ...> [options]
   stegoshard estimate <file> [--paper]
+  stegoshard gallery-save <file> <cover-photos|folder ...> [options]
+  stegoshard gallery-restore <photos|folder ...> [options]
 
 Save options:
   --out <dir>            Output directory (default: current directory)
@@ -51,12 +55,20 @@ Password (any command that needs one), in order of precedence:
   STEGOSHARD_PASSWORD    Environment variable
   interactive prompt     Asked (hidden) when none of the above is set
 
+Gallery Mode (a secret hidden, fragmented, across many ordinary photos):
+  --out <dir>            Output directory for the modified photos
+  Every photo is modified; the best K+M carry Reed-Solomon fragments and the
+  rest become decoys (min 5 photos total, at least 2 decoys). Restore is blind:
+  any photos that authenticate are used, and any K fragments reconstruct.
+
 Examples:
   stegoshard save secret.txt --out ./vault
   stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
   stegoshard save notes.txt --paper --instructions --locale fr --out ./print
   stegoshard save archive.zip --binary --disguise --out ./vault
   stegoshard restore ./vault --out ./restored
+  stegoshard gallery-save note.txt ./photos --out ./album
+  stegoshard gallery-restore ./album --out ./restored
 `;
 
 function fail(message: string, code = 1): never {
@@ -221,6 +233,31 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
+  if (command === 'gallery-save') {
+    const secretFile = positionals[0];
+    if (!secretFile) fail('gallery-save: missing <file>');
+    const covers = positionals.slice(1);
+    if (covers.length === 0) fail('gallery-save: give cover photos or a folder');
+    const password = await resolvePassword(values);
+    const res = await runGallerySave({ secretFile, covers, outDir, password });
+    process.stdout.write(
+      `Saved gallery across ${res.files.length} photo(s) ` +
+        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy):\n` +
+        `${res.files.map((f) => `  ${f}`).join('\n')}\n`,
+    );
+    process.stdout.write(`Keep your password; any ${res.k} of the fragment photos restore it.\n`);
+    return 0;
+  }
+
+  if (command === 'gallery-restore') {
+    if (positionals.length === 0) fail('gallery-restore: missing photos/folder');
+    const password = await resolvePassword(values);
+    const res = await runGalleryRestore({ inputs: positionals, outDir, password });
+    process.stderr.write(`scanned ${res.seen} photo(s)\n`);
+    process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
+    return 0;
+  }
+
   if (command === 'estimate') {
     const inputFile = positionals[0];
     if (!inputFile) fail('estimate: missing <file>');
@@ -236,6 +273,9 @@ main(process.argv.slice(2))
   .then((code) => process.exit(code))
   .catch((err: unknown) => {
     if (err instanceof WrongPasswordError) fail('wrong password');
+    if (err instanceof GalleryRestoreError) {
+      fail('no restorable gallery found (wrong password or these are not gallery photos)');
+    }
     if (err instanceof MissingKeyError) {
       fail('this image set needs a separate key (use --key <file|image>)');
     }

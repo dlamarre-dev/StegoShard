@@ -17,4 +17,5 @@ export * from './header';
 export * from './erasure';
 export * from './binary-container';
 export * from './vault';
+export * from './gallery';
 export * from './codec';

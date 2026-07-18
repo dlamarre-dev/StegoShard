@@ -162,6 +162,28 @@ export async function decryptBytes(
   return new Uint8Array(pt);
 }
 
+/**
+ * HKDF-SHA256 (RFC 5869) key derivation. Used to split one high-entropy secret
+ * (e.g. an Argon2id output) into several independent, domain-separated subkeys
+ * via distinct `info` labels — safer than reusing the same bytes for two jobs.
+ * `salt` defaults to empty (the IKM is already high-entropy). Reproduced by the
+ * Python reference decoder, so it is part of the frozen format.
+ */
+export async function hkdf(
+  ikm: Uint8Array,
+  info: Uint8Array,
+  length: number,
+  salt: Uint8Array = new Uint8Array(0),
+): Promise<Uint8Array> {
+  const key = await subtle.importKey('raw', ikm as BufferSource, 'HKDF', false, ['deriveBits']);
+  const bits = await subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: salt as BufferSource, info: info as BufferSource },
+    key,
+    length * 8,
+  );
+  return new Uint8Array(bits);
+}
+
 /** Wrap (encrypt) the DEK with the KEK. */
 export async function wrapDEK(
   dek: CryptoKey,

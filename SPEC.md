@@ -353,7 +353,89 @@ Canonical filenames used by the reference implementations: branded
 
 ---
 
-## 9. Constants summary
+## 9. Gallery Mode (deniable multi-image distribution)
+
+Instead of visible QR images (§7) or one binary file (§8), Gallery Mode hides a
+secret **fragmented across many ordinary photos**, so the set tolerates partial
+loss and each photo stays deniable. It combines the vault blob (§6), Reed-Solomon
+erasure coding (§7), DCT/LSB stego (§5.3/§5.4), and decoy ("chaffing") images
+decoded blindly by trial-authentication ("winnowing").
+
+### 9.1 Keys
+
+`seed = Argon2id(NFC(password), GALLERY_SALT, DEFAULT_ARGON2, 32 bytes)` where
+`GALLERY_SALT` is the 16 ASCII bytes `"StegoShard-gllry"` (`53 74 65 67 6f 53 68
+61 72 64 2d 67 6c 6c 72 79`), distinct from the §5 stego salt. HKDF-SHA256 (RFC
+5869, empty salt) splits the seed into two 32-byte subkeys by `info` label:
+
+- `posKey` ← `info = "stegoshard/gallery/pos"` — drives carrier selection.
+- `aeadKey` ← `info = "stegoshard/gallery/aead"` — seals fragments (AES-256-GCM).
+
+The gallery Argon2 cost is the frozen `DEFAULT_ARGON2` and is **not stored**
+anywhere (like the §5.3 stego salt). Because `aeadKey` is password-only,
+extraction is image-independent — a decoder can trial-open every photo blindly.
+
+### 9.2 Fragment and slot layout (all lengths fixed)
+
+```
+SLOT_DATA = 2048                                  shard-data bytes per image
+FRAG_LEN  = 33 + SLOT_DATA = 2081                 inner AEAD plaintext
+SLOT_BYTES = 12 + FRAG_LEN + 16 = 2109            embedded per image
+
+Inner plaintext P (FRAG_LEN bytes):
+  [ header 33 (§3, CODEC_ID = 1 = gallery) ][ shard (SHARD_LEN) ][ zero pad ]
+
+Embedded slot (SLOT_BYTES, identical for data / parity / decoy):
+  [ NONCE 12 (random per fragment) ][ AES-256-GCM(aeadKey, NONCE, P) ]   (= FRAG_LEN + 16 tag)
+```
+
+The nonce is a fresh random 12 bytes carried in the slot — never derived from the
+shard index — so two galleries under the same password never reuse a `(key,
+nonce)` pair. A decoy image embeds `SLOT_BYTES` of CSPRNG bytes at the same
+`posKey`-selected carriers; without the password it is indistinguishable from a
+sealed fragment (both are uniform).
+
+### 9.3 Carrier selection
+
+Identical to §5.3/§5.4 — an AES-CTR keystream seeded by `posKey` drives
+rejection-sampled distinct carrier positions (RGB LSBs for a PNG cover; eligible
+AC coefficients with `|coef| ≥ 2` for a baseline JPEG, keeping size invariance),
+MSB-first bit order — **except** there is no whitening pad (the sealed slot is
+already uniform) and the length is `SLOT_BYTES·8` bits, not the fixed key-block
+length. A cover must have `≥ SLOT_BYTES·8·4` eligible carriers (a ×4 margin keeps
+embedding sparse) or it is rejected.
+
+### 9.4 Encode
+
+1. Build the standard vault blob (§6) in embedded key mode (`KB_LEN = 92`), from
+   the gzip-compressed envelope (§4) encrypted under a fresh DEK.
+2. `k = ceil(blobLen / SLOT_DATA)`, `m = max(ceil(k·0.3), 2)` (§7.2). Require
+   `blobLen ≤ 389120` (`SLOT_DATA·190`) so `k + m + 2 ≤ 256` (GF limit, §7.1).
+3. RS-encode into `k + m` shards (§7). For each shard `i`, build `P` (§9.2), seal
+   it, and embed the slot into a distinct cover photo.
+4. The remaining covers (≥ 2) become decoys. Total covers ≥ 5, ≤ 256.
+
+### 9.5 Decode (blind winnowing)
+
+For **every** photo: extract `SLOT_BYTES` at `posKey` carriers, split
+`NONCE ‖ ciphertext`, and AES-GCM-open with `aeadKey`. A failed tag (decoy,
+recompressed/destroyed carrier, foreign image, or wrong password) is dropped
+silently. Surviving fragments are grouped by `SET_ID` (§3); once a group has
+`≥ K` distinct valid shard indices, reconstruct (§7.5), verify `HASH_GLOBAL`,
+and decrypt the blob (§6). Wrong password ⇒ zero survivors ⇒ indistinguishable
+from "no gallery here".
+
+### 9.6 Deniability & limits
+
+The `|coef| ≥ 2` magnitude-LSB invariant keeps a JPEG carrier the same size (byte-
+faithful for `restartInterval = 0`; ≤ 0.5% drift from byte-stuffing otherwise) and
+its Huffman size-category histogram unchanged. Honest limit: Gallery Mode modifies
+**every** selected photo, so an adversary holding the untouched originals can diff
+them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
+
+---
+
+## 10. Constants summary
 
 | Name             | Value                                                         |
 | ---------------- | ------------------------------------------------------------- |
@@ -362,18 +444,22 @@ Canonical filenames used by the reference implementations: branded
 | Key block magic  | `"SSKY"`                                                      |
 | Binary magic     | `"SSBN"` (branded); 100-byte SQLite header (disguised) (§8)   |
 | Header length    | 33 bytes                                                      |
+| Codec IDs        | `0` QR-grid; `1` gallery (§9)                                 |
 | Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                          |
 | KDF              | Argon2id, 32-byte output, salt 16 bytes                       |
 | KDF defaults     | iterations 3, memory 64 MiB, parallelism 1                    |
 | GF polynomial    | `0x11D`, generator `0x02`                                     |
 | Parity           | `m = max(ceil(k·0.3), 2)`                                     |
 | Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)   |
+| Gallery salt     | `"StegoShard-gllry"` (16 bytes) (§9.1)                        |
+| Gallery slot     | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)   |
 | Limits           | file ≤ 1 MiB (images/PDF) or ≤ 100 MiB (binary); images ≤ 150 |
+| Gallery limits   | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)            |
 | Compression      | gzip (RFC 1952), opportunistic                                |
 
 ---
 
-## 10. Reference implementation
+## 11. Reference implementation
 
 The TypeScript core in `src/core/` is the reference encoder/decoder:
 
@@ -387,6 +473,8 @@ The TypeScript core in `src/core/` is the reference encoder/decoder:
 | Image header       | `header.ts`                     |
 | Vault blob & flow  | `vault.ts`                      |
 | QR-grid codec      | `codec/qr-grid.ts`              |
+| Variable-len stego | `stego.ts`                      |
+| Gallery Mode (§9)  | `gallery.ts`                    |
 
 A standalone **Python reference decoder** in `python/stegoshard/` implements this
 same specification independently (GF(2^8) + Reed-Solomon, header, key block,

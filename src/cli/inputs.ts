@@ -84,6 +84,16 @@ function walk(dir: string): string[] {
   return out;
 }
 
+/** Expand paths (files or directories) into image file paths only (Gallery Mode). */
+export function gatherImageFiles(paths: string[]): string[] {
+  const files: string[] = [];
+  for (const path of paths) {
+    if (statSync(path).isDirectory()) files.push(...walk(path));
+    else files.push(path);
+  }
+  return files.filter((p) => IMAGE_RE.test(basename(p)));
+}
+
 /** Expand input paths into decoded payloads plus an optional key block. */
 export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
   const files: string[] = [];

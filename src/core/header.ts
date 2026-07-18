@@ -21,6 +21,8 @@ export const HASH_LEN = 4;
 export const HEADER_LEN = 33;
 
 export const CODEC_QR_GRID = 0;
+/** Gallery Mode carries the header||shard inside a sealed stego slot (SPEC §9). */
+export const CODEC_GALLERY = 1;
 export const PROFILE_DISK = 0;
 export const PROFILE_CLOUD = 1;
 export const PROFILE_PAPER = 2;

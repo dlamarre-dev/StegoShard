@@ -131,7 +131,7 @@ export class MissingKeyError extends Error {
   }
 }
 
-async function sha256Short(data: Uint8Array): Promise<Uint8Array> {
+export async function sha256Short(data: Uint8Array): Promise<Uint8Array> {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', data as BufferSource);
   return new Uint8Array(digest).slice(0, HASH_LEN);
 }
@@ -201,7 +201,7 @@ export async function estimateImages(
  * Build the encrypted vault blob — the container shared by every output path.
  * The image path erasure-codes it; the binary path wraps it in a container file.
  */
-async function buildVaultBlob(
+export async function buildVaultBlob(
   filename: string,
   content: Uint8Array,
   key: VaultKey,
@@ -216,7 +216,7 @@ async function buildVaultBlob(
 }
 
 /** Reverse of buildVaultBlob: blob (+ external key) → original file. */
-async function decodeVaultBlob(
+export async function decodeVaultBlob(
   blob: Uint8Array,
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },

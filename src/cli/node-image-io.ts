@@ -13,6 +13,8 @@ import {
   CODEC_QR_GRID,
   JpegUnsupportedError,
   StegoCoverFormatError,
+  type GalleryCover,
+  type GalleryImage,
   type ImageDataLike,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
@@ -197,6 +199,33 @@ export async function embedKeyImage(
     return { bytes: imageDataToPng(img), ext: 'png' };
   }
   throw new StegoCoverFormatError();
+}
+
+// --- Gallery Mode cover I/O (SPEC §9) ----------------------------------------
+
+/**
+ * Turn image file bytes into a gallery cover: a baseline JPEG is carried as-is
+ * (its DCT coefficients are the carrier), anything else is decoded to RGBA (PNG
+ * spatial LSBs). A non-baseline JPEG fails later, at the capacity check.
+ */
+export function fileToGalleryCover(bytes: Uint8Array, name: string): GalleryCover {
+  if (isJpegBytes(bytes)) return { kind: 'jpeg', name, jpeg: bytes };
+  const img = fileToImageData(bytes, name);
+  return { kind: 'rgba', name, rgba: img.data, width: img.width, height: img.height };
+}
+
+/** Serialize a produced gallery image back to file bytes, keeping its format. */
+export function galleryImageToFile(img: GalleryImage): { name: string; bytes: Uint8Array } {
+  if (img.kind === 'jpeg') return { name: img.name, bytes: img.jpeg };
+  const bytes = encodePng({
+    width: img.width,
+    height: img.height,
+    data: img.rgba,
+    channels: 4,
+    depth: 8,
+  });
+  const name = /\.png$/i.test(img.name) ? img.name : `${img.name.replace(/\.[^.]+$/, '')}.png`;
+  return { name, bytes };
 }
 
 /** Recover a key block hidden in a stego cover image (JPEG or PNG), or null. */

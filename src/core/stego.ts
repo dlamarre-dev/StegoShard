@@ -95,6 +95,20 @@ function capacityBits(width: number, height: number): number {
   return width * height * 3;
 }
 
+/** Deterministic AES-CTR keystream of `len` bytes from a raw 32-byte seed. */
+async function keystreamFromSeed(seed: Uint8Array, len: number): Promise<Uint8Array> {
+  const key = await subtle.importKey('raw', seed as BufferSource, { name: 'AES-CTR' }, false, [
+    'encrypt',
+  ]);
+  return new Uint8Array(
+    await subtle.encrypt(
+      { name: 'AES-CTR', counter: new Uint8Array(16), length: 64 },
+      key,
+      new Uint8Array(len),
+    ),
+  );
+}
+
 /** Deterministic keystream of `len` bytes from the password via Argon2id + AES-CTR. */
 async function keystream(password: string, len: number, params: Argon2Params): Promise<Uint8Array> {
   const seed = (await argon2id({
@@ -106,17 +120,8 @@ async function keystream(password: string, len: number, params: Argon2Params): P
     hashLength: 32,
     outputType: 'binary',
   })) as Uint8Array;
-  const key = await subtle.importKey('raw', seed as BufferSource, { name: 'AES-CTR' }, false, [
-    'encrypt',
-  ]);
+  const stream = await keystreamFromSeed(seed, len);
   seed.fill(0);
-  const stream = new Uint8Array(
-    await subtle.encrypt(
-      { name: 'AES-CTR', counter: new Uint8Array(16), length: 64 },
-      key,
-      new Uint8Array(len),
-    ),
-  );
   return stream;
 }
 
@@ -319,4 +324,141 @@ export async function extractKeyBlockStegoJpeg(
   stream.fill(0);
 
   return isSerializedKeyBlock(out) ? out : null;
+}
+
+// --- Variable-length payload stego (Gallery Mode, SPEC §9) --------------------
+//
+// The key-block paths above hide a fixed 92-byte block, whiten it, and validate
+// a magic on extraction. Gallery Mode instead hides an arbitrary-length, already
+// authenticated slot (a sealed fragment or a random decoy), so these variants:
+//   - take a raw 32-byte position seed (the caller derives it once via Argon2id
+//     + HKDF; there is no per-image Argon2 cost),
+//   - do NOT whiten (the slot bytes are already uniform — GCM output or random),
+//   - do NOT check any magic (the caller authenticates via the AEAD tag).
+// Everything else — keyed position selection, the |coef|≥2 invariant, byte-exact
+// same-size JPEG output — is shared with the key-block paths.
+
+/** Fixed application salt for the gallery key derivation. ASCII "StegoShard-gllry" (16 bytes). */
+export const GALLERY_SALT = Uint8Array.from([
+  0x53, 0x74, 0x65, 0x67, 0x6f, 0x53, 0x68, 0x61, 0x72, 0x64, 0x2d, 0x67, 0x6c, 0x6c, 0x72, 0x79,
+]);
+
+/**
+ * Keystream length that comfortably covers `payloadBits` distinct position draws
+ * (4 bytes each) plus rejection-sampling and collision slack. The gallery keeps
+ * carriers sparse (capacity ≫ payloadBits), so collisions are rare and this is
+ * generous.
+ */
+function positionStreamLen(payloadBits: number): number {
+  return payloadBits * 8 + 4096;
+}
+
+/** Embed `data` into an RGBA buffer in place at seed-derived LSBs (no whitening). */
+export async function embedBytesStegoRgba(
+  rgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  data: Uint8Array,
+  seed: Uint8Array,
+): Promise<void> {
+  const capacity = capacityBits(width, height);
+  const payloadBits = data.length * 8;
+  if (capacity < payloadBits) throw new StegoCapacityError(capacity);
+
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
+  const positions = pickPositions(new StreamReader(stream), capacity, payloadBits);
+  for (let i = 0; i < payloadBits; i++) {
+    const bit = (data[i >> 3]! >> (7 - (i & 7))) & 1;
+    const byteIndex = channelByte(positions[i]!);
+    rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
+  }
+  stream.fill(0);
+}
+
+/** Extract `length` bytes from an RGBA buffer at seed-derived LSBs. Null if too small. */
+export async function extractBytesStegoRgba(
+  rgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  seed: Uint8Array,
+  length: number,
+): Promise<Uint8Array | null> {
+  const capacity = capacityBits(width, height);
+  const payloadBits = length * 8;
+  if (capacity < payloadBits) return null;
+
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
+  const positions = pickPositions(new StreamReader(stream), capacity, payloadBits);
+  const out = new Uint8Array(length);
+  for (let i = 0; i < payloadBits; i++) {
+    if (rgba[channelByte(positions[i]!)]! & 1) out[i >> 3]! |= 1 << (7 - (i & 7));
+  }
+  stream.fill(0);
+  return out;
+}
+
+/** Eligible-carrier count of a baseline JPEG (|coef|≥2 AC coeffs), or 0 if undecodable. */
+export function jpegStegoCapacityBits(jpegBytes: Uint8Array): number {
+  try {
+    return eligibleCoefficients(decodeJpeg(jpegBytes)).count;
+  } catch {
+    return 0;
+  }
+}
+
+/** Embed `data` into a baseline JPEG's DCT coefficients (no whitening); returns new bytes. */
+export async function embedBytesStegoJpeg(
+  jpegBytes: Uint8Array,
+  data: Uint8Array,
+  seed: Uint8Array,
+): Promise<Uint8Array> {
+  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  const payloadBits = data.length * 8;
+  const bitAt = (i: number): number => (data[i >> 3]! >> (7 - (i & 7))) & 1;
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
+
+  if (model.restartInterval === 0) {
+    const carriers = eligibleInPlace(model);
+    if (carriers.count < payloadBits) throw new StegoCapacityError(carriers.count);
+    const positions = pickPositions(new StreamReader(stream), carriers.count, payloadBits);
+    const toggles: number[] = [];
+    for (let i = 0; i < payloadBits; i++) {
+      const p = positions[i]!;
+      if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
+    }
+    stream.fill(0);
+    return applyScanToggles(model, toggles);
+  }
+
+  const carriers = eligibleCoefficients(model);
+  if (carriers.count < payloadBits) throw new StegoCapacityError(carriers.count);
+  const positions = pickPositions(new StreamReader(stream), carriers.count, payloadBits);
+  for (let i = 0; i < payloadBits; i++) carriers.setLsb(positions[i]!, bitAt(i));
+  stream.fill(0);
+  return encodeJpeg(model);
+}
+
+/** Extract `length` bytes from a baseline JPEG's coefficients. Null if undecodable/too small. */
+export async function extractBytesStegoJpeg(
+  jpegBytes: Uint8Array,
+  seed: Uint8Array,
+  length: number,
+): Promise<Uint8Array | null> {
+  let carriers: ReturnType<typeof eligibleCoefficients>;
+  try {
+    carriers = eligibleCoefficients(decodeJpeg(jpegBytes));
+  } catch {
+    return null;
+  }
+  const payloadBits = length * 8;
+  if (carriers.count < payloadBits) return null;
+
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
+  const positions = pickPositions(new StreamReader(stream), carriers.count, payloadBits);
+  const out = new Uint8Array(length);
+  for (let i = 0; i < payloadBits; i++) {
+    if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+  }
+  stream.fill(0);
+  return out;
 }
