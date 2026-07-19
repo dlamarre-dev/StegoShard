@@ -11,6 +11,38 @@ artificial images** designed to survive recompression and printing, spread acros
 set with **cross-image error correction** (erasure coding). Store them where you like:
 image files on disk, a printable PDF, or a cloud photo album.
 
+## Quickstart
+
+Three ways to use StegoShard; all run the **same `@core` format**, so a vault made with
+one restores with any other (and with the [Python decoder](python/README.md)).
+
+**1. Web app — no install, nothing leaves your device.** The fastest way to try it: the
+offline core (Disk + Paper) runs entirely in your browser.
+
+> ▶️ **[dlamarre-dev.github.io/StegoShard](https://dlamarre-dev.github.io/StegoShard/)**
+
+**2. Browser extension.** During beta, build it and load it unpacked (store listings are
+pending, see [Status](#status)):
+
+```bash
+npm install
+npm run build            # → dist/chrome/  (also: npm run build:firefox, build:edge)
+```
+
+Then `chrome://extensions` → Developer mode → **Load unpacked** → pick `dist/chrome/`
+(Firefox: `about:debugging` → This Firefox → **Load Temporary Add-on** → its `manifest.json`).
+
+**3. Command-line tool.** From a clone, no global install needed:
+
+```bash
+npm install
+npm run cli -- save secret.txt --out ./vault      # → PNG images
+npm run cli -- restore ./vault --out ./restored    # ← images / folder / .zip / .pdf
+```
+
+See [Command-line tool](#command-line-tool) for key modes, paper, binary, and Gallery Mode.
+(A published `npm i -g stegoshard` and standalone binaries land with 1.0.)
+
 ## What it does
 
 **Save (export)**
@@ -47,29 +79,46 @@ not stop restoration** as long as at least `k` images survive.
 
 ## Status
 
-🚧 **Early development — Phase 2 (UX / managed key).** The offline pipeline is complete
-and tested: Argon2id KEK/DEK, AES-GCM, opportunistic gzip, Reed-Solomon erasure coding,
-the QR-grid image codec, the self-describing header, and the **Disk** destination (save
-a file as a set of PNG images, restore it — tolerating missing images). Phase 2 adds a
-**managed vault key** (create / unlock per session / change password / export / import /
-erase, in the options page), **key modes** (key embedded in the images, or a separate
-`.key` file), an optional **readable label band** on the images, and clear error
-messages. The unlocked session persists across popup reopens (volatile, until the
-browser closes), and image sets can be saved and restored as a single **.zip**. A
-**Paper** destination generates a printable PDF (one high-ECC QR per page, with a
-readable header and an optional instruction sheet) that restores from scans or photos.
-A standalone **[Python reference decoder](python/README.md)** restores a vault without the
-extension and runs in CI as a cross-implementation conformance test. An **optional Google
-Photos** destination (upload to a dedicated album, restore via the Picker API, Cloud
-profile) is available when a Google OAuth client id is configured in a local `.env` (see
-`.env.example`); it is a convenience, never the only copy. The UI is localized into 8
-languages (en, fr, it, de, es, pt, ja, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)).
-The on-image format is frozen in [SPEC.md](SPEC.md). The extension is packaged for the
-Chrome Web Store, Edge Add-ons, and Firefox (`npm run package`); see
-[docs/STORE.md](docs/STORE.md) and the [privacy policy](docs/PRIVACY.md). Remaining before
-a public 1.0: native proofread of the `ja`/`zh_TW` locales, localized store screenshots,
-Google's OAuth verification (only for public Google Photos), and an optional external
-crypto review. The optional stego key mode is a later addition.
+🧪 **Beta — feature-complete, hardening for a public 1.0.** Every piece of the product
+is built, tested, and cross-validated; what remains before 1.0 is release logistics and
+an external review, not features.
+
+**Complete and tested:**
+
+- **Crypto core** — Argon2id KEK/DEK, AES-256-GCM, opportunistic gzip, Reed-Solomon
+  erasure coding, the QR-grid image codec, and the self-describing header. The layer is
+  documented for auditors in a [cryptographic review dossier](docs/CRYPTO-REVIEW.md)
+  (claims → where enforced → which test proves it), with frozen cross-implementation
+  test vectors and exhaustive negative/fuzz testing.
+- **Destinations** — **Disk** (a set of PNG images, or a single `.zip`), **Paper** (a
+  printable PDF, one high-ECC QR per page, readable header + optional instruction sheet,
+  restores from scans or photos), and an **optional Google Photos** album (upload +
+  restore via the Picker API); the cloud is a convenience, never the only copy.
+- **Key modes** — **embedded** (key block travels in the images), **keyfile** (a separate
+  `.key` file), and **deniable stego** (the key hidden in an ordinary photo — a baseline
+  JPEG cover stays a same-size JPEG via DCT-coefficient embedding, a PNG cover stays a
+  PNG). Plus a **managed vault key** in the options page (create / unlock per session /
+  change password / export / import / erase); the unlocked session is volatile and
+  persists across popup reopens until the browser closes.
+- **Advanced output** — a **binary (non-image) container** for larger secrets (up to
+  100 MB, no image-count ceiling), optionally **disguised** with a valid SQLite header
+  (SPEC §8); and **Gallery Mode** (SPEC §9), which fragments a small secret across a
+  folder of ordinary photos plus decoys, Reed-Solomon-protected and decoded blindly.
+- **Independent recovery** — a standalone **[Python reference decoder](python/README.md)**
+  restores a vault without the extension and runs in CI as a cross-implementation
+  conformance test, and a headless **CLI** (below) creates and restores the same format.
+- **Localization** — the UI, privacy policy, and terms are localized into 8 languages
+  (en, fr, it, de, es, pt, ja, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)),
+  all natively proofread.
+
+The on-image format is **frozen** in [SPEC.md](SPEC.md) (`FORMAT_VERSION = 1`). The
+extension is packaged for the Chrome Web Store, Edge Add-ons, and Firefox
+(`npm run package`); see [docs/STORE.md](docs/STORE.md) and the
+[privacy policy](docs/PRIVACY.md).
+
+**Remaining before a public 1.0:** localized store screenshots, Google's OAuth
+verification (only for the public Google Photos destination), and an optional external
+crypto review.
 
 ## Development
 
@@ -151,10 +200,6 @@ visible in your shell history and the process list), `--password-file`, the
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
 none is found — nothing is ever downloaded.
-
-Load `dist/chrome/` as an unpacked extension
-(`chrome://extensions` → Developer mode → Load unpacked), or `dist/firefox/` in Firefox
-(`about:debugging` → This Firefox → Load Temporary Add-on → pick its `manifest.json`).
 
 ## Contributing & security
 
