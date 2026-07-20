@@ -533,6 +533,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
 
   function showDone(note: string): void {
     state.done = true;
+    // Don't keep the plaintext password alive in the closure after completion.
+    state.savePassword = '';
+    state.restorePassword = '';
     root.replaceChildren(
       h(
         'section',

@@ -142,6 +142,8 @@ def parse_envelope(envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES) 
     flags = envelope[0]
     (name_len,) = struct.unpack(">H", envelope[1:3])
     name_end = 3 + name_len
+    if len(envelope) < name_end:
+        raise ValueError("payload: truncated filename")
     filename = envelope[3:name_end].decode("utf-8")
     stored = envelope[name_end:]
     if flags & FLAG_COMPRESSED:

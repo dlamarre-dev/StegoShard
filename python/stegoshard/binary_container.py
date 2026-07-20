@@ -36,6 +36,8 @@ def wrap_binary(payload: bytes, variant: str) -> bytes:
 def unwrap_binary(data: bytes) -> tuple[bytes, str] | None:
     """Strip a container to (payload, variant), or None if it is neither."""
     if data[: len(BINARY_MAGIC)] == BINARY_MAGIC:
+        if len(data) <= len(BINARY_MAGIC):
+            raise ValueError("binary container: truncated (no version byte)")
         version = data[len(BINARY_MAGIC)]
         if version != BINARY_VERSION:
             raise ValueError(f"binary container: unsupported version {version}")

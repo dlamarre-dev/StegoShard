@@ -6,6 +6,7 @@
 
 import {
   closeSync,
+  existsSync,
   fstatSync,
   mkdirSync,
   openSync,
@@ -62,9 +63,16 @@ function read(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));
 }
 
+// Set per run from the command's --force flag; guards writeOut against clobbering
+// existing files (a mistyped --out, or restoring a name that already exists).
+let allowOverwrite = false;
+
 function writeOut(dir: string, name: string, bytes: Uint8Array): string {
   mkdirSync(dir, { recursive: true });
   const path = join(dir, name);
+  if (!allowOverwrite && existsSync(path)) {
+    throw new Error(`refusing to overwrite existing file: ${path} (use --force to overwrite)`);
+  }
   writeFileSync(path, bytes);
   return path;
 }
@@ -108,6 +116,8 @@ export interface SaveOptions {
   passwordHint?: string | undefined;
   keyLocation?: string | undefined;
   fontPath?: string | undefined;
+  /** Overwrite existing output files instead of refusing. */
+  force?: boolean | undefined;
 }
 
 export interface SaveResult {
@@ -147,6 +157,7 @@ async function externalKey(
 }
 
 export async function runSave(opts: SaveOptions): Promise<SaveResult> {
+  allowOverwrite = Boolean(opts.force);
   const content = read(opts.inputFile);
   const key = await makeKey(opts.password);
 
@@ -244,6 +255,8 @@ export interface RestoreOptions {
   outDir: string;
   password: string;
   keyPath?: string | undefined;
+  /** Overwrite an existing output file instead of refusing. */
+  force?: boolean | undefined;
 }
 
 export interface RestoreResult {
@@ -285,6 +298,7 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
 }
 
 export async function runRestore(opts: RestoreOptions): Promise<RestoreResult> {
+  allowOverwrite = Boolean(opts.force);
   const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
   if (binaryVaultPath) {
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
@@ -318,6 +332,8 @@ export interface GallerySaveOptions {
   covers: string[];
   outDir: string;
   password: string;
+  /** Overwrite existing output files instead of refusing. */
+  force?: boolean | undefined;
 }
 
 export interface GallerySaveResult {
@@ -329,6 +345,7 @@ export interface GallerySaveResult {
 }
 
 export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+  allowOverwrite = Boolean(opts.force);
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
   if (coverPaths.length === 0) throw new Error('gallery: no cover images found in the given paths');
@@ -355,6 +372,7 @@ export interface GalleryRestoreResult {
 }
 
 export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
+  allowOverwrite = Boolean(opts.force);
   const coverPaths = gatherImageFiles(opts.inputs);
   if (coverPaths.length === 0) throw new Error('gallery: no images found in the inputs');
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));

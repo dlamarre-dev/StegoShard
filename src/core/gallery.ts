@@ -59,7 +59,7 @@ import {
   extractBytesStegoJpeg,
   extractBytesStegoRgba,
 } from './stego';
-import { type VaultKey, buildVaultBlob, decodeVaultBlob, sha256Short } from './vault';
+import { type VaultKey, MAX_FILE_BYTES, buildVaultBlob, decodeVaultBlob, sha256Short } from './vault';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -279,6 +279,13 @@ export async function galleryEncode(
   if (covers.length < GALLERY_MIN_IMAGES) {
     throw new GalleryTooFewImagesError(covers.length, GALLERY_MIN_IMAGES);
   }
+  // Cap the *original* content, not just the compressed blob: restore bounds the
+  // decompressed size, so a highly compressible secret that slips under the blob
+  // ceiling here would otherwise be unrecoverable. Matches the Python decoder's
+  // MAX_CONTENT_BYTES (1 MiB), keeping the two implementations in agreement.
+  if (content.length > MAX_FILE_BYTES) {
+    throw new GalleryFileTooLargeError(content.length, MAX_FILE_BYTES);
+  }
 
   // One self-contained, password-encrypted vault blob (key block embedded).
   const { dek, block } = await createKeyBlock(password, params);
@@ -355,7 +362,9 @@ async function reconstructGroup(
   if (toHex(hash) !== toHex(first.hash)) throw new GalleryRestoreError();
   return decodeVaultBlob(blob, password, {
     keyBlock: undefined,
-    maxContentBytes: GALLERY_MAX_BLOB,
+    // The decompressed content ceiling — the compressed blob is bounded
+    // separately by GALLERY_MAX_BLOB at encode time (see galleryEncode).
+    maxContentBytes: MAX_FILE_BYTES,
   });
 }
 

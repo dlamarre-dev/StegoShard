@@ -207,6 +207,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
     show(saveResult, true);
+    savePw.value = ''; // don't leave the secret in the field after use
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -277,6 +278,7 @@ restoreBtn.addEventListener('click', async () => {
     setStatus(restoreStatus, '');
     restoreResultNote.textContent = note;
     show(restoreResult, true);
+    restorePw.value = ''; // clear the secret from the field after use
     clearCaptured();
     reflectCaptured(0);
   } catch (err) {

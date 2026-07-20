@@ -15,6 +15,7 @@ import {
   type BinaryVariant,
   type KeyMode,
   type VaultKey,
+  WrongPasswordError,
   parseKeyBlock,
   unlockKeyBlock,
 } from '@core';
@@ -68,8 +69,11 @@ export async function verifyStegoPassword(
   try {
     await unlockKeyBlock(parseKeyBlock(keyBlock), password);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // Only a genuine password mismatch is "false"; a corrupt key block or any
+    // other failure is surfaced, not silently reported as a wrong password.
+    if (err instanceof WrongPasswordError) return false;
+    throw err;
   }
 }
 

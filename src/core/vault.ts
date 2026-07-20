@@ -323,16 +323,69 @@ export async function importVault(
     if (header.shardIndex < k + m) slots[header.shardIndex] = shard;
   }
 
-  const blob = decodeBlob(slots, k, m, blobLen);
-  const hash = await sha256Short(blob);
-  if (!bytesEqual(hash, first.hash)) {
-    throw new Error('import: reconstructed blob failed its integrity check');
-  }
+  // An erasure code can fill gaps but cannot detect a present-but-wrong shard.
+  // If the first-k reconstruction fails the integrity hash while extra shards are
+  // available, retry over other k-subsets so one corrupt shard cannot turn an
+  // otherwise-recoverable set fatal (bounded attempts guard against blow-up).
+  const blob = await reconstructVerified(slots, k, m, blobLen, first.hash);
+  if (!blob) throw new Error('import: reconstructed blob failed its integrity check');
 
   return decodeVaultBlob(blob, password, {
     keyBlock: opts.keyBlock,
     maxContentBytes: MAX_FILE_BYTES,
   });
+}
+
+/** Upper bound on RS reconstruction attempts when trying alternative shard subsets. */
+const MAX_RECON_ATTEMPTS = 256;
+
+/**
+ * Reconstruct the blob and verify it against `expectedHash`, trying alternative
+ * k-subsets of the present shards if the first attempt fails its hash. Returns
+ * the verified blob, or null if none of the attempted subsets reconstruct it.
+ */
+async function reconstructVerified(
+  slots: (Uint8Array | null)[],
+  k: number,
+  m: number,
+  blobLen: number,
+  expectedHash: Uint8Array,
+): Promise<Uint8Array | null> {
+  const present: number[] = [];
+  slots.forEach((s, i) => {
+    if (s) present.push(i);
+  });
+  if (present.length < k) return null;
+
+  let attempts = 0;
+  for (const subset of kSubsets(present, k)) {
+    if (++attempts > MAX_RECON_ATTEMPTS) break;
+    const trial: (Uint8Array | null)[] = new Array<Uint8Array | null>(slots.length).fill(null);
+    for (const i of subset) trial[i] = slots[i]!;
+    let blob: Uint8Array;
+    try {
+      blob = decodeBlob(trial, k, m, blobLen);
+    } catch {
+      continue; // singular matrix for this subset — try another
+    }
+    if (bytesEqual(await sha256Short(blob), expectedHash)) return blob;
+  }
+  return null;
+}
+
+/** Lazily yield every k-combination of `items` (first yield = the first k). */
+function* kSubsets(items: number[], k: number): Generator<number[]> {
+  const n = items.length;
+  if (k > n || k < 1) return;
+  const idx = Array.from({ length: k }, (_, i) => i);
+  for (;;) {
+    yield idx.map((i) => items[i]!);
+    let p = k - 1;
+    while (p >= 0 && idx[p] === n - k + p) p--;
+    if (p < 0) return;
+    idx[p]! += 1;
+    for (let j = p + 1; j < k; j++) idx[j] = idx[j - 1]! + 1;
+  }
 }
 
 /**

@@ -33,7 +33,7 @@ export async function buildPayload(filename: string, content: Uint8Array): Promi
  */
 export async function parsePayload(
   bytes: Uint8Array,
-  maxContentBytes: number = Infinity,
+  maxContentBytes: number,
 ): Promise<{ filename: string; content: Uint8Array }> {
   if (bytes.length < 3) throw new Error('payload: too short');
   const flags = bytes[0]!;

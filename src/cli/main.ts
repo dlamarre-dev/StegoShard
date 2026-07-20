@@ -49,6 +49,9 @@ Restore options:
   --out <dir>            Output directory (default: current directory)
   --key <file|image>     A .key file, a stego image, or a binary key container
 
+Common:
+  --force                Overwrite existing output files (default: refuse)
+
 Password (any command that needs one), in order of precedence:
   --password <pw>        Discouraged: visible in shell history / process list
   --password-file <path> Read the password from a file (first line)
@@ -123,19 +126,23 @@ function promptHidden(question: string): Promise<string> {
 }
 
 async function resolvePassword(values: Record<string, unknown>): Promise<string> {
+  let pw: string;
   if (typeof values.password === 'string') {
     process.stderr.write(
       'Warning: --password is visible in your shell history and the process list; ' +
         'prefer STEGOSHARD_PASSWORD, --password-file, or the interactive prompt.\n',
     );
-    return values.password;
+    pw = values.password;
+  } else if (typeof values['password-file'] === 'string') {
+    pw = readFileSync(values['password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
+  } else if (process.env.STEGOSHARD_PASSWORD) {
+    pw = process.env.STEGOSHARD_PASSWORD;
+  } else {
+    pw = await promptHidden('Password: ');
   }
-  if (typeof values['password-file'] === 'string') {
-    return readFileSync(values['password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
-  }
-  if (process.env.STEGOSHARD_PASSWORD) return process.env.STEGOSHARD_PASSWORD;
-  const pw = await promptHidden('Password: ');
-  if (!pw) fail('no password provided');
+  // Reject an empty password from every source, not just the interactive prompt
+  // (an empty --password/--password-file/env var would silently gut the KDF).
+  if (!pw) fail('no password provided (an empty password is not allowed)');
   return pw;
 }
 
@@ -169,8 +176,11 @@ async function main(argv: string[]): Promise<number> {
       key: { type: 'string' },
       password: { type: 'string' },
       'password-file': { type: 'string' },
+      force: { type: 'boolean' },
     },
   });
+
+  const force = Boolean(values.force);
 
   const outDir = (values.out as string) ?? '.';
 
@@ -204,6 +214,7 @@ async function main(argv: string[]): Promise<number> {
       passwordHint: values['password-hint'] as string | undefined,
       keyLocation: values['key-location'] as string | undefined,
       fontPath: values.font as string | undefined,
+      force,
     };
 
     const res = await runSave(opts);
@@ -227,6 +238,7 @@ async function main(argv: string[]): Promise<number> {
       outDir,
       password,
       keyPath: values.key as string | undefined,
+      force,
     });
     process.stderr.write(`decoded ${res.decoded} of ${res.seen} image(s)\n`);
     process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
@@ -239,7 +251,7 @@ async function main(argv: string[]): Promise<number> {
     const covers = positionals.slice(1);
     if (covers.length === 0) fail('gallery-save: give cover photos or a folder');
     const password = await resolvePassword(values);
-    const res = await runGallerySave({ secretFile, covers, outDir, password });
+    const res = await runGallerySave({ secretFile, covers, outDir, password, force });
     process.stdout.write(
       `Saved gallery across ${res.files.length} photo(s) ` +
         `(${res.k} data + ${res.m} parity + ${res.decoys} decoy):\n` +
@@ -252,7 +264,7 @@ async function main(argv: string[]): Promise<number> {
   if (command === 'gallery-restore') {
     if (positionals.length === 0) fail('gallery-restore: missing photos/folder');
     const password = await resolvePassword(values);
-    const res = await runGalleryRestore({ inputs: positionals, outDir, password });
+    const res = await runGalleryRestore({ inputs: positionals, outDir, password, force });
     process.stderr.write(`scanned ${res.seen} photo(s)\n`);
     process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
     return 0;

@@ -13,6 +13,7 @@ import {
   type GalleryImage,
   GALLERY_SLOT_BYTES,
   GalleryCoverCapacityError,
+  GalleryFileTooLargeError,
   GalleryRestoreError,
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
@@ -90,6 +91,26 @@ describe('gallery round-trip', () => {
     const out = await galleryDecode(images as GalleryCover[], 'hunter2', { params: FAST });
     expect(dec.decode(out.content)).toBe('gallery jpeg secret');
   }, 30000);
+
+  it('round-trips a compressible secret larger than the compressed-blob ceiling', async () => {
+    // 500 KB of repetition gzips to a few KB (well under GALLERY_MAX_BLOB) but
+    // inflates back to 500 KB on restore. Regression for the decode bound bug
+    // that once capped decompression at the *compressed* ceiling (~380 KB).
+    const covers = [0, 1, 2, 3, 4, 5].map((i) => rgbaCover(`p${i}.png`, i + 7));
+    const secret = new Uint8Array(500 * 1024).fill(0x41);
+    const { images } = await galleryEncode('big.txt', secret, 'pw', covers, { params: FAST });
+    const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST });
+    expect(out.content.length).toBe(secret.length);
+    expect([...out.content.subarray(0, 8)]).toEqual([...secret.subarray(0, 8)]);
+  });
+
+  it('rejects a secret larger than the 1 MiB content ceiling', async () => {
+    const covers = [0, 1, 2, 3, 4, 5].map((i) => rgbaCover(`p${i}.png`, i + 20));
+    const tooBig = new Uint8Array(1024 * 1024 + 1).fill(0x41);
+    await expect(
+      galleryEncode('huge.txt', tooBig, 'pw', covers, { params: FAST }),
+    ).rejects.toThrow(GalleryFileTooLargeError);
+  });
 
   it('wrong password yields no restorable gallery', async () => {
     const covers = [1, 2, 3, 4, 5].map((i) => rgbaCover(`p${i}.png`, i));

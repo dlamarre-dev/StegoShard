@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import struct
 import sys
 import zipfile
 
@@ -200,6 +201,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except MissingKeyError:
         print("this vault needs a separate key (use --key)", file=sys.stderr)
+        return 1
+    except (ValueError, struct.error) as exc:
+        # Malformed / truncated input — a clean message, not a stack trace.
+        print(f"not a valid StegoShard vault: {exc}", file=sys.stderr)
         return 1
 
     os.makedirs(args.out, exist_ok=True)

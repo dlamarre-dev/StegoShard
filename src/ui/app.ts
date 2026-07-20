@@ -370,6 +370,9 @@ async function doSave(req: SaveRequest): Promise<void> {
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
     show(saveResult, true);
+    // Don't leave secrets sitting in the popup's DOM after the operation.
+    stegoPw.value = '';
+    gallerySavePw.value = '';
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -408,8 +411,12 @@ saveBtn.addEventListener('click', async () => {
     const cover = coverFile.files?.[0];
     if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
     if (!stegoPw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
-    if (!(await verifyStegoPassword(session.keyBlock, stegoPw.value))) {
-      return setStatus(saveStatus, msg('errWrongPassword'), true);
+    try {
+      if (!(await verifyStegoPassword(session.keyBlock, stegoPw.value))) {
+        return setStatus(saveStatus, msg('errWrongPassword'), true);
+      }
+    } catch (err) {
+      return setStatus(saveStatus, friendlyError(err), true);
     }
     stego = { cover, password: stegoPw.value };
   }
@@ -451,6 +458,7 @@ restoreBtn.addEventListener('click', async () => {
     setStatus(restoreStatus, '');
     restoreResultNote.textContent = note;
     show(restoreResult, true);
+    restorePw.value = ''; // clear the secret from the DOM after use
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {

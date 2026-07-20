@@ -25,7 +25,7 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
-import { unzipSync, zipSync } from 'fflate';
+import { Unzip, UnzipInflate, zipSync } from 'fflate';
 import {
   decodeImageBytes,
   downloadBlob,
@@ -234,28 +234,57 @@ const MAX_ZIP_ENTRIES = MAX_IMAGES + 4; // images + a stray .key or two
 const MAX_ENTRY_BYTES = 25 * 1024 * 1024; // 25 MB per image (a large photo)
 const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // cumulative uncompressed
 
-/** Extract only image/.key entries from a zip, within the size/count budgets. */
+/**
+ * Extract only image/.key entries from a zip, within the size/count budgets.
+ * Streams each entry and enforces the caps on the *actual* inflated bytes (not
+ * the attacker-declarable header size), aborting before a zip bomb can grow
+ * unbounded. Runs synchronously: fflate's `Unzip` + `UnzipInflate` deliver all
+ * data during the single `push` below.
+ */
 export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
-  let count = 0;
-  let total = 0;
-  const entries = unzipSync(zipBytes, {
-    filter: (f) => {
-      if (!(IMAGE_RE.test(f.name) || isKey(f.name))) return false;
-      if (f.originalSize > MAX_ENTRY_BYTES) throw new Error('restore: a .zip entry is too large');
-      count += 1;
-      total += f.originalSize;
-      if (count > MAX_ZIP_ENTRIES) throw new Error('restore: too many entries in the .zip');
-      if (total > MAX_TOTAL_BYTES) throw new Error('restore: .zip contents are too large');
-      return true;
-    },
-  });
   const images: Uint8Array[] = [];
   let keyBlock: Uint8Array | undefined;
-  for (const [name, bytes] of Object.entries(entries)) {
-    if (isKey(name)) keyBlock = bytes;
-    else if (IMAGE_RE.test(name)) images.push(bytes);
-  }
+  let count = 0;
+  let total = 0;
+
+  const unzip = new Unzip();
+  unzip.register(UnzipInflate);
+  unzip.onfile = (file) => {
+    const name = file.name;
+    if (!(IMAGE_RE.test(name) || isKey(name))) return; // never decompressed
+    count += 1;
+    if (count > MAX_ZIP_ENTRIES) throw new Error('restore: too many entries in the .zip');
+
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    file.ondata = (err, chunk, final) => {
+      if (err) throw err;
+      size += chunk.length;
+      total += chunk.length;
+      if (size > MAX_ENTRY_BYTES) throw new Error('restore: a .zip entry is too large');
+      if (total > MAX_TOTAL_BYTES) throw new Error('restore: .zip contents are too large');
+      parts.push(chunk.slice()); // fflate may reuse the buffer — copy it
+      if (final) {
+        const bytes = parts.length === 1 ? parts[0]! : concatChunks(parts, size);
+        if (isKey(name)) keyBlock = bytes;
+        else images.push(bytes);
+      }
+    };
+    file.start();
+  };
+  unzip.push(zipBytes, true);
+
   return keyBlock ? { images, keyBlock } : { images };
+}
+
+function concatChunks(parts: Uint8Array[], total: number): Uint8Array {
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
 }
 
 /**

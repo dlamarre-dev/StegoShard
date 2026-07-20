@@ -109,15 +109,29 @@ describe('keyfile mode (external key block)', () => {
 });
 
 describe('import robustness', () => {
-  it('detects a silently corrupted shard via the blob integrity check', async () => {
+  it('recovers a single present-but-corrupt shard from the remaining shards', async () => {
     const key = await makeKey('pw');
     const content = pseudoRandom(3000, 33);
     const { imagePayloads } = await exportVault('a.bin', content, key);
-    // Corrupt one shard byte past the header: erasure coding only repairs
-    // MISSING shards, so with the full set present the corruption survives
-    // reconstruction and must be caught by the blob hash before decryption.
+    // Corrupt one shard byte past the header. The blob hash catches the bad
+    // first-k reconstruction, and the subset retry then rebuilds from the other
+    // shards — a single corruption must not be fatal when parity is available.
     const corrupted = imagePayloads.map((p) => p.slice());
     corrupted[0]![40] = corrupted[0]![40]! ^ 0xff;
+    const out = await importVault(corrupted, 'pw');
+    expect([...out.content]).toEqual([...content]);
+  });
+
+  it('fails the integrity check when more shards are corrupt than parity covers', async () => {
+    const key = await makeKey('pw');
+    const content = pseudoRandom(3000, 33);
+    const { imagePayloads, m } = await exportVault('a.bin', content, key);
+    // Corrupt m+1 shards past their headers: fewer than k good shards remain, so
+    // no k-subset reconstructs and the blob hash rejects every attempt.
+    const corrupted = imagePayloads.map((p) => p.slice());
+    for (let i = 0; i < m + 1 && i < corrupted.length; i++) {
+      corrupted[i]![40] = corrupted[i]![40]! ^ 0xff;
+    }
     await expect(importVault(corrupted, 'pw')).rejects.toThrow(/integrity/);
   });
 

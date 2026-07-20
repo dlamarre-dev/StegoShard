@@ -186,7 +186,7 @@ describe('frozen vectors: full vault blob decrypt', () => {
 
       const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), v.password);
       const envelope = await decryptBytes(dek, iv, ciphertext);
-      const { filename, content } = await parsePayload(envelope);
+      const { filename, content } = await parsePayload(envelope, 1024 * 1024);
       expect(filename).toBe(v.filename);
       expect(toHex(content)).toBe(v.contentHex);
     });

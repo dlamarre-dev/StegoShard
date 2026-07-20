@@ -11,15 +11,8 @@
  *  - `extractPdfPayloads`: browser-only, turns those into codec payloads
  */
 
-import {
-  PDFDocument,
-  PDFName,
-  PDFRawStream,
-  PDFNumber,
-  PDFArray,
-  PDFStream,
-  decodePDFRawStream,
-} from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream, PDFNumber, PDFArray, PDFStream } from 'pdf-lib';
+import { unzlibSync } from 'fflate';
 import { CODEC_QR_GRID, getCodec, type ImageDataLike } from '@core';
 
 /** Resource guards for an untrusted PDF (mirrors the .zip restore bounds). */
@@ -98,15 +91,28 @@ export async function extractPdfImages(bytes: Uint8Array): Promise<PdfImage[]> {
         images.push({ kind: 'jpeg', bytes: obj.getContents() });
         continue;
       }
+      // Only FlateDecode is materialized here; anything else is skipped (a lost
+      // page is tolerated by the erasure coding).
+      if (filterName !== 'FlateDecode') continue;
 
-      // FlateDecode (and friends) → raw samples via pdf-lib's filter pipeline.
       const bpc = dict.get(PDFName.of('BitsPerComponent'));
       if (!(bpc instanceof PDFNumber) || bpc.asNumber() !== 8) continue;
       const comps = componentsFor(dict);
       if (comps === 0) continue;
 
-      const raw = decodePDFRawStream(obj).decode();
-      if (raw.length < width * height * comps) continue;
+      // Inflate with the output hard-capped at the declared pixel size, so a
+      // crafted stream (tiny declared dimensions, huge FlateDecode body) cannot
+      // inflate to gigabytes and OOM the tab. Our paper PDFs store un-predicted
+      // FlateDecode samples, which match this exactly; predicted or foreign
+      // streams overflow the cap (or decode wrong) and are simply dropped.
+      const needed = width * height * comps;
+      let raw: Uint8Array;
+      try {
+        raw = unzlibSync(obj.getContents(), { out: new Uint8Array(needed) });
+      } catch {
+        continue; // over-cap (potential bomb), predicted, or corrupt — skip
+      }
+      if (raw.length < needed) continue;
       images.push({ kind: 'pixels', img: toImageData(raw, width, height, comps) });
     } catch {
       // Unsupported or corrupt XObject — skip it.
