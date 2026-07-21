@@ -133,8 +133,10 @@ def _restore_gallery(args: argparse.Namespace) -> int:
         print("no images found in the inputs", file=sys.stderr)
         return 2
     password = args.password or getpass.getpass("Password: ")
+    # A keyfile/stego gallery delivers its key separately (a .key or a cover photo).
+    key_block = _resolve_key(args.key, password) if args.key else None
     try:
-        restored = decode_gallery(images, password)
+        restored = decode_gallery(images, password, key_block)
     except GalleryRestoreError as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -407,8 +407,14 @@ embedding sparse) or it is rejected.
 
 ### 9.4 Encode
 
-1. Build the standard vault blob (§6) in embedded key mode (`KB_LEN = 92`), from
-   the gzip-compressed envelope (§4) encrypted under a fresh DEK.
+1. Build the standard vault blob (§6). By default this is **embedded key mode**
+   (`KB_LEN = 92`), from the gzip-compressed envelope (§4) encrypted under a fresh
+   DEK. A gallery may instead use **keyfile** or **stego** key mode (`KB_LEN = 0`),
+   in which case the key block is not carried in the fragments but delivered
+   separately — a loose `.key` file, or hidden in an ordinary cover photo (§5).
+   This shrinks the blob by 92 bytes; the `blobLen ≤ 389120` bound (step 2) is
+   unchanged. Deniability note: a separate key artifact is itself a tell, so this
+   is opt-in.
 2. `k = ceil(blobLen / SLOT_DATA)`, `m = max(ceil(k·0.3), 2)` (§7.2). Require
    `blobLen ≤ 389120` (`SLOT_DATA·190`) so `k + m + 2 ≤ 256` (GF limit, §7.1).
 3. RS-encode into `k + m` shards (§7). For each shard `i`, build `P` (§9.2), seal
@@ -422,8 +428,9 @@ For **every** photo: extract `SLOT_BYTES` at `posKey` carriers, split
 recompressed/destroyed carrier, foreign image, or wrong password) is dropped
 silently. Surviving fragments are grouped by `SET_ID` (§3); once a group has
 `≥ K` distinct valid shard indices, reconstruct (§7.5), verify `HASH_GLOBAL`,
-and decrypt the blob (§6). Wrong password ⇒ zero survivors ⇒ indistinguishable
-from "no gallery here".
+and decrypt the blob (§6). For a keyfile/stego gallery (§9.4, `KB_LEN = 0`) the
+decoder is additionally given the external key block. Wrong password ⇒ zero
+survivors ⇒ indistinguishable from "no gallery here".
 
 ### 9.6 Deniability & limits
 

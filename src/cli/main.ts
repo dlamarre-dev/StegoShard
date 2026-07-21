@@ -60,6 +60,9 @@ Password (any command that needs one), in order of precedence:
 
 Gallery Mode (a secret hidden, fragmented, across many ordinary photos):
   --out <dir>            Output directory for the modified photos
+  --key-mode <mode>      embedded (default) | keyfile | stego   (gallery-save)
+  --cover <image>        Cover photo for --key-mode stego (gallery-save)
+  --key <file|image>     External key for a keyfile/stego gallery (gallery-restore)
   Every photo is modified; the best K+M carry Reed-Solomon fragments and the
   rest become decoys (min 5 photos total, at least 2 decoys). Restore is blind:
   any photos that authenticate are used, and any K fragments reconstruct.
@@ -250,21 +253,42 @@ async function main(argv: string[]): Promise<number> {
     if (!secretFile) fail('gallery-save: missing <file>');
     const covers = positionals.slice(1);
     if (covers.length === 0) fail('gallery-save: give cover photos or a folder');
+    const keyMode = ((values['key-mode'] as string) ?? 'embedded') as KeyMode;
+    if (!KEY_MODES.includes(keyMode)) fail(`gallery-save: invalid --key-mode "${keyMode}"`);
+    if (keyMode === 'stego' && !values.cover)
+      fail('gallery-save: --key-mode stego requires --cover <image>');
     const password = await resolvePassword(values);
-    const res = await runGallerySave({ secretFile, covers, outDir, password, force });
+    const res = await runGallerySave({
+      secretFile,
+      covers,
+      outDir,
+      password,
+      keyMode,
+      keyCover: values.cover as string | undefined,
+      force,
+    });
     process.stdout.write(
-      `Saved gallery across ${res.files.length} photo(s) ` +
-        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy):\n` +
+      `Saved gallery across ${res.files.length} file(s) ` +
+        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy) [${res.keyMode}]:\n` +
         `${res.files.map((f) => `  ${f}`).join('\n')}\n`,
     );
     process.stdout.write(`Keep your password; any ${res.k} of the fragment photos restore it.\n`);
+    if (res.keyMode !== 'embedded') {
+      process.stdout.write('Keep the separate key artifact too (restore with --key).\n');
+    }
     return 0;
   }
 
   if (command === 'gallery-restore') {
     if (positionals.length === 0) fail('gallery-restore: missing photos/folder');
     const password = await resolvePassword(values);
-    const res = await runGalleryRestore({ inputs: positionals, outDir, password, force });
+    const res = await runGalleryRestore({
+      inputs: positionals,
+      outDir,
+      password,
+      keyPath: values.key as string | undefined,
+      force,
+    });
     process.stderr.write(`scanned ${res.seen} photo(s)\n`);
     process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
     return 0;

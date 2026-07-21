@@ -39,7 +39,7 @@ wireLanguageSelect(el<HTMLSelectElement>('lang-select'), () => {
   if (view === 'guided') wizard?.reset();
 });
 
-type Dest = 'disk' | 'paper' | 'gallery';
+type Dest = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
 const saveFile = el<HTMLInputElement>('save-file');
 const fileDrop = el('file-drop');
@@ -56,6 +56,10 @@ const galleryFields = el('gallery-fields');
 const galleryCovers = el<HTMLInputElement>('gallery-covers');
 const galleryCoversDrop = el('gallery-covers-drop');
 const galleryCoversName = el('gallery-covers-name');
+const galleryStegoFields = el('gallery-stego-fields');
+const galleryCover = el<HTMLInputElement>('gallery-cover');
+const galleryCoverDrop = el('gallery-cover-drop');
+const galleryCoverName = el('gallery-cover-name');
 const addBand = el<HTMLInputElement>('add-band');
 const addBandLabel = el('add-band-label');
 const bandFields = el('band-fields');
@@ -88,6 +92,7 @@ const restoreGalleryHint = el('restore-gallery-hint');
 
 const selectedDest = () => pick<Dest>('dest', 'disk');
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
+const selectedGalleryKeyMode = () => pick<KeyMode>('gallery-keymode', 'embedded');
 const selectedRestoreMode = () => pick<RestoreMode>('restore-mode', 'standard');
 
 function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputElement): void {
@@ -99,27 +104,29 @@ function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputEleme
 function reflectDestination(): void {
   const dest = selectedDest();
   const gallery = dest === 'gallery';
-  const paper = dest === 'paper';
-  // Gallery has its own pipeline: no key mode, band, zip, or image estimate.
-  // (Its "password" is the always-visible save password field.)
+  // Gallery has its own key mode + password; the band/zip/estimate don't apply
+  // to it (nor to binary/sqlite, which are single opaque files).
   show(galleryFields, gallery);
   show(keymodeFields, !gallery);
   show(estimateLine, !gallery);
-  show(zipField, !gallery && !paper);
-  show(addBandLabel, !gallery);
-  show(bandFields, !gallery && addBand.checked);
-  show(paperFields, paper);
+  show(zipField, dest === 'disk');
+  show(addBandLabel, dest === 'disk');
+  show(bandFields, dest === 'paper' || (dest === 'disk' && addBand.checked));
+  show(paperFields, dest === 'paper');
   reflectKeyMode();
+  reflectGalleryKeyMode();
 }
 
 async function updateEstimate(): Promise<void> {
   const file = saveFile.files?.[0];
   if (!file) return void (estimate.textContent = '—');
-  if (selectedDest() === 'gallery') return; // estimate line is hidden for gallery
+  const dest = selectedDest();
+  if (dest === 'gallery') return; // estimate line is hidden for gallery
+  if (dest === 'binary' || dest === 'sqlite') return void (estimate.textContent = '1');
   estimate.textContent = '…';
   try {
     const content = new Uint8Array(await file.arrayBuffer());
-    const profile = selectedDest() === 'paper' ? PROFILE_PAPER : PROFILE_DISK;
+    const profile = dest === 'paper' ? PROFILE_PAPER : PROFILE_DISK;
     const { images } = await estimateImages(file.name, content, {
       keyMode: selectedKeyMode(),
       profile,
@@ -134,11 +141,16 @@ function reflectKeyMode(): void {
   show(stegoFields, selectedDest() !== 'gallery' && selectedKeyMode() === 'stego');
 }
 
-/** Standard restore uses a key file; gallery restore is password-only. */
+/** Gallery has its own key mode; show its stego cover picker only for stego. */
+function reflectGalleryKeyMode(): void {
+  show(galleryStegoFields, selectedDest() === 'gallery' && selectedGalleryKeyMode() === 'stego');
+}
+
+/** Both modes can take a key: standard vaults, and keyfile/stego galleries. */
 function reflectRestoreMode(): void {
   const gallery = selectedRestoreMode() === 'gallery';
   show(restoreGalleryHint, gallery);
-  show(restoreAdvanced, !gallery);
+  show(restoreAdvanced, true);
 }
 
 addBand.addEventListener('change', () => show(bandFields, addBand.checked));
@@ -154,6 +166,9 @@ for (const r of document.querySelectorAll('input[name="keymode"]')) {
     void updateEstimate();
   });
 }
+for (const r of document.querySelectorAll('input[name="gallery-keymode"]')) {
+  r.addEventListener('change', reflectGalleryKeyMode);
+}
 for (const r of document.querySelectorAll('input[name="restore-mode"]')) {
   r.addEventListener('change', reflectRestoreMode);
 }
@@ -166,6 +181,9 @@ wireDropzone(fileDrop, saveFile, () => {
 wireDropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
 wireDropzone(galleryCoversDrop, galleryCovers, () =>
   reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers),
+);
+wireDropzone(galleryCoverDrop, galleryCover, () =>
+  reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
 );
 wireDropzone(restoreDrop, restoreFiles, () =>
   reflectFile(restoreDrop, restoreDzFile, restoreFiles),
@@ -224,7 +242,21 @@ saveBtn.addEventListener('click', async () => {
   if (dest === 'gallery') {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
     if (covers.length === 0) return setStatus(saveStatus, msg('errNoCovers'), true);
-    await doSave(async () => ({ dest, file, covers, galleryPassword: savePw.value }));
+    const gKeyMode = selectedGalleryKeyMode();
+    let gStego: StegoInput | undefined;
+    if (gKeyMode === 'stego') {
+      const cover = galleryCover.files?.[0];
+      if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
+      gStego = { cover, password: savePw.value };
+    }
+    await doSave(async () => ({
+      dest,
+      file,
+      covers,
+      galleryPassword: savePw.value,
+      keyMode: gKeyMode,
+      stego: gStego,
+    }));
     return;
   }
 
@@ -306,7 +338,7 @@ let wizard: Wizard | null = null;
 const wizardEnv: WizardEnv = {
   msg,
   locale: currentLocale,
-  saveDestinations: ['disk', 'paper', 'gallery'],
+  saveDestinations: ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
   getSaveKey: (pw) => makeKey(pw),
   needsSavePassword: true,
   camera: {

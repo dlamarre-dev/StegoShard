@@ -18,6 +18,7 @@ import {
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
   decode as decodeJpeg,
+  estimateGalleryCovers,
   galleryDecode,
   galleryEncode,
 } from './index';
@@ -102,6 +103,30 @@ describe('gallery round-trip', () => {
     const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST });
     expect(out.content.length).toBe(secret.length);
     expect([...out.content.subarray(0, 8)]).toEqual([...secret.subarray(0, 8)]);
+  });
+
+  it('round-trips a keyfile gallery only with the external key block', async () => {
+    const covers = [0, 1, 2, 3, 4, 5].map((i) => rgbaCover(`p${i}.png`, i + 40));
+    const secret = enc.encode('keyfile gallery secret');
+    const { images, keyBlock } = await galleryEncode('k.txt', secret, 'pw', covers, {
+      params: FAST,
+      keyMode: 'keyfile',
+    });
+    // Without the key the fragments cannot be unwrapped → indistinguishable from none.
+    await expect(galleryDecode(images as GalleryCover[], 'pw', { params: FAST })).rejects.toThrow(
+      GalleryRestoreError,
+    );
+    const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST, keyBlock });
+    expect(dec.decode(out.content)).toBe('keyfile gallery secret');
+  });
+
+  it('estimateGalleryCovers predicts the minimum cover count encode needs', async () => {
+    const secret = enc.encode('a short secret');
+    const { needed } = await estimateGalleryCovers('s.txt', secret, 'embedded');
+    expect(needed).toBe(5); // k=1 + m=2 + 2 decoys for a tiny secret
+    const covers = Array.from({ length: needed }, (_, i) => rgbaCover(`p${i}.png`, i + 60));
+    const res = await galleryEncode('s.txt', secret, 'pw', covers, { params: FAST });
+    expect(res.images.length).toBe(needed);
   });
 
   it('rejects a secret larger than the 1 MiB content ceiling', async () => {

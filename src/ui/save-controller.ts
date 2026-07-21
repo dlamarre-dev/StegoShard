@@ -21,7 +21,7 @@ import {
 } from '@core';
 import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
 
-export type SaveDestination = 'disk' | 'paper' | 'binary' | 'cloud' | 'gallery';
+export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'cloud' | 'gallery';
 
 /** A localizer with the same shape in both the extension and the web app. */
 export type Msg = (key: string, subs?: string | string[]) => string;
@@ -46,7 +46,6 @@ export interface SaveRequest {
   /** Readable title band drawn above disk images. */
   label?: { title?: string; date?: string } | undefined;
   asZip?: boolean | undefined;
-  variant?: BinaryVariant;
   includeInstructions?: boolean;
   passwordHint?: string | undefined;
   keyLocation?: string | undefined;
@@ -97,13 +96,27 @@ function binaryNote(msg: Msg, keyMode: KeyMode, variant: BinaryVariant): string 
   return msg(key, msg(variant === 'branded' ? 'binaryVariantBranded' : 'binaryVariantDisguised'));
 }
 
+function galleryNote(msg: Msg, keyMode: KeyMode, imageCount: number): string {
+  const key =
+    keyMode === 'embedded'
+      ? 'statusGallerySaved'
+      : keyMode === 'stego'
+        ? 'statusGallerySavedStego'
+        : 'statusGallerySavedKeyfile';
+  return msg(key, String(imageCount));
+}
+
 /** Run a save and return a localized result note. Throws on any failure. */
 export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
   if (req.dest === 'gallery') {
     const covers = req.covers ?? [];
     if (!req.galleryPassword) throw new Error('gallery mode requires a password');
-    const res = await saveGalleryToDisk(req.file, covers, req.galleryPassword);
-    return { note: msg('statusGallerySaved', String(res.imageCount)) };
+    const keyMode = req.keyMode ?? 'embedded';
+    const res = await saveGalleryToDisk(req.file, covers, req.galleryPassword, {
+      keyMode,
+      stego: req.stego,
+    });
+    return { note: galleryNote(msg, keyMode, res.imageCount) };
   }
 
   if (!req.key) throw new Error('a vault key is required');
@@ -134,13 +147,16 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
     return { note: msg('statusSavedPdf', String(imageCount)) };
   }
 
-  if (req.dest === 'binary') {
-    const { variant } = await saveFileToBinary(req.file, req.key, {
+  if (req.dest === 'binary' || req.dest === 'sqlite') {
+    // Two destinations map to the one binary container: 'binary' is a branded
+    // .ssbn, 'sqlite' is disguised with a valid SQLite header (.db).
+    const variant: BinaryVariant = req.dest === 'sqlite' ? 'disguised' : 'branded';
+    const { variant: saved } = await saveFileToBinary(req.file, req.key, {
       keyMode,
-      variant: req.variant ?? 'branded',
+      variant,
       stego: req.stego,
     });
-    return { note: binaryNote(msg, keyMode, variant) };
+    return { note: binaryNote(msg, keyMode, saved) };
   }
 
   // disk

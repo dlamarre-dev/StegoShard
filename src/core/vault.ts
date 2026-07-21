@@ -187,11 +187,23 @@ export async function estimateImages(
   content: Uint8Array,
   options: ExportOptions = {},
 ): Promise<{ k: number; m: number; images: number }> {
+  const envelope = await buildPayload(filename, content);
+  return imagesForEnvelopeLen(envelope.length, options);
+}
+
+/**
+ * The image split for an already-built envelope length, without re-compressing.
+ * Callers that need counts for several profiles of the same file should build
+ * the envelope once (`buildPayload`) and call this per profile.
+ */
+export function imagesForEnvelopeLen(
+  envelopeLen: number,
+  options: ExportOptions = {},
+): { k: number; m: number; images: number } {
   const profile = options.profile ?? PROFILE_DISK;
   const codecId = options.codecId ?? CODEC_QR_GRID;
   const embedKey = isEmbedded(options.keyMode ?? 'embedded');
-  const envelope = await buildPayload(filename, content);
-  const blobLen = blobLenFor(envelope.length, embedKey);
+  const blobLen = blobLenFor(envelopeLen, embedKey);
   const k = Math.max(1, Math.ceil(blobLen / dataPerShard(codecId, profile)));
   const m = parityCount(k);
   return { k, m, images: k + m };

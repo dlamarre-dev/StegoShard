@@ -61,4 +61,41 @@ describe('CLI gallery round-trip', () => {
     expect(res.seen).toBe(6);
     expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
   });
+
+  it('round-trips a keyfile gallery: the separate .key is needed to restore', SLOW, async () => {
+    const coverDir = tmp();
+    for (let i = 0; i < 6; i++) writePngCover(coverDir, `photo-${i}.png`, i + 10);
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    const secret = Buffer.from('the key rides separately');
+    writeFileSync(secretPath, secret);
+
+    const albumDir = tmp();
+    const save = await runGallerySave({
+      secretFile: secretPath,
+      covers: [coverDir],
+      outDir: albumDir,
+      password: PW,
+      keyMode: 'keyfile',
+    });
+    expect(save.keyMode).toBe('keyfile');
+    const keyPath = save.files.find((f) => f.endsWith('.key'));
+    expect(keyPath).toBeTruthy();
+
+    // Without the key, restore fails.
+    await expect(
+      runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW }),
+    ).rejects.toThrow();
+
+    // With the key, it restores. (Pass the photos, not the folder, so the walker
+    // doesn't feed the .key in as a "photo".)
+    const photos = save.files.filter((f) => !f.endsWith('.key'));
+    const res = await runGalleryRestore({
+      inputs: photos,
+      outDir: tmp(),
+      password: PW,
+      keyPath,
+    });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+  });
 });

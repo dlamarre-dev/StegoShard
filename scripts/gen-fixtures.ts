@@ -96,7 +96,11 @@ function makeRgbaCover(w: number, h: number, seed: number): Uint8Array {
 /** Gallery Mode fixture (SPEC §9): a secret fragmented + decoy-padded across
  * photos, which the Python decoder must restore blindly. Uses the frozen default
  * gallery Argon2 cost (not stored), so the decoder derives with those defaults. */
-async function generateGallery(name: string, coverJpeg: boolean): Promise<void> {
+async function generateGallery(
+  name: string,
+  coverJpeg: boolean,
+  keyMode: KeyMode = 'embedded',
+): Promise<void> {
   const dir = join(outRoot, name);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -120,7 +124,9 @@ async function generateGallery(name: string, coverJpeg: boolean): Promise<void> 
     }
   }
 
-  const res = await galleryEncode(FILENAME, content, PASSWORD, covers);
+  const res = await galleryEncode(FILENAME, content, PASSWORD, covers, { keyMode });
+  // Keyfile gallery: the key block is delivered separately, not embedded.
+  if (keyMode === 'keyfile') writeFileSync(join(dir, 'vault.key'), res.keyBlock);
   res.images.forEach((img, i) => {
     const idx = String(i + 1).padStart(2, '0');
     if (img.kind === 'jpeg') {
@@ -146,7 +152,7 @@ async function generateGallery(name: string, coverJpeg: boolean): Promise<void> 
       {
         password: PASSWORD,
         filename: FILENAME,
-        keyMode: 'gallery',
+        keyMode,
         images: res.images.length,
         k: res.k,
         m: res.m,
@@ -267,4 +273,5 @@ await generateBinary('binary-branded', 'embedded', 'branded', content);
 await generateBinary('binary-disguised', 'keyfile', 'disguised', content);
 await generateGallery('gallery-png', false);
 await generateGallery('gallery-jpeg', true);
+await generateGallery('gallery-keyfile', false, 'keyfile');
 console.log(`fixtures written to ${outRoot}`);

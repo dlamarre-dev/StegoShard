@@ -118,6 +118,11 @@
                   data-i18n="destBinary"
                 ></span
               ></label>
+              <label
+                ><input type="radio" name="dest" value="sqlite" /><span
+                  data-i18n="destSqlite"
+                ></span
+              ></label>
               <label id="dest-cloud-label" hidden
                 ><input type="radio" name="dest" value="cloud" /><span data-i18n="destCloud"></span
               ></label>
@@ -167,6 +172,36 @@
               </div>
               <label data-i18n="labelStegoPassword" for="gallery-save-pw"></label>
               <input id="gallery-save-pw" type="password" autocomplete="new-password" />
+
+              <label class="muted" data-i18n="keyModeHeading"></label>
+              <fieldset class="segmented">
+                <label
+                  ><input type="radio" name="gallery-keymode" value="embedded" checked /><span
+                    data-i18n="keyModeEmbedded"
+                  ></span
+                ></label>
+                <label
+                  ><input type="radio" name="gallery-keymode" value="keyfile" /><span
+                    data-i18n="keyModeKeyfile"
+                  ></span
+                ></label>
+                <label
+                  ><input type="radio" name="gallery-keymode" value="stego" /><span
+                    data-i18n="keyModeStego"
+                  ></span
+                ></label>
+              </fieldset>
+              <div id="gallery-stego-fields" hidden>
+                <div id="gallery-cover-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                  <span class="dz-prompt">
+                    <span class="dz-title" data-i18n="coverTitle"></span><br />
+                    <span class="muted" data-i18n="dropPrompt"></span>
+                  </span>
+                  <span id="gallery-cover-name" class="dz-file"></span>
+                  <input id="gallery-cover" type="file" accept="image/png,image/jpeg" />
+                </div>
+                <p class="muted warn" data-i18n="stegoWarning"></p>
+              </div>
             </div>
 
             <div id="stego-fields" hidden>
@@ -208,15 +243,6 @@
             <label id="zip-field" class="checkbox"
               ><input id="as-zip" type="checkbox" checked /> <span data-i18n="labelAsZip"></span
             ></label>
-
-            <div id="binary-fields" hidden>
-              <label class="muted" data-i18n="binaryVariantHeading" for="binary-variant"></label>
-              <select id="binary-variant">
-                <option value="branded" data-i18n="binaryVariantBranded"></option>
-                <option value="disguised" data-i18n="binaryVariantDisguised"></option>
-              </select>
-              <p class="muted" id="binary-variant-help" data-i18n="binaryVariantHelpBranded"></p>
-            </div>
 
             <div id="paper-fields" hidden>
               <label class="checkbox"

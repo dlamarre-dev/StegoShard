@@ -148,6 +148,27 @@ def test_gallery_jpeg_round_trip():
     assert restored.content == expected
 
 
+def test_gallery_keyfile_round_trip():
+    """A keyfile gallery (TS encode, KB_LEN=0) restores only with the external
+    .key block delivered alongside the photos (SPEC §9.4)."""
+    from stegoshard import decode_gallery
+
+    manifest, images, expected = _gallery_photos("gallery-keyfile")
+    assert manifest["keyMode"] == "keyfile"
+    key_block = (FIXTURES / "gallery-keyfile" / "vault.key").read_bytes()
+    restored = decode_gallery(images, manifest["password"], key_block)
+    assert restored.content == expected
+
+
+def test_gallery_keyfile_without_key_fails():
+    """Without the external key, a keyfile gallery cannot be restored."""
+    from stegoshard import GalleryRestoreError, decode_gallery
+
+    manifest, images, _expected = _gallery_photos("gallery-keyfile")
+    with pytest.raises(GalleryRestoreError):
+        decode_gallery(images, manifest["password"])
+
+
 def test_gallery_ignores_foreign_photo():
     """A foreign JPEG whose carrier count is just above the slot size (below the 4x
     margin) is skipped, not fatal — the capacity-margin guard on extraction."""

@@ -4,11 +4,13 @@
  */
 
 import browser from 'webextension-polyfill';
-import type { BinaryVariant, KeyMode } from '@core';
+import type { KeyMode } from '@core';
 
 const PREFS_KEY = 'stegoshard.prefs';
 
-export type Destination = 'disk' | 'paper' | 'cloud' | 'binary' | 'gallery';
+// 'binary' = branded .ssbn, 'sqlite' = disguised .db (SPEC §8) — two destinations
+// over the one binary container.
+export type Destination = 'disk' | 'paper' | 'cloud' | 'binary' | 'sqlite' | 'gallery';
 
 /** Which UI to show at launch — the step-by-step wizard or the dense one-screen UI. */
 export type Workflow = 'guided' | 'expert';
@@ -21,7 +23,6 @@ export interface Prefs {
   title: string;
   asZip: boolean;
   includeInstructions: boolean;
-  binaryVariant: BinaryVariant;
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -32,7 +33,6 @@ const DEFAULT_PREFS: Prefs = {
   title: '',
   asZip: true,
   includeInstructions: false,
-  binaryVariant: 'branded',
 };
 
 export async function getPrefs(): Promise<Prefs> {

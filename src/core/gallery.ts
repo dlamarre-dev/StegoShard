@@ -33,6 +33,7 @@ import {
   DEFAULT_ARGON2,
   GCM_TAG_LEN,
   IV_LEN,
+  KEY_BLOCK_LEN,
   createKeyBlock,
   decryptBytes,
   encryptBytes,
@@ -41,6 +42,8 @@ import {
   randomBytes,
   serializeKeyBlock,
 } from './crypto';
+import { buildPayload } from './payload';
+import type { KeyMode } from './types';
 import { decodeBlob, encodeShards, parityCount } from './erasure';
 import {
   CODEC_GALLERY,
@@ -105,6 +108,12 @@ export type GalleryImage =
 export interface GalleryEncodeOptions {
   /** Argon2 cost; leave unset in production (frozen DEFAULT_ARGON2). Tests pass cheaper values. */
   params?: Argon2Params;
+  /**
+   * How the vault key is delivered. 'embedded' (default) hides it in the fragments;
+   * 'keyfile'/'stego' leave it out (KB_LEN=0) so the caller delivers `keyBlock`
+   * separately (a loose .key or hidden in a cover photo).
+   */
+  keyMode?: KeyMode;
 }
 export interface GalleryEncodeResult {
   images: GalleryImage[];
@@ -112,9 +121,43 @@ export interface GalleryEncodeResult {
   m: number;
   decoys: number;
   setId: Uint8Array;
+  /** The serialized key block — travels in the images when embedded, else delivered externally. */
+  keyBlock: Uint8Array;
 }
 export interface GalleryDecodeOptions {
   params?: Argon2Params;
+  /** External key block for keyfile/stego galleries (omit for embedded). */
+  keyBlock?: Uint8Array | undefined;
+}
+
+/**
+ * Estimate how many cover photos a secret needs, without running Argon2. The
+ * vault blob is fixed-width apart from the (compressed) envelope, so blobLen is
+ * computable analytically; returns the shard split and the minimum photo count
+ * (`k + m + GALLERY_MIN_DECOYS`).
+ */
+export async function estimateGalleryCovers(
+  filename: string,
+  content: Uint8Array,
+  keyMode: KeyMode = 'embedded',
+): Promise<{ k: number; m: number; needed: number }> {
+  const envelope = await buildPayload(filename, content);
+  return galleryCoversForEnvelopeLen(envelope.length, keyMode);
+}
+
+/**
+ * The gallery shard split + minimum photo count for an already-built envelope
+ * length, without re-compressing (mirrors `imagesForEnvelopeLen`).
+ */
+export function galleryCoversForEnvelopeLen(
+  envelopeLen: number,
+  keyMode: KeyMode = 'embedded',
+): { k: number; m: number; needed: number } {
+  const embedded = keyMode === 'embedded';
+  const blobLen = 2 + (embedded ? KEY_BLOCK_LEN : 0) + IV_LEN + envelopeLen + GCM_TAG_LEN;
+  const k = Math.max(1, Math.ceil(blobLen / GALLERY_SLOT_DATA));
+  const m = parityCount(k);
+  return { k, m, needed: k + m + GALLERY_MIN_DECOYS };
 }
 
 /** Thrown when too few photos are supplied for the secret plus the decoy floor. */
@@ -273,6 +316,7 @@ export async function galleryEncode(
   options: GalleryEncodeOptions = {},
 ): Promise<GalleryEncodeResult> {
   const params = options.params ?? DEFAULT_ARGON2;
+  const keyMode = options.keyMode ?? 'embedded';
   if (covers.length > GALLERY_MAX_IMAGES) {
     throw new GalleryTooManyImagesError(covers.length, GALLERY_MAX_IMAGES);
   }
@@ -287,10 +331,12 @@ export async function galleryEncode(
     throw new GalleryFileTooLargeError(content.length, MAX_FILE_BYTES);
   }
 
-  // One self-contained, password-encrypted vault blob (key block embedded).
+  // One self-contained, password-encrypted vault blob. The key block travels in
+  // the fragments (embedded) or is left out for the caller to deliver separately.
   const { dek, block } = await createKeyBlock(password, params);
-  const key: VaultKey = { dek, keyBlock: serializeKeyBlock(block) };
-  const blob = await buildVaultBlob(filename, content, key, 'embedded');
+  const keyBlock = serializeKeyBlock(block);
+  const key: VaultKey = { dek, keyBlock };
+  const blob = await buildVaultBlob(filename, content, key, keyMode);
   if (blob.length > GALLERY_MAX_BLOB) {
     throw new GalleryFileTooLargeError(content.length, GALLERY_MAX_BLOB);
   }
@@ -335,13 +381,14 @@ export async function galleryEncode(
     images.push(await embedSlot(covers[i]!, slot, posKey));
   }
   posKey.fill(0);
-  return { images, k, m, decoys, setId };
+  return { images, k, m, decoys, setId, keyBlock };
 }
 
 /** Reconstruct one set's blob from its authenticated fragments, or throw. */
 async function reconstructGroup(
   members: { header: Header; shard: Uint8Array }[],
   password: string,
+  keyBlock: Uint8Array | undefined,
 ): Promise<{ filename: string; content: Uint8Array }> {
   const first = members[0]!.header;
   const { k, m, blobLen } = first;
@@ -361,7 +408,9 @@ async function reconstructGroup(
   const hash = await sha256Short(blob);
   if (toHex(hash) !== toHex(first.hash)) throw new GalleryRestoreError();
   return decodeVaultBlob(blob, password, {
-    keyBlock: undefined,
+    // External key block for keyfile/stego galleries; ignored when the blob
+    // carries an embedded one.
+    keyBlock,
     // The decompressed content ceiling — the compressed blob is bounded
     // separately by GALLERY_MAX_BLOB at encode time (see galleryEncode).
     maxContentBytes: MAX_FILE_BYTES,
@@ -412,7 +461,7 @@ export async function galleryDecode(
   }
   for (const members of [...groups.values()].sort((a, b) => b.length - a.length)) {
     try {
-      return await reconstructGroup(members, password);
+      return await reconstructGroup(members, password, options.keyBlock);
     } catch {
       // this set is incomplete or failed integrity — try the next
     }

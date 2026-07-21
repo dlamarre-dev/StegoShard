@@ -79,14 +79,17 @@ def _extract_slot(image_bytes: bytes, pos_key: bytes) -> bytes | None:
 def decode_gallery(
     images: list[bytes],
     password: str,
+    key_block: bytes | None = None,
     iterations: int = 3,
     memory_kib: int = 64 * 1024,
     parallelism: int = 1,
 ) -> RestoredFile:
     """Restore a secret from a folder of photos, blindly (SPEC §9.5).
 
-    `images` is the raw bytes of each candidate photo. The gallery Argon2 cost is
-    the frozen default (not stored); override only to match test fixtures.
+    `images` is the raw bytes of each candidate photo. `key_block` is the external
+    key for a keyfile/stego gallery (omit for the default embedded-key gallery).
+    The gallery Argon2 cost is the frozen default (not stored); override only to
+    match test fixtures.
     """
     pos_key, aead_key = _gallery_keys(password, iterations, memory_kib, parallelism)
     aead = AESGCM(aead_key)
@@ -121,7 +124,7 @@ def decode_gallery(
 
     for group in sorted(groups.values(), key=len, reverse=True):
         try:
-            return decode_vault(group, password)
+            return decode_vault(group, password, key_block)
         except Exception:  # noqa: BLE001 - incomplete/failed set, try the next
             continue
     raise GalleryRestoreError("gallery reconstruction failed")

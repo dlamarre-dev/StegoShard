@@ -102,6 +102,16 @@
                 ><input type="radio" name="dest" value="paper" /><span data-i18n="destPaper"></span
               ></label>
               <label
+                ><input type="radio" name="dest" value="binary" /><span
+                  data-i18n="destBinary"
+                ></span
+              ></label>
+              <label
+                ><input type="radio" name="dest" value="sqlite" /><span
+                  data-i18n="destSqlite"
+                ></span
+              ></label>
+              <label
                 ><input type="radio" name="dest" value="gallery" /><span
                   data-i18n="destGallery"
                 ></span
@@ -144,6 +154,36 @@
                 <input id="gallery-covers" type="file" accept="image/png,image/jpeg" multiple />
               </div>
               <p class="muted" data-i18n="galleryPasswordHint"></p>
+
+              <label class="muted" data-i18n="keyModeHeading"></label>
+              <fieldset class="segmented">
+                <label
+                  ><input type="radio" name="gallery-keymode" value="embedded" checked /><span
+                    data-i18n="keyModeEmbedded"
+                  ></span
+                ></label>
+                <label
+                  ><input type="radio" name="gallery-keymode" value="keyfile" /><span
+                    data-i18n="keyModeKeyfile"
+                  ></span
+                ></label>
+                <label
+                  ><input type="radio" name="gallery-keymode" value="stego" /><span
+                    data-i18n="keyModeStego"
+                  ></span
+                ></label>
+              </fieldset>
+              <div id="gallery-stego-fields" hidden>
+                <div id="gallery-cover-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                  <span class="dz-prompt">
+                    <span class="dz-title" data-i18n="coverTitle"></span><br />
+                    <span class="muted" data-i18n="dropPrompt"></span>
+                  </span>
+                  <span id="gallery-cover-name" class="dz-file"></span>
+                  <input id="gallery-cover" type="file" accept="image/png,image/jpeg" />
+                </div>
+                <p class="muted warn" data-i18n="stegoWarning"></p>
+              </div>
             </div>
 
             <div id="stego-fields" hidden>
