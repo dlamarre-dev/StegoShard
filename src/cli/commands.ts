@@ -332,6 +332,10 @@ export interface GallerySaveOptions {
   covers: string[];
   outDir: string;
   password: string;
+  /** 'embedded' (default), 'keyfile', or 'stego' — how the key is delivered. */
+  keyMode?: KeyMode;
+  /** Cover photo for --key-mode stego (the key is hidden in it). */
+  keyCover?: string | undefined;
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
 }
@@ -342,16 +346,21 @@ export interface GallerySaveResult {
   m: number;
   decoys: number;
   setId: string;
+  keyMode: KeyMode;
 }
 
 export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
   allowOverwrite = Boolean(opts.force);
+  const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
   if (coverPaths.length === 0) throw new Error('gallery: no cover images found in the given paths');
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
-  const res = await galleryEncode(basename(opts.secretFile), content, opts.password, covers);
+  const res = await galleryEncode(basename(opts.secretFile), content, opts.password, covers, {
+    keyMode,
+  });
+  const setHex = toHex(res.setId);
 
   const used = new Set<string>();
   const files = res.images.map((img) => {
@@ -362,7 +371,10 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     used.add(name);
     return writeOut(opts.outDir, name, f.bytes);
   });
-  return { files, k: res.k, m: res.m, decoys: res.decoys, setId: toHex(res.setId) };
+  // Deliver the external key alongside the photos for keyfile/stego galleries.
+  const ext = await externalKey(keyMode, res.keyBlock, setHex, opts.password, opts.keyCover);
+  if (ext) files.push(writeExternalKey(opts.outDir, ext));
+  return { files, k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
 }
 
 export interface GalleryRestoreResult {
@@ -377,7 +389,9 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   if (coverPaths.length === 0) throw new Error('gallery: no images found in the inputs');
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
-  const { filename, content } = await galleryDecode(covers, opts.password);
+  // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
+  const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
+  const { filename, content } = await galleryDecode(covers, opts.password, { keyBlock });
   const outName = basename(filename) || 'restored.bin';
   const outPath = writeOut(opts.outDir, outName, content);
   return { outPath, filename, seen: covers.length };

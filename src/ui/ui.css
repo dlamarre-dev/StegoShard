@@ -823,3 +823,20 @@ details.advanced[open] > summary::before {
 .wiz-nav .btn-primary {
   flex: 1 1 auto;
 }
+
+/* Wizard: greyed-out (unavailable) destination options + per-option notes. */
+.wiz-option--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wiz-option--disabled input {
+  cursor: not-allowed;
+}
+.wiz-option-note {
+  grid-column: 2;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.wiz-fileinfo {
+  margin-top: 10px;
+}

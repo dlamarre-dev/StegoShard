@@ -215,12 +215,17 @@ export async function galleryImageToBlob(img: GalleryImage): Promise<{ name: str
   return { name, blob };
 }
 
-/** Trigger a browser download for a blob. */
-export function downloadBlob(blob: Blob, filename: string): void {
+/**
+ * Trigger a browser download for a blob. When `subdir` is given, the file is
+ * placed in that folder under the browser's download directory — Chromium
+ * honors a relative path in the `download` attribute (Firefox/Safari flatten to
+ * the basename, so it degrades gracefully).
+ */
+export function downloadBlob(blob: Blob, filename: string, subdir?: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = subdir ? `${subdir}/${filename}` : filename;
   document.body.appendChild(a);
   a.click();
   a.remove();

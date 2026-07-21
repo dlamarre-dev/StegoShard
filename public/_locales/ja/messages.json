@@ -725,5 +725,108 @@
   "keyModeStegoDesc": {
     "message": "鍵はあなたが用意した普通の写真の中に隠されます。復元にはその写真を保管してください。",
     "description": "Wizard: stego key-mode description."
+  },
+  "destSqlite": {
+    "message": "偽のデータベース（.db）",
+    "description": "Destination: a binary vault disguised with a real SQLite header."
+  },
+  "destSqliteDesc": {
+    "message": "通常の SQLite データベースに偽装した単一ファイル。ファイル種別の判定では .db として扱われます。",
+    "description": "Wizard: disguised-SQLite destination description."
+  },
+  "statusGallerySavedKeyfile": {
+    "message": "$COUNT$ 枚の写真に保存しました。復元には別の .key ファイルとパスワードの両方を保管してください。",
+    "description": "Gallery Mode saved, keyfile key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusGallerySavedStego": {
+    "message": "$COUNT$ 枚の写真に保存しました。復元には鍵の写真とパスワードの両方を保管してください。",
+    "description": "Gallery Mode saved, stego key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizComputing": {
+    "message": "利用可能な形式を確認しています…",
+    "description": "Wizard file step: estimates are being computed."
+  },
+  "wizFileInfo": {
+    "message": "$SIZE$ · 利用可能: $FORMATS$",
+    "description": "Wizard file step: file size and the list of available formats.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "formats": {
+        "content": "$2"
+      }
+    }
+  },
+  "wizNoFormat": {
+    "message": "このファイルはどの形式にも大きすぎます。より小さいファイルをお試しください。",
+    "description": "Wizard file step: no destination can hold this file."
+  },
+  "wizTooLarge": {
+    "message": "大きすぎます（最大 1 MB）",
+    "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeBinary": {
+    "message": "大きすぎます（最大 100 MB）",
+    "description": "Wizard: destination unavailable — over the 100 MB binary cap."
+  },
+  "wizTooManyImages": {
+    "message": "$MAX$ 枚を超える画像が必要です",
+    "description": "Wizard: destination unavailable — would exceed the image ceiling.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizImagesCount": {
+    "message": "$N$ 枚の画像",
+    "description": "Wizard destination note: expected image count.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizOneFile": {
+    "message": "1 個のファイル",
+    "description": "Wizard destination note: a single output file."
+  },
+  "wizGalleryPhotos": {
+    "message": "約 $N$ 枚の写真",
+    "description": "Wizard destination note: cover photos a gallery needs.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryCovers": {
+    "message": "少なくとも $N$ 枚の写真を追加してください（JPG または PNG、できればすべて同じ形式）。",
+    "description": "Wizard gallery step: how many cover photos to add.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryNeed": {
+    "message": "このギャラリーには少なくとも $N$ 枚の写真が必要です。",
+    "description": "Wizard gallery step: not enough cover photos yet.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   }
 }

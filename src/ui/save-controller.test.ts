@@ -8,7 +8,12 @@ const saveFileToDisk = vi.fn(async (_file: unknown, _key: unknown, _opts: unknow
   setId: 'ab',
   keyMode: 'embedded',
 }));
-const saveFileToBinary = vi.fn(async () => ({ keyMode: 'embedded', variant: 'branded' }));
+const saveFileToBinary = vi.fn(
+  async (_file: unknown, _key: unknown, opts: { variant: 'branded' | 'disguised' }) => ({
+    keyMode: 'embedded' as const,
+    variant: opts.variant,
+  }),
+);
 const saveGalleryToDisk = vi.fn(async () => ({ imageCount: 5, k: 1, m: 2, decoys: 2, setId: 'cd' }));
 vi.mock('./disk', () => ({ saveFileToDisk, saveFileToBinary, saveGalleryToDisk }));
 
@@ -40,16 +45,26 @@ describe('runSave routing', () => {
     expect(note).toBe('statusSavedKeyfile:7');
   });
 
-  it('routes binary saves and localizes the variant', async () => {
+  it('routes binary saves as the branded variant', async () => {
     const { note } = await runSave({ dest: 'binary', file, key, keyMode: 'embedded' }, msg);
     expect(saveFileToBinary).toHaveBeenCalledOnce();
+    expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ variant: 'branded' });
     expect(note).toBe('statusSavedBinary:binaryVariantBranded');
+  });
+
+  it('routes sqlite saves as the disguised variant', async () => {
+    const { note } = await runSave({ dest: 'sqlite', file, key, keyMode: 'embedded' }, msg);
+    expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ variant: 'disguised' });
+    expect(note).toBe('statusSavedBinary:binaryVariantDisguised');
   });
 
   it('routes gallery saves with the covers + gallery password, no vault key needed', async () => {
     const covers = [new File([new Uint8Array([9])], 'a.jpg')];
     const { note } = await runSave({ dest: 'gallery', file, covers, galleryPassword: 'pw' }, msg);
-    expect(saveGalleryToDisk).toHaveBeenCalledWith(file, covers, 'pw');
+    expect(saveGalleryToDisk).toHaveBeenCalledWith(file, covers, 'pw', {
+      keyMode: 'embedded',
+      stego: undefined,
+    });
     expect(saveFileToDisk).not.toHaveBeenCalled();
     expect(note).toBe('statusGallerySaved:5');
   });

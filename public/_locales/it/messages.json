@@ -725,5 +725,108 @@
   "keyModeStegoDesc": {
     "message": "La chiave è nascosta in una foto ordinaria che fornisci tu. Conserva quella foto per ripristinare.",
     "description": "Wizard: stego key-mode description."
+  },
+  "destSqlite": {
+    "message": "Database falso (.db)",
+    "description": "Destination: a binary vault disguised with a real SQLite header."
+  },
+  "destSqliteDesc": {
+    "message": "Un file camuffato da normale database SQLite: l'analisi del tipo lo legge come un .db.",
+    "description": "Wizard: disguised-SQLite destination description."
+  },
+  "statusGallerySavedKeyfile": {
+    "message": "Salvato su $COUNT$ foto. Conserva il file .key separato E la password per ripristinare.",
+    "description": "Gallery Mode saved, keyfile key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusGallerySavedStego": {
+    "message": "Salvato su $COUNT$ foto. Conserva la foto chiave E la password per ripristinare.",
+    "description": "Gallery Mode saved, stego key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizComputing": {
+    "message": "verifica dei formati disponibili…",
+    "description": "Wizard file step: estimates are being computed."
+  },
+  "wizFileInfo": {
+    "message": "$SIZE$ · Disponibili: $FORMATS$",
+    "description": "Wizard file step: file size and the list of available formats.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "formats": {
+        "content": "$2"
+      }
+    }
+  },
+  "wizNoFormat": {
+    "message": "Questo file è troppo grande per qualsiasi formato. Prova un file più piccolo.",
+    "description": "Wizard file step: no destination can hold this file."
+  },
+  "wizTooLarge": {
+    "message": "troppo grande (max 1 MB)",
+    "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeBinary": {
+    "message": "troppo grande (max 100 MB)",
+    "description": "Wizard: destination unavailable — over the 100 MB binary cap."
+  },
+  "wizTooManyImages": {
+    "message": "richiede più di $MAX$ immagini",
+    "description": "Wizard: destination unavailable — would exceed the image ceiling.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizImagesCount": {
+    "message": "$N$ immagini",
+    "description": "Wizard destination note: expected image count.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizOneFile": {
+    "message": "1 file",
+    "description": "Wizard destination note: a single output file."
+  },
+  "wizGalleryPhotos": {
+    "message": "~$N$ foto",
+    "description": "Wizard destination note: cover photos a gallery needs.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryCovers": {
+    "message": "Aggiungi almeno $N$ foto (JPG o PNG, idealmente tutte dello stesso formato).",
+    "description": "Wizard gallery step: how many cover photos to add.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryNeed": {
+    "message": "Questa galleria richiede almeno $N$ foto.",
+    "description": "Wizard gallery step: not enough cover photos yet.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   }
 }

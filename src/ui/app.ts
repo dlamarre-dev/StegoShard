@@ -1,6 +1,5 @@
 import browser from 'webextension-polyfill';
 import {
-  type BinaryVariant,
   estimateImages,
   PROFILE_CLOUD,
   PROFILE_DISK,
@@ -54,9 +53,6 @@ const bandFields = el('band-fields');
 const bandTitle = el<HTMLInputElement>('band-title');
 const asZip = el<HTMLInputElement>('as-zip');
 const zipField = el('zip-field');
-const binaryFields = el('binary-fields');
-const binaryVariant = el<HTMLSelectElement>('binary-variant');
-const binaryVariantHelp = el('binary-variant-help');
 const sizeWarn = el('size-warn');
 const paperFields = el('paper-fields');
 const addInstructions = el<HTMLInputElement>('add-instructions');
@@ -74,6 +70,10 @@ const galleryCovers = el<HTMLInputElement>('gallery-covers');
 const galleryCoversDrop = el('gallery-covers-drop');
 const galleryCoversName = el('gallery-covers-name');
 const gallerySavePw = el<HTMLInputElement>('gallery-save-pw');
+const galleryStegoFields = el('gallery-stego-fields');
+const galleryCover = el<HTMLInputElement>('gallery-cover');
+const galleryCoverDrop = el('gallery-cover-drop');
+const galleryCoverName = el('gallery-cover-name');
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
 const restoreDrop = el('restore-drop');
@@ -91,6 +91,7 @@ const restoreAdvanced = el('restore-advanced');
 const restoreGalleryHint = el('restore-gallery-hint');
 
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
+const selectedGalleryKeyMode = () => pick<KeyMode>('gallery-keymode', 'embedded');
 const selectedDest = () => pick<Destination>('dest', 'disk');
 const selectedRestoreMode = () => pick<RestoreMode>('restore-mode', 'standard');
 
@@ -106,32 +107,22 @@ function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputEleme
   chip.textContent = file ? file.name : '';
 }
 
-const selectedVariant = () => binaryVariant.value as BinaryVariant;
-
 /** Show the option controls that match the chosen destination. */
 function reflectDestination(): void {
   const dest = selectedDest();
-  // Gallery derives its own key from a dedicated password and produces innocuous
-  // photos — the key mode, label band, zip and image estimate don't apply to it.
+  // Gallery has its own key mode + password and produces innocuous photos; the
+  // label band, zip and image estimate don't apply to it (nor to binary/sqlite).
   const gallery = dest === 'gallery';
   show(galleryFields, gallery);
   show(keymodeFields, !gallery);
   show(estimateLine, !gallery);
   show(zipField, dest === 'disk');
-  show(binaryFields, dest === 'binary');
   show(paperFields, dest === 'paper');
-  // A label band is drawn onto images; it makes no sense for binary output.
+  // A label band is only drawn onto images.
   show(addBandLabel, dest === 'disk');
-  show(bandFields, !gallery && ((dest !== 'disk' && dest !== 'binary') || addBand.checked));
-  reflectVariant();
+  show(bandFields, dest === 'paper' || dest === 'cloud' || (dest === 'disk' && addBand.checked));
   reflectKeyMode();
-}
-
-/** Update the binary-variant help text to match the chosen variant. */
-function reflectVariant(): void {
-  binaryVariantHelp.textContent = msg(
-    selectedVariant() === 'branded' ? 'binaryVariantHelpBranded' : 'binaryVariantHelpDisguised',
-  );
+  reflectGalleryKeyMode();
 }
 
 /** Show the cover-image + password inputs only for the stego key mode. */
@@ -139,11 +130,16 @@ function reflectKeyMode(): void {
   show(stegoFields, selectedDest() !== 'gallery' && selectedKeyMode() === 'stego');
 }
 
-/** Standard restore uses a key file; gallery restore is password-only. */
+/** Gallery has its own key mode; show its stego cover picker only for stego. */
+function reflectGalleryKeyMode(): void {
+  show(galleryStegoFields, selectedDest() === 'gallery' && selectedGalleryKeyMode() === 'stego');
+}
+
+/** Both modes can take a key: standard vaults, and keyfile/stego galleries. */
 function reflectRestoreMode(): void {
   const gallery = selectedRestoreMode() === 'gallery';
   show(restoreGalleryHint, gallery);
-  show(restoreAdvanced, !gallery);
+  show(restoreAdvanced, true);
 }
 
 if (HAS_GOOGLE_PHOTOS) {
@@ -162,7 +158,6 @@ async function loadPrefs(): Promise<void> {
   bandTitle.value = prefs.title;
   asZip.checked = prefs.asZip;
   addInstructions.checked = prefs.includeInstructions;
-  binaryVariant.value = prefs.binaryVariant;
   // Highlight the workflow the user last chose as the recommended one.
   show(el('rec-guided'), prefs.workflow === 'guided');
   show(el('rec-expert'), prefs.workflow === 'expert');
@@ -184,8 +179,8 @@ const wizardEnv: WizardEnv = {
   msg,
   locale: () => browser.i18n.getUILanguage(),
   saveDestinations: HAS_GOOGLE_PHOTOS
-    ? ['disk', 'paper', 'binary', 'cloud', 'gallery']
-    : ['disk', 'paper', 'binary', 'gallery'],
+    ? ['disk', 'paper', 'binary', 'sqlite', 'cloud', 'gallery']
+    : ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
   getSaveKey: async () => {
     const s = await getSession();
     if (!s) throw new Error(msg('errLocked'));
@@ -295,10 +290,9 @@ for (const radio of document.querySelectorAll('input[name="keymode"]')) {
     void updateEstimate();
   });
 }
-binaryVariant.addEventListener('change', () => {
-  reflectVariant();
-  void savePrefs({ binaryVariant: selectedVariant() });
-});
+for (const radio of document.querySelectorAll('input[name="gallery-keymode"]')) {
+  radio.addEventListener('change', reflectGalleryKeyMode);
+}
 
 async function updateEstimate(): Promise<void> {
   const file = saveFile.files?.[0];
@@ -309,7 +303,7 @@ async function updateEstimate(): Promise<void> {
   }
   const dest = selectedDest();
   if (dest === 'gallery') return; // its estimate line is hidden — nothing to compute
-  if (dest === 'binary') {
+  if (dest === 'binary' || dest === 'sqlite') {
     // A single file, whatever the size — show that instead of an image count.
     estimate.textContent = '1';
     show(sizeWarn, false);
@@ -354,6 +348,9 @@ wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreK
 wireDropzone(galleryCoversDrop, galleryCovers, () =>
   reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers),
 );
+wireDropzone(galleryCoverDrop, galleryCover, () =>
+  reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
+);
 
 for (const radio of document.querySelectorAll('input[name="restore-mode"]')) {
   radio.addEventListener('change', reflectRestoreMode);
@@ -391,7 +388,22 @@ saveBtn.addEventListener('click', async () => {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
     if (covers.length === 0) return setStatus(saveStatus, msg('errNoCovers'), true);
     if (!gallerySavePw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
-    await doSave({ dest, file, covers, galleryPassword: gallerySavePw.value });
+    const gKeyMode = selectedGalleryKeyMode();
+    let gStego: StegoInput | undefined;
+    if (gKeyMode === 'stego') {
+      const cover = galleryCover.files?.[0];
+      if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
+      // The gallery stego cover is keyed by the gallery password (not the managed key).
+      gStego = { cover, password: gallerySavePw.value };
+    }
+    await doSave({
+      dest,
+      file,
+      covers,
+      galleryPassword: gallerySavePw.value,
+      keyMode: gKeyMode,
+      stego: gStego,
+    });
     return;
   }
 
@@ -428,7 +440,6 @@ saveBtn.addEventListener('click', async () => {
     keyMode,
     label: useLabel ? { title, date } : undefined,
     asZip: asZip.checked,
-    variant: selectedVariant(),
     includeInstructions: addInstructions.checked,
     passwordHint: pwHint.value.trim() || undefined,
     keyLocation: keyLocation.value.trim() || undefined,

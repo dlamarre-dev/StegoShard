@@ -14,7 +14,7 @@ export interface RestoreRequest {
   mode: RestoreMode;
   files: File[];
   password: string;
-  /** Standard mode only: a `.key` file or a stego cover image. */
+  /** A `.key` file or a stego cover image (standard, or a keyfile/stego gallery). */
   keyFile?: File | undefined;
   /** Standard mode only: already-decoded payloads (e.g. live camera captures). */
   extraPayloads?: Uint8Array[];
@@ -27,7 +27,7 @@ export async function runRestore(
 ): Promise<{ filename: string; note: string }> {
   const { filename } =
     req.mode === 'gallery'
-      ? await restoreGalleryFromDisk(req.files, req.password)
+      ? await restoreGalleryFromDisk(req.files, req.password, req.keyFile)
       : await restoreFileFromDisk(req.files, req.password, req.keyFile, req.extraPayloads ?? []);
   return { filename, note: msg('statusRestored', filename) };
 }

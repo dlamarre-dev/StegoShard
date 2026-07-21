@@ -725,5 +725,108 @@
   "keyModeStegoDesc": {
     "message": "金鑰藏在您提供的一張普通照片中。請保留該照片以便還原。",
     "description": "Wizard: stego key-mode description."
+  },
+  "destSqlite": {
+    "message": "偽裝的資料庫（.db）",
+    "description": "Destination: a binary vault disguised with a real SQLite header."
+  },
+  "destSqliteDesc": {
+    "message": "偽裝成一般 SQLite 資料庫的單一檔案 — 檔案類型判斷會將它視為 .db。",
+    "description": "Wizard: disguised-SQLite destination description."
+  },
+  "statusGallerySavedKeyfile": {
+    "message": "已儲存於 $COUNT$ 張照片。還原時請同時保留獨立的 .key 檔案與您的密碼。",
+    "description": "Gallery Mode saved, keyfile key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusGallerySavedStego": {
+    "message": "已儲存於 $COUNT$ 張照片。還原時請同時保留金鑰照片與您的密碼。",
+    "description": "Gallery Mode saved, stego key.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizComputing": {
+    "message": "正在檢查可用的格式…",
+    "description": "Wizard file step: estimates are being computed."
+  },
+  "wizFileInfo": {
+    "message": "$SIZE$ · 可用：$FORMATS$",
+    "description": "Wizard file step: file size and the list of available formats.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "formats": {
+        "content": "$2"
+      }
+    }
+  },
+  "wizNoFormat": {
+    "message": "這個檔案對任何格式來說都太大了。請改用較小的檔案。",
+    "description": "Wizard file step: no destination can hold this file."
+  },
+  "wizTooLarge": {
+    "message": "太大（上限 1 MB）",
+    "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeBinary": {
+    "message": "太大（上限 100 MB）",
+    "description": "Wizard: destination unavailable — over the 100 MB binary cap."
+  },
+  "wizTooManyImages": {
+    "message": "需要超過 $MAX$ 張圖片",
+    "description": "Wizard: destination unavailable — would exceed the image ceiling.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizImagesCount": {
+    "message": "$N$ 張圖片",
+    "description": "Wizard destination note: expected image count.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizOneFile": {
+    "message": "1 個檔案",
+    "description": "Wizard destination note: a single output file."
+  },
+  "wizGalleryPhotos": {
+    "message": "約 $N$ 張照片",
+    "description": "Wizard destination note: cover photos a gallery needs.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryCovers": {
+    "message": "請至少加入 $N$ 張照片（JPG 或 PNG，最好全部同一種格式）。",
+    "description": "Wizard gallery step: how many cover photos to add.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryNeed": {
+    "message": "這個相簿至少需要 $N$ 張照片。",
+    "description": "Wizard gallery step: not enough cover photos yet.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   }
 }

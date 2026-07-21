@@ -7,7 +7,20 @@
  * each supplies its differences through a `WizardEnv`.
  */
 
-import type { KeyMode, VaultKey } from '@core';
+import {
+  type KeyMode,
+  type VaultKey,
+  GALLERY_K_MAX,
+  MAX_FILE_BYTES,
+  MAX_FILE_BYTES_BINARY,
+  MAX_IMAGES,
+  PROFILE_CLOUD,
+  PROFILE_DISK,
+  PROFILE_PAPER,
+  buildPayload,
+  galleryCoversForEnvelopeLen,
+  imagesForEnvelopeLen,
+} from '@core';
 import { friendlyError as friendlyErrorWith, reflectFiles, wireDropzone } from './domhelpers';
 import { runSave, type SaveDestination, type SaveRequest } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
@@ -47,6 +60,18 @@ export interface WizardEnv {
 
 type Action = 'save' | 'restore';
 
+/** Per-destination availability + expected output count for the chosen file. */
+interface DestEstimate {
+  available: boolean;
+  /** Images (disk/paper/cloud), 1 (binary/sqlite), or needed photos (gallery). */
+  count: number;
+  /** Gallery only: minimum cover photos needed. */
+  needed?: number;
+  /** Why unavailable, when `available` is false. */
+  reason?: string;
+}
+type Estimates = Partial<Record<SaveDestination, DestEstimate>>;
+
 interface State {
   action: Action | null;
   // save
@@ -56,6 +81,9 @@ interface State {
   stegoCover: File | null;
   covers: File[];
   savePassword: string;
+  /** Per-destination availability for `file`, and which file it was computed for. */
+  estimates: Estimates | null;
+  estimatesFor: File | null;
   // restore
   restoreMode: RestoreMode;
   restoreFiles: File[];
@@ -75,6 +103,8 @@ function initialState(env: WizardEnv): State {
     stegoCover: null,
     covers: [],
     savePassword: '',
+    estimates: null,
+    estimatesFor: null,
     restoreMode: 'standard',
     restoreFiles: [],
     keyFile: null,
@@ -104,6 +134,13 @@ function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
+
+/** Human-readable byte size, e.g. "512 KB" / "1.4 MB". */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export interface Wizard {
   /** Rebuild from the first step (used when re-entering the guided workflow). */
@@ -138,15 +175,17 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     if (state.action === 'save') {
       const s = ['action', 'file', 'dest'];
       if (state.dest === 'gallery') s.push('covers');
-      else s.push('keymode');
-      if (state.dest !== 'gallery' && state.keyMode === 'stego') s.push('stego');
+      // Key handling applies to every destination now (gallery too): embedded,
+      // a separate .key, or hidden in a photo.
+      s.push('keymode');
+      if (state.keyMode === 'stego') s.push('stego');
       if (needsPasswordStep()) s.push('password');
       s.push('run');
       return s;
     }
-    const s = ['action', 'restore-mode', 'restore-files'];
-    if (state.restoreMode === 'standard') s.push('keyfile');
-    s.push('restore-password', 'run');
+    // The key step is offered for both modes: standard restores may need a .key
+    // or stego cover, and a keyfile/stego gallery needs its external key too.
+    const s = ['action', 'restore-mode', 'restore-files', 'keyfile', 'restore-password', 'run'];
     return s;
   }
 
@@ -167,11 +206,71 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     render();
   }
 
+  // --- per-file destination availability + counts ----------------------------
+
+  /** Availability + count for one destination, from the file's size + envelope length. */
+  function estimateFor(dest: SaveDestination, size: number, envelopeLen: number): DestEstimate {
+    if (dest === 'binary' || dest === 'sqlite') {
+      return size <= MAX_FILE_BYTES_BINARY
+        ? { available: true, count: 1 }
+        : { available: false, count: 0, reason: msg('wizTooLargeBinary') };
+    }
+    if (dest === 'gallery') {
+      if (size > MAX_FILE_BYTES) return { available: false, count: 0, reason: msg('wizTooLarge') };
+      const { k, needed } = galleryCoversForEnvelopeLen(envelopeLen, 'embedded');
+      return k <= GALLERY_K_MAX
+        ? { available: true, count: needed, needed }
+        : { available: false, count: 0, reason: msg('wizTooLarge') };
+    }
+    // disk / paper / cloud
+    if (size > MAX_FILE_BYTES) return { available: false, count: 0, reason: msg('wizTooLarge') };
+    const profile = dest === 'paper' ? PROFILE_PAPER : dest === 'cloud' ? PROFILE_CLOUD : PROFILE_DISK;
+    const { images } = imagesForEnvelopeLen(envelopeLen, { profile, keyMode: 'embedded' });
+    return images <= MAX_IMAGES
+      ? { available: true, count: images }
+      : { available: false, count: 0, reason: msg('wizTooManyImages', String(MAX_IMAGES)) };
+  }
+
+  /** Compute (once per file) which destinations fit and their output counts. */
+  async function ensureEstimates(): Promise<void> {
+    const file = state.file;
+    if (!file || state.estimatesFor === file) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // Compress once — the envelope length drives every image/gallery count.
+    const envelopeLen = (await buildPayload(file.name, bytes)).length;
+    if (state.file !== file) return; // a newer file superseded this computation
+    const est: Estimates = {};
+    for (const d of env.saveDestinations) est[d] = estimateFor(d, file.size, envelopeLen);
+    state.estimates = est;
+    state.estimatesFor = file;
+    // If the remembered destination no longer fits, fall back to the first that does.
+    if (!est[state.dest]?.available) {
+      const firstOk = env.saveDestinations.find((d) => est[d]?.available);
+      if (firstOk) state.dest = firstOk;
+    }
+    render();
+  }
+
+  const availableDests = (): SaveDestination[] =>
+    env.saveDestinations.filter((d) => state.estimates?.[d]?.available);
+
+  function countNote(dest: SaveDestination, e: DestEstimate): string {
+    if (dest === 'binary' || dest === 'sqlite') return msg('wizOneFile');
+    if (dest === 'gallery') return msg('wizGalleryPhotos', String(e.needed ?? e.count));
+    return msg('wizImagesCount', String(e.count));
+  }
+
   // --- option lists (radio-style cards reusing the .segmented look) ----------
 
   function optionList(
     name: string,
-    options: { value: string; label: string; desc: string }[],
+    options: {
+      value: string;
+      label: string;
+      desc: string;
+      disabled?: boolean | undefined;
+      note?: string | undefined;
+    }[],
     current: string,
     onPick: (value: string) => void,
   ): HTMLElement {
@@ -181,16 +280,18 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         type: 'radio',
         name,
         value: opt.value,
-        ...(opt.value === current ? { checked: '' } : {}),
+        ...(opt.value === current && !opt.disabled ? { checked: '' } : {}),
+        ...(opt.disabled ? { disabled: '' } : {}),
       });
       input.addEventListener('change', () => onPick(opt.value));
       wrap.append(
         h(
           'label',
-          { class: 'wiz-option' },
+          { class: opt.disabled ? 'wiz-option wiz-option--disabled' : 'wiz-option' },
           input,
           h('span', { class: 'wiz-option-label', text: opt.label }),
           h('span', { class: 'wiz-option-desc muted', text: opt.desc }),
+          opt.note ? h('span', { class: 'wiz-option-note', text: opt.note }) : null,
         ),
       );
     }
@@ -264,26 +365,69 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             (v) => chooseAction(v as Action),
           ),
         };
-      case 'file':
-        return {
-          title: msg('wizFileTitle'),
-          body: filePicker(msg('dropTitle'), false, null, state.file ? [state.file] : [], (f) => {
+      case 'file': {
+        const body = h(
+          'div',
+          {},
+          filePicker(msg('dropTitle'), false, null, state.file ? [state.file] : [], (f) => {
             state.file = f[0] ?? null;
+            state.estimates = null; // recompute for the new file
+            render();
           }),
-        };
+        );
+        if (state.file) {
+          if (state.estimatesFor !== state.file) {
+            body.append(
+              h('p', {
+                class: 'muted wiz-fileinfo',
+                text: `${formatSize(state.file.size)} · ${msg('wizComputing')}`,
+              }),
+            );
+            void ensureEstimates();
+          } else {
+            const avail = availableDests();
+            if (avail.length === 0) {
+              body.append(h('p', { class: 'status error', text: msg('wizNoFormat') }));
+            } else {
+              body.append(
+                h('p', {
+                  class: 'muted wiz-fileinfo',
+                  text: msg('wizFileInfo', [
+                    formatSize(state.file.size),
+                    avail.map((d) => destLabel(d)).join(', '),
+                  ]),
+                }),
+              );
+            }
+          }
+        }
+        return { title: msg('wizFileTitle'), body };
+      }
       case 'dest': {
         const labels: Record<SaveDestination, [string, string]> = {
           disk: [msg('destDisk'), msg('destDiskDesc')],
           paper: [msg('destPaper'), msg('destPaperDesc')],
           binary: [msg('destBinary'), msg('destBinaryDesc')],
+          sqlite: [msg('destSqlite'), msg('destSqliteDesc')],
           cloud: [msg('destCloud'), msg('destCloudDesc')],
           gallery: [msg('destGallery'), msg('destGalleryDesc')],
         };
+        if (state.file) void ensureEstimates();
+        const est = state.estimates;
         return {
           title: msg('wizDestTitle'),
           body: optionList(
             'wiz-dest',
-            env.saveDestinations.map((d) => ({ value: d, label: labels[d][0], desc: labels[d][1] })),
+            env.saveDestinations.map((d) => {
+              const e = est?.[d];
+              return {
+                value: d,
+                label: labels[d][0],
+                desc: labels[d][1],
+                disabled: e ? !e.available : false,
+                note: e ? (e.available ? countNote(d, e) : e.reason) : '…',
+              };
+            }),
             state.dest,
             (v) => {
               state.dest = v as SaveDestination;
@@ -291,18 +435,24 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           ),
         };
       }
-      case 'covers':
+      case 'covers': {
+        if (state.file) void ensureEstimates();
+        const needed = state.estimates?.gallery?.needed;
         return {
           title: msg('galleryCoversTitle'),
           body: h(
             'div',
             {},
-            h('p', { class: 'muted', text: msg('galleryIntro') }),
+            h('p', {
+              class: 'muted',
+              text: needed ? msg('wizGalleryCovers', String(needed)) : msg('galleryIntro'),
+            }),
             filePicker(msg('galleryCoversTitle'), true, 'image/png,image/jpeg', state.covers, (f) => {
               state.covers = f;
             }),
           ),
         };
+      }
       case 'keymode':
         return {
           title: msg('wizKeyTitle'),
@@ -446,19 +596,22 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   // --- run the actual save / restore -----------------------------------------
 
   async function buildSaveRequest(): Promise<SaveRequest> {
+    // The stego cover (when chosen) is keyed by the same password the user typed.
+    const stego =
+      state.keyMode === 'stego' && state.stegoCover
+        ? { cover: state.stegoCover, password: state.savePassword }
+        : undefined;
     if (state.dest === 'gallery') {
       return {
         dest: 'gallery',
         file: state.file!,
         covers: state.covers,
         galleryPassword: state.savePassword,
+        keyMode: state.keyMode,
+        stego,
       };
     }
     const key = await env.getSaveKey(state.savePassword);
-    const stego =
-      state.keyMode === 'stego' && state.stegoCover
-        ? { cover: state.stegoCover, password: state.savePassword }
-        : undefined;
     return {
       dest: state.dest,
       file: state.file!,
@@ -467,7 +620,6 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       // Guided uses friendly defaults for the advanced knobs the expert UI exposes.
       asZip: state.dest === 'disk' ? true : undefined,
       includeInstructions: state.dest === 'paper',
-      variant: 'branded',
       stego,
       locale: env.locale(),
     };
@@ -476,8 +628,18 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   function validate(): string | null {
     const list = steps();
     const id = list[state.index];
-    if (id === 'file' && !state.file) return msg('errNoFile');
-    if (id === 'covers' && state.covers.length === 0) return msg('errNoCovers');
+    if (id === 'file') {
+      if (!state.file) return msg('errNoFile');
+      // Block only once estimates are in and nothing fits (they compute fast).
+      if (state.estimatesFor === state.file && availableDests().length === 0) {
+        return msg('wizNoFormat');
+      }
+    }
+    if (id === 'covers') {
+      if (state.covers.length === 0) return msg('errNoCovers');
+      const needed = state.estimates?.gallery?.needed;
+      if (needed && state.covers.length < needed) return msg('wizGalleryNeed', String(needed));
+    }
     if (id === 'stego' && !state.stegoCover) return msg('errNoCover');
     if (id === 'password' && !state.savePassword) return msg('errNoPassword');
     if (id === 'restore-files') {

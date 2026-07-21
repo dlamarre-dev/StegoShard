@@ -28,10 +28,16 @@ describe('runRestore routing', () => {
     expect(note).toBe('statusRestored:secret.txt');
   });
 
-  it('routes gallery restores through restoreGalleryFromDisk (password only)', async () => {
+  it('routes gallery restores through restoreGalleryFromDisk (embedded: no key)', async () => {
     const { note } = await runRestore({ mode: 'gallery', files: [img], password: 'pw' }, msg);
-    expect(restoreGalleryFromDisk).toHaveBeenCalledWith([img], 'pw');
+    expect(restoreGalleryFromDisk).toHaveBeenCalledWith([img], 'pw', undefined);
     expect(restoreFileFromDisk).not.toHaveBeenCalled();
     expect(note).toBe('statusRestored:note.txt');
+  });
+
+  it('forwards the key file to a keyfile/stego gallery restore', async () => {
+    const keyFile = new File([new Uint8Array([2])], 'vault.key');
+    await runRestore({ mode: 'gallery', files: [img], password: 'pw', keyFile }, msg);
+    expect(restoreGalleryFromDisk).toHaveBeenCalledWith([img], 'pw', keyFile);
   });
 });

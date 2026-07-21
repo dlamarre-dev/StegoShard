@@ -55,6 +55,22 @@ async function blobBytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+/**
+ * Download a set of files. When there is more than one, they are grouped into a
+ * `subdir` under the browser's download folder (so a save never scatters loose
+ * files), with a small gap between downloads to avoid batch-blocking.
+ */
+async function deliver(downloads: { name: string; blob: Blob }[], subdir: string): Promise<void> {
+  const multi = downloads.length > 1;
+  for (let i = 0; i < downloads.length; i++) {
+    downloadBlob(downloads[i]!.blob, downloads[i]!.name, multi ? subdir : undefined);
+    if (i < downloads.length - 1) await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+const octet = (bytes: Uint8Array, type = 'application/octet-stream'): Blob =>
+  new Blob([bytes as BufferSource], { type });
+
 /** Encode a file into a set of PNG images and download them (or a .zip). */
 export async function saveFileToDisk(
   file: File,
@@ -104,31 +120,21 @@ export async function saveFileToDisk(
     };
   }
 
+  // Collect everything this save produces, then deliver. A separate key (a .key
+  // or a stego cover) is always delivered on its own — never inside the .zip —
+  // so the two factors stay physically separate.
+  const downloads: { name: string; blob: Blob }[] = [];
   if (options.asZip) {
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
-    if (externalKey && keyMode === 'keyfile') entries[externalKey.name] = externalKey.bytes;
     const zipped = zipSync(entries, { level: 0 }); // PNGs are already compressed
-    downloadBlob(new Blob([zipped as BufferSource]), `stegoshard-${setHex}.zip`);
-    if (externalKey && keyMode === 'stego') {
-      downloadBlob(
-        new Blob([externalKey.bytes as BufferSource], { type: externalKey.mime }),
-        externalKey.name,
-      );
-    }
+    downloads.push({ name: `stegoshard-${setHex}.zip`, blob: octet(zipped) });
   } else {
-    for (const p of pngs) {
-      downloadBlob(new Blob([p.bytes as BufferSource], { type: 'image/png' }), p.name);
-      await new Promise((r) => setTimeout(r, 150)); // avoid batch-blocking
-    }
-    if (externalKey) {
-      downloadBlob(
-        new Blob([externalKey.bytes as BufferSource], { type: externalKey.mime }),
-        externalKey.name,
-      );
-    }
+    for (const p of pngs) downloads.push({ name: p.name, blob: octet(p.bytes, 'image/png') });
   }
+  if (externalKey) downloads.push({ name: externalKey.name, blob: octet(externalKey.bytes, externalKey.mime) });
 
+  await deliver(downloads, `stegoshard-${setHex}`);
   return { imageCount: total, setId: setHex, keyMode };
 }
 
@@ -147,26 +153,26 @@ export async function saveFileToBinary(
     keyMode: options.keyMode,
     variant: options.variant,
   });
-  downloadBlob(
-    new Blob([container as BufferSource], { type: 'application/octet-stream' }),
-    binaryVaultName(options.variant),
-  );
+  const downloads: { name: string; blob: Blob }[] = [
+    { name: binaryVaultName(options.variant), blob: octet(container) },
+  ];
 
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const stegoKey = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
-    downloadBlob(
-      new Blob([stegoKey.bytes as BufferSource], { type: stegoKey.mime }),
-      stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
-    );
+    downloads.push({
+      name: stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
+      blob: octet(stegoKey.bytes, stegoKey.mime),
+    });
   } else if (keyMode === 'keyfile') {
-    downloadBlob(
-      new Blob([wrapBinary(keyBlock, options.variant) as BufferSource], {
-        type: 'application/octet-stream',
-      }),
-      binaryKeyName(options.variant),
-    );
+    downloads.push({
+      name: binaryKeyName(options.variant),
+      blob: octet(wrapBinary(keyBlock, options.variant)),
+    });
   }
+  // No setId on the binary path — group the vault + key under a random-id folder.
+  const id = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+  await deliver(downloads, `stegoshard-${id}`);
   return { keyMode, variant: options.variant };
 }
 
@@ -180,44 +186,75 @@ export interface GallerySaveResult {
 
 /**
  * Gallery Mode (SPEC §9): hide a secret fragmented across the given cover photos
- * plus decoys, then download every (modified) photo individually — keeping each
- * cover's own filename so the set blends into a photo library (no telltale zip).
+ * plus decoys, then download every (modified) photo, keeping each cover's own
+ * filename so the set blends into a photo library (no telltale zip). By default
+ * the key is embedded in the fragments; keyMode 'keyfile'/'stego' deliver it
+ * separately (a loose .key or hidden in a cover photo — a deniability trade-off).
  */
 export async function saveGalleryToDisk(
   secret: File,
   covers: File[],
   password: string,
+  options: { keyMode?: KeyMode; stego?: SaveOptions['stego'] } = {},
 ): Promise<GallerySaveResult> {
+  const keyMode = options.keyMode ?? 'embedded';
   const content = new Uint8Array(await secret.arrayBuffer());
   const galleryCovers = await Promise.all(covers.map(fileToGalleryCover));
-  const res = await galleryEncode(secret.name, content, password, galleryCovers);
+  const res = await galleryEncode(secret.name, content, password, galleryCovers, { keyMode });
+  const setHex = toHex(res.setId);
 
   // Two covers can share a basename, and gallery reuses cover names — disambiguate.
+  const downloads: { name: string; blob: Blob }[] = [];
   const used = new Set<string>();
   for (const img of res.images) {
     const { name, blob } = await galleryImageToBlob(img);
     let unique = name;
     for (let n = 2; used.has(unique); n++) unique = name.replace(/(\.[^.]+)?$/, `-${n}$1`);
     used.add(unique);
-    downloadBlob(blob, unique);
-    await new Promise((r) => setTimeout(r, 150)); // avoid batch-blocking downloads
+    downloads.push({ name: unique, blob });
   }
-  return {
-    imageCount: res.images.length,
-    k: res.k,
-    m: res.m,
-    decoys: res.decoys,
-    setId: toHex(res.setId),
-  };
+  // A separate key rides alongside the photos when not embedded.
+  if (keyMode === 'stego') {
+    if (!options.stego) throw new Error('stego mode requires a cover image and password');
+    const k = await embedKeyImage(options.stego.cover, res.keyBlock, options.stego.password);
+    downloads.push({
+      name: stegoKeyName(options.stego.cover.name, k.ext, setHex),
+      blob: octet(k.bytes, k.mime),
+    });
+  } else if (keyMode === 'keyfile') {
+    // Deniability caveat: a `.key` (and its telltale name) sitting beside the
+    // photos gives the gallery away. keyfile trades deniability for a key you
+    // can store apart from the photos — opt-in, unlike the deniable stego/embedded
+    // modes. Stego keeps the cover's own filename (blends in); keyfile does not.
+    downloads.push({ name: `stegoshard-${setHex}.key`, blob: octet(res.keyBlock) });
+  }
+
+  // Neutral folder name (the bare set id, no "stegoshard-" prefix) so grouping
+  // the photos doesn't itself betray the gallery.
+  await deliver(downloads, setHex);
+  return { imageCount: res.images.length, k: res.k, m: res.m, decoys: res.decoys, setId: setHex };
 }
 
 /** Restore a secret from a set of gallery photos (blind winnowing) and download it. */
 export async function restoreGalleryFromDisk(
   files: File[],
   password: string,
+  keyFile?: File,
 ): Promise<{ filename: string }> {
   const covers = await Promise.all(files.map(fileToGalleryCover));
-  const { filename, content } = await galleryDecode(covers, password);
+  // Optional external key (keyfile/stego galleries): a .key, a binary key
+  // container, or a stego cover de-embedded with the restore password.
+  let keyBlock: Uint8Array | undefined;
+  if (keyFile) {
+    const bytes = await blobBytes(keyFile);
+    const unwrapped = unwrapBinary(bytes);
+    keyBlock = unwrapped
+      ? unwrapped.payload
+      : isKey(keyFile.name)
+        ? bytes
+        : ((await extractKeyImage(keyFile, password)) ?? undefined);
+  }
+  const { filename, content } = await galleryDecode(covers, password, { keyBlock });
   downloadBlob(new Blob([content as BufferSource]), filename);
   return { filename };
 }
