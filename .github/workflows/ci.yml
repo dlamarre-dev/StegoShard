@@ -94,7 +94,7 @@ jobs:
         run: cryptodeps analyze . --fail-on none
 
       - name: Upload CBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crypto-bom
           path: crypto-bom.json
