@@ -80,8 +80,8 @@ def decode_gallery(
     images: list[bytes],
     password: str,
     key_block: bytes | None = None,
-    iterations: int = 3,
-    memory_kib: int = 64 * 1024,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
     parallelism: int = 1,
 ) -> RestoredFile:
     """Restore a secret from a folder of photos, blindly (SPEC §9.5).

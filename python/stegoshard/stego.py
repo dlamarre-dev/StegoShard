@@ -73,8 +73,8 @@ def extract_key_block(
     width: int,
     height: int,
     password: str,
-    iterations: int = 3,
-    memory_kib: int = 64 * 1024,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
     parallelism: int = 1,
 ) -> bytes | None:
     """Recover a stego-embedded key block, or None if absent / wrong password.
@@ -109,8 +109,8 @@ JPEG_MIN_CAPACITY = PAYLOAD_BITS * 2  # matches src/core/stego.ts
 def extract_key_block_jpeg(
     jpeg_bytes: bytes,
     password: str,
-    iterations: int = 3,
-    memory_kib: int = 64 * 1024,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
     parallelism: int = 1,
 ) -> bytes | None:
     """Recover a key block hidden in a baseline JPEG's DCT coefficients (SPEC §5.4).
@@ -214,8 +214,8 @@ def extract_bytes_jpeg(
 def extract_key_block_from_image(
     image_bytes: bytes,
     password: str,
-    iterations: int = 3,
-    memory_kib: int = 64 * 1024,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
     parallelism: int = 1,
 ) -> bytes | None:
     """Extract the key from a stego cover, sniffing PNG (spatial LSB) vs baseline

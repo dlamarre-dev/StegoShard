@@ -17,8 +17,10 @@ Scope: `src/core/crypto.ts` (primitives + key block), `src/core/vault.ts`
   the clear; the keystore holds it wrapped.
 - **KEK** (key encryption key): derived from the password with **Argon2id**
   (hash-wasm, audited WASM build of the reference algorithm), 32-byte output,
-  16-byte random salt. Production parameters: `t=3, m=64 MiB, p=1`
-  (`DEFAULT_ARGON2`).
+  16-byte random salt. Production parameters: `t=4, m=256 MiB, p=1`
+  (`DEFAULT_ARGON2`) — calibrated for a ~1–2 s desktop unlock while remaining
+  viable in a browser tab, and several times more costly to brute-force than the
+  earlier 64 MiB × t=3 baseline.
 - **Key block:** `AES-256-GCM(KEK, rawDEK)` with a random 12-byte IV, plus the
   Argon2id parameters and salt, serialized per SPEC §5.1. The GCM tag makes the
   block self-authenticating: a wrong password cannot unwrap it.

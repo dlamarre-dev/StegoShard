@@ -135,8 +135,8 @@ bytes after `wrappedDEK` (exactly `44 + wrappedLen` bytes total).
 
 - **KDF:** Argon2id, `hashLength = 32` (the KEK is a 256-bit AES-GCM key).
   Parameters are stored in the block so any decoder can reproduce the derivation.
-  The extension's production defaults are `iterations = 3`, `memoryKiB = 65536`
-  (64 MiB), `parallelism = 1`.
+  The extension's production defaults are `iterations = 4`, `memoryKiB = 262144`
+  (256 MiB), `parallelism = 1`.
 - **Password normalization:** the password MUST be normalized to **Unicode NFC**
   and encoded as **UTF-8** before it is fed to Argon2id. This makes the KEK
   depend on the text, not on how a particular platform or keyboard happened to
@@ -458,7 +458,7 @@ them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
 | Codec IDs        | `0` QR-grid; `1` gallery (§9)                                 |
 | Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                          |
 | KDF              | Argon2id, 32-byte output, salt 16 bytes                       |
-| KDF defaults     | iterations 3, memory 64 MiB, parallelism 1                    |
+| KDF defaults     | iterations 4, memory 256 MiB, parallelism 1                   |
 | GF polynomial    | `0x11D`, generator `0x02`                                     |
 | Parity           | `m = max(ceil(k·0.3), 2)`                                     |
 | Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)   |

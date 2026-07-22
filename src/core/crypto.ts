@@ -62,12 +62,16 @@ export function validateArgon2Params(p: Argon2Params): void {
 }
 
 /**
- * Production defaults, calibrated toward ~0.25–1 s on typical hardware
- * (plan §4). Frozen in SPEC.md. Tests override these with cheaper values.
+ * Production defaults. Calibrated toward a ~1–2 s unlock on typical desktop
+ * hardware while staying viable in a browser tab and on mobile. 256 MiB × t=4
+ * raises the cost of an offline password search several-fold over the old
+ * 64 MiB × t=3 baseline. Frozen in SPEC.md. Tests override these with cheaper
+ * values, and the Python reference decoder mirrors them for the stego/gallery
+ * layer (whose cost is not stored — see python/stegoshard/stego.py).
  */
 export const DEFAULT_ARGON2: Argon2Params = {
-  iterations: 3,
-  memoryKiB: 64 * 1024, // 64 MiB
+  iterations: 4,
+  memoryKiB: 256 * 1024, // 256 MiB
   parallelism: 1,
 };
 
