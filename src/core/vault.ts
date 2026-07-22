@@ -19,12 +19,15 @@
 
 import { concatBytes, readU16, toHex, writeU16 } from './bytes';
 import {
+  CONTENT_SALT_LEN,
   decryptBytes,
+  deriveContentKey,
   encryptBytes,
   GCM_TAG_LEN,
   IV_LEN,
   KEY_BLOCK_LEN,
   parseKeyBlock,
+  randomBytes,
   unlockKeyBlock,
 } from './crypto';
 import type { KeyMode } from './types';
@@ -87,8 +90,10 @@ function dataPerShard(codecId: number, profile: number): number {
 
 /** Analytical vault blob length. `embedKey` includes the wrapped DEK block. */
 function blobLenFor(envelopeLen: number, embedKey: boolean): number {
-  // [ KB_LEN u16 ][ key block? ][ IV ][ ciphertext = envelope + GCM tag ]
-  return 2 + (embedKey ? KEY_BLOCK_LEN : 0) + IV_LEN + envelopeLen + GCM_TAG_LEN;
+  // [ KB_LEN u16 ][ key block? ][ contentSalt 16 ][ IV ][ ciphertext = envelope + GCM tag ]
+  return (
+    2 + (embedKey ? KEY_BLOCK_LEN : 0) + CONTENT_SALT_LEN + IV_LEN + envelopeLen + GCM_TAG_LEN
+  );
 }
 
 /** True when this key mode stores the wrapped DEK inside the images. */
@@ -136,19 +141,21 @@ export async function sha256Short(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(digest).slice(0, HASH_LEN);
 }
 
-/** vault blob = [ KB_LEN u16 ][ keyBlock ][ IV 12 ][ ciphertext ] */
+/** vault blob = [ KB_LEN u16 ][ keyBlock ][ contentSalt 16 ][ IV 12 ][ ciphertext ] */
 function serializeVaultBlob(
   keyBlock: Uint8Array,
+  contentSalt: Uint8Array,
   iv: Uint8Array,
   ciphertext: Uint8Array,
 ): Uint8Array {
   const lenField = new Uint8Array(2);
   writeU16(lenField, 0, keyBlock.length);
-  return concatBytes(lenField, keyBlock, iv, ciphertext);
+  return concatBytes(lenField, keyBlock, contentSalt, iv, ciphertext);
 }
 
 function parseVaultBlob(blob: Uint8Array): {
   keyBlock: Uint8Array;
+  contentSalt: Uint8Array;
   iv: Uint8Array;
   ciphertext: Uint8Array;
 } {
@@ -156,10 +163,12 @@ function parseVaultBlob(blob: Uint8Array): {
   let o = 2;
   const keyBlock = blob.slice(o, o + kbLen);
   o += kbLen;
+  const contentSalt = blob.slice(o, o + CONTENT_SALT_LEN);
+  o += CONTENT_SALT_LEN;
   const iv = blob.slice(o, o + IV_LEN);
   o += IV_LEN;
   const ciphertext = blob.slice(o);
-  return { keyBlock, iv, ciphertext };
+  return { keyBlock, contentSalt, iv, ciphertext };
 }
 
 /**
@@ -220,11 +229,16 @@ export async function buildVaultBlob(
   keyMode: KeyMode,
 ): Promise<Uint8Array> {
   const envelope = await buildPayload(filename, content);
-  const { iv, ciphertext } = await encryptBytes(key.dek, envelope);
+  // Encrypt under a per-export subkey (CEK) derived from the DEK and a fresh
+  // random salt, so the random-IV collision bound is per-export even though the
+  // DEK is shared across vaults (SPEC §6).
+  const contentSalt = randomBytes(CONTENT_SALT_LEN);
+  const cek = await deriveContentKey(key.dek, contentSalt);
+  const { iv, ciphertext } = await encryptBytes(cek, envelope);
   // Embed the key block, or leave it out (KB_LEN=0) so it can be delivered
   // separately (keyfile/stego/binary-key modes).
   const embeddedKeyBlock = isEmbedded(keyMode) ? key.keyBlock : new Uint8Array(0);
-  return serializeVaultBlob(embeddedKeyBlock, iv, ciphertext);
+  return serializeVaultBlob(embeddedKeyBlock, contentSalt, iv, ciphertext);
 }
 
 /** Reverse of buildVaultBlob: blob (+ external key) → original file. */
@@ -233,12 +247,13 @@ export async function decodeVaultBlob(
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
 ): Promise<{ filename: string; content: Uint8Array }> {
-  const { keyBlock, iv, ciphertext } = parseVaultBlob(blob);
+  const { keyBlock, contentSalt, iv, ciphertext } = parseVaultBlob(blob);
   // Embedded key block travels in the blob; otherwise the caller must supply it.
   const kbBytes = keyBlock.length > 0 ? keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
   const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
-  const envelope = await decryptBytes(dek, iv, ciphertext);
+  const cek = await deriveContentKey(dek, contentSalt);
+  const envelope = await decryptBytes(cek, iv, ciphertext);
   return parsePayload(envelope, opts.maxContentBytes);
 }
 

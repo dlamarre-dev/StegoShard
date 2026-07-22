@@ -44,13 +44,16 @@ Scope: `src/core/crypto.ts` (primitives + key block), `src/core/vault.ts`
   - a distribution sanity check on 64 KiB of output.
 
 **IV collision bound (honest statement).** IVs are random 96-bit values, not a
-counter, and the keystore reuses one DEK across vaults. Random IVs cannot make
-reuse _impossible_; the standard bound applies (NIST SP 800-38D): keep
-invocations per key ≤ 2³² for a collision probability ≤ 2⁻³². One invocation
-here is one vault export (plus one DEK wrap per password change). A user would
-need billions of exports against the same key for this bound to matter; the
-practical exposure is nil, but reviewers should know the design relies on the
-probabilistic bound, not on a nonce counter.
+counter. The keystore reuses one DEK across vaults, but the content is **not**
+encrypted under the DEK directly: each export derives a fresh per-export content
+key `CEK = HKDF-SHA256(DEK, salt = contentSalt, info = "stegoshard/vault/content")`
+with a random 16-byte `contentSalt` stored in the blob (SPEC §6, `deriveContentKey`
+in `crypto.ts`). So the AES-GCM random-IV collision bound (NIST SP 800-38D: keep
+invocations per key ≤ 2³² for a collision probability ≤ 2⁻³²) applies **per
+export** — one export is a single content encryption under its own CEK — instead
+of accumulating across every export made under the shared DEK. Reviewers should
+note the guarantee now rests on per-export key separation, not merely on the
+low expected export count.
 
 ## 3. Key material lifecycle
 
@@ -317,9 +320,9 @@ has them.
    for fast triage of reconstruction errors. The security boundary is the GCM
    tag, never this hash.
 5. **Zeroization is best-effort** in a garbage-collected runtime (§3).
-6. **DEK reuse across vaults** relies on the random-IV bound (§2). A future
-   format version could derive a per-export subkey if this ever became a
-   concern.
+6. **DEK reuse across vaults** is decoupled from the IV bound by the per-export
+   content key (§2): the shared DEK never encrypts content directly, so each
+   export gets an independent AES-GCM key and the collision bound is per-export.
 
 ## 8. How to reproduce
 

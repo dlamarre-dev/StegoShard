@@ -188,6 +188,31 @@ export async function hkdf(
   return new Uint8Array(bits);
 }
 
+/** Length of the random per-export content salt stored in the vault blob (§6). */
+export const CONTENT_SALT_LEN = 16;
+const CONTENT_INFO = new TextEncoder().encode('stegoshard/vault/content');
+
+/**
+ * Derive a per-export content-encryption key (CEK) from the DEK via HKDF-SHA256.
+ * The DEK is reused across vaults (the keystore holds one), which alone would
+ * make the AES-GCM random-IV collision bound accumulate across every export
+ * under that key. A fresh random `salt` per export gives each export its own CEK,
+ * so the (key, IV) space is per-export and the bound resets — one export is one
+ * message. The raw DEK never leaves this function. Frozen format (SPEC §6);
+ * mirrored by the Python reference decoder.
+ */
+export async function deriveContentKey(dek: CryptoKey, salt: Uint8Array): Promise<CryptoKey> {
+  const rawDek = new Uint8Array((await subtle.exportKey('raw', dek)).slice(0));
+  const cekBytes = await hkdf(rawDek, CONTENT_INFO, DEK_LEN, salt);
+  rawDek.fill(0); // zeroize the transient raw DEK copy
+  const key = await subtle.importKey('raw', cekBytes as BufferSource, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+  cekBytes.fill(0); // zeroize the transient raw CEK bytes (key is now non-extractable)
+  return key;
+}
+
 /** Wrap (encrypt) the DEK with the KEK. */
 export async function wrapDEK(
   dek: CryptoKey,

@@ -10,7 +10,7 @@ import struct
 from dataclasses import dataclass
 
 from .binary_container import unwrap_binary
-from .crypto import decrypt_content, unwrap_dek
+from .crypto import decrypt_content, derive_content_key, unwrap_dek
 from .format import (
     MAX_CONTENT_BYTES,
     MAX_CONTENT_BYTES_BINARY,
@@ -73,13 +73,14 @@ def decode_vault(
 def _decode_vault_blob(
     blob: bytes, password: str, key_block: bytes | None, max_content_bytes: int
 ) -> RestoredFile:
-    embedded_kb, iv, ciphertext = parse_vault_blob(blob)
+    embedded_kb, content_salt, iv, ciphertext = parse_vault_blob(blob)
     kb_bytes = embedded_kb if len(embedded_kb) > 0 else key_block
     if not kb_bytes:
         raise MissingKeyError("this vault needs a separate key to restore")
 
     dek = unwrap_dek(parse_key_block(kb_bytes), password)
-    envelope = decrypt_content(dek, iv, ciphertext)
+    cek = derive_content_key(dek, content_salt)
+    envelope = decrypt_content(cek, iv, ciphertext)
     filename, content = parse_envelope(envelope, max_content_bytes)
     return RestoredFile(filename, content)
 

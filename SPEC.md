@@ -245,11 +245,19 @@ The blob is what gets erasure-coded and split across images. It bundles everythi
 needed (besides the password) to decrypt:
 
 ```
-[ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1) ][ IV 12 ][ ciphertext (§5) ]
+[ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1) ][ contentSalt 16 ][ IV 12 ][ ciphertext (§5) ]
 ```
 
 `KB_LEN` is `0` for the keyfile/stego modes (§5.2); the key block is then
 supplied externally at restore time.
+
+The `ciphertext` is not encrypted under the DEK directly but under a **per-export
+content key** `CEK = HKDF-SHA256(DEK, salt = contentSalt, info =
+"stegoshard/vault/content")`, where `contentSalt` is 16 fresh random bytes stored
+above. The DEK is reused across vaults (one lives in the keystore); deriving a
+fresh CEK per export keeps the AES-GCM random-IV collision bound (§5) per-export
+instead of accumulating across every export under the shared DEK. Every conforming
+decoder MUST derive the CEK identically.
 
 `BLOB_LEN` in each header (§3) records the blob's true length so padding added
 during sharding (§7) can be stripped after reconstruction. `HASH_GLOBAL` is

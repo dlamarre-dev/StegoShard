@@ -5,11 +5,14 @@ from __future__ import annotations
 import unicodedata
 
 from argon2.low_level import ARGON2_VERSION, Type, hash_secret_raw
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from .format import KeyBlock
 
 DEK_LEN = 32
+CONTENT_INFO = b"stegoshard/vault/content"
 
 
 class WrongPasswordError(Exception):
@@ -47,5 +50,14 @@ def unwrap_dek(key_block: KeyBlock, password: str) -> bytes:
         raise WrongPasswordError("wrong password") from exc
 
 
-def decrypt_content(dek: bytes, iv: bytes, ciphertext: bytes) -> bytes:
-    return AESGCM(dek).decrypt(iv, ciphertext, None)
+def derive_content_key(dek: bytes, salt: bytes) -> bytes:
+    """Per-export content key: HKDF-SHA256(DEK, salt=contentSalt, info=CONTENT_INFO).
+
+    Mirrors crypto.deriveContentKey (SPEC §6): a fresh salt per export gives each
+    vault its own content key even though the DEK is reused across vaults.
+    """
+    return HKDF(algorithm=hashes.SHA256(), length=DEK_LEN, salt=salt, info=CONTENT_INFO).derive(dek)
+
+
+def decrypt_content(cek: bytes, iv: bytes, ciphertext: bytes) -> bytes:
+    return AESGCM(cek).decrypt(iv, ciphertext, None)

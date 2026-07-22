@@ -123,17 +123,23 @@ def parse_key_block(data: bytes) -> KeyBlock:
     return KeyBlock(salt, iterations, memory_kib, parallelism, iv, wrapped)
 
 
-def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes]:
-    """Return (key_block_bytes, iv, ciphertext). key_block_bytes is empty when
-    the key is external (keyfile/stego modes)."""
+CONTENT_SALT_LEN = 16
+
+
+def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
+    """Return (key_block_bytes, content_salt, iv, ciphertext). key_block_bytes is
+    empty when the key is external (keyfile/stego modes). content_salt feeds the
+    per-export content-key derivation (SPEC §6)."""
     (kb_len,) = struct.unpack(">H", blob[0:2])
     o = 2
     key_block = blob[o : o + kb_len]
     o += kb_len
+    content_salt = blob[o : o + CONTENT_SALT_LEN]
+    o += CONTENT_SALT_LEN
     iv = blob[o : o + IV_LEN]
     o += IV_LEN
     ciphertext = blob[o:]
-    return key_block, iv, ciphertext
+    return key_block, content_salt, iv, ciphertext
 
 
 def parse_envelope(envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES) -> tuple[str, bytes]:

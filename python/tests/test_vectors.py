@@ -21,7 +21,13 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from stegoshard.crypto import WrongPasswordError, decrypt_content, derive_kek, unwrap_dek
+from stegoshard.crypto import (
+    WrongPasswordError,
+    decrypt_content,
+    derive_content_key,
+    derive_kek,
+    unwrap_dek,
+)
 from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
 
 VECTORS_PATH = pathlib.Path(__file__).parents[2] / "tests" / "vectors" / "crypto-vectors.json"
@@ -124,7 +130,7 @@ def test_key_block_rejects_trailing_bytes():
 
 @pytest.mark.parametrize("v", VECTORS["vaultBlob"], ids=lambda v: v["name"])
 def test_vault_blob_decrypts_to_expected_content(v):
-    key_block_bytes, iv, ciphertext = parse_vault_blob(_hx(v["blobHex"]))
+    key_block_bytes, content_salt, iv, ciphertext = parse_vault_blob(_hx(v["blobHex"]))
     if v["mode"] == "keyfile":
         assert key_block_bytes == b""
         key_block_bytes = _hx(v["keyBlockHex"])
@@ -132,6 +138,7 @@ def test_vault_blob_decrypts_to_expected_content(v):
         assert key_block_bytes == _hx(v["keyBlockHex"])
 
     dek = unwrap_dek(parse_key_block(key_block_bytes), v["password"])
-    filename, content = parse_envelope(decrypt_content(dek, iv, ciphertext))
+    cek = derive_content_key(dek, content_salt)
+    filename, content = parse_envelope(decrypt_content(cek, iv, ciphertext))
     assert filename == v["filename"]
     assert content == _hx(v["contentHex"])

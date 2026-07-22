@@ -22,7 +22,13 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argon2id } from 'hash-wasm';
 import { toHex, writeU16, concatBytes } from '../src/core/bytes';
-import { normalizePassword, serializeKeyBlock, type Argon2Params } from '../src/core/crypto';
+import {
+  CONTENT_SALT_LEN,
+  hkdf,
+  normalizePassword,
+  serializeKeyBlock,
+  type Argon2Params,
+} from '../src/core/crypto';
 import { buildPayload } from '../src/core/payload';
 
 const subtle = globalThis.crypto.subtle;
@@ -264,7 +270,7 @@ async function makeVaultBlobVector(
   password: string,
   filename: string,
   content: Uint8Array,
-  seeds: { salt: number; wrapIv: number; dek: number; contentIv: number },
+  seeds: { salt: number; wrapIv: number; dek: number; contentSalt: number; contentIv: number },
   params: Argon2Params,
 ): Promise<VaultBlobVector> {
   const kb = await makeKeyBlockVector(
@@ -276,14 +282,19 @@ async function makeVaultBlobVector(
     params,
   );
   const envelope = await buildPayload(filename, content);
+  // Per-export content subkey: CEK = HKDF-SHA256(DEK, salt=contentSalt,
+  // info="stegoshard/vault/content"). Mirrors crypto.deriveContentKey (SPEC §6).
+  const contentSalt = pattern(CONTENT_SALT_LEN, seeds.contentSalt);
+  const contentInfo = new TextEncoder().encode('stegoshard/vault/content');
+  const cek = await hkdf(fromHex(kb.dekHex), contentInfo, 32, contentSalt);
   const contentIv = pattern(12, seeds.contentIv);
-  const ctHex = await gcmEncrypt(kb.dekHex, toHex(contentIv), toHex(envelope));
+  const ctHex = await gcmEncrypt(toHex(cek), toHex(contentIv), toHex(envelope));
 
   const keyBlock = fromHex(kb.blockHex);
   const embedded = mode === 'embedded' ? keyBlock : new Uint8Array(0);
   const lenField = new Uint8Array(2);
   writeU16(lenField, 0, embedded.length);
-  const blob = concatBytes(lenField, embedded, contentIv, fromHex(ctHex));
+  const blob = concatBytes(lenField, embedded, contentSalt, contentIv, fromHex(ctHex));
 
   return {
     name,
@@ -344,7 +355,7 @@ async function main() {
       'vault password',
       'seed-phrase.txt',
       pattern(64, 200),
-      { salt: 201, wrapIv: 202, dek: 203, contentIv: 204 },
+      { salt: 201, wrapIv: 202, dek: 203, contentSalt: 219, contentIv: 204 },
       PARAMS_FAST,
     ),
     // Highly compressible content → stored gzip-compressed (FLAGS bit 0 set).
@@ -354,7 +365,7 @@ async function main() {
       'vault password',
       'notes.txt',
       new Uint8Array(512).fill(0x41),
-      { salt: 205, wrapIv: 206, dek: 207, contentIv: 208 },
+      { salt: 205, wrapIv: 206, dek: 207, contentSalt: 220, contentIv: 208 },
       PARAMS_FAST,
     ),
     await makeVaultBlobVector(
@@ -363,7 +374,7 @@ async function main() {
       'keyfile password',
       'wallet.dat',
       pattern(48, 210),
-      { salt: 211, wrapIv: 212, dek: 213, contentIv: 214 },
+      { salt: 211, wrapIv: 212, dek: 213, contentSalt: 221, contentIv: 214 },
       PARAMS_FAST,
     ),
   ];

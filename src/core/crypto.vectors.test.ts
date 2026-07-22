@@ -20,8 +20,10 @@ import { describe, it, expect } from 'vitest';
 import { argon2id } from 'hash-wasm';
 import { toHex, readU16 } from './bytes';
 import {
+  CONTENT_SALT_LEN,
   IV_LEN,
   decryptBytes,
+  deriveContentKey,
   exportDekRaw,
   normalizePassword,
   parseKeyBlock,
@@ -181,11 +183,16 @@ describe('frozen vectors: full vault blob decrypt', () => {
       else expect(kbLen).toBeGreaterThan(0);
 
       const kbBytes = kbLen > 0 ? blob.slice(2, 2 + kbLen) : fromHex(v.keyBlockHex);
-      const iv = blob.slice(2 + kbLen, 2 + kbLen + IV_LEN);
-      const ciphertext = blob.slice(2 + kbLen + IV_LEN);
+      let o = 2 + kbLen;
+      const contentSalt = blob.slice(o, o + CONTENT_SALT_LEN);
+      o += CONTENT_SALT_LEN;
+      const iv = blob.slice(o, o + IV_LEN);
+      o += IV_LEN;
+      const ciphertext = blob.slice(o);
 
       const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), v.password);
-      const envelope = await decryptBytes(dek, iv, ciphertext);
+      const cek = await deriveContentKey(dek, contentSalt);
+      const envelope = await decryptBytes(cek, iv, ciphertext);
       const { filename, content } = await parsePayload(envelope, 1024 * 1024);
       expect(filename).toBe(v.filename);
       expect(toHex(content)).toBe(v.contentHex);
