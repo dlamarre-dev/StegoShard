@@ -56,7 +56,7 @@ jobs:
       # self-decompresses at launch. Skipped on macOS (see the matrix note).
       - name: Compress with UPX
         if: matrix.upx
-        uses: crazy-max/ghaction-upx@v3
+        uses: crazy-max/ghaction-upx@v4
         with:
           install: true
           files: ${{ matrix.name }}
