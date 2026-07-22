@@ -223,8 +223,7 @@ def extract_bytes_rgba(
     bits = length * 8
     if capacity < bits * margin:
         return None
-    cover = _cover_key(seed, _cover_fingerprint_rgba(rgba, width, height))
-    stream = _keystream_from_seed(cover, _position_stream_len(bits))
+    stream = _keystream_from_seed(seed, _position_stream_len(bits))
     positions = _pick_positions(stream, 0, capacity, bits)
     out = bytearray(length)
     for i, pos in enumerate(positions):
@@ -252,8 +251,7 @@ def extract_bytes_jpeg(
     bits = length * 8
     if capacity < bits * margin:
         return None
-    cover = _cover_key(seed, _cover_fingerprint_jpeg(carriers))
-    stream = _keystream_from_seed(cover, _position_stream_len(bits))
+    stream = _keystream_from_seed(seed, _position_stream_len(bits))
     positions = _pick_positions(stream, 0, capacity, bits)
     out = bytearray(length)
     for i, pos in enumerate(positions):

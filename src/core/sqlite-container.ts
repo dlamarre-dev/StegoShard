@@ -230,20 +230,22 @@ export function packSqlite(blob: Uint8Array): Uint8Array {
   }
   const page2 = buildLeafPage([...included, vaultCell], 0);
 
-  // Overflow chain (pages 3..N) carrying the spilled payload.
-  const pages: Uint8Array[] = [page1, page2];
+  // Assemble directly into one preallocated buffer: page 1, page 2, then the
+  // overflow chain (pages 3..N) written in place. Avoids spreading thousands of
+  // page arrays into concatBytes and the extra full-size copy that would entail.
+  const out = new Uint8Array(pageCount * PAGE_SIZE);
+  out.set(page1, 0);
+  out.set(page2, PAGE_SIZE);
+  const dvOut = new DataView(out.buffer);
   let o = local;
   for (let i = 0; i < overflowPageCount; i++) {
-    const page = new Uint8Array(PAGE_SIZE);
-    const chunk = vaultRecord.subarray(o, o + OVERFLOW_CHUNK);
+    const base = (2 + i) * PAGE_SIZE;
     const next = i === overflowPageCount - 1 ? 0 : 3 + i + 1;
-    new DataView(page.buffer).setUint32(0, next, false);
-    page.set(chunk, 4);
-    pages.push(page);
+    dvOut.setUint32(base, next, false); // 4-byte next-overflow-page pointer
+    out.set(vaultRecord.subarray(o, o + OVERFLOW_CHUNK), base + 4);
     o += OVERFLOW_CHUNK;
   }
-
-  return concatBytes(...pages);
+  return out;
 }
 
 // --- reader -------------------------------------------------------------------

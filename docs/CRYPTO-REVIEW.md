@@ -176,8 +176,10 @@ bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
   stored** — yet the whitening pad and carrier layout are now unique per cover. This
   closes a reuse gap: without it, the same password over two same-size covers reused
   one pad and one position set (an XOR-of-plaintexts / carrier-correlation leak across
-  images); now every cover is independent. Gallery Mode (§6c) derives its per-cover
-  keystream the same way from its `posKey`.
+  images); now every cover is independent. Gallery Mode (§6c) deliberately does **not**
+  use this binding: its slots are independent AES-GCM messages (fresh random nonce, no
+  whitening), so repeated carrier positions across covers leak nothing and a per-cover
+  hash would be cost without benefit.
 - **No structure on the wire.** Fixed payload length, no magic/length/header in
   the image. Wrong-password extraction yields random bytes that fail the §5.1
   key-block magic check and is reported identically to "no key here"

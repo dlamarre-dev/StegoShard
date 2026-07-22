@@ -89,7 +89,7 @@ function dataPerShard(codecId: number, profile: number): number {
 }
 
 /** Analytical vault blob length. `embedKey` includes the wrapped DEK block. */
-function blobLenFor(envelopeLen: number, embedKey: boolean): number {
+export function blobLenFor(envelopeLen: number, embedKey: boolean): number {
   // [ KB_LEN u16 ][ key block? ][ contentSalt 16 ][ IV ][ ciphertext = envelope + GCM tag ]
   return (
     2 + (embedKey ? KEY_BLOCK_LEN : 0) + CONTENT_SALT_LEN + IV_LEN + envelopeLen + GCM_TAG_LEN

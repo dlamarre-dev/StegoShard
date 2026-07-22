@@ -55,15 +55,18 @@ import {
 
 const subtle = globalThis.crypto.subtle;
 
-// Per-cover keystream nonce (SPEC §5.3/§5.4/§9.3). The keystream that both
-// whitens the payload and selects carrier positions is bound to a fingerprint of
-// the *cover*, so two vaults saved with the same password into different covers
-// (or the same cover reused) never share a whitening pad or a carrier layout —
-// which would otherwise be a two-time-pad / correlation leak. The fingerprint is
-// taken over exactly the bits embedding never changes (RGB with the LSB masked;
-// JPEG coefficient magnitudes with bit 0 masked), so it is identical at embed and
-// at extract and NOTHING has to be stored in the image ("no structure on the
-// wire" is preserved). Mirrored bit-for-bit by the Python reference decoder.
+// Per-cover keystream nonce for the key-block stego paths (SPEC §5.3/§5.4). The
+// keystream that both whitens the payload and selects carrier positions is bound
+// to a fingerprint of the *cover*, so two vaults saved with the same password
+// into different covers (or the same cover reused) never share a whitening pad or
+// a carrier layout — which would otherwise be a two-time-pad / correlation leak.
+// The fingerprint is taken over exactly the bits embedding never changes (RGB
+// with the LSB masked; JPEG coefficient magnitudes with bit 0 masked), so it is
+// identical at embed and at extract and NOTHING has to be stored in the image
+// ("no structure on the wire" is preserved). Mirrored bit-for-bit by the Python
+// reference decoder. Gallery Mode (§9) does NOT use this: its slots are already
+// per-fragment AES-GCM with random nonces and carry no whitening, so position
+// reuse across covers leaks nothing — the per-cover hash would be pure cost.
 const STEGO_COVER_INFO = new TextEncoder().encode('stegoshard/stego/cover');
 
 /** SHA-256 over an RGBA cover's embedding-invariant bits (RGB, LSB masked; alpha excluded). */
@@ -445,9 +448,7 @@ export async function embedBytesStegoRgba(
   const payloadBits = data.length * 8;
   if (capacity < payloadBits * margin) throw new StegoCapacityError(capacity);
 
-  const ckey = await coverKey(seed, await coverFingerprintRgba(rgba, width, height));
-  const stream = await keystreamFromSeed(ckey, positionStreamLen(payloadBits));
-  ckey.fill(0);
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
   const positions = pickPositions(new StreamReader(stream), capacity, payloadBits);
   for (let i = 0; i < payloadBits; i++) {
     const bit = (data[i >> 3]! >> (7 - (i & 7))) & 1;
@@ -475,9 +476,7 @@ export async function extractBytesStegoRgba(
   const payloadBits = length * 8;
   if (capacity < payloadBits * margin) return null;
 
-  const ckey = await coverKey(seed, await coverFingerprintRgba(rgba, width, height));
-  const stream = await keystreamFromSeed(ckey, positionStreamLen(payloadBits));
-  ckey.fill(0);
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
   const positions = pickPositions(new StreamReader(stream), capacity, payloadBits);
   const out = new Uint8Array(length);
   for (let i = 0; i < payloadBits; i++) {
@@ -510,9 +509,7 @@ export async function embedBytesStegoJpeg(
   const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
   const payloadBits = data.length * 8;
   const bitAt = (i: number): number => (data[i >> 3]! >> (7 - (i & 7))) & 1;
-  const ckey = await coverKey(seed, await coverFingerprintJpeg(model));
-  const stream = await keystreamFromSeed(ckey, positionStreamLen(payloadBits));
-  ckey.fill(0);
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
 
   if (model.restartInterval === 0) {
     const carriers = eligibleInPlace(model);
@@ -556,9 +553,7 @@ export async function extractBytesStegoJpeg(
   const payloadBits = length * 8;
   if (carriers.count < payloadBits * margin) return null;
 
-  const ckey = await coverKey(seed, await coverFingerprintJpeg(model));
-  const stream = await keystreamFromSeed(ckey, positionStreamLen(payloadBits));
-  ckey.fill(0);
+  const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
   const positions = pickPositions(new StreamReader(stream), carriers.count, payloadBits);
   const out = new Uint8Array(length);
   for (let i = 0; i < payloadBits; i++) {

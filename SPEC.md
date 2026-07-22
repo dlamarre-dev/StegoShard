@@ -429,17 +429,17 @@ sealed fragment (both are uniform).
 
 ### 9.3 Carrier selection
 
-Identical to §5.3/§5.4 — an AES-CTR keystream drives rejection-sampled distinct
-carrier positions (RGB LSBs for a PNG cover; eligible AC coefficients with
-`|coef| ≥ 2` for a baseline JPEG, keeping size invariance), MSB-first bit order —
-**except** there is no whitening pad (the sealed slot is already uniform) and the
-length is `SLOT_BYTES·8` bits, not the fixed key-block length. The keystream key
-is per-cover: `key = HKDF-SHA256(ikm = posKey, salt = fp,
-info = "stegoshard/stego/cover", L = 32)` with the same cover fingerprint `fp` as
-§5.3 (PNG) / §5.4 (JPEG), so each photo's carrier layout is unique even though one
-`posKey` covers the whole gallery, and blind extraction recomputes `fp` from each
-candidate photo. A cover must have `≥ SLOT_BYTES·8·4` eligible carriers (a ×4
-margin keeps embedding sparse) or it is rejected.
+Identical to §5.3/§5.4 — an AES-CTR keystream seeded by `posKey` drives
+rejection-sampled distinct carrier positions (RGB LSBs for a PNG cover; eligible
+AC coefficients with `|coef| ≥ 2` for a baseline JPEG, keeping size invariance),
+MSB-first bit order — **except** there is no whitening pad (the sealed slot is
+already uniform) and the length is `SLOT_BYTES·8` bits, not the fixed key-block
+length. Unlike §5.3/§5.4 the keystream is **not** bound to a per-cover fingerprint:
+positions may repeat across same-size covers, but this leaks nothing here because
+each slot is an independent AES-GCM message (fresh random nonce, §9.2) with no
+whitening — there is no two-time-pad to exploit. A cover must have
+`≥ SLOT_BYTES·8·4` eligible carriers (a ×4 margin keeps embedding sparse) or it is
+rejected.
 
 ### 9.4 Encode
 

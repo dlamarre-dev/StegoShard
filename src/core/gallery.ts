@@ -33,7 +33,6 @@ import {
   DEFAULT_ARGON2,
   GCM_TAG_LEN,
   IV_LEN,
-  KEY_BLOCK_LEN,
   createKeyBlock,
   decryptBytes,
   encryptBytes,
@@ -62,7 +61,14 @@ import {
   extractBytesStegoJpeg,
   extractBytesStegoRgba,
 } from './stego';
-import { type VaultKey, MAX_FILE_BYTES, buildVaultBlob, decodeVaultBlob, sha256Short } from './vault';
+import {
+  type VaultKey,
+  MAX_FILE_BYTES,
+  blobLenFor,
+  buildVaultBlob,
+  decodeVaultBlob,
+  sha256Short,
+} from './vault';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -154,7 +160,9 @@ export function galleryCoversForEnvelopeLen(
   keyMode: KeyMode = 'embedded',
 ): { k: number; m: number; needed: number } {
   const embedded = keyMode === 'embedded';
-  const blobLen = 2 + (embedded ? KEY_BLOCK_LEN : 0) + IV_LEN + envelopeLen + GCM_TAG_LEN;
+  // Reuse the single source of truth for blob length (includes A3's contentSalt);
+  // duplicating the formula here previously drifted from vault.ts.
+  const blobLen = blobLenFor(envelopeLen, embedded);
   const k = Math.max(1, Math.ceil(blobLen / GALLERY_SLOT_DATA));
   const m = parityCount(k);
   return { k, m, needed: k + m + GALLERY_MIN_DECOYS };

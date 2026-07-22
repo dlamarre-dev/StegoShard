@@ -19,6 +19,8 @@ import {
   GalleryTooManyImagesError,
   decode as decodeJpeg,
   estimateGalleryCovers,
+  galleryCoversForEnvelopeLen,
+  GALLERY_SLOT_DATA,
   galleryDecode,
   galleryEncode,
 } from './index';
@@ -352,3 +354,14 @@ function shannonEntropy(bytes: Uint8Array): number {
   }
   return h;
 }
+
+describe('gallery cover estimate accounts for the full blob (A3 contentSalt)', () => {
+  it('counts the per-export contentSalt so the estimate matches the real blob split', () => {
+    // Envelope length chosen so the blob straddles a GALLERY_SLOT_DATA boundary
+    // ONLY because of A3's 16-byte contentSalt: keyfile blob = 2+16+12+env+16.
+    // At env=2010 → blob=2056 → k=2; without the contentSalt it would be 2040 → k=1.
+    const env = 2 * GALLERY_SLOT_DATA - 2038; // 2010 when SLOT_DATA=2048
+    const { k } = galleryCoversForEnvelopeLen(env, 'keyfile');
+    expect(k).toBe(2);
+  });
+});
