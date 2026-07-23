@@ -49,10 +49,13 @@ jobs:
       - name: Build (CLI)
         run: npm run build:cli
 
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.1.4
+
       - name: CLI smoke test (Deno)
         run: |
-          curl -fsSL https://deno.land/install.sh | sh -s v2.1.4
-          export PATH="$HOME/.deno/bin:$PATH"
           echo "deno smoke: save + restore a vault with the bundled CLI" > /tmp/ss-secret.txt
           STEGOSHARD_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
             dist-cli/stegoshard.js save /tmp/ss-secret.txt --out /tmp/ss-out
