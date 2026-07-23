@@ -875,5 +875,29 @@
   },
   "modeLegend": {
     "message": "可否認模式偽裝成一般檔案；其餘則明確為 StegoShard。"
+  },
+  "recoveryHeading": {
+    "message": "日後還原時請保留："
+  },
+  "recoveryPassword": {
+    "message": "你的密碼——遺失將無法還原"
+  },
+  "recoveryImages": {
+    "message": "已儲存的影像"
+  },
+  "recoveryFile": {
+    "message": "已儲存的檔案"
+  },
+  "recoveryPhotos": {
+    "message": "此組的每一張相片"
+  },
+  "recoveryKeyfile": {
+    "message": "另存的金鑰檔"
+  },
+  "recoveryCover": {
+    "message": "藏有金鑰的封面相片"
+  },
+  "recoveryLossless": {
+    "message": "請原樣保存——縮放、重新壓縮，或透過會重新編碼影像的服務傳送都會使其損毀。"
   }
 }

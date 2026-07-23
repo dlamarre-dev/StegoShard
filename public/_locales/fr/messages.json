@@ -971,5 +971,29 @@
   },
   "modeLegend": {
     "message": "Les modes déniables se fondent dans des fichiers ordinaires ; les autres sont ouvertement StegoShard."
+  },
+  "recoveryHeading": {
+    "message": "Pour restaurer plus tard, conserve :"
+  },
+  "recoveryPassword": {
+    "message": "Ton mot de passe — aucune récupération possible si tu le perds"
+  },
+  "recoveryImages": {
+    "message": "Les images enregistrées"
+  },
+  "recoveryFile": {
+    "message": "Le fichier enregistré"
+  },
+  "recoveryPhotos": {
+    "message": "Toutes les photos de cet ensemble"
+  },
+  "recoveryKeyfile": {
+    "message": "Le fichier-clé séparé"
+  },
+  "recoveryCover": {
+    "message": "La photo de couverture contenant la clé cachée"
+  },
+  "recoveryLossless": {
+    "message": "Conserve-les exactement telles quelles — redimensionner, recompresser ou les faire passer par un service qui ré-encode les images les détruit."
   }
 }

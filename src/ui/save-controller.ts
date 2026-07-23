@@ -106,6 +106,28 @@ function galleryNote(msg: Msg, keyMode: KeyMode, imageCount: number): string {
   return msg(key, String(imageCount));
 }
 
+/**
+ * What the user must keep to restore, given the destination and key mode, plus
+ * whether the artifacts must be stored losslessly (the fragile LSB carriers).
+ * Returns i18n keys so both surfaces render the same recovery checklist.
+ */
+export interface RecoveryGuidance {
+  items: string[];
+  lossless: boolean;
+}
+export function recoveryGuidance(dest: SaveDestination, keyMode: KeyMode): RecoveryGuidance {
+  const items = ['recoveryPassword'];
+  if (dest === 'gallery') items.push('recoveryPhotos');
+  else if (dest === 'binary' || dest === 'sqlite') items.push('recoveryFile');
+  else items.push('recoveryImages'); // disk / paper / cloud
+  if (keyMode === 'keyfile') items.push('recoveryKeyfile');
+  else if (keyMode === 'stego') items.push('recoveryCover');
+  // LSB carriers (a stego key cover, or Gallery Mode's photos) are destroyed by
+  // any recompression/resize — call that out explicitly.
+  const lossless = keyMode === 'stego' || dest === 'gallery';
+  return { items, lossless };
+}
+
 /** Run a save and return a localized result note. Throws on any failure. */
 export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
   if (req.dest === 'gallery') {

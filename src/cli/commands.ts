@@ -43,6 +43,9 @@ import {
   serializeKeyBlock,
   toHex,
   unwrapBinary,
+  verifyBinaryExport,
+  verifyGalleryExport,
+  verifyImageExport,
   wrapBinary,
   type ImageDataLike,
   type KeyMode,
@@ -171,6 +174,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
       key,
       { keyMode: opts.keyMode, variant },
     );
+    await verifyBinaryExport(container, key.dek, basename(opts.inputFile), content);
     const files = [writeOut(opts.outDir, binaryVaultName(variant), container)];
     if (keyMode === 'stego') {
       const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
@@ -190,6 +194,7 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
     { profile, keyMode: opts.keyMode },
   );
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
+  await verifyImageExport(imagePayloads, key.dek, basename(opts.inputFile), content);
   const setHex = toHex(setId);
   const files: string[] = [];
   const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
@@ -362,6 +367,13 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
   const res = await galleryEncode(basename(opts.secretFile), content, opts.password, covers, {
     keyMode,
   });
+  await verifyGalleryExport(
+    res.images,
+    opts.password,
+    keyMode === 'embedded' ? undefined : res.keyBlock,
+    basename(opts.secretFile),
+    content,
+  );
   const setHex = toHex(res.setId);
 
   const used = new Set<string>();

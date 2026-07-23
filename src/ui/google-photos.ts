@@ -18,6 +18,7 @@ import {
   decodeHeader,
   PROFILE_CLOUD,
   toHex,
+  verifyImageExport,
   type KeyMode,
   type VaultKey,
 } from '@core';
@@ -164,6 +165,10 @@ export async function saveToPhotos(
     keyMode: options.keyMode,
   });
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
+  // Verify the local encode restores before uploading. (The cloud QR uses the
+  // recompression-robust PROFILE_CLOUD; server-side JPEG recompression itself
+  // isn't verifiable here without re-download — see docs.)
+  await verifyImageExport(imagePayloads, key.dek, file.name, content);
   const setHex = toHex(setId);
   const albumTitle = `StegoShard ${options.title || setHex}`;
   const albumId = await createAlbum(token, albumTitle);

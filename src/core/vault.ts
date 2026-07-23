@@ -311,10 +311,23 @@ export async function importVault(
   password: string,
   opts: { keyBlock?: Uint8Array | undefined } = {},
 ): Promise<{ filename: string; content: Uint8Array }> {
+  const blob = await reassembleBlob(payloads);
+  return decodeVaultBlob(blob, password, {
+    keyBlock: opts.keyBlock,
+    maxContentBytes: MAX_FILE_BYTES,
+  });
+}
+
+/**
+ * Decode image payloads back to the verified vault blob: majority-set selection
+ * (foreign/corrupt images dropped), RS reconstruction tolerant of up to m missing
+ * shards, retrying alternative k-subsets so one present-but-wrong shard can't turn
+ * a recoverable set fatal, gated by the integrity hash. Shared by importVault and
+ * post-save verification.
+ */
+async function reassembleBlob(payloads: Uint8Array[]): Promise<Uint8Array> {
   if (payloads.length === 0) throw new Error('import: no images provided');
 
-  // Decode defensively: silently drop images that are not valid StegoShard
-  // payloads (a foreign QR, a corrupt header) rather than aborting the restore.
   const decoded: { header: Header; shard: Uint8Array }[] = [];
   for (const payload of payloads) {
     try {
@@ -325,8 +338,6 @@ export async function importVault(
   }
   if (decoded.length === 0) throw new Error('import: no valid StegoShard images found');
 
-  // Images from different vaults may be mixed in; use the majority set so one
-  // stray or first-listed foreign image cannot derail reconstruction.
   const counts = new Map<string, number>();
   for (const { header } of decoded) {
     const key = toHex(header.setId);
@@ -344,23 +355,14 @@ export async function importVault(
   const first = members[0]!.header;
   const { k, m, blobLen } = first;
 
-  // Place each shard at its global index.
   const slots: (Uint8Array | null)[] = new Array(k + m).fill(null);
   for (const { header, shard } of members) {
     if (header.shardIndex < k + m) slots[header.shardIndex] = shard;
   }
 
-  // An erasure code can fill gaps but cannot detect a present-but-wrong shard.
-  // If the first-k reconstruction fails the integrity hash while extra shards are
-  // available, retry over other k-subsets so one corrupt shard cannot turn an
-  // otherwise-recoverable set fatal (bounded attempts guard against blow-up).
   const blob = await reconstructVerified(slots, k, m, blobLen, first.hash);
   if (!blob) throw new Error('import: reconstructed blob failed its integrity check');
-
-  return decodeVaultBlob(blob, password, {
-    keyBlock: opts.keyBlock,
-    maxContentBytes: MAX_FILE_BYTES,
-  });
+  return blob;
 }
 
 /** Upper bound on RS reconstruction attempts when trying alternative shard subsets. */
@@ -455,4 +457,77 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
+}
+
+// --- Post-save round-trip verification ---------------------------------------
+//
+// Immediately after producing the artifacts, decode them back and confirm the
+// original file returns — BEFORE telling the user the save succeeded. This catches
+// any encoding/carrier fault (erasure, codec, container, a lossy cover) at save
+// time rather than at some future restore when the original is gone.
+
+/** Thrown when a just-saved artifact does not decode back to the original file. */
+export class VerificationError extends Error {
+  constructor() {
+    super('post-save verification failed: the saved artifact did not restore to the original file');
+    this.name = 'VerificationError';
+  }
+}
+
+/**
+ * Decrypt a vault blob's content with an already-unlocked DEK — no password, no
+ * Argon2 (the content key is derived from the DEK regardless of key mode). Lets
+ * verification reuse the managed key in hand instead of re-deriving from a password.
+ */
+export async function decodeVaultBlobWithDek(
+  blob: Uint8Array,
+  dek: CryptoKey,
+  maxContentBytes = MAX_FILE_BYTES_BINARY,
+): Promise<{ filename: string; content: Uint8Array }> {
+  const { contentSalt, iv, ciphertext } = parseVaultBlob(blob);
+  const cek = await deriveContentKey(dek, contentSalt);
+  const envelope = await decryptBytes(cek, iv, ciphertext);
+  return parsePayload(envelope, maxContentBytes);
+}
+
+async function assertRestores(
+  blob: Uint8Array,
+  dek: CryptoKey,
+  filename: string,
+  content: Uint8Array,
+): Promise<void> {
+  let got: { filename: string; content: Uint8Array };
+  try {
+    got = await decodeVaultBlobWithDek(blob, dek);
+  } catch {
+    throw new VerificationError();
+  }
+  if (got.filename !== filename || !bytesEqual(got.content, content)) throw new VerificationError();
+}
+
+/** Verify a freshly produced image set (disk/cloud/paper) round-trips. */
+export async function verifyImageExport(
+  imagePayloads: Uint8Array[],
+  dek: CryptoKey,
+  filename: string,
+  content: Uint8Array,
+): Promise<void> {
+  let blob: Uint8Array;
+  try {
+    blob = await reassembleBlob(imagePayloads);
+  } catch {
+    throw new VerificationError();
+  }
+  await assertRestores(blob, dek, filename, content);
+}
+
+/** Verify a freshly produced binary/disguised container round-trips. */
+export async function verifyBinaryExport(
+  container: Uint8Array,
+  dek: CryptoKey,
+  filename: string,
+  content: Uint8Array,
+): Promise<void> {
+  const blob = unwrapBinary(container)?.payload ?? container;
+  await assertRestores(blob, dek, filename, content);
 }

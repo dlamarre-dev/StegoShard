@@ -16,6 +16,7 @@ import {
   PROFILE_PAPER,
   decodeHeader,
   toHex,
+  verifyImageExport,
   type KeyMode,
   type VaultKey,
 } from '@core';
@@ -142,6 +143,7 @@ export async function saveFileToPaper(
     keyMode: options.keyMode,
   });
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
+  await verifyImageExport(imagePayloads, key.dek, file.name, content);
   const setHex = toHex(setId);
 
   const pdfBytes = await buildPaperPdf({

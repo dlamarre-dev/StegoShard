@@ -8,6 +8,7 @@ import { type Destination, getPrefs, savePrefs, type Workflow } from './prefs';
 import { HAS_GOOGLE_PHOTOS } from './config';
 import { wireKeyManager } from './keymanager';
 import {
+  recoveryGuidance,
   runSave,
   verifyStegoPassword,
   type SaveRequest,
@@ -382,6 +383,29 @@ for (const radio of document.querySelectorAll('input[name="restore-mode"]')) {
 reflectRestoreMode();
 
 /** Run a prepared save request through the shared controller, driving the UI. */
+/** Populate the expert save-result recovery checklist ("what to keep to restore"). */
+function renderRecovery(guidance: { items: string[]; lossless: boolean }): void {
+  const box = el('save-recovery');
+  box.replaceChildren();
+  const heading = document.createElement('p');
+  heading.className = 'result-recovery-heading';
+  heading.textContent = msg('recoveryHeading');
+  const list = document.createElement('ul');
+  list.className = 'recovery-list';
+  for (const key of guidance.items) {
+    const li = document.createElement('li');
+    li.textContent = msg(key);
+    list.append(li);
+  }
+  box.append(heading, list);
+  if (guidance.lossless) {
+    const warn = document.createElement('p');
+    warn.className = 'muted warn';
+    warn.textContent = msg('recoveryLossless');
+    box.append(warn);
+  }
+}
+
 async function doSave(req: SaveRequest): Promise<void> {
   saveBtn.disabled = true;
   show(saveResult, false);
@@ -390,6 +414,7 @@ async function doSave(req: SaveRequest): Promise<void> {
     const { note } = await runSave(req, msg);
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
+    renderRecovery(recoveryGuidance(req.dest, req.keyMode ?? 'embedded'));
     show(saveResult, true);
     // Don't leave secrets sitting in the popup's DOM after the operation.
     stegoPw.value = '';

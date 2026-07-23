@@ -933,3 +933,22 @@ details.advanced[open] > summary::before {
   font-size: 0.85em;
   margin-top: 4px;
 }
+
+/* Recovery checklist shown after a save ("what to keep to restore") */
+.result-recovery {
+  margin-top: 12px;
+}
+.result-recovery:empty {
+  display: none;
+}
+.result-recovery-heading {
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.recovery-list {
+  margin: 0 0 8px;
+  padding-left: 1.2em;
+}
+.recovery-list li {
+  margin: 2px 0;
+}

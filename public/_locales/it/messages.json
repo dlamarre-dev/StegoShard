@@ -875,5 +875,29 @@
   },
   "modeLegend": {
     "message": "Le modalità negabili si mimetizzano come file ordinari; le altre sono apertamente StegoShard."
+  },
+  "recoveryHeading": {
+    "message": "Per ripristinare in seguito, conserva:"
+  },
+  "recoveryPassword": {
+    "message": "La tua password — nessun recupero se la perdi"
+  },
+  "recoveryImages": {
+    "message": "Le immagini salvate"
+  },
+  "recoveryFile": {
+    "message": "Il file salvato"
+  },
+  "recoveryPhotos": {
+    "message": "Tutte le foto di questo set"
+  },
+  "recoveryKeyfile": {
+    "message": "Il file chiave separato"
+  },
+  "recoveryCover": {
+    "message": "La foto di copertina che contiene la chiave nascosta"
+  },
+  "recoveryLossless": {
+    "message": "Conservale esattamente così — ridimensionarle, ricomprimerle o inviarle tramite un servizio che ricodifica le immagini le distrugge."
   }
 }

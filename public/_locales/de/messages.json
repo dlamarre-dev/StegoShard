@@ -875,5 +875,29 @@
   },
   "modeLegend": {
     "message": "Abstreitbare Modi tarnen sich als gewöhnliche Dateien; die übrigen sind offen StegoShard."
+  },
+  "recoveryHeading": {
+    "message": "Zum späteren Wiederherstellen aufbewahren:"
+  },
+  "recoveryPassword": {
+    "message": "Dein Passwort — ohne es gibt es keine Wiederherstellung"
+  },
+  "recoveryImages": {
+    "message": "Die gespeicherten Bilder"
+  },
+  "recoveryFile": {
+    "message": "Die gespeicherte Datei"
+  },
+  "recoveryPhotos": {
+    "message": "Alle Fotos dieses Satzes"
+  },
+  "recoveryKeyfile": {
+    "message": "Die separate Schlüsseldatei"
+  },
+  "recoveryCover": {
+    "message": "Das Deckfoto mit dem versteckten Schlüssel"
+  },
+  "recoveryLossless": {
+    "message": "Genau so aufbewahren — Verkleinern, Neukomprimieren oder das Senden über einen Dienst, der Bilder neu kodiert, zerstört sie."
   }
 }

@@ -875,5 +875,29 @@
   },
   "modeLegend": {
     "message": "秘匿モードは通常のファイルに紛れます。それ以外は明示的にStegoShardです。"
+  },
+  "recoveryHeading": {
+    "message": "あとで復元するために保管するもの："
+  },
+  "recoveryPassword": {
+    "message": "パスワード（失うと復元できません）"
+  },
+  "recoveryImages": {
+    "message": "保存された画像"
+  },
+  "recoveryFile": {
+    "message": "保存されたファイル"
+  },
+  "recoveryPhotos": {
+    "message": "このセットのすべての写真"
+  },
+  "recoveryKeyfile": {
+    "message": "別の鍵ファイル"
+  },
+  "recoveryCover": {
+    "message": "鍵を隠したカバー写真"
+  },
+  "recoveryLossless": {
+    "message": "保存されたままの状態で保管してください。リサイズ・再圧縮、または画像を再エンコードするサービスを通すと破損します。"
   }
 }

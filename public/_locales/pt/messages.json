@@ -875,5 +875,29 @@
   },
   "modeLegend": {
     "message": "Os modos negáveis disfarçam-se como ficheiros comuns; os restantes são abertamente StegoShard."
+  },
+  "recoveryHeading": {
+    "message": "Para restaurar depois, guarda:"
+  },
+  "recoveryPassword": {
+    "message": "A tua palavra-passe — não há recuperação se a perderes"
+  },
+  "recoveryImages": {
+    "message": "As imagens guardadas"
+  },
+  "recoveryFile": {
+    "message": "O ficheiro guardado"
+  },
+  "recoveryPhotos": {
+    "message": "Todas as fotos deste conjunto"
+  },
+  "recoveryKeyfile": {
+    "message": "O ficheiro de chave separado"
+  },
+  "recoveryCover": {
+    "message": "A foto de capa que contém a chave escondida"
+  },
+  "recoveryLossless": {
+    "message": "Mantém-nas exatamente como estão — redimensionar, recomprimir ou enviá-las por um serviço que recodifica imagens destrói-as."
   }
 }

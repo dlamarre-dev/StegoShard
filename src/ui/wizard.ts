@@ -9,7 +9,12 @@
 
 import { type KeyMode, type VaultKey } from '@core';
 import { friendlyError as friendlyErrorWith, reflectFiles, wireDropzone } from './domhelpers';
-import { runSave, type SaveDestination, type SaveRequest } from './save-controller';
+import {
+  recoveryGuidance,
+  runSave,
+  type SaveDestination,
+  type SaveRequest,
+} from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
 import type { Msg } from './save-controller';
 import { type DestEstimate, type Estimates, computeEstimates, formatSize } from './estimate';
@@ -707,6 +712,10 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     // Don't keep the plaintext password alive in the closure after completion.
     state.savePassword = '';
     state.restorePassword = '';
+    const guidance =
+      state.action === 'save' && state.dest
+        ? recoveryGuidance(state.dest, state.keyMode ?? 'embedded')
+        : null;
     root.replaceChildren(
       h(
         'section',
@@ -719,6 +728,19 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             text: msg(state.action === 'save' ? 'savedTitle' : 'restoredTitle'),
           }),
           h('p', { class: 'result-note', text: note }),
+          guidance
+            ? h(
+                'div',
+                { class: 'result-recovery' },
+                h('p', { class: 'result-recovery-heading', text: msg('recoveryHeading') }),
+                h(
+                  'ul',
+                  { class: 'recovery-list' },
+                  ...guidance.items.map((k) => h('li', { text: msg(k) })),
+                ),
+                guidance.lossless ? h('p', { class: 'muted warn', text: msg('recoveryLossless') }) : null,
+              )
+            : null,
         ),
         h('button', {
           class: 'btn-primary btn-lg',

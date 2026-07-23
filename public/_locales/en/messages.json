@@ -971,5 +971,29 @@
   },
   "modeLegend": {
     "message": "Deniable modes blend in as ordinary files; the others are openly StegoShard."
+  },
+  "recoveryHeading": {
+    "message": "To restore later, keep:"
+  },
+  "recoveryPassword": {
+    "message": "Your password — there is no recovery if you lose it"
+  },
+  "recoveryImages": {
+    "message": "The saved images"
+  },
+  "recoveryFile": {
+    "message": "The saved file"
+  },
+  "recoveryPhotos": {
+    "message": "Every photo in this set"
+  },
+  "recoveryKeyfile": {
+    "message": "The separate key file"
+  },
+  "recoveryCover": {
+    "message": "The cover photo holding the hidden key"
+  },
+  "recoveryLossless": {
+    "message": "Keep these exactly as saved — resizing, re-compressing, or sending them through a service that re-encodes images destroys them."
   }
 }

@@ -18,9 +18,13 @@ import {
   importVaultBinary,
   MAX_IMAGES,
   PROFILE_DISK,
+  VerificationError,
   decodeHeader,
   toHex,
   unwrapBinary,
+  verifyBinaryExport,
+  verifyGalleryExport,
+  verifyImageExport,
   wrapBinary,
   type KeyMode,
   type VaultKey,
@@ -70,6 +74,21 @@ async function deliver(downloads: { name: string; blob: Blob }[], subdir: string
 
 const octet = (bytes: Uint8Array, type = 'application/octet-stream'): Blob =>
   new Blob([bytes as BufferSource], { type });
+
+/**
+ * Confirm a produced stego cover actually yields the key block back (the LSB/DCT
+ * carrier is the fragile part). Throws VerificationError otherwise.
+ */
+async function verifyStegoKeyCover(
+  bytes: Uint8Array,
+  name: string,
+  password: string,
+  keyBlock: Uint8Array,
+): Promise<void> {
+  const recovered = await extractKeyImage(new File([bytes as BlobPart], name), password);
+  if (!recovered || recovered.length !== keyBlock.length) throw new VerificationError();
+  for (let i = 0; i < keyBlock.length; i++) if (recovered[i] !== keyBlock[i]) throw new VerificationError();
+}
 
 /** Encode a file into a set of PNG images and download them (or a .zip). */
 export async function saveFileToDisk(
@@ -134,6 +153,12 @@ export async function saveFileToDisk(
   }
   if (externalKey) downloads.push({ name: externalKey.name, blob: octet(externalKey.bytes, externalKey.mime) });
 
+  // Prove the set (and, for stego, the key cover) restores before handing it over.
+  await verifyImageExport(imagePayloads, key.dek, file.name, content);
+  if (keyMode === 'stego' && externalKey && options.stego) {
+    await verifyStegoKeyCover(externalKey.bytes, externalKey.name, options.stego.password, keyBlock);
+  }
+
   await deliver(downloads, `stegoshard-${setHex}`);
   return { imageCount: total, setId: setHex, keyMode };
 }
@@ -169,6 +194,17 @@ export async function saveFileToBinary(
       name: binaryKeyName(options.variant),
       blob: octet(wrapBinary(keyBlock, options.variant)),
     });
+  }
+  // Prove the container (and, for stego, the key cover) restores before delivering.
+  await verifyBinaryExport(container, key.dek, file.name, content);
+  if (keyMode === 'stego' && options.stego) {
+    const stegoDownload = downloads[downloads.length - 1]!;
+    await verifyStegoKeyCover(
+      await blobBytes(stegoDownload.blob),
+      stegoDownload.name,
+      options.stego.password,
+      keyBlock,
+    );
   }
   // No setId on the binary path — group the vault + key under a random-id folder.
   const id = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
@@ -227,6 +263,14 @@ export async function saveGalleryToDisk(
     // can store apart from the photos — opt-in, unlike the deniable stego/embedded
     // modes. Stego keeps the cover's own filename (blends in); keyfile does not.
     downloads.push({ name: `stegoshard-${setHex}.key`, blob: octet(res.keyBlock) });
+  }
+
+  // Prove the photos blind-winnow back to the original before delivering.
+  const externalKeyBlock = keyMode === 'embedded' ? undefined : res.keyBlock;
+  await verifyGalleryExport(res.images, password, externalKeyBlock, secret.name, content);
+  if (keyMode === 'stego' && options.stego) {
+    const cover = downloads[downloads.length - 1]!;
+    await verifyStegoKeyCover(await blobBytes(cover.blob), cover.name, options.stego.password, res.keyBlock);
   }
 
   // Neutral folder name (the bare set id, no "stegoshard-" prefix) so grouping

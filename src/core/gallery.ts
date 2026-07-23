@@ -64,6 +64,7 @@ import {
 import {
   type VaultKey,
   MAX_FILE_BYTES,
+  VerificationError,
   blobLenFor,
   buildVaultBlob,
   decodeVaultBlob,
@@ -475,4 +476,29 @@ export async function galleryDecode(
     }
   }
   throw new GalleryRestoreError();
+}
+
+/**
+ * Post-save verification for Gallery Mode: blind-winnow the freshly produced
+ * photos and confirm they restore to (filename, content). Runs the full decode
+ * (one gallery Argon2 + key-block unwrap) — acceptable on this deliberately heavy,
+ * opt-in path. Throws VerificationError on any mismatch.
+ */
+export async function verifyGalleryExport(
+  images: GalleryImage[],
+  password: string,
+  keyBlock: Uint8Array | undefined,
+  filename: string,
+  content: Uint8Array,
+): Promise<void> {
+  let got: { filename: string; content: Uint8Array };
+  try {
+    got = await galleryDecode(images as GalleryCover[], password, { keyBlock });
+  } catch {
+    throw new VerificationError();
+  }
+  if (got.filename !== filename || got.content.length !== content.length) throw new VerificationError();
+  for (let i = 0; i < content.length; i++) {
+    if (got.content[i] !== content[i]) throw new VerificationError();
+  }
 }
