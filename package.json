@@ -38,6 +38,7 @@
     "test:coverage": "vitest run --coverage",
     "fixtures": "tsx scripts/gen-fixtures.ts",
     "vectors": "tsx scripts/gen-vectors.ts",
+    "fuzz": "tsx scripts/fuzz.ts",
     "icons": "tsx scripts/gen-icons.ts",
     "package": "npm run build:store && npm run build:store:edge && npm run build:store:firefox && tsx scripts/package.ts"
   },

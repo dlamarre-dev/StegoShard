@@ -37,6 +37,10 @@ jobs:
       - name: Test (with coverage)
         run: npm run test:coverage
 
+      # Quick fixed-seed parser fuzz smoke; the deep nightly run is fuzz.yml.
+      - name: Fuzz smoke (parsers)
+        run: npm run fuzz -- --iters=2000 --seed=1
+
       - name: Build (Chrome/Edge)
         run: npm run build
 

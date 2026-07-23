@@ -21,7 +21,7 @@ export default defineConfig({
         // The core (crypto / codec / erasure) meets the plan's ≥90% target.
         lines: 90,
         functions: 90,
-        branches: 80,
+        branches: 85,
         statements: 90,
       },
     },
