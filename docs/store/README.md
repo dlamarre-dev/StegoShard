@@ -16,10 +16,10 @@ and is **not** part of the copy.
 | ------ | ---- | ------------- |
 | en | [`en.md`](en.md) | Source of truth |
 | fr | [`fr.md`](fr.md) | Author-reviewed (project language) |
-| de | [`de.md`](de.md) | Translated — light native proofread recommended |
-| es | [`es.md`](es.md) | Translated — light native proofread recommended |
-| it | [`it.md`](it.md) | Translated — light native proofread recommended |
-| pt | [`pt.md`](pt.md) | Translated (generic Portuguese) — light proofread recommended |
+| de | [`de.md`](de.md) | Translated + copy-edited — native check optional |
+| es | [`es.md`](es.md) | Translated + copy-edited — native check optional |
+| it | [`it.md`](it.md) | Translated + copy-edited — native check optional |
+| pt | [`pt.md`](pt.md) | Translated (generic Portuguese) + copy-edited — native check optional |
 | ja | [`ja.md`](ja.md) | Native-reviewed |
 | zh_TW | [`zh_TW.md`](zh_TW.md) | Native-reviewed |
 
