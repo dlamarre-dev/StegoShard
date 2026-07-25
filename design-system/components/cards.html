@@ -1,0 +1,29 @@
+<!-- @dsCard group="Components" name="Cards" subtitle="card, card-head, lead" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StegoShard — Cards</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius:14px;--shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;max-width:420px}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+h2{font-size:1.05rem;margin:0}
+.pill{font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.lead{color:var(--muted);margin:-2px 0 0}
+</style>
+</head>
+<body>
+<section class="card">
+  <div class="card-head">
+    <h2>Save a file</h2>
+    <span class="pill">Step 1</span>
+  </div>
+  <p class="lead">Pick a file and a passphrase. StegoShard turns it into an image you can keep anywhere.</p>
+</section>
+</body>
+</html>

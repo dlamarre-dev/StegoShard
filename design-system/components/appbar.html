@@ -1,0 +1,39 @@
+<!-- @dsCard group="Components" name="App bar" subtitle="Brand + status pill + actions" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StegoShard — App bar</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--ok:#2b8a3e;--radius-sm:9px;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--ok:#51cf66}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5}
+.appbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;background:color-mix(in srgb,var(--surface) 88%,transparent);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:9px;display:block}
+.brand-name{font-weight:700;font-size:1.05rem;line-height:1.1}
+.brand-tag{font-size:.8rem;color:var(--muted)}
+.appbar-actions{display:flex;align-items:center;gap:12px}
+.pill{font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.pill-ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--border));background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.btn-ghost{padding:7px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 128 128" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b5bdb"/><stop offset="1" stop-color="#2f49b8"/></linearGradient></defs><rect width="128" height="128" rx="28" fill="url(#g)"/><circle cx="64" cy="54" r="19" fill="#fff"/><path d="M40 96 L64 78 L88 96 Z" fill="#fff"/></svg>
+    <div>
+      <div class="brand-name">StegoShard</div>
+      <div class="brand-tag">Files, hidden in plain images</div>
+    </div>
+  </div>
+  <div class="appbar-actions">
+    <span class="pill pill-ok">Local only</span>
+    <button class="btn-ghost">Settings</button>
+  </div>
+</header>
+</body>
+</html>

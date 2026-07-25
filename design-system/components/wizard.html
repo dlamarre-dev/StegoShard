@@ -1,0 +1,53 @@
+<!-- @dsCard group="Components" name="Wizard options" subtitle="Step label + selectable option rows" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StegoShard — Wizard options</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--accent-contrast:#fff;--accent-hover:#2f49b8;--radius-sm:9px;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--accent-contrast:#0e1116;--accent-hover:#748ffc}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px;max-width:460px}
+.wiz-step{font-size:.85rem;margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.wiz-title{margin:0 0 16px;font-size:1.4rem}
+.wiz-options{display:flex;flex-direction:column;gap:10px}
+.wiz-option{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer}
+.wiz-option:has(input:checked){border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.wiz-option input{grid-row:1/3;accent-color:var(--accent)}
+.wiz-option-label{font-weight:600;color:var(--text)}
+.wiz-option-desc{grid-column:2;font-size:.88rem;color:var(--muted)}
+.wiz-option--disabled{opacity:.5;cursor:not-allowed}
+.wiz-nav{display:flex;gap:12px;margin-top:16px}
+button{font:inherit;cursor:pointer;border-radius:var(--radius-sm);border:1px solid transparent;padding:10px 16px;font-weight:600}
+.btn-secondary{background:var(--surface-2);color:var(--text);border-color:var(--border);flex:0 0 auto}
+.btn-primary{background:var(--accent);color:var(--accent-contrast);flex:1 1 auto}
+</style>
+</head>
+<body>
+<p class="wiz-step">Step 2 of 3</p>
+<h2 class="wiz-title">Where should it live?</h2>
+<div class="wiz-options">
+  <label class="wiz-option">
+    <input type="radio" name="w" checked>
+    <span class="wiz-option-label">On disk</span>
+    <span class="wiz-option-desc">A .png you keep on this device or a USB stick.</span>
+  </label>
+  <label class="wiz-option">
+    <input type="radio" name="w">
+    <span class="wiz-option-label">Cloud photos</span>
+    <span class="wiz-option-desc">Looks like an ordinary photo in your library.</span>
+  </label>
+  <label class="wiz-option wiz-option--disabled">
+    <input type="radio" name="w" disabled>
+    <span class="wiz-option-label">Paper</span>
+    <span class="wiz-option-desc">File too large for a single printable sheet.</span>
+  </label>
+</div>
+<div class="wiz-nav">
+  <button class="btn-secondary">Back</button>
+  <button class="btn-primary">Continue</button>
+</div>
+</body>
+</html>
