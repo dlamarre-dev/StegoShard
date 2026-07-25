@@ -264,6 +264,7 @@ tool.
 | Doc | What's in it |
 | --- | ------------ |
 | [Why StegoShard?](docs/WHY.md) | The problem, and the reasoning behind the two-model design. |
+| [Where it fits](docs/COMPARISON.md) | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
 | [Command-line reference](docs/CLI.md) | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging. |
 | [Threat model](docs/THREAT-MODEL.md) | Adversaries, what each model defends against, and the deliberate non-goals. |
 | [Format specification](SPEC.md) | The frozen on-disk / on-image format (`FORMAT_VERSION = 1`). |
