@@ -1,0 +1,33 @@
+<!-- @dsCard group="Components" name="Chooser cards" subtitle="Two-up workflow picker" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StegoShard — Chooser cards</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius-sm:9px;--shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
+.chooser-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:520px}
+@media (max-width:560px){.chooser-grid{grid-template-columns:1fr}}
+.chooser-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:18px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer}
+.chooser-card:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.chooser-card-title{font-weight:600;font-size:1.05rem;color:var(--text)}
+.chooser-card-desc{font-size:.9rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="chooser-grid">
+  <button class="chooser-card" style="border-color:var(--accent);box-shadow:var(--shadow)">
+    <span class="chooser-card-title">Save a file</span>
+    <span class="chooser-card-desc">Encrypt a file into an image you can keep anywhere.</span>
+  </button>
+  <button class="chooser-card">
+    <span class="chooser-card-title">Restore</span>
+    <span class="chooser-card-desc">Recover the original file from a StegoShard image.</span>
+  </button>
+</div>
+</body>
+</html>
