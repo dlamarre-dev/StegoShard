@@ -21,6 +21,8 @@ what will be uploaded as an unpacked extension and test it before submitting.
 
 - **Name / short description**: localized in `public/_locales/*/messages.json`
   (`extName` ≤ 75 chars, `extDesc` ≤ 132 chars), keyword-oriented per language.
+- **Long description**: ready-to-paste, localized in `docs/store/<code>.md`
+  (one per locale; see `docs/store/README.md`).
 - **Category**: Productivity / Tools.
 - **Single purpose**: "Encrypt a file and store it inside images — either as
   robust, error-corrected carriers restorable from disk, paper, or Google Photos,
