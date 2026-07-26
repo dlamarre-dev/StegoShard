@@ -10,8 +10,8 @@
 // target only so packaging emits a clearly named artifact for the Edge store.
 export type Target = 'chrome' | 'edge' | 'firefox';
 
-// Bumped independently of the npm package version; surfaced in stores.
-const VERSION = '0.1.0';
+// Surfaced in stores; kept in sync with the npm package version (package.json).
+const VERSION = '0.9.0';
 
 const HOMEPAGE = 'https://github.com/dlamarre-dev/StegoShard';
 
