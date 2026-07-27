@@ -98,7 +98,12 @@ ctx.onmessage = async (ev: MessageEvent<RunReq>) => {
   if (ev.origin && ev.origin !== ctx.location.origin) return;
   const req = ev.data;
   const handler = HANDLERS[req.op] as ((r: RunReq) => Promise<Reply>) | undefined;
-  if (!handler) return;
+  if (!handler) {
+    // Unknown/malformed op: reply with an error so the caller's promise rejects
+    // instead of hanging forever. (Internal callers only ever send known ops.)
+    ctx.postMessage(errorPayload(req.id, new Error(`unknown worker op: ${String(req.op)}`)));
+    return;
+  }
   try {
     const { message, transfer } = await handler(req);
     ctx.postMessage(message, transfer);
