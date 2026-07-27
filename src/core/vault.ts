@@ -31,7 +31,13 @@ import {
   unlockKeyBlock,
 } from './crypto';
 import type { KeyMode } from './types';
+import type { OnProgress } from './progress';
 import { type BinaryVariant, unwrapBinary, wrapBinary } from './binary-container';
+import {
+  buildSegmentedBlob,
+  decodeSegmentedBlob,
+  decodeSegmentedBlobWithDek,
+} from './segmented';
 import { buildPayload, parsePayload } from './payload';
 import { decodeBlob, encodeShards, parityCount } from './erasure';
 import {
@@ -55,9 +61,15 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 export const WARN_FILE_BYTES = 256 * 1024;
 /**
  * Binary (non-image) output has no per-image ceiling, so it tolerates far larger
- * secrets. This bound doubles as the decompression-bomb guard on that path.
+ * secrets, and the segmented format processes it in chunks off the main thread.
+ * Two caps: the CLI (headless, only bounded by RAM) allows more than the browser
+ * UI (which still buffers the whole plaintext in a tab). Callers pass the cap via
+ * `maxBytes`; both also bound decompression as a gzip-bomb guard.
  */
-export const MAX_FILE_BYTES_BINARY = 100 * 1024 * 1024;
+export const MAX_FILE_BYTES_BINARY_CLI = 1024 * 1024 * 1024; // 1 GiB
+export const MAX_FILE_BYTES_BINARY_UI = 256 * 1024 * 1024; // 256 MiB
+/** Default (most generous) binary cap; individual callers may pass a lower one. */
+export const MAX_FILE_BYTES_BINARY = MAX_FILE_BYTES_BINARY_CLI;
 /** Independent safety ceiling on the number of images (plan §5). */
 export const MAX_IMAGES = 150;
 
@@ -427,14 +439,16 @@ export async function exportVaultBinary(
   filename: string,
   content: Uint8Array,
   key: VaultKey,
-  options: { keyMode?: KeyMode; variant?: BinaryVariant } = {},
+  options: { keyMode?: KeyMode; variant?: BinaryVariant; maxBytes?: number } = {},
+  onProgress?: OnProgress,
 ): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
-  if (content.length > MAX_FILE_BYTES_BINARY) {
-    throw new FileTooLargeError(content.length, MAX_FILE_BYTES_BINARY);
+  const maxBytes = options.maxBytes ?? MAX_FILE_BYTES_BINARY;
+  if (content.length > maxBytes) {
+    throw new FileTooLargeError(content.length, maxBytes);
   }
   const keyMode = options.keyMode ?? 'embedded';
   const variant = options.variant ?? 'branded';
-  const blob = await buildVaultBlob(filename, content, key, keyMode);
+  const blob = await buildSegmentedBlob(filename, content, key, keyMode, onProgress);
   return { container: wrapBinary(blob, variant), keyMode, keyBlock: key.keyBlock };
 }
 
@@ -442,15 +456,18 @@ export async function exportVaultBinary(
 export async function importVaultBinary(
   container: Uint8Array,
   password: string,
-  opts: { keyBlock?: Uint8Array | undefined } = {},
+  opts: { keyBlock?: Uint8Array | undefined; maxBytes?: number } = {},
+  onProgress?: OnProgress,
 ): Promise<{ filename: string; content: Uint8Array }> {
   // Strip the container; bytes matching neither variant are treated as a bare
   // blob, letting AES-GCM be the final arbiter of whether they are ours.
   const blob = unwrapBinary(container)?.payload ?? container;
-  return decodeVaultBlob(blob, password, {
-    keyBlock: opts.keyBlock,
-    maxContentBytes: MAX_FILE_BYTES_BINARY,
-  });
+  return decodeSegmentedBlob(
+    blob,
+    password,
+    { keyBlock: opts.keyBlock, maxContentBytes: opts.maxBytes ?? MAX_FILE_BYTES_BINARY },
+    onProgress,
+  );
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -527,7 +544,14 @@ export async function verifyBinaryExport(
   dek: CryptoKey,
   filename: string,
   content: Uint8Array,
+  onProgress?: OnProgress,
 ): Promise<void> {
   const blob = unwrapBinary(container)?.payload ?? container;
-  await assertRestores(blob, dek, filename, content);
+  let got: { filename: string; content: Uint8Array };
+  try {
+    got = await decodeSegmentedBlobWithDek(blob, dek, MAX_FILE_BYTES_BINARY, onProgress);
+  } catch {
+    throw new VerificationError();
+  }
+  if (got.filename !== filename || !bytesEqual(got.content, content)) throw new VerificationError();
 }

@@ -8,7 +8,7 @@
 import {
   GALLERY_K_MAX,
   MAX_FILE_BYTES,
-  MAX_FILE_BYTES_BINARY,
+  MAX_FILE_BYTES_BINARY_UI,
   MAX_IMAGES,
   PROFILE_CLOUD,
   PROFILE_DISK,
@@ -46,7 +46,7 @@ export function estimateFor(
   msg: Msg,
 ): DestEstimate {
   if (dest === 'binary' || dest === 'sqlite') {
-    return size <= MAX_FILE_BYTES_BINARY
+    return size <= MAX_FILE_BYTES_BINARY_UI
       ? { available: true, count: 1 }
       : { available: false, count: 0, reason: msg('wizTooLargeBinary') };
   }

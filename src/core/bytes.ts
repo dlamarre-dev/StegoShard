@@ -73,3 +73,28 @@ export function readU32(buf: Uint8Array, offset: number): number {
   }
   return ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0;
 }
+
+/**
+ * Write a 64-bit unsigned integer, big-endian, at the given offset. JavaScript
+ * numbers are exact only up to 2^53−1, so values are bounded to a safe integer
+ * (far above any real payload). Used by the segmented binary format's length
+ * field so it never needs a second format bump if the size cap rises past 4 GiB.
+ */
+export function writeU64(buf: Uint8Array, offset: number, value: number): void {
+  if (!Number.isInteger(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError(`u64 out of range: ${value}`);
+  }
+  new DataView(buf.buffer, buf.byteOffset, buf.byteLength).setBigUint64(
+    offset,
+    BigInt(value),
+    false,
+  );
+}
+
+/** Read a 64-bit unsigned integer, big-endian, at the given offset. Rejects
+ *  values beyond Number.MAX_SAFE_INTEGER so the returned number is exact. */
+export function readU64(buf: Uint8Array, offset: number): number {
+  const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getBigUint64(offset, false);
+  if (v > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('u64 exceeds safe integer range');
+  return Number(v);
+}

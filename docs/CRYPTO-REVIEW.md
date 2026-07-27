@@ -95,9 +95,40 @@ it failed.**
 - **Seeded fuzzing** (reproducible): 2 000 random buffers and 150 multi-byte
   mutations of a valid block; a throw is the only accepted outcome.
 - Related decoder guards outside the crypto layer: bounded gzip inflation
-  (1 MiB cap on the image/PDF path, 100 MiB on the binary path — the export size
-  limits double as the decompression-bomb ceiling), header `k`/`m`/length
-  validation — see SPEC §3–§4 tests.
+  (1 MiB cap on the image/PDF path, up to 1 GiB CLI / 256 MiB browser on the
+  binary path — the export size limits double as the decompression-bomb ceiling),
+  header `k`/`m`/length validation — see SPEC §3–§4 tests.
+
+## 4b. Segmented binary format (STREAM AEAD)
+
+The binary path (`.ssbn`/`.db`, SPEC §8.1) does **not** use the §6 single-shot
+`AES-GCM(envelope)`. To report byte-level progress and run off the UI thread, the
+compressed envelope is split into fixed-size chunks (default 1 MiB) and each chunk
+is sealed with AES-256-GCM under a **STREAM** nonce discipline (Hoang–Reyhanitabar–
+Rogaway–Vizár, as used by `age`). Points a reviewer should check
+(`src/core/segmented.ts`, `python/stegoshard/segmented.py`, `segmented.test.ts`):
+
+- **Key**: the per-export CEK is the same `HKDF-SHA256(DEK, contentSalt)` as §6 —
+  no new KDF. A fresh `contentSalt` **and** a fresh 7-byte `noncePrefix` are drawn
+  per export.
+- **Nonce uniqueness** (GCM's one hard requirement): `nonce_i = noncePrefix ‖
+  u32_be(i) ‖ finalByte`. Within an export the counter makes every nonce distinct;
+  across exports the random prefix and per-export CEK mean no `(key, nonce)` reuse
+  even under a salt collision.
+- **AAD** = the full header prefix (version, salt, nonce prefix, chunk size,
+  plaintext length, key block), so no field or chunk can be swapped without
+  breaking every tag.
+- **Truncation / reordering / splicing**: only the last chunk carries
+  `finalByte = 1`; an exact body-length cross-check fixes the chunk count from the
+  header, and each chunk authenticates before its plaintext is retained. Tests
+  cover flipped bytes, reordered chunks, dropped tails, appended bytes, and a
+  tampered `chunkSize` — each MUST be rejected.
+- **No partial-plaintext exposure**: the decryptor buffers the whole plaintext and
+  only hands it back after the final chunk authenticates.
+- **Isolation**: the chunked path lives in its own module and never shares the
+  §6 random-IV helper, so the counter-nonce and random-IV disciplines cannot cross.
+- **Pre-release note**: this replaces the old single-shot binary blob outright
+  (no version dispatch); there are no pre-existing `.ssbn`/`.db` users.
 
 Timing side channels are not unit-testable in this environment; the relevant
 surfaces are constant-time by construction (GCM tag check inside

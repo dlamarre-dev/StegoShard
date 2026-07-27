@@ -17,6 +17,7 @@ import {
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
 import type { Msg } from './save-controller';
+import { makeProgressUI } from './progress-ui';
 import { type DestEstimate, type Estimates, computeEstimates, formatSize } from './estimate';
 import { generatePassphrase, passwordStrength } from './password';
 
@@ -668,6 +669,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     runBtn.disabled = true;
     status.classList.remove('error');
     status.textContent = msg(state.action === 'save' ? 'statusSaving' : 'statusRestoring');
+    const { bar, fill } = ensureProgress(status);
+    const prog = makeProgressUI(bar, fill, status, msg);
     try {
       if (state.action === 'save') {
         // Stego hides the key in a cover photo, which the cloud flow can't carry
@@ -684,7 +687,10 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         ) {
           throw new Error(msg('errWrongPassword'));
         }
-        const { note } = await runSave(await buildSaveRequest(), msg);
+        const req = await buildSaveRequest();
+        req.onProgress = prog.onProgress;
+        const { note } = await runSave(req, msg);
+        prog.done();
         showDone(note);
       } else {
         const { note } = await runRestore(
@@ -694,17 +700,37 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             password: state.restorePassword,
             keyFile: state.keyFile ?? undefined,
             extraPayloads: env.camera?.capturedPayloads() ?? [],
+            onProgress: prog.onProgress,
           },
           msg,
         );
+        prog.done();
         env.camera?.clearCaptured();
         showDone(note);
       }
     } catch (err) {
+      prog.done();
       status.textContent = friendlyError(err);
       status.classList.add('error');
       runBtn.disabled = false;
     }
+  }
+
+  /** Insert (once) a progress bar right after the run status line. */
+  function ensureProgress(status: HTMLElement): { bar: HTMLElement; fill: HTMLElement } {
+    const sibling = status.nextElementSibling;
+    if (sibling instanceof HTMLElement && sibling.classList.contains('progress')) {
+      return { bar: sibling, fill: sibling.firstElementChild as HTMLElement };
+    }
+    const bar = document.createElement('div');
+    bar.className = 'progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.hidden = true;
+    const fill = document.createElement('div');
+    fill.className = 'progress-bar';
+    bar.appendChild(fill);
+    status.after(bar);
+    return { bar, fill };
   }
 
   function showDone(note: string): void {

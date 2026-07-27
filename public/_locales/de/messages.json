@@ -774,7 +774,7 @@
     "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
   },
   "wizTooLargeBinary": {
-    "message": "zu groß (max. 100 MB)",
+    "message": "zu groß (max. 256 MiB)",
     "description": "Wizard: destination unavailable — over the 100 MB binary cap."
   },
   "wizTooManyImages": {
@@ -917,5 +917,23 @@
   },
   "onboardingDismiss": {
     "message": "Loslegen"
+  },
+  "statusCompressing": {
+    "message": "Komprimieren…"
+  },
+  "statusEncrypting": {
+    "message": "Verschlüsseln…"
+  },
+  "statusDecrypting": {
+    "message": "Entschlüsseln…"
+  },
+  "statusVerifying": {
+    "message": "Überprüfen…"
+  },
+  "statusUnlocking": {
+    "message": "Entsperren…"
+  },
+  "statusRendering": {
+    "message": "Rendern…"
   }
 }

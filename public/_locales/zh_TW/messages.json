@@ -774,7 +774,7 @@
     "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
   },
   "wizTooLargeBinary": {
-    "message": "太大（上限 100 MB）",
+    "message": "太大（上限 256 MiB）",
     "description": "Wizard: destination unavailable — over the 100 MB binary cap."
   },
   "wizTooManyImages": {
@@ -917,5 +917,23 @@
   },
   "onboardingDismiss": {
     "message": "開始"
+  },
+  "statusCompressing": {
+    "message": "壓縮中…"
+  },
+  "statusEncrypting": {
+    "message": "加密中…"
+  },
+  "statusDecrypting": {
+    "message": "解密中…"
+  },
+  "statusVerifying": {
+    "message": "驗證中…"
+  },
+  "statusUnlocking": {
+    "message": "解鎖中…"
+  },
+  "statusRendering": {
+    "message": "產生中…"
   }
 }

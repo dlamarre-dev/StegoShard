@@ -19,7 +19,7 @@ import {
   runSave,
   type SaveOptions,
 } from './commands';
-import { GalleryRestoreError, type KeyMode } from '@core';
+import { GalleryRestoreError, type KeyMode, type OnProgress, type Progress } from '@core';
 
 const USAGE = `StegoShard — encrypt a file into resilient images, an opaque binary
 file, or a decoy database, and restore it.
@@ -35,7 +35,7 @@ Save options:
   --out <dir>            Output directory (default: current directory)
   --paper                Produce a printable PDF (high-ECC) instead of PNGs
   --zip                  Bundle the PNG set into a single .zip (disk mode)
-  --binary               Output one opaque file instead of images (up to 100 MB)
+  --binary               Output one opaque file instead of images (up to 1 GiB)
   --disguise             With --binary: give it a SQLite-database header (.db)
   --key-mode <mode>      embedded | keyfile | stego   (default: embedded)
   --cover <image>        Cover photo for --key-mode stego (key hidden in it)
@@ -53,6 +53,7 @@ Restore options:
 
 Common:
   --force                Overwrite existing output files (default: refuse)
+  --quiet                Suppress the progress indicator on stderr
 
 Password (any command that needs one), in order of precedence:
   --password <pw>        Discouraged: visible in shell history / process list
@@ -82,6 +83,40 @@ Examples:
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`);
   process.exit(code);
+}
+
+const PHASE_LABELS: Record<Progress['phase'], string> = {
+  compress: 'Compressing',
+  encrypt: 'Encrypting',
+  decrypt: 'Decrypting',
+  verify: 'Verifying',
+  unlock: 'Unlocking',
+  render: 'Rendering',
+};
+
+/**
+ * A progress reporter on stderr (results stay on stdout, so piping is unaffected).
+ * On a TTY it redraws a single line with a live percentage; when piped it emits one
+ * plain line per phase change. Returns undefined when quiet, plus a `done()` to
+ * finish the line. The core drives it through the shared `onProgress` callback.
+ */
+function makeProgress(quiet: boolean): { onProgress?: OnProgress; done: () => void } {
+  if (quiet) return { done: () => {} };
+  const tty = Boolean(process.stderr.isTTY);
+  let lastLabel = '';
+  let wroteTty = false;
+  const onProgress: OnProgress = (p) => {
+    const label = PHASE_LABELS[p.phase] ?? p.phase;
+    if (tty) {
+      const suffix = p.total > 0 ? `… ${Math.floor((p.done / p.total) * 100)}%` : '…';
+      process.stderr.write(`\r\x1b[2K${label}${suffix}`);
+      wroteTty = true;
+    } else if (label !== lastLabel) {
+      process.stderr.write(`${label}…\n`);
+      lastLabel = label;
+    }
+  };
+  return { onProgress, done: () => { if (tty && wroteTty) process.stderr.write('\r\x1b[2K'); } };
 }
 
 /** Read a hidden line from a TTY; fall back to plain stdin when piped. */
@@ -182,6 +217,7 @@ async function main(argv: string[]): Promise<number> {
       password: { type: 'string' },
       'password-file': { type: 'string' },
       force: { type: 'boolean' },
+      quiet: { type: 'boolean' },
     },
   });
 
@@ -222,7 +258,9 @@ async function main(argv: string[]): Promise<number> {
       force,
     };
 
-    const res = await runSave(opts);
+    const progress = makeProgress(Boolean(values.quiet));
+    const res = await runSave(opts, progress.onProgress);
+    progress.done();
     if (res.fontWarning) process.stderr.write(`${res.fontWarning}\n`);
     if (res.sizeWarning) process.stderr.write(`Warning: ${res.sizeWarning}\n`);
     const what = res.binary
@@ -238,13 +276,18 @@ async function main(argv: string[]): Promise<number> {
   if (command === 'restore') {
     if (positionals.length === 0) fail('restore: missing input images/folder/zip/pdf');
     const password = await resolvePassword(values);
-    const res = await runRestore({
-      inputs: positionals,
-      outDir,
-      password,
-      keyPath: values.key as string | undefined,
-      force,
-    });
+    const progress = makeProgress(Boolean(values.quiet));
+    const res = await runRestore(
+      {
+        inputs: positionals,
+        outDir,
+        password,
+        keyPath: values.key as string | undefined,
+        force,
+      },
+      progress.onProgress,
+    );
+    progress.done();
     process.stderr.write(`decoded ${res.decoded} of ${res.seen} image(s)\n`);
     process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
     return 0;

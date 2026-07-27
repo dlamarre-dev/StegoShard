@@ -5,6 +5,7 @@
  * lives in one place. Returns a localized result note via the caller's `msg`.
  */
 
+import type { OnProgress } from '@core';
 import { restoreFileFromDisk, restoreGalleryFromDisk } from './disk';
 import type { Msg } from './save-controller';
 
@@ -18,6 +19,8 @@ export interface RestoreRequest {
   keyFile?: File | undefined;
   /** Standard mode only: already-decoded payloads (e.g. live camera captures). */
   extraPayloads?: Uint8Array[];
+  /** Progress callback for the binary path (the slow, large-file container). */
+  onProgress?: OnProgress;
 }
 
 /** Run a restore and return the recovered filename plus a localized note. */
@@ -28,6 +31,12 @@ export async function runRestore(
   const { filename } =
     req.mode === 'gallery'
       ? await restoreGalleryFromDisk(req.files, req.password, req.keyFile)
-      : await restoreFileFromDisk(req.files, req.password, req.keyFile, req.extraPayloads ?? []);
+      : await restoreFileFromDisk(
+          req.files,
+          req.password,
+          req.keyFile,
+          req.extraPayloads ?? [],
+          req.onProgress,
+        );
   return { filename, note: msg('statusRestored', filename) };
 }

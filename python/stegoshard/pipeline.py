@@ -20,6 +20,7 @@ from .format import (
     parse_vault_blob,
     split_payload,
 )
+from .segmented import decode_segmented_blob
 
 
 class MissingKeyError(Exception):
@@ -88,8 +89,10 @@ def _decode_vault_blob(
 def decode_vault_binary(
     container: bytes, password: str, key_block: bytes | None = None
 ) -> RestoredFile:
-    """Restore from a binary container file (SPEC §8). Bytes matching neither
-    variant are treated as a bare blob, letting AES-GCM be the arbiter."""
+    """Restore from a binary container file (SPEC §8): the payload is a segmented
+    (chunked-AEAD) vault blob. Bytes matching neither container variant are treated
+    as a bare blob, letting AES-GCM be the arbiter."""
     unwrapped = unwrap_binary(container)
     blob = unwrapped[0] if unwrapped else container
-    return _decode_vault_blob(blob, password, key_block, MAX_CONTENT_BYTES_BINARY)
+    filename, content = decode_segmented_blob(blob, password, key_block, MAX_CONTENT_BYTES_BINARY)
+    return RestoredFile(filename, content)

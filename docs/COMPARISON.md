@@ -190,9 +190,9 @@ no other tool packages as a first-class mode.
 - **Maturity, audits, ecosystem → age, GnuPG, VeraCrypt, restic/Borg.** StegoShard is new;
   its crypto review / external audit is still pending, and it currently has a small
   maintainer base.
-- **Large data → restic / Borg.** StegoShard is deliberately for *small* secrets (~4×
-  overhead as images, 1 MiB per image, 100 MB for the binary form); it is not a
-  general backup system.
+- **Large data → restic / Borg.** StegoShard is deliberately for small-to-medium secrets
+  (~4× overhead as images, 1 MiB per image; up to 1 GiB CLI / 256 MiB browser for the
+  binary form); it is not a general backup system.
 - **Simplicity for one seed → SeedQR / metal.** If you only need to stamp a single seed,
   those are simpler.
 

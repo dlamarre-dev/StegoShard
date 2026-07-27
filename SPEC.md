@@ -339,16 +339,48 @@ If fewer than `k` shards survive, reconstruction is impossible.
 ## 8. Binary (non-image) output
 
 Instead of erasure-coding the vault blob (§6) into QR images, an implementation
-MAY write it to a single **container file**. This trades the images' loss
-tolerance and camera-restore for a compact artifact and a much larger size
-budget (no per-image ceiling). The blob is unchanged — the container is pure
-packaging around the already-authenticated bytes, so it adds no secrecy.
+MAY write a **segmented vault blob** (§8.1) to a single **container file**. This
+trades the images' loss tolerance and camera-restore for a compact artifact and a
+much larger size budget (no per-image ceiling). Unlike the image path — which
+encrypts the envelope in one AES-GCM call (§6) — the binary path splits it into
+chunks so encryption/decryption report byte-level progress and run off the UI
+thread; the container is pure packaging around the already-authenticated bytes,
+so it adds no secrecy.
 
-Two variants:
+### 8.1 Segmented vault blob
+
+The binary path replaces the §6 single-shot vault blob with a **self-describing,
+chunked** blob. The compressed envelope (§4) is split into fixed-size chunks, each
+sealed with AES-256-GCM under a STREAM nonce discipline (Hoang–Reyhanitabar–
+Rogaway–Vizár — the construction `age` uses).
 
 ```
-branded    [ MAGIC "SSBN" = 53 53 42 4E ][ VERSION u8 = 1 ][ vault blob (§6) ]
-disguised  a complete SQLite 3 database whose `cache` table holds the vault blob
+[ MAGIC "SSCS" = 53 53 43 53 ][ VERSION u8 = 1 ][ FLAGS u8 (bit0 = key block embedded) ]
+[ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1; empty for external keys) ]
+[ contentSalt 16 ][ noncePrefix 7 ][ chunkSize u32 ][ plaintextLen u64 ]
+[ chunk_0 ] … [ chunk_{n-1} ]        chunk_i = ciphertext_i || tag_i(16)
+```
+
+- **CEK** = `HKDF-SHA256(DEK, salt = contentSalt, info = "stegoshard/vault/content")`
+  — identical to §6.
+- **Chunks**: `n = ceil(plaintextLen / chunkSize)` (at least one, so an empty
+  payload yields one empty final chunk). `chunkSize` is implementation-chosen
+  within `[4096, 16·2²⁰]`; the reference encoder uses 1 MiB.
+- **Nonce_i** (12 bytes) = `noncePrefix (7, random per export) || u32_be(i) ||
+  finalByte`, where `finalByte = 1` only for the last chunk, else `0`.
+- **AAD** for every chunk = the entire header prefix above (magic … plaintextLen,
+  key block included), binding all chunks to the version, salt, nonce prefix,
+  chunk size, length, and key.
+- **Decrypt**: verify `containerLen − headerLen == (n−1)·(chunkSize+16) +
+  (lastSegLen+16)` (rejects truncation / trailing bytes), then open each chunk in
+  order; a bad tag, a dropped final chunk (finalByte mismatch), or reordering all
+  fail authentication. Each chunk is authenticated before its plaintext is kept.
+
+Two container variants wrap this blob:
+
+```
+branded    [ MAGIC "SSBN" = 53 53 42 4E ][ VERSION u8 = 1 ][ segmented vault blob (§8.1) ]
+disguised  a complete SQLite 3 database whose `cache` table holds the segmented vault blob
 ```
 
 - **Branded** (`.ssbn`) is self-labelling: easy for the owner to recognize; it
@@ -379,8 +411,9 @@ key delivery (§5.3/§5.4) is unchanged — the key stays a cover image.
 the SQLite header). Branded strips its 5-byte prefix; disguised parses the
 database and concatenates the `page_cache_*` rows. Bytes matching neither variant
 (or a SQLite file that is not one of ours) are treated as a bare blob, letting
-AES-GCM be the final arbiter. Then decrypt exactly as §6/§5. The gzip guard (§4)
-uses the binary size cap (below), which also bounds decompression on this path.
+AES-GCM be the final arbiter. Then decrypt the segmented blob as §8.1 (unlocking
+the key block as §5). The gzip guard (§4) uses the binary size cap (below), which
+also bounds decompression on this path.
 
 Canonical filenames used by the reference implementations: branded
 `stegoshard-vault.ssbn` / `stegoshard-key.ssbn`; disguised `cache.db` /
@@ -499,7 +532,7 @@ them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
 | Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)   |
 | Gallery salt     | `"StegoShard-gllry"` (16 bytes) (§9.1)                        |
 | Gallery slot     | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)   |
-| Limits           | file ≤ 1 MiB (images/PDF) or ≤ 100 MiB (binary); images ≤ 150 |
+| Limits           | file ≤ 1 MiB (images/PDF) or ≤ 1 GiB CLI / 256 MiB browser (binary); images ≤ 150 |
 | Gallery limits   | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)            |
 | Compression      | gzip (RFC 1952), opportunistic                                |
 

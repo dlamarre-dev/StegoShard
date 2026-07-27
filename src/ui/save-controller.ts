@@ -14,6 +14,7 @@
 import {
   type BinaryVariant,
   type KeyMode,
+  type OnProgress,
   type VaultKey,
   WrongPasswordError,
   parseKeyBlock,
@@ -54,6 +55,8 @@ export interface SaveRequest {
   /** Gallery Mode only: the cover photos and its own password. */
   covers?: File[];
   galleryPassword?: string;
+  /** Progress callback for the binary path (the slow, large-file destination). */
+  onProgress?: OnProgress;
 }
 
 /**
@@ -177,6 +180,7 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
       keyMode,
       variant,
       stego: req.stego,
+      onProgress: req.onProgress,
     });
     return { note: binaryNote(msg, keyMode, saved) };
   }

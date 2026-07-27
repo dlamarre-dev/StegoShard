@@ -41,6 +41,10 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [manifestPlugin(googlePhotos)],
+    // Bundle Web Workers as ES modules (the app is ES modules and the worker
+    // imports @core, which pulls in hash-wasm) instead of the default iife, which
+    // would inline a duplicate copy of the core into the worker bundle.
+    worker: { format: 'es' },
     build: {
       // One directory per target so the Chrome and Firefox manifests never
       // clobber each other — load dist/chrome or dist/firefox accordingly.

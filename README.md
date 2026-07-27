@@ -73,7 +73,7 @@ choice explicit instead of pretending one setting does both.
 images), and hide **only the recovery key** in an ordinary photo:
 
 ```
-Archive (≤ 100 MB)
+Archive (≤ 1 GiB)
         │
         ▼
 StegoShard — Resilient Storage
@@ -101,12 +101,12 @@ like on disk:
 | Output form | Model | What it is |
 | ----------- | :---: | ---------- |
 | **QR-grid images** (disk / paper / cloud) | 🛡 Resilient | Openly artificial images; survive recompression, printing, and cloud storage. |
-| **Opaque binary file** (`.ssbn`) | 🛡 Resilient | One compact file for larger secrets (up to 100 MB, no image-count ceiling). Not deniable — clearly a StegoShard vault. |
+| **Opaque binary file** (`.ssbn`) | 🛡 Resilient | One compact file for larger secrets (up to 1 GiB in the CLI, 256 MiB in the browser; no image-count ceiling). Not deniable — clearly a StegoShard vault. |
 | **Decoy database** (`.db`) | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Survives copying; deniability is shallow against a tool that actually opens it. |
 | **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. |
 
 The binary file and decoy database are peers of the image output, not afterthoughts:
-they are how you store a **larger** secret (up to 100 MB), resiliently or deniably, when
+they are how you store a **larger** secret (up to 1 GiB), resiliently or deniably, when
 the image count would otherwise be impractical.
 
 ## Quickstart
@@ -165,19 +165,28 @@ not stop restoration** as long as at least `k` images survive.
 
 ## Performance
 
-StegoShard targets **small, high-value secrets**, so the only deliberate cost is the one
-that protects you: **key derivation**. Every unlock runs Argon2id at **256 MiB, t=4**
-(frozen in [SPEC.md](SPEC.md)), tuned for a **~1–2 s** unlock on typical desktop hardware
-while staying viable in a browser tab and on a phone. That slowness is the point — it
-makes an offline password search expensive.
+Two costs are worth knowing about; both are deliberate, and neither is hidden from you.
 
-Everything else is negligible next to it. Payloads are capped small (≤ 1 MiB per
-image/PDF vault, ≤ 100 MB for the binary/decoy-database output), so encryption,
-Reed-Solomon erasure coding, and image encode/decode finish effectively instantly compared
-with the key-derivation step. It all runs **locally** — WebAssembly in the browser, the
-bundled runtime in the CLI — with no network round-trips (the optional cloud destination
-aside). Budget roughly **256 MiB of transient memory** for Argon2id; it is freed as soon
-as the key is derived.
+**Key derivation** is the cost that protects you. Every unlock runs Argon2id at
+**256 MiB, t=4** (frozen in [SPEC.md](SPEC.md)), tuned for a **~1–2 s** unlock on typical
+desktop hardware while staying viable in a browser tab and on a phone. That slowness is the
+point — it makes an offline password search expensive. Budget roughly **256 MiB of
+transient memory** for it; it is freed as soon as the key is derived.
+
+**Processing the secret** is effectively instant on the image/PDF path (capped at ≤ 1 MiB),
+but it takes **real, visible time on the large binary path** (`.ssbn` / `.db`, up to
+**256 MiB** in the browser or **1 GiB** in the CLI). There the file is gzip-compressed,
+encrypted with a chunked authenticated cipher, and then decrypted once more to prove the
+save round-trips *before* you are told it succeeded — on a large file that is a few seconds
+of work, not instant. So the work is made honest and non-blocking:
+
+- In the **browser**, the binary encrypt/decrypt runs in a **Web Worker** (off the UI
+  thread) with a **progress bar**, so the tab stays responsive instead of freezing.
+- In the **CLI**, a **progress indicator** on stderr names each phase (suppress with
+  `--quiet`).
+
+It all runs **locally** — WebAssembly in the browser, the bundled runtime in the CLI —
+with no network round-trips (the optional cloud destination aside).
 
 ## Design principles
 
@@ -186,7 +195,8 @@ as the key is derived.
   looks like coded noise, not vacation photos — deliberately; Deniable Storage blends
   in but is fragile by nature. StegoShard makes you choose rather than pretending one
   setting does both, and documents the honest limits of each.
-- **Small secrets.** ~4× size overhead when stored as images; large binaries are out of scope.
+- **Small-to-medium secrets.** ~4× size overhead when stored as images (≤ 1 MiB there); the
+  binary path takes up to 1 GiB (CLI) / 256 MiB (browser). Multi-gigabyte files are out of scope.
 - **No single support is trusted.** Resilience (multiple destinations + erasure coding)
   is the value proposition.
 - **The offline core (file → images → disk/paper) depends on no third-party service or
@@ -219,7 +229,7 @@ an external review, not features.
   this **is** Hybrid mode. Plus a **managed vault key** in the options page (create /
   unlock per session / change password / export / import / erase); the unlocked session
   is volatile and persists across popup reopens until the browser closes.
-- **Non-image output** — a **binary container** for larger secrets (up to 100 MB, no
+- **Non-image output** — a **binary container** for larger secrets (up to 1 GiB, no
   image-count ceiling): a compact opaque `.ssbn` file _(🛡 Resilient)_, or the same bytes
   wrapped as a **decoy database** with a valid SQLite header so file-type triage reads it
   as an ordinary `.db` _(🎭 Deniable)_ (SPEC §8). Plus **Gallery Mode** _(🎭 Deniable)_
