@@ -23,7 +23,8 @@ describe('runRestore routing', () => {
       { mode: 'standard', files: [img], password: 'pw', keyFile },
       msg,
     );
-    expect(restoreFileFromDisk).toHaveBeenCalledWith([img], 'pw', keyFile, []);
+    // The 5th arg is the optional onProgress (undefined here — not supplied).
+    expect(restoreFileFromDisk).toHaveBeenCalledWith([img], 'pw', keyFile, [], undefined);
     expect(filename).toBe('secret.txt');
     expect(note).toBe('statusRestored:secret.txt');
   });
