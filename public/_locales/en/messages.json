@@ -890,7 +890,7 @@
     "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
   },
   "wizTooLargeBinary": {
-    "message": "too large (max 100 MB)",
+    "message": "too large (max 256 MiB)",
     "description": "Wizard: destination unavailable — over the 100 MB binary cap."
   },
   "wizTooManyImages": {
@@ -1013,5 +1013,29 @@
   },
   "onboardingDismiss": {
     "message": "Get started"
+  },
+  "statusCompressing": {
+    "message": "Compressing…",
+    "description": "Progress phase label: compressing the file."
+  },
+  "statusEncrypting": {
+    "message": "Encrypting…",
+    "description": "Progress phase label: encrypting."
+  },
+  "statusDecrypting": {
+    "message": "Decrypting…",
+    "description": "Progress phase label: decrypting."
+  },
+  "statusVerifying": {
+    "message": "Verifying…",
+    "description": "Progress phase label: verifying the saved vault round-trips."
+  },
+  "statusUnlocking": {
+    "message": "Unlocking…",
+    "description": "Progress phase label: deriving the key with Argon2 (restore)."
+  },
+  "statusRendering": {
+    "message": "Rendering…",
+    "description": "Progress phase label: rendering images."
   }
 }

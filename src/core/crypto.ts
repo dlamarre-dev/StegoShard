@@ -149,6 +149,45 @@ export async function encryptBytes(
   return { iv, ciphertext: new Uint8Array(ct) };
 }
 
+/**
+ * AES-GCM seal with a caller-supplied 12-byte nonce and additional authenticated
+ * data (AAD). Returns `ciphertext || tag` (WebCrypto's combined form). Used by the
+ * segmented binary format (STREAM), where the caller manages a strict per-chunk
+ * nonce discipline — unlike `encryptBytes`, which picks a random IV. Keeping the
+ * two on separate helpers ensures the random-IV and counter-nonce disciplines are
+ * never accidentally crossed.
+ */
+export async function aeadSeal(
+  key: CryptoKey,
+  nonce: Uint8Array,
+  plaintext: Uint8Array,
+  aad: Uint8Array,
+): Promise<Uint8Array> {
+  if (nonce.length !== IV_LEN) throw new RangeError('aead: bad nonce length');
+  const ct = await subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: aad as BufferSource },
+    key,
+    plaintext as BufferSource,
+  );
+  return new Uint8Array(ct);
+}
+
+/** AES-GCM open (verify + decrypt) for `aeadSeal`. Throws on a bad tag/AAD/nonce. */
+export async function aeadOpen(
+  key: CryptoKey,
+  nonce: Uint8Array,
+  ciphertext: Uint8Array,
+  aad: Uint8Array,
+): Promise<Uint8Array> {
+  if (nonce.length !== IV_LEN) throw new RangeError('aead: bad nonce length');
+  const pt = await subtle.decrypt(
+    { name: 'AES-GCM', iv: nonce as BufferSource, additionalData: aad as BufferSource },
+    key,
+    ciphertext as BufferSource,
+  );
+  return new Uint8Array(pt);
+}
+
 /** AES-GCM decrypt. Throws (OperationError) on a wrong key or tampering. */
 export async function decryptBytes(
   key: CryptoKey,

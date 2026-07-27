@@ -22,7 +22,9 @@ FLAG_COMPRESSED = 0x01
 
 # Guards for untrusted input (mirror the TypeScript decoder).
 MAX_CONTENT_BYTES = 1024 * 1024  # image/PDF export cap; bounds gzip on that path
-MAX_CONTENT_BYTES_BINARY = 100 * 1024 * 1024  # binary (non-image) export cap
+# Binary (non-image) export cap. The reference decoder must accept the largest
+# artifact the tools can produce, i.e. the CLI cap (the browser UI caps lower).
+MAX_CONTENT_BYTES_BINARY = 1024 * 1024 * 1024  # 1 GiB
 ARGON2_LIMITS = {
     "iterations": (1, 16),
     "memory_kib": (8, 1024 * 1024),  # <= 1 GiB

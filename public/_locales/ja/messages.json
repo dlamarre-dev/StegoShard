@@ -774,7 +774,7 @@
     "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
   },
   "wizTooLargeBinary": {
-    "message": "大きすぎます（最大 100 MB）",
+    "message": "大きすぎます（最大 256 MiB）",
     "description": "Wizard: destination unavailable — over the 100 MB binary cap."
   },
   "wizTooManyImages": {
@@ -917,5 +917,23 @@
   },
   "onboardingDismiss": {
     "message": "はじめる"
+  },
+  "statusCompressing": {
+    "message": "圧縮中…"
+  },
+  "statusEncrypting": {
+    "message": "暗号化中…"
+  },
+  "statusDecrypting": {
+    "message": "復号中…"
+  },
+  "statusVerifying": {
+    "message": "検証中…"
+  },
+  "statusUnlocking": {
+    "message": "ロック解除中…"
+  },
+  "statusRendering": {
+    "message": "生成中…"
   }
 }

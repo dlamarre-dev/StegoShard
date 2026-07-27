@@ -868,6 +868,44 @@ details.advanced[open] > summary::before {
   justify-content: space-between;
   gap: 8px;
 }
+/* Determinate/indeterminate progress bar for save/restore (worker-driven). */
+.progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+/* Coarse phases (compress/unlock) have no percentage: sweep a highlight so the
+   user sees ongoing work. Reduced-motion (below) stops the animation; the bar
+   then reads as a full accent track while the status label names the phase. */
+.progress-bar--indeterminate {
+  width: 100% !important;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 35%, transparent),
+    var(--accent),
+    color-mix(in srgb, var(--accent) 35%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: progress-sweep 1.1s linear infinite;
+}
+@keyframes progress-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .pw-meter {
   height: 4px;
   background: var(--border);

@@ -16,6 +16,8 @@ export default defineConfig({
       '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
     },
   },
+  // Bundle the pipeline Web Worker as an ES module (see vite.config.ts).
+  worker: { format: 'es' },
   build: {
     outDir: resolve(__dirname, 'web-dist'),
     emptyOutDir: true,

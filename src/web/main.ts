@@ -12,6 +12,7 @@ import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/dom
 import { type Estimates, computeEstimates, formatSize } from '../ui/estimate';
 import { runSave, type SaveRequest, type StegoInput } from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
+import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
@@ -67,6 +68,8 @@ const pwHint = el<HTMLInputElement>('pw-hint');
 const keyLocation = el<HTMLInputElement>('key-location');
 const saveBtn = el<HTMLButtonElement>('save-btn');
 const saveStatus = el('save-status');
+const saveProgress = el('save-progress');
+const saveProgressBar = el('save-progress-bar');
 const saveResult = el('save-result');
 const saveResultNote = el('save-result-note');
 
@@ -80,6 +83,8 @@ const cameraCaptured = el('camera-captured');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
 const restoreStatus = el('restore-status');
+const restoreProgress = el('restore-progress');
+const restoreProgressBar = el('restore-progress-bar');
 const restoreResult = el('restore-result');
 const restoreResultNote = el('restore-result-note');
 const restoreAdvanced = el('restore-advanced');
@@ -245,9 +250,12 @@ async function makeKey(password: string): Promise<VaultKey> {
 async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
   saveBtn.disabled = true;
   show(saveResult, false);
+  const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
   setStatus(saveStatus, msg('statusSaving'));
   try {
-    const { note } = await runSave(await build(), msg);
+    const req = await build();
+    req.onProgress = prog.onProgress;
+    const { note } = await runSave(req, msg);
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
     show(saveResult, true);
@@ -255,6 +263,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
+    prog.done();
     saveBtn.disabled = false;
   }
 }
@@ -321,6 +330,7 @@ restoreBtn.addEventListener('click', async () => {
 
   restoreBtn.disabled = true;
   show(restoreResult, false);
+  const prog = makeProgressUI(restoreProgress, restoreProgressBar, restoreStatus, msg);
   setStatus(restoreStatus, msg('statusRestoring'));
   try {
     const { note } = await runRestore(
@@ -330,6 +340,7 @@ restoreBtn.addEventListener('click', async () => {
         password: restorePw.value,
         keyFile: restoreKey.files?.[0],
         extraPayloads: capturedPayloads(),
+        onProgress: prog.onProgress,
       },
       msg,
     );
@@ -342,6 +353,7 @@ restoreBtn.addEventListener('click', async () => {
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {
+    prog.done();
     restoreBtn.disabled = false;
   }
 });

@@ -11,24 +11,23 @@ import {
   binaryVaultName,
   getCodec,
   exportVault,
-  exportVaultBinary,
   galleryDecode,
   galleryEncode,
   importVault,
-  importVaultBinary,
   MAX_IMAGES,
   PROFILE_DISK,
   VerificationError,
   decodeHeader,
   toHex,
   unwrapBinary,
-  verifyBinaryExport,
   verifyGalleryExport,
   verifyImageExport,
   wrapBinary,
   type KeyMode,
+  type OnProgress,
   type VaultKey,
 } from '@core';
+import { decryptBinaryInWorker, encryptBinaryInWorker } from './run-in-worker';
 import { Unzip, UnzipInflate, zipSync } from 'fflate';
 import {
   decodeImageBytes,
@@ -171,13 +170,26 @@ export async function saveFileToDisk(
 export async function saveFileToBinary(
   file: File,
   key: VaultKey,
-  options: { keyMode: KeyMode; variant: BinaryVariant; stego?: SaveOptions['stego'] },
+  options: {
+    keyMode: KeyMode;
+    variant: BinaryVariant;
+    stego?: SaveOptions['stego'];
+    onProgress?: OnProgress | undefined;
+  },
 ): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
   const content = new Uint8Array(await file.arrayBuffer());
-  const { container, keyBlock, keyMode } = await exportVaultBinary(file.name, content, key, {
-    keyMode: options.keyMode,
-    variant: options.variant,
-  });
+  const keyMode = options.keyMode;
+  const keyBlock = key.keyBlock;
+  // Encrypt + verify off the main thread (the worker also runs the post-save
+  // round-trip check) so the UI stays responsive and the progress bar animates.
+  const container = await encryptBinaryInWorker(
+    file.name,
+    content,
+    key,
+    keyMode,
+    options.variant,
+    options.onProgress,
+  );
   const downloads: { name: string; blob: Blob }[] = [
     { name: binaryVaultName(options.variant), blob: octet(container) },
   ];
@@ -195,8 +207,8 @@ export async function saveFileToBinary(
       blob: octet(wrapBinary(keyBlock, options.variant)),
     });
   }
-  // Prove the container (and, for stego, the key cover) restores before delivering.
-  await verifyBinaryExport(container, key.dek, file.name, content);
+  // The container round-trip is verified inside the worker; here we only still
+  // need to prove the stego key cover yields the key block back.
   if (keyMode === 'stego' && options.stego) {
     const stegoDownload = downloads[downloads.length - 1]!;
     await verifyStegoKeyCover(
@@ -380,6 +392,7 @@ export async function restoreFileFromDisk(
   password: string,
   keyFile?: File,
   extraPayloads: Uint8Array[] = [],
+  onProgress?: OnProgress,
 ): Promise<{ filename: string }> {
   const images: Uint8Array[] = [];
   const payloads: Uint8Array[] = [...extraPayloads];
@@ -402,7 +415,12 @@ export async function restoreFileFromDisk(
     for (const file of files) {
       const bytes = await blobBytes(file);
       if (unwrapBinary(bytes)) {
-        const { filename, content } = await importVaultBinary(bytes, password, { keyBlock });
+        const { filename, content } = await decryptBinaryInWorker(
+          bytes,
+          password,
+          keyBlock,
+          onProgress,
+        );
         downloadBlob(new Blob([content as BufferSource]), filename);
         return { filename };
       }

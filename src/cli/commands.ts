@@ -49,6 +49,7 @@ import {
   wrapBinary,
   type ImageDataLike,
   type KeyMode,
+  type OnProgress,
   type VaultKey,
 } from '@core';
 import {
@@ -160,7 +161,7 @@ async function externalKey(
   return undefined;
 }
 
-export async function runSave(opts: SaveOptions): Promise<SaveResult> {
+export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   allowOverwrite = Boolean(opts.force);
   const content = read(opts.inputFile);
   const key = await makeKey(opts.password);
@@ -173,8 +174,9 @@ export async function runSave(opts: SaveOptions): Promise<SaveResult> {
       content,
       key,
       { keyMode: opts.keyMode, variant },
+      onProgress,
     );
-    await verifyBinaryExport(container, key.dek, basename(opts.inputFile), content);
+    await verifyBinaryExport(container, key.dek, basename(opts.inputFile), content, onProgress);
     const files = [writeOut(opts.outDir, binaryVaultName(variant), container)];
     if (keyMode === 'stego') {
       const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
@@ -304,14 +306,20 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
   return (await extractKeyImage(bytes, basename(keyPath), password)) ?? undefined; // stego image
 }
 
-export async function runRestore(opts: RestoreOptions): Promise<RestoreResult> {
+export async function runRestore(
+  opts: RestoreOptions,
+  onProgress?: OnProgress,
+): Promise<RestoreResult> {
   allowOverwrite = Boolean(opts.force);
   const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
   if (binaryVaultPath) {
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
-    const { filename, content } = await importVaultBinary(read(binaryVaultPath), opts.password, {
-      keyBlock,
-    });
+    const { filename, content } = await importVaultBinary(
+      read(binaryVaultPath),
+      opts.password,
+      { keyBlock },
+      onProgress,
+    );
     const outName = basename(filename) || 'restored.bin';
     const outPath = writeOut(opts.outDir, outName, content);
     return { outPath, filename, seen: 1, decoded: 1 };
