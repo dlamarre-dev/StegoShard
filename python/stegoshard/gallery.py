@@ -83,6 +83,7 @@ def decode_gallery(
     iterations: int = 4,
     memory_kib: int = 256 * 1024,
     parallelism: int = 1,
+    secret: bytes | None = None,
 ) -> RestoredFile:
     """Restore a secret from a folder of photos, blindly (SPEC §9.5).
 
@@ -124,7 +125,18 @@ def decode_gallery(
 
     for group in sorted(groups.values(), key=len, reverse=True):
         try:
-            return decode_vault(group, password, key_block)
+            # Gallery vaults carry the §10 multi-region blob; the external artifact
+            # for a keyfile/stego gallery is a 32-byte key factor (here `key_block`).
+            return decode_vault(
+                group,
+                password,
+                multiregion=True,
+                key_factor=key_block,
+                secret=secret,
+                iterations=iterations,
+                memory_kib=memory_kib,
+                parallelism=parallelism,
+            )
         except Exception:  # noqa: BLE001 - incomplete/failed set, try the next
             continue
     raise GalleryRestoreError("gallery reconstruction failed")

@@ -11,8 +11,12 @@ import {
   StegoCoverFormatError,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  embedKeyFactorStego,
+  embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
   extractKeyBlockStegoJpeg,
+  extractKeyFactorStego,
+  extractKeyFactorStegoJpeg,
   getCodec,
   isJpeg,
   type GalleryCover,
@@ -185,6 +189,54 @@ export async function extractKeyImage(file: Blob, password: string): Promise<Uin
   if (isPngBytes(bytes)) {
     const img = await fileToImageData(file); // full resolution (no cap)
     return extractKeyBlockStego(img.data, img.width, img.height, password);
+  }
+  return null;
+}
+
+/**
+ * Hide the 32-byte external key factor (§10.3) in a cover photo, keeping the
+ * cover's format — the stego-delivery counterpart of a raw `.key` file on the
+ * multi-region paths (gallery, disguised `.db`). Same format rules as
+ * embedKeyImage.
+ */
+export async function embedKeyFactorImage(
+  cover: Blob,
+  factor: Uint8Array,
+  password: string,
+): Promise<StegoKeyImage> {
+  const bytes = new Uint8Array(await cover.arrayBuffer());
+  if (isJpeg(bytes)) {
+    try {
+      const out = await embedKeyFactorStegoJpeg(bytes, factor, password);
+      return { bytes: out, mime: 'image/jpeg', ext: 'jpg' };
+    } catch (err) {
+      if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
+      throw err;
+    }
+  }
+  if (isPngBytes(bytes)) {
+    const img = await fileToImageData(cover); // full resolution (no cap)
+    await embedKeyFactorStego(img.data, img.width, img.height, factor, password);
+    const blob = await imageDataToPngBlob(img);
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png', ext: 'png' };
+  }
+  throw new StegoCoverFormatError();
+}
+
+/**
+ * Recover the 32-byte key factor from a stego cover (JPEG or PNG). Returns null
+ * when the password is wrong / the image carries no factor / the format is
+ * unsupported (all indistinguishable).
+ */
+export async function extractKeyFactorImage(
+  file: Blob,
+  password: string,
+): Promise<Uint8Array | null> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (isJpeg(bytes)) return extractKeyFactorStegoJpeg(bytes, password);
+  if (isPngBytes(bytes)) {
+    const img = await fileToImageData(file); // full resolution (no cap)
+    return extractKeyFactorStego(img.data, img.width, img.height, password);
   }
   return null;
 }

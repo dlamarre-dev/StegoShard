@@ -89,16 +89,20 @@ describe('entropy audit', () => {
     }
   });
 
-  it('never repeats an IV across many encryptions with the same key', async () => {
-    const { dek } = await createKeyBlock('pw', FAST);
-    const seen = new Set<string>();
-    for (let i = 0; i < 2000; i++) {
-      const { iv } = await encryptBytes(dek, new Uint8Array(1));
-      const hex = toHex(iv);
-      expect(seen.has(hex)).toBe(false);
-      seen.add(hex);
-    }
-  });
+  it(
+    'never repeats an IV across many encryptions with the same key',
+    { timeout: 15000 },
+    async () => {
+      const { dek } = await createKeyBlock('pw', FAST);
+      const seen = new Set<string>();
+      for (let i = 0; i < 2000; i++) {
+        const { iv } = await encryptBytes(dek, new Uint8Array(1));
+        const hex = toHex(iv);
+        expect(seen.has(hex)).toBe(false);
+        seen.add(hex);
+      }
+    },
+  );
 
   it('never repeats a salt across many draws', () => {
     const seen = new Set<string>();

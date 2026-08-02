@@ -9,6 +9,11 @@ import {
   type BinaryVariant,
   binaryKeyName,
   binaryVaultName,
+  buildDuressDbContainer,
+  buildNonPossessionDbContainer,
+  shareFileText,
+  randomBytes,
+  KEY_FACTOR_LEN,
   getCodec,
   exportVault,
   galleryDecode,
@@ -16,24 +21,32 @@ import {
   importVault,
   MAX_IMAGES,
   PROFILE_DISK,
+  shamirRecover,
   VerificationError,
   decodeHeader,
   toHex,
   unwrapBinary,
   verifyGalleryExport,
-  verifyImageExport,
   wrapBinary,
+  verifyImageExport,
   type KeyMode,
   type OnProgress,
   type VaultKey,
 } from '@core';
-import { decryptBinaryInWorker, encryptBinaryInWorker } from './run-in-worker';
+import type { AccessMode } from './save-controller';
+import {
+  decryptBinaryInWorker,
+  encryptBinaryDisguisedInWorker,
+  encryptBinaryInWorker,
+} from './run-in-worker';
 import { Unzip, UnzipInflate, zipSync } from 'fflate';
 import {
   decodeImageBytes,
   downloadBlob,
   embedKeyImage,
+  embedKeyFactorImage,
   extractKeyImage,
+  extractKeyFactorImage,
   fileToGalleryCover,
   galleryImageToBlob,
   imageWithLabelToPngBlob,
@@ -82,11 +95,19 @@ async function verifyStegoKeyCover(
   bytes: Uint8Array,
   name: string,
   password: string,
-  keyBlock: Uint8Array,
+  expected: Uint8Array,
+  // The single-region paths (disk/paper/branded .ssbn) hide a 92-byte key block;
+  // the multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
+  variant: 'block' | 'factor' = 'block',
 ): Promise<void> {
-  const recovered = await extractKeyImage(new File([bytes as BlobPart], name), password);
-  if (!recovered || recovered.length !== keyBlock.length) throw new VerificationError();
-  for (let i = 0; i < keyBlock.length; i++) if (recovered[i] !== keyBlock[i]) throw new VerificationError();
+  const file = new File([bytes as BlobPart], name);
+  const recovered =
+    variant === 'factor'
+      ? await extractKeyFactorImage(file, password)
+      : await extractKeyImage(file, password);
+  if (!recovered || recovered.length !== expected.length) throw new VerificationError();
+  for (let i = 0; i < expected.length; i++)
+    if (recovered[i] !== expected[i]) throw new VerificationError();
 }
 
 /** Encode a file into a set of PNG images and download them (or a .zip). */
@@ -150,16 +171,122 @@ export async function saveFileToDisk(
   } else {
     for (const p of pngs) downloads.push({ name: p.name, blob: octet(p.bytes, 'image/png') });
   }
-  if (externalKey) downloads.push({ name: externalKey.name, blob: octet(externalKey.bytes, externalKey.mime) });
+  if (externalKey)
+    downloads.push({ name: externalKey.name, blob: octet(externalKey.bytes, externalKey.mime) });
 
   // Prove the set (and, for stego, the key cover) restores before handing it over.
   await verifyImageExport(imagePayloads, key.dek, file.name, content);
   if (keyMode === 'stego' && externalKey && options.stego) {
-    await verifyStegoKeyCover(externalKey.bytes, externalKey.name, options.stego.password, keyBlock);
+    await verifyStegoKeyCover(
+      externalKey.bytes,
+      externalKey.name,
+      options.stego.password,
+      keyBlock,
+    );
   }
 
   await deliver(downloads, `stegoshard-${setHex}`);
   return { imageCount: total, setId: setHex, keyMode };
+}
+
+/** The text file handed to one threshold holder (§10.6 / §10.8 item 4). */
+function shareDownloads(
+  shares: Uint8Array[],
+  k: number,
+  n: number,
+): { name: string; blob: Blob }[] {
+  return shares.map((share, i) => ({
+    name: `stegoshard-share-${i + 1}.txt`,
+    blob: new Blob([shareFileText(share, i + 1, n, k, 'and load them at restore.')], {
+      type: 'text/plain',
+    }),
+  }));
+}
+
+/**
+ * Build a disguised .db vault in a §10 access mode (duress or non-possession) on
+ * the main thread. Payloads are bucket-capped, so the extra Argon2id is a brief,
+ * opt-in blocking cost; the plain path stays on the worker. Returns the downloads.
+ */
+async function buildDisguisedMode(
+  file: File,
+  content: Uint8Array,
+  options: {
+    mode: AccessMode;
+    password: string;
+    keyMode: KeyMode;
+    stego?: { cover: File; password: string } | undefined;
+    duressPassword?: string | undefined;
+    decoy?: File | undefined;
+    threshold?: { k: number; n: number } | undefined;
+    onProgress?: OnProgress | undefined;
+  },
+): Promise<{ name: string; blob: Blob }[]> {
+  const vaultName = binaryVaultName('disguised');
+  // keyfile/stego mint a 32-byte external key factor (§10.3) that composes with the
+  // access mode as an extra layer (needed on top of the password / duress / shares).
+  const keyFactor = options.keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+
+  async function deliverFactor(): Promise<{ name: string; blob: Blob }[]> {
+    if (!keyFactor) return [];
+    if (options.keyMode === 'keyfile') {
+      return [
+        { name: binaryKeyName('disguised'), blob: octet(wrapBinary(keyFactor, 'disguised')) },
+      ];
+    }
+    if (!options.stego) throw new Error('stego mode requires a cover image and password');
+    const k = await embedKeyFactorImage(options.stego.cover, keyFactor, options.stego.password);
+    const dl = {
+      name: stegoKeyName(options.stego.cover.name, k.ext, ''),
+      blob: octet(k.bytes, k.mime),
+    };
+    await verifyStegoKeyCover(
+      await blobBytes(dl.blob),
+      dl.name,
+      options.stego.password,
+      keyFactor,
+      'factor',
+    );
+    return [dl];
+  }
+
+  if (options.mode === 'duress') {
+    if (!options.duressPassword || !options.decoy) {
+      throw new Error('duress mode requires a duress password and a decoy file');
+    }
+    const decoyContent = new Uint8Array(await options.decoy.arrayBuffer());
+    // Core builds + self-verifies both regions and wraps the container.
+    const { container } = await buildDuressDbContainer(
+      file.name,
+      content,
+      options.decoy.name,
+      decoyContent,
+      options.password,
+      options.duressPassword,
+      keyFactor,
+      undefined,
+      options.onProgress,
+    );
+    return [{ name: vaultName, blob: octet(container) }, ...(await deliverFactor())];
+  }
+  // non-possession
+  if (!options.threshold) throw new Error('non-possession mode requires a threshold');
+  const { k, n } = options.threshold;
+  const { container, shares } = await buildNonPossessionDbContainer(
+    file.name,
+    content,
+    options.password,
+    k,
+    n,
+    keyFactor,
+    undefined,
+    options.onProgress,
+  );
+  return [
+    { name: vaultName, blob: octet(container) },
+    ...shareDownloads(shares, k, n),
+    ...(await deliverFactor()),
+  ];
 }
 
 /**
@@ -174,11 +301,83 @@ export async function saveFileToBinary(
     keyMode: KeyMode;
     variant: BinaryVariant;
     stego?: SaveOptions['stego'];
+    password?: string | undefined;
+    mode?: AccessMode | undefined;
+    duressPassword?: string | undefined;
+    decoy?: File | undefined;
+    threshold?: { k: number; n: number } | undefined;
     onProgress?: OnProgress | undefined;
   },
 ): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
   const content = new Uint8Array(await file.arrayBuffer());
   const keyMode = options.keyMode;
+  const mode = options.mode ?? 'plain';
+
+  // Disguised .db is a §10 multi-region container keyed by the per-save password
+  // (not the managed key). The worker returns the generated key factor for keyfile
+  // delivery; the container round-trip is verified inside the worker.
+  if (options.variant === 'disguised') {
+    if (!options.password) throw new Error('the disguised .db vault requires a per-save password');
+    // Duress / non-possession run on the main thread (bucket-capped payloads); the
+    // plain path stays on the worker. keyfile/stego compose with these modes as an
+    // extra external key factor (§10.3) layered on top of the duress password / shares.
+    if (mode !== 'plain') {
+      const downloads = await buildDisguisedMode(file, content, {
+        mode,
+        password: options.password,
+        keyMode,
+        stego: options.stego,
+        duressPassword: options.duressPassword,
+        decoy: options.decoy,
+        threshold: options.threshold,
+        onProgress: options.onProgress,
+      });
+      const modeId = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+      await deliver(downloads, `stegoshard-${modeId}`);
+      return { keyMode, variant: 'disguised' };
+    }
+    const { container, keyBlock: keyFactor } = await encryptBinaryDisguisedInWorker(
+      file.name,
+      content,
+      options.password,
+      keyMode,
+      options.onProgress,
+    );
+    const downloads: { name: string; blob: Blob }[] = [
+      { name: binaryVaultName('disguised'), blob: octet(container) },
+    ];
+    if (keyMode === 'stego') {
+      if (!options.stego) throw new Error('stego mode requires a cover image and password');
+      // The .db is a multi-region path → hide the 32-byte key factor (SSKF), not a
+      // 92-byte key block.
+      const stegoKey = await embedKeyFactorImage(
+        options.stego.cover,
+        keyFactor,
+        options.stego.password,
+      );
+      const dl = {
+        name: stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
+        blob: octet(stegoKey.bytes, stegoKey.mime),
+      };
+      downloads.push(dl);
+      await verifyStegoKeyCover(
+        await blobBytes(dl.blob),
+        dl.name,
+        options.stego.password,
+        keyFactor,
+        'factor',
+      );
+    } else if (keyMode === 'keyfile') {
+      downloads.push({
+        name: binaryKeyName('disguised'),
+        blob: octet(wrapBinary(keyFactor, 'disguised')),
+      });
+    }
+    const disguisedId = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+    await deliver(downloads, `stegoshard-${disguisedId}`);
+    return { keyMode, variant: 'disguised' };
+  }
+
   const keyBlock = key.keyBlock;
   // Encrypt + verify off the main thread (the worker also runs the post-save
   // round-trip check) so the UI stays responsive and the progress bar animates.
@@ -243,12 +442,23 @@ export async function saveGalleryToDisk(
   secret: File,
   covers: File[],
   password: string,
-  options: { keyMode?: KeyMode; stego?: SaveOptions['stego'] } = {},
+  options: {
+    keyMode?: KeyMode;
+    stego?: SaveOptions['stego'];
+    mode?: AccessMode;
+    threshold?: { k: number; n: number } | undefined;
+  } = {},
 ): Promise<GallerySaveResult> {
   const keyMode = options.keyMode ?? 'embedded';
+  const mode = options.mode ?? 'plain';
   const content = new Uint8Array(await secret.arrayBuffer());
   const galleryCovers = await Promise.all(covers.map(fileToGalleryCover));
-  const res = await galleryEncode(secret.name, content, password, galleryCovers, { keyMode });
+  const res = await galleryEncode(secret.name, content, password, galleryCovers, {
+    keyMode,
+    // Duress is refused upstream (winnowing block); gallery does plain + Mode B.
+    mode: mode === 'nonpossession' ? 'nonpossession' : 'plain',
+    threshold: options.threshold,
+  });
   const setHex = toHex(res.setId);
 
   // Two covers can share a basename, and gallery reuses cover names — disambiguate.
@@ -264,7 +474,9 @@ export async function saveGalleryToDisk(
   // A separate key rides alongside the photos when not embedded.
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const k = await embedKeyImage(options.stego.cover, res.keyBlock, options.stego.password);
+    // Gallery is a multi-region path: the external artifact is the 32-byte key
+    // factor (§10.3), hidden in its own SSKF envelope, not a 92-byte key block.
+    const k = await embedKeyFactorImage(options.stego.cover, res.keyBlock, options.stego.password);
     downloads.push({
       name: stegoKeyName(options.stego.cover.name, k.ext, setHex),
       blob: octet(k.bytes, k.mime),
@@ -277,12 +489,34 @@ export async function saveGalleryToDisk(
     downloads.push({ name: `stegoshard-${setHex}.key`, blob: octet(res.keyBlock) });
   }
 
+  // Non-possession (Mode B): the shares recover the secret that gates verification.
+  const thresholdSecret =
+    mode === 'nonpossession' && res.shares ? await shamirRecover(res.shares) : undefined;
+
   // Prove the photos blind-winnow back to the original before delivering.
   const externalKeyBlock = keyMode === 'embedded' ? undefined : res.keyBlock;
-  await verifyGalleryExport(res.images, password, externalKeyBlock, secret.name, content);
+  await verifyGalleryExport(
+    res.images,
+    password,
+    externalKeyBlock,
+    secret.name,
+    content,
+    thresholdSecret,
+  );
   if (keyMode === 'stego' && options.stego) {
     const cover = downloads[downloads.length - 1]!;
-    await verifyStegoKeyCover(await blobBytes(cover.blob), cover.name, options.stego.password, res.keyBlock);
+    await verifyStegoKeyCover(
+      await blobBytes(cover.blob),
+      cover.name,
+      options.stego.password,
+      res.keyBlock,
+      'factor',
+    );
+  }
+
+  // After the stego-cover check, add the threshold share files for holders.
+  if (thresholdSecret && res.shares && options.threshold) {
+    downloads.push(...shareDownloads(res.shares, options.threshold.k, options.threshold.n));
   }
 
   // Neutral folder name (the bare set id, no "stegoshard-" prefix) so grouping
@@ -296,6 +530,7 @@ export async function restoreGalleryFromDisk(
   files: File[],
   password: string,
   keyFile?: File,
+  secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
   const covers = await Promise.all(files.map(fileToGalleryCover));
   // Optional external key (keyfile/stego galleries): a .key, a binary key
@@ -308,9 +543,10 @@ export async function restoreGalleryFromDisk(
       ? unwrapped.payload
       : isKey(keyFile.name)
         ? bytes
-        : ((await extractKeyImage(keyFile, password)) ?? undefined);
+        : ((await extractKeyFactorImage(keyFile, password)) ?? undefined);
   }
-  const { filename, content } = await galleryDecode(covers, password, { keyBlock });
+  // Mode B (non-possession): `secret` is recovered from a threshold share quorum.
+  const { filename, content } = await galleryDecode(covers, password, { keyBlock, secret });
   downloadBlob(new Blob([content as BufferSource]), filename);
   return { filename };
 }
@@ -393,6 +629,7 @@ export async function restoreFileFromDisk(
   keyFile?: File,
   extraPayloads: Uint8Array[] = [],
   onProgress?: OnProgress,
+  secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
   const images: Uint8Array[] = [];
   const payloads: Uint8Array[] = [...extraPayloads];
@@ -406,7 +643,13 @@ export async function restoreFileFromDisk(
       ? unwrapped.payload
       : isKey(keyFile.name)
         ? bytes
-        : ((await extractKeyImage(keyFile, password)) ?? undefined);
+        : // A stego cover carries either a 92-byte key block (single-region: disk /
+          // paper / branded .ssbn) or the 32-byte key factor (multi-region .db).
+          // The two envelopes self-distinguish by magic, so try block then factor;
+          // only the one actually embedded returns non-null.
+          ((await extractKeyImage(keyFile, password)) ??
+          (await extractKeyFactorImage(keyFile, password)) ??
+          undefined);
   }
 
   // A single binary vault container short-circuits the image pipeline. (Camera
@@ -419,6 +662,7 @@ export async function restoreFileFromDisk(
           bytes,
           password,
           keyBlock,
+          secret,
           onProgress,
         );
         downloadBlob(new Blob([content as BufferSource]), filename);

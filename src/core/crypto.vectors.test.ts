@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { argon2id } from 'hash-wasm';
 import { toHex, readU16 } from './bytes';
 import {
+  type Argon2Params,
   CONTENT_SALT_LEN,
   IV_LEN,
   decryptBytes,
@@ -31,6 +32,9 @@ import {
   WrongPasswordError,
 } from './crypto';
 import { parsePayload } from './payload';
+import { decodeMultiRegionVaultBlob } from './vault';
+import { decodeMultiRegionSegmentedBlob } from './segmented';
+import { shamirRecover } from './shamir';
 
 interface Argon2Vector {
   name: string;
@@ -63,11 +67,73 @@ interface VaultBlobVector {
   filename: string;
   contentHex: string;
 }
+interface MultiRegionVaultVector {
+  name: string;
+  mode: 'embedded' | 'keyfile';
+  password: string;
+  keyFactorHex: string;
+  blobHex: string;
+  filename: string;
+  contentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
+interface MultiRegionSegmentedVector extends MultiRegionVaultVector {
+  chunkSize: number;
+}
+interface GatedVaultVector {
+  name: string;
+  password: string;
+  secretHex: string;
+  blobHex: string;
+  filename: string;
+  contentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
+interface ShamirVector {
+  name: string;
+  secretHex: string;
+  k: number;
+  n: number;
+  shares: string[];
+}
+interface DuressVaultVector {
+  name: string;
+  realPassword: string;
+  duressPassword: string;
+  blobHex: string;
+  realFilename: string;
+  realContentHex: string;
+  decoyFilename: string;
+  decoyContentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
 interface Vectors {
   argon2id: Argon2Vector[];
   aesGcm: GcmVector[];
   keyBlock: KeyBlockVector[];
   vaultBlob: VaultBlobVector[];
+  multiRegionVaultBlob: MultiRegionVaultVector[];
+  multiRegionSegmentedBlob: MultiRegionSegmentedVector[];
+  gatedVaultBlob: GatedVaultVector[];
+  shamir: ShamirVector[];
+  duressVaultBlob: DuressVaultVector[];
+}
+
+function vectorParams(v: {
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}): Argon2Params {
+  return { iterations: v.iterations, memoryKiB: v.memoryKiB, parallelism: v.parallelism };
+}
+function vectorFactor(hex: string): Uint8Array | null {
+  return hex ? fromHex(hex) : null;
 }
 
 const vectors: Vectors = JSON.parse(
@@ -196,6 +262,117 @@ describe('frozen vectors: full vault blob decrypt', () => {
       const { filename, content } = await parsePayload(envelope, 1024 * 1024);
       expect(filename).toBe(v.filename);
       expect(toHex(content)).toBe(v.contentHex);
+    });
+  }
+});
+
+describe('frozen vectors: multi-region vault blob (§10.6, gallery geometry)', () => {
+  for (const v of vectors.multiRegionVaultBlob) {
+    it(`decodes ${v.name}`, async () => {
+      const { filename, content } = await decodeMultiRegionVaultBlob(
+        fromHex(v.blobHex),
+        v.password,
+        {
+          params: vectorParams(v),
+          keyFactor: vectorFactor(v.keyFactorHex),
+          maxContentBytes: 1024 * 1024,
+        },
+      );
+      expect(filename).toBe(v.filename);
+      expect(toHex(content)).toBe(v.contentHex);
+    });
+
+    it(`rejects ${v.name} without the key factor / with a wrong password`, async () => {
+      // keyfile vectors require the factor; embedded vectors reject a wrong password.
+      const bad =
+        v.mode === 'keyfile'
+          ? decodeMultiRegionVaultBlob(fromHex(v.blobHex), v.password, {
+              params: vectorParams(v),
+              maxContentBytes: 1024 * 1024,
+            })
+          : decodeMultiRegionVaultBlob(fromHex(v.blobHex), v.password + 'x', {
+              params: vectorParams(v),
+              maxContentBytes: 1024 * 1024,
+            });
+      await expect(bad).rejects.toBeInstanceOf(WrongPasswordError);
+    });
+  }
+});
+
+describe('frozen vectors: multi-region segmented blob (§10.7, .db geometry)', () => {
+  for (const v of vectors.multiRegionSegmentedBlob) {
+    it(`decodes ${v.name}`, async () => {
+      const { filename, content } = await decodeMultiRegionSegmentedBlob(
+        fromHex(v.blobHex),
+        v.password,
+        {
+          params: vectorParams(v),
+          keyFactor: vectorFactor(v.keyFactorHex),
+          maxContentBytes: 1024 * 1024,
+        },
+      );
+      expect(filename).toBe(v.filename);
+      expect(toHex(content)).toBe(v.contentHex);
+    });
+  }
+});
+
+describe('frozen vectors: threshold-gated slot (Mode B, §10.6)', () => {
+  for (const v of vectors.gatedVaultBlob) {
+    it(`decodes ${v.name} only with the threshold secret`, async () => {
+      // With the recovered secret S the gated slot opens.
+      const { filename, content } = await decodeMultiRegionVaultBlob(
+        fromHex(v.blobHex),
+        v.password,
+        {
+          params: vectorParams(v),
+          secret: fromHex(v.secretHex),
+          maxContentBytes: 1024 * 1024,
+        },
+      );
+      expect(filename).toBe(v.filename);
+      expect(toHex(content)).toBe(v.contentHex);
+
+      // The correct password WITHOUT the secret cannot open it (inability, §10.6).
+      await expect(
+        decodeMultiRegionVaultBlob(fromHex(v.blobHex), v.password, {
+          params: vectorParams(v),
+          maxContentBytes: 1024 * 1024,
+        }),
+      ).rejects.toBeInstanceOf(WrongPasswordError);
+    });
+  }
+});
+
+describe('frozen vectors: Shamir shares (§10.6.1)', () => {
+  for (const v of vectors.shamir) {
+    it(`${v.name}: any k recover S, k-1 do not`, async () => {
+      const shares = v.shares.map(fromHex);
+      // Any k of the n shares reconstruct the exact secret.
+      const kSubset = shares.slice(0, v.k);
+      expect(toHex(await shamirRecover(kSubset))).toBe(v.secretHex);
+      // k-1 shares reveal zero information (must not reconstruct S).
+      if (v.k > 1) {
+        expect(toHex(await shamirRecover(shares.slice(0, v.k - 1)))).not.toBe(v.secretHex);
+      }
+    });
+  }
+});
+
+describe('frozen vectors: duress (Mode A, §10.5)', () => {
+  for (const v of vectors.duressVaultBlob) {
+    it(`${v.name}: each credential opens its own region`, async () => {
+      const blob = fromHex(v.blobHex);
+      const opts = { params: vectorParams(v), maxContentBytes: 1024 * 1024 };
+      // The real credential yields the real region.
+      const real = await decodeMultiRegionVaultBlob(blob, v.realPassword, opts);
+      expect(real.filename).toBe(v.realFilename);
+      expect(toHex(real.content)).toBe(v.realContentHex);
+      // The duress credential yields ONLY the decoy — never the real content.
+      const duress = await decodeMultiRegionVaultBlob(blob, v.duressPassword, opts);
+      expect(duress.filename).toBe(v.decoyFilename);
+      expect(toHex(duress.content)).toBe(v.decoyContentHex);
+      expect(toHex(duress.content)).not.toBe(v.realContentHex);
     });
   }
 });

@@ -33,13 +33,12 @@ import {
   DEFAULT_ARGON2,
   GCM_TAG_LEN,
   IV_LEN,
-  createKeyBlock,
+  KEY_FACTOR_LEN,
   decryptBytes,
   encryptBytes,
   hkdf,
   normalizePassword,
   randomBytes,
-  serializeKeyBlock,
 } from './crypto';
 import { buildPayload } from './payload';
 import type { KeyMode } from './types';
@@ -62,14 +61,15 @@ import {
   extractBytesStegoRgba,
 } from './stego';
 import {
-  type VaultKey,
   MAX_FILE_BYTES,
   VerificationError,
-  blobLenFor,
-  buildVaultBlob,
-  decodeVaultBlob,
+  buildPlainVaultBlobMulti,
+  decodeMultiRegionVaultBlob,
+  multiRegionBlobLen,
   sha256Short,
 } from './vault';
+import { buildNonPossessionVaultBlob } from './access';
+import { BucketTooLargeError, GALLERY_LADDER } from './buckets';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -121,6 +121,14 @@ export interface GalleryEncodeOptions {
    * separately (a loose .key or hidden in a cover photo).
    */
   keyMode?: KeyMode;
+  /**
+   * §10 access mode. 'plain' (default) or 'nonpossession' (Mode B: the vault is
+   * gated on threshold shares — `threshold` required, shares returned). Duress
+   * (Mode A) is not available on gallery: the winnowing key is password-derived,
+   * so two credentials would find different fragment sets (SPEC §10.11).
+   */
+  mode?: 'plain' | 'nonpossession';
+  threshold?: { k: number; n: number } | undefined;
 }
 export interface GalleryEncodeResult {
   images: GalleryImage[];
@@ -130,11 +138,15 @@ export interface GalleryEncodeResult {
   setId: Uint8Array;
   /** The serialized key block — travels in the images when embedded, else delivered externally. */
   keyBlock: Uint8Array;
+  /** Mode B only: the n serialized Shamir shares to deliver to holders. */
+  shares?: Uint8Array[] | undefined;
 }
 export interface GalleryDecodeOptions {
   params?: Argon2Params;
   /** External key block for keyfile/stego galleries (omit for embedded). */
   keyBlock?: Uint8Array | undefined;
+  /** Recovered Shamir secret S for a Mode B (non-possession) gallery (§10.6). */
+  secret?: Uint8Array | undefined;
 }
 
 /**
@@ -158,12 +170,12 @@ export async function estimateGalleryCovers(
  */
 export function galleryCoversForEnvelopeLen(
   envelopeLen: number,
-  keyMode: KeyMode = 'embedded',
+  _keyMode: KeyMode = 'embedded',
 ): { k: number; m: number; needed: number } {
-  const embedded = keyMode === 'embedded';
-  // Reuse the single source of truth for blob length (includes A3's contentSalt);
-  // duplicating the formula here previously drifted from vault.ts.
-  const blobLen = blobLenFor(envelopeLen, embedded);
+  // The multi-region blob always carries the 4-slot array and two bucket-padded
+  // regions, so its length is a pure function of the envelope's bucket — the same
+  // for every key mode (the slot array is always embedded), and ~2× the old size.
+  const blobLen = multiRegionBlobLen(envelopeLen, 0, GALLERY_LADDER);
   const k = Math.max(1, Math.ceil(blobLen / GALLERY_SLOT_DATA));
   const m = parityCount(k);
   return { k, m, needed: k + m + GALLERY_MIN_DECOYS };
@@ -340,12 +352,56 @@ export async function galleryEncode(
     throw new GalleryFileTooLargeError(content.length, MAX_FILE_BYTES);
   }
 
-  // One self-contained, password-encrypted vault blob. The key block travels in
-  // the fragments (embedded) or is left out for the caller to deliver separately.
-  const { dek, block } = await createKeyBlock(password, params);
-  const keyBlock = serializeKeyBlock(block);
-  const key: VaultKey = { dek, keyBlock };
-  const blob = await buildVaultBlob(filename, content, key, keyMode);
+  // One self-contained, password-encrypted MULTI-REGION blob (§10.4): the mandatory
+  // 4-slot / 2-region geometry, always embedded in the fragments. embedded mode is
+  // password-only; keyfile/stego mix an external 32-byte key factor into the slot
+  // KEK, returned as keyBlock (a .key file, or hidden in a cover). The winnowing
+  // keys below stay password-derived — that outer deniability layer is unchanged.
+  const mode = options.mode ?? 'plain';
+  let blob: Uint8Array;
+  let keyBlock: Uint8Array = new Uint8Array(0);
+  let shares: Uint8Array[] | undefined;
+  try {
+    if (mode === 'nonpossession') {
+      // Mode B: threshold shares are one factor; keyfile/stego may add a second
+      // external key factor (§10.3) on top, so an unlock needs password + factor +
+      // shares. embedded uses shares only.
+      if (!options.threshold) throw new Error('gallery: mode nonpossession requires a threshold');
+      const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+      const built = await buildNonPossessionVaultBlob(
+        filename,
+        content,
+        password,
+        options.threshold.k,
+        options.threshold.n,
+        GALLERY_LADDER,
+        params,
+        keyFactor,
+      );
+      blob = built.blob;
+      shares = built.shares;
+      if (keyFactor) keyBlock = keyFactor;
+    } else {
+      const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+      ({ blob } = await buildPlainVaultBlobMulti(
+        filename,
+        content,
+        password,
+        GALLERY_LADDER,
+        params,
+        keyFactor,
+      ));
+      if (keyFactor) keyBlock = keyFactor;
+    }
+  } catch (err) {
+    if (err instanceof BucketTooLargeError) {
+      throw new GalleryFileTooLargeError(
+        content.length,
+        GALLERY_LADDER[GALLERY_LADDER.length - 1]!,
+      );
+    }
+    throw err;
+  }
   if (blob.length > GALLERY_MAX_BLOB) {
     throw new GalleryFileTooLargeError(content.length, GALLERY_MAX_BLOB);
   }
@@ -390,14 +446,16 @@ export async function galleryEncode(
     images.push(await embedSlot(covers[i]!, slot, posKey));
   }
   posKey.fill(0);
-  return { images, k, m, decoys, setId, keyBlock };
+  return { images, k, m, decoys, setId, keyBlock, shares };
 }
 
 /** Reconstruct one set's blob from its authenticated fragments, or throw. */
 async function reconstructGroup(
   members: { header: Header; shard: Uint8Array }[],
   password: string,
-  keyBlock: Uint8Array | undefined,
+  keyFactor: Uint8Array | undefined,
+  params: Argon2Params,
+  secret: Uint8Array | undefined,
 ): Promise<{ filename: string; content: Uint8Array }> {
   const first = members[0]!.header;
   const { k, m, blobLen } = first;
@@ -416,12 +474,16 @@ async function reconstructGroup(
   const blob = decodeBlob(slots, k, m, blobLen);
   const hash = await sha256Short(blob);
   if (toHex(hash) !== toHex(first.hash)) throw new GalleryRestoreError();
-  return decodeVaultBlob(blob, password, {
-    // External key block for keyfile/stego galleries; ignored when the blob
-    // carries an embedded one.
-    keyBlock,
+  // Open the slot array and decrypt only the region the credential unlocks.
+  // `keyFactor` is the external 32-byte secret for keyfile/stego galleries
+  // (a .key or a stego cover); undefined for embedded. Slot Argon2 params are
+  // frozen (not stored), so decode uses the same cost as encode.
+  return decodeMultiRegionVaultBlob(blob, password, {
+    keyFactor: keyFactor ?? null,
+    secret: secret ?? null,
+    params,
     // The decompressed content ceiling — the compressed blob is bounded
-    // separately by GALLERY_MAX_BLOB at encode time (see galleryEncode).
+    // separately by the gallery bucket ladder at encode time (see galleryEncode).
     maxContentBytes: MAX_FILE_BYTES,
   });
 }
@@ -470,7 +532,7 @@ export async function galleryDecode(
   }
   for (const members of [...groups.values()].sort((a, b) => b.length - a.length)) {
     try {
-      return await reconstructGroup(members, password, options.keyBlock);
+      return await reconstructGroup(members, password, options.keyBlock, params, options.secret);
     } catch {
       // this set is incomplete or failed integrity — try the next
     }
@@ -490,14 +552,16 @@ export async function verifyGalleryExport(
   keyBlock: Uint8Array | undefined,
   filename: string,
   content: Uint8Array,
+  secret?: Uint8Array | undefined,
 ): Promise<void> {
   let got: { filename: string; content: Uint8Array };
   try {
-    got = await galleryDecode(images as GalleryCover[], password, { keyBlock });
+    got = await galleryDecode(images as GalleryCover[], password, { keyBlock, secret });
   } catch {
     throw new VerificationError();
   }
-  if (got.filename !== filename || got.content.length !== content.length) throw new VerificationError();
+  if (got.filename !== filename || got.content.length !== content.length)
+    throw new VerificationError();
   for (let i = 0; i < content.length; i++) {
     if (got.content[i] !== content[i]) throw new VerificationError();
   }

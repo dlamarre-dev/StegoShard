@@ -9,18 +9,37 @@ import hashlib
 import struct
 from dataclasses import dataclass
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from .binary_container import unwrap_binary
-from .crypto import decrypt_content, derive_content_key, unwrap_dek
+from .crypto import (
+    decrypt_content,
+    derive_content_key,
+    derive_region_key,
+    open_slot_array,
+    slot_kek_candidates,
+    unwrap_dek,
+)
 from .format import (
+    CONTENT_SALT_LEN,
+    IV_LEN,
     MAX_CONTENT_BYTES,
     MAX_CONTENT_BYTES_BINARY,
     decode_blob,
     parse_envelope,
     parse_key_block,
+    parse_region_plaintext,
     parse_vault_blob,
+    split_multiregion_vault_blob,
     split_payload,
 )
-from .segmented import decode_segmented_blob
+from .segmented import decode_multiregion_segmented_blob, decode_segmented_blob
+
+# Frozen slot-KEK Argon2 defaults (SPEC §10.2 / §5.1). Not stored in the container,
+# so the decoder supplies them; tests override with cheaper values.
+DEFAULT_ITERATIONS = 4
+DEFAULT_MEMORY_KIB = 256 * 1024
+DEFAULT_PARALLELISM = 1
 
 
 class MissingKeyError(Exception):
@@ -34,7 +53,16 @@ class RestoredFile:
 
 
 def decode_vault(
-    payloads: list[bytes], password: str, key_block: bytes | None = None
+    payloads: list[bytes],
+    password: str,
+    key_block: bytes | None = None,
+    *,
+    multiregion: bool = False,
+    key_factor: bytes | None = None,
+    secret: bytes | None = None,
+    iterations: int = DEFAULT_ITERATIONS,
+    memory_kib: int = DEFAULT_MEMORY_KIB,
+    parallelism: int = DEFAULT_PARALLELISM,
 ) -> RestoredFile:
     if not payloads:
         raise ValueError("import: no images provided")
@@ -68,6 +96,10 @@ def decode_vault(
     if hashlib.sha256(blob).digest()[:4] != first.hash:
         raise ValueError("import: reconstructed blob failed its integrity check")
 
+    if multiregion:
+        return decode_multiregion_vault_blob(
+            blob, password, key_factor, MAX_CONTENT_BYTES, iterations, memory_kib, parallelism, secret
+        )
     return _decode_vault_blob(blob, password, key_block, MAX_CONTENT_BYTES)
 
 
@@ -86,13 +118,65 @@ def _decode_vault_blob(
     return RestoredFile(filename, content)
 
 
-def decode_vault_binary(
-    container: bytes, password: str, key_block: bytes | None = None
+def decode_multiregion_vault_blob(
+    blob: bytes,
+    password: str,
+    key_factor: bytes | None,
+    max_content_bytes: int,
+    iterations: int = DEFAULT_ITERATIONS,
+    memory_kib: int = DEFAULT_MEMORY_KIB,
+    parallelism: int = DEFAULT_PARALLELISM,
+    secret: bytes | None = None,
 ) -> RestoredFile:
-    """Restore from a binary container file (SPEC §8): the payload is a segmented
-    (chunked-AEAD) vault blob. Bytes matching neither container variant are treated
-    as a bare blob, letting AES-GCM be the arbiter."""
+    """Decode a multi-region vault blob (SPEC §10.6, the gallery geometry): open the
+    slot array (constant-work), then decrypt ONLY the region the credential unlocks.
+    `secret` is the recovered Shamir S for a Mode B (threshold-gated) slot."""
+    vault_salt, slot_array, region_area, r = split_multiregion_vault_blob(blob)
+    candidates = slot_kek_candidates(
+        password, vault_salt, key_factor, secret, iterations, memory_kib, parallelism
+    )
+    dek, region_index = open_slot_array(slot_array, candidates)
+    block = region_area[region_index * r : (region_index + 1) * r]
+    content_salt = block[:CONTENT_SALT_LEN]
+    iv = block[CONTENT_SALT_LEN : CONTENT_SALT_LEN + IV_LEN]
+    ciphertext = block[CONTENT_SALT_LEN + IV_LEN :]
+    cek = derive_region_key(dek, content_salt, region_index)
+    plaintext = AESGCM(cek).decrypt(iv, ciphertext, None)
+    envelope = parse_region_plaintext(plaintext, max_content_bytes)
+    filename, content = parse_envelope(envelope, max_content_bytes)
+    return RestoredFile(filename, content)
+
+
+def decode_vault_binary(
+    container: bytes,
+    password: str,
+    key_block: bytes | None = None,
+    *,
+    key_factor: bytes | None = None,
+    secret: bytes | None = None,
+    iterations: int = DEFAULT_ITERATIONS,
+    memory_kib: int = DEFAULT_MEMORY_KIB,
+    parallelism: int = DEFAULT_PARALLELISM,
+) -> RestoredFile:
+    """Restore from a binary container file (SPEC §8). Geometry is chosen by the
+    recovered variant (§10 governing decision 2): a disguised `.db` is a multi-region
+    container (§10.7); branded `.ssbn` and bare payloads are single-region (§8.1).
+
+    `key_factor` is the keyfile/stego secret (§10.3); `secret` is the recovered Shamir
+    S for a Mode B (threshold-gated) .db vault — the two compose as extra layers."""
     unwrapped = unwrap_binary(container)
+    if unwrapped is not None and unwrapped[1] == "disguised":
+        filename, content = decode_multiregion_segmented_blob(
+            unwrapped[0],
+            password,
+            key_factor,
+            MAX_CONTENT_BYTES_BINARY,
+            iterations,
+            memory_kib,
+            parallelism,
+            secret,
+        )
+        return RestoredFile(filename, content)
     blob = unwrapped[0] if unwrapped else container
     filename, content = decode_segmented_blob(blob, password, key_block, MAX_CONTENT_BYTES_BINARY)
     return RestoredFile(filename, content)

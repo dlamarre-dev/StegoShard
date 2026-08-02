@@ -127,6 +127,47 @@ def parse_key_block(data: bytes) -> KeyBlock:
 
 CONTENT_SALT_LEN = 16
 
+# --- Access structures (SPEC §10): multi-region geometry (gallery + .db) -------
+
+SLOT_COUNT = 4
+SLOT_SIZE = 76  # nonce[12] || AES-GCM(48) = ct[48] || tag[16]
+SLOT_PLAINTEXT_LEN = 48  # dek[32] || region_index[1] || reserved[15]
+SLOT_ARRAY_LEN = SLOT_COUNT * SLOT_SIZE  # 304
+REGION_INDEX_OFF = 32  # within the slot plaintext
+REGION_COUNT = 2
+VAULT_SALT_LEN = 16
+REGION_LEN_FIELD = 4  # u32 true-length prefix inside a region plaintext
+GCM_TAG_LEN = 16
+REGION_OVERHEAD = CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN  # 44 (bucket adds the rest)
+
+
+def parse_region_plaintext(plaintext: bytes, max_content_bytes: int) -> bytes:
+    """Recover the envelope from a decrypted region plaintext (SPEC §10.5). The
+    true length is bounded against the bucket and the cap BEFORE slicing."""
+    if len(plaintext) < REGION_LEN_FIELD:
+        raise ValueError("region: too short")
+    (length,) = struct.unpack(">I", plaintext[:REGION_LEN_FIELD])
+    if length > len(plaintext) - REGION_LEN_FIELD:
+        raise ValueError("region: length exceeds bucket")
+    if length > max_content_bytes:
+        raise ValueError("region: declared length exceeds the allowed size")
+    return plaintext[REGION_LEN_FIELD : REGION_LEN_FIELD + length]
+
+
+def split_multiregion_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, int]:
+    """Split a multi-region vault blob (§10.6) into (vault_salt, slot_array,
+    region_area, R). Validates geometry before any use."""
+    head = VAULT_SALT_LEN + SLOT_ARRAY_LEN
+    if len(blob) < head + REGION_COUNT * (REGION_OVERHEAD + 1):
+        raise ValueError("multi-region blob: too short")
+    region_area = blob[head:]
+    if len(region_area) % REGION_COUNT != 0:
+        raise ValueError("multi-region blob: odd region area")
+    r = len(region_area) // REGION_COUNT
+    if r < REGION_OVERHEAD + 1:
+        raise ValueError("multi-region blob: region too small")
+    return blob[:VAULT_SALT_LEN], blob[VAULT_SALT_LEN:head], region_area, r
+
 
 def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
     """Return (key_block_bytes, content_salt, iv, ciphertext). key_block_bytes is

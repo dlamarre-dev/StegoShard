@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": ".key ファイルを別に保存したセットにのみ必要です（.zip に含まれている場合は不要）。"
   },
+  "labelShareFiles": {
+    "message": "しきい値シェアファイル（非保持）",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "非保持の保管庫では、n個のシェアファイル（.txt）のうち任意のk個を追加して解錠します。それ以外では不要です。",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "すべてを 1 つの .zip にまとめる"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "生成中…"
+  },
+  "accessModeHeading": {
+    "message": "アクセスモード",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "標準",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "強要（おとり）",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "非保持（シェア）",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "強要用パスワード（おとりを開く）",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "おとりファイル",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "強要下でおとりを提示する行為は、地域によっては虚偽陳述——犯罪——になり得ます。まず脅威モデルをお読みください。",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "強要と鍵開示法について →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "キーファイルやステゴカバーを使うと、この追加要素は本物のファイルのみを保護します。おとりは強要用パスワードだけで開きます。",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "しきい値（n 人中 k 人）",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "単独で開ける情報は一切手元に残りません。n 個のシェアファイルのうち任意の k 個が必要です。",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "有効な k-of-n のしきい値を入力してください（1 ≤ k ≤ n）。",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "強要モードには強要用パスワードとおとりファイルが必要です。",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "強要モードは写真ギャラリーでは使用できません。おとりデータベース（.db）を使用してください。",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "このアクセスモードはおとりデータベース（.db）または写真ギャラリー専用です。",
+    "description": "Error: mode on an excluded path."
   }
 }

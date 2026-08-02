@@ -14,8 +14,11 @@ import {
   decode as decodeJpeg,
   embedKeyBlockStegoJpeg,
   extractKeyBlockStegoJpeg,
+  embedKeyFactorStegoJpeg,
+  extractKeyFactorStegoJpeg,
   isSerializedKeyBlock,
   serializeKeyBlock,
+  KEY_FACTOR_LEN,
 } from './index';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
@@ -56,6 +59,17 @@ describe('JPEG stego round-trip', () => {
     expect(out).not.toBeNull();
     expect([...out!]).toEqual([...kb]);
     expect(isSerializedKeyBlock(out!)).toBe(true);
+  });
+
+  it('embeds and extracts the 32-byte key factor (SSKF), wrong password → null', async () => {
+    const factor = Uint8Array.from({ length: KEY_FACTOR_LEN }, (_, i) => (i * 37 + 5) & 0xff);
+    const cover = noisyJpeg(W, H);
+    const stego = await embedKeyFactorStegoJpeg(cover, factor, 'pw', FAST);
+    expect(jpeg.decode(stego, { useTArray: true }).width).toBe(W);
+    const out = await extractKeyFactorStegoJpeg(stego, 'pw', FAST);
+    expect(out).not.toBeNull();
+    expect([...out!]).toEqual([...factor]);
+    expect(await extractKeyFactorStegoJpeg(stego, 'nope', FAST)).toBeNull();
   });
 
   it('extracts across NFC/NFD password forms', async () => {
