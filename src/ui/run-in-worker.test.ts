@@ -37,8 +37,12 @@ const { decryptBinaryInWorker } = await import('./run-in-worker');
 describe('run-in-worker transport', () => {
   it('sends a decryptBinary request and resolves with the transferred result', async () => {
     const seen: string[] = [];
-    const promise = decryptBinaryInWorker(new Uint8Array([1, 2, 3]), 'pw', undefined, (p) =>
-      seen.push(`${p.phase}:${p.done}/${p.total}`),
+    const promise = decryptBinaryInWorker(
+      new Uint8Array([1, 2, 3]),
+      'pw',
+      undefined,
+      undefined,
+      (p) => seen.push(`${p.phase}:${p.done}/${p.total}`),
     );
     const w = FakeWorker.last!;
     const sent = w.posted[w.posted.length - 1]!;

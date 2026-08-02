@@ -220,6 +220,14 @@
     "message": "Only needed for sets you saved as a separate .key file (skip if it is inside the .zip).",
     "description": "Popup: hint for the restore key file input."
   },
+  "labelShareFiles": {
+    "message": "Threshold share files (non-possession)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "For a non-possession vault, add any k of your n share files (.txt) to unlock. Not needed otherwise.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Bundle everything into a single .zip",
     "description": "Popup: toggle to download one zip instead of many files."
@@ -1037,5 +1045,65 @@
   "statusRendering": {
     "message": "Rendering…",
     "description": "Progress phase label: rendering images."
+  },
+  "accessModeHeading": {
+    "message": "Access mode",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Plain",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Duress (decoy)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "Non-possession (shares)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Duress password (opens the decoy)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "Decoy file",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Producing a decoy under duress can, in some places, be a false statement — a crime. Read the threat model first.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Duress and key-disclosure law →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "With a key file or stego cover, the extra factor protects your real file only — the decoy still opens with the duress password alone.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Threshold (k of n holders)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "You keep nothing that opens this alone — any k of the n share files do.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Enter a valid k-of-n threshold (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "Duress mode needs a duress password and a decoy file.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "Duress is not available for photo galleries; use the decoy database (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "This access mode is only for the decoy database (.db) or photo galleries.",
+    "description": "Error: mode on an excluded path."
   }
 }

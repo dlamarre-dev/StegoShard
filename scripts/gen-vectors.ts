@@ -21,7 +21,8 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argon2id } from 'hash-wasm';
-import { toHex, writeU16, concatBytes } from '../src/core/bytes';
+import { toHex, writeU16, writeU32, writeU64, concatBytes } from '../src/core/bytes';
+import { gfAdd, gfMul } from '../src/core/gf256';
 import {
   CONTENT_SALT_LEN,
   hkdf,
@@ -307,6 +308,422 @@ async function makeVaultBlobVector(
   };
 }
 
+// ---- Multi-region blob vectors (SPEC §10) ---------------------------------------
+//
+// Deterministically assembled from fixed inputs (vault salt, slot nonces, a fixed
+// live-slot position, region DEK, content salt, IV). A compact synthetic bucket is
+// used: a decode KAT exercises the wire layout + slot/region crypto, which is what
+// both stacks must agree on; the ladder policy is encode-side and tested separately.
+
+const ENC = (s: string) => new TextEncoder().encode(s);
+const REGION_INFO = (idx: number) =>
+  concatBytes(ENC('stegoshard/vault/region'), Uint8Array.of(idx));
+
+async function gcmEncryptAad(
+  keyHex: string,
+  ivHex: string,
+  ptHex: string,
+  aadHex: string,
+): Promise<string> {
+  const key = await subtle.importKey(
+    'raw',
+    fromHex(keyHex) as BufferSource,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+  const ct = await subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: fromHex(ivHex) as BufferSource,
+      additionalData: fromHex(aadHex) as BufferSource,
+    },
+    key,
+    fromHex(ptHex) as BufferSource,
+  );
+  return toHex(new Uint8Array(ct));
+}
+
+/** The slot KEK: Argon2id output, or HKDF(argon || factor) when a key factor is present. */
+async function slotKekBytes(
+  password: string,
+  vaultSalt: Uint8Array,
+  params: Argon2Params,
+  keyFactor: Uint8Array | null,
+): Promise<Uint8Array> {
+  const argon = fromHex(await kekHex(password, vaultSalt, params));
+  if (!keyFactor) return argon;
+  return hkdf(concatBytes(argon, keyFactor), ENC('stegoshard/v1/keyfile-kek'), 32, vaultSalt);
+}
+
+/** One live slot: nonce || AES-GCM_kek(dek || region_index || reserved[15]). */
+async function liveSlot(
+  kek: Uint8Array,
+  nonce: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+): Promise<Uint8Array> {
+  const pt = concatBytes(dek, Uint8Array.of(regionIndex), new Uint8Array(15));
+  const ct = fromHex(await gcmEncrypt(toHex(kek), toHex(nonce), toHex(pt)));
+  return concatBytes(nonce, ct);
+}
+
+/** Assemble the 304-byte slot array with the live slot at a fixed position. */
+async function slotArray(
+  kek: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+  livePos: number,
+  nonceSeed: number,
+  deadSeed: number,
+): Promise<Uint8Array> {
+  const live = await liveSlot(kek, pattern(12, nonceSeed), dek, regionIndex);
+  const slots: Uint8Array[] = [];
+  for (let i = 0; i < 4; i++) slots.push(i === livePos ? live : pattern(76, deadSeed + i));
+  return concatBytes(...slots);
+}
+
+interface MultiRegionVaultVector {
+  name: string;
+  mode: 'embedded' | 'keyfile';
+  password: string;
+  keyFactorHex: string;
+  blobHex: string;
+  filename: string;
+  contentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
+
+async function makeMultiRegionVaultVector(
+  name: string,
+  mode: 'embedded' | 'keyfile',
+  password: string,
+  filename: string,
+  content: Uint8Array,
+  bucket: number,
+  regionIndex: number,
+  livePos: number,
+  seeds: Record<string, number>,
+  params: Argon2Params,
+): Promise<MultiRegionVaultVector> {
+  const vaultSalt = pattern(16, seeds.vaultSalt!);
+  const keyFactor = mode === 'keyfile' ? pattern(32, seeds.keyFactor!) : null;
+  const kek = await slotKekBytes(password, vaultSalt, params, keyFactor);
+  const dek = pattern(32, seeds.dek!);
+  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+
+  const contentSalt = pattern(16, seeds.contentSalt!);
+  const iv = pattern(12, seeds.iv!);
+  const envelope = await buildPayload(filename, content);
+  const cek = await hkdf(dek, REGION_INFO(regionIndex), 32, contentSalt);
+  const rp = new Uint8Array(bucket);
+  writeU32(rp, 0, envelope.length);
+  rp.set(envelope, 4);
+  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  const live = concatBytes(contentSalt, iv, ct);
+  const dead = pattern(44 + bucket, seeds.deadRegion!);
+  const blob = concatBytes(
+    vaultSalt,
+    arr,
+    regionIndex === 0 ? live : dead,
+    regionIndex === 0 ? dead : live,
+  );
+
+  return {
+    name,
+    mode,
+    password,
+    keyFactorHex: keyFactor ? toHex(keyFactor) : '',
+    blobHex: toHex(blob),
+    filename,
+    contentHex: toHex(content),
+    iterations: params.iterations,
+    memoryKiB: params.memoryKiB,
+    parallelism: params.parallelism,
+  };
+}
+
+interface MultiRegionSegmentedVector extends MultiRegionVaultVector {
+  chunkSize: number;
+}
+
+async function makeMultiRegionSegmentedVector(
+  name: string,
+  mode: 'embedded' | 'keyfile',
+  password: string,
+  filename: string,
+  content: Uint8Array,
+  bucket: number,
+  chunkSize: number,
+  regionIndex: number,
+  livePos: number,
+  seeds: Record<string, number>,
+  params: Argon2Params,
+): Promise<MultiRegionSegmentedVector> {
+  const vaultSalt = pattern(16, seeds.vaultSalt!);
+  const keyFactor = mode === 'keyfile' ? pattern(32, seeds.keyFactor!) : null;
+  const kek = await slotKekBytes(password, vaultSalt, params, keyFactor);
+  const dek = pattern(32, seeds.dek!);
+  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+
+  // Container head: SSCS ver flags vault_salt slot_array chunkSize bucketLen.
+  const head = new Uint8Array(6 + 16 + 304 + 4 + 8);
+  head.set(ENC('SSCS'), 0);
+  head[4] = 1; // SEG_VERSION
+  head[5] = 0; // FLAGS reserved
+  head.set(vaultSalt, 6);
+  head.set(arr, 22);
+  writeU32(head, 326, chunkSize);
+  writeU64(head, 330, bucket);
+
+  const contentSalt = pattern(16, seeds.contentSalt!);
+  const noncePrefix = pattern(7, seeds.noncePrefix!);
+  const envelope = await buildPayload(filename, content);
+  const cek = await hkdf(dek, REGION_INFO(regionIndex), 32, contentSalt);
+  const rp = new Uint8Array(bucket);
+  writeU32(rp, 0, envelope.length);
+  rp.set(envelope, 4);
+
+  const aad = concatBytes(head, Uint8Array.of(regionIndex), contentSalt, noncePrefix);
+  const n = Math.max(1, Math.ceil(bucket / chunkSize));
+  const chunks: Uint8Array[] = [];
+  for (let i = 0; i < n; i++) {
+    const seg = rp.subarray(i * chunkSize, Math.min((i + 1) * chunkSize, bucket));
+    const counter = new Uint8Array(4);
+    writeU32(counter, 0, i);
+    const nonce = concatBytes(noncePrefix, counter, Uint8Array.of(i === n - 1 ? 1 : 0));
+    chunks.push(fromHex(await gcmEncryptAad(toHex(cek), toHex(nonce), toHex(seg), toHex(aad))));
+  }
+  const live = concatBytes(contentSalt, noncePrefix, ...chunks);
+  const streamLen = 23 + bucket + n * 16;
+  const dead = pattern(streamLen, seeds.deadRegion!);
+  const blob = concatBytes(head, regionIndex === 0 ? live : dead, regionIndex === 0 ? dead : live);
+
+  return {
+    name,
+    mode,
+    password,
+    keyFactorHex: keyFactor ? toHex(keyFactor) : '',
+    blobHex: toHex(blob),
+    filename,
+    contentHex: toHex(content),
+    iterations: params.iterations,
+    memoryKiB: params.memoryKiB,
+    parallelism: params.parallelism,
+    chunkSize,
+  };
+}
+
+// ---- Mode B vectors: gated slot KEK + Shamir shares (SPEC §10.6) -----------------
+
+interface GatedVaultVector {
+  name: string;
+  password: string;
+  secretHex: string;
+  blobHex: string;
+  filename: string;
+  contentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
+
+/** A multi-region vault blob whose single live slot is threshold-GATED (§10.6.2). */
+async function makeGatedVaultVector(
+  name: string,
+  password: string,
+  secret: Uint8Array,
+  filename: string,
+  content: Uint8Array,
+  bucket: number,
+  regionIndex: number,
+  livePos: number,
+  seeds: Record<string, number>,
+  params: Argon2Params,
+): Promise<GatedVaultVector> {
+  const vaultSalt = pattern(16, seeds.vaultSalt!);
+  const argon = fromHex(await kekHex(password, vaultSalt, params));
+  const kek = await hkdf(concatBytes(argon, secret), ENC('stegoshard/v1/slot-kek'), 32, vaultSalt);
+  const dek = pattern(32, seeds.dek!);
+  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+
+  const contentSalt = pattern(16, seeds.contentSalt!);
+  const iv = pattern(12, seeds.iv!);
+  const envelope = await buildPayload(filename, content);
+  const cek = await hkdf(dek, REGION_INFO(regionIndex), 32, contentSalt);
+  const rp = new Uint8Array(bucket);
+  writeU32(rp, 0, envelope.length);
+  rp.set(envelope, 4);
+  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  const live = concatBytes(contentSalt, iv, ct);
+  const dead = pattern(44 + bucket, seeds.deadRegion!);
+  const blob = concatBytes(
+    vaultSalt,
+    arr,
+    regionIndex === 0 ? live : dead,
+    regionIndex === 0 ? dead : live,
+  );
+
+  return {
+    name,
+    password,
+    secretHex: toHex(secret),
+    blobHex: toHex(blob),
+    filename,
+    contentHex: toHex(content),
+    iterations: params.iterations,
+    memoryKiB: params.memoryKiB,
+    parallelism: params.parallelism,
+  };
+}
+
+interface ShamirVector {
+  name: string;
+  secretHex: string;
+  k: number;
+  n: number;
+  shares: string[];
+}
+
+/** Horner evaluation of p(x) = s0 + c1·x + … over GF(2^8). */
+function evalPolyGen(coeffs: Uint8Array, s0: number, x: number): number {
+  let acc = 0;
+  for (let t = coeffs.length - 1; t >= 0; t--) acc = gfAdd(coeffs[t]!, gfMul(acc, x));
+  return gfAdd(s0, gfMul(acc, x));
+}
+
+/** Deterministic Shamir shares (fixed coefficients) — a frozen split KAT. */
+async function makeShamirVector(
+  name: string,
+  secret: Uint8Array,
+  k: number,
+  n: number,
+  coeffSeed: number,
+): Promise<ShamirVector> {
+  const coeffs: Uint8Array[] = [];
+  for (let j = 0; j < 32; j++) coeffs.push(pattern(k - 1, coeffSeed + j));
+  const shares: string[] = [];
+  for (let index = 1; index <= n; index++) {
+    const value = new Uint8Array(32);
+    for (let j = 0; j < 32; j++) value[j] = evalPolyGen(coeffs[j]!, secret[j]!, index);
+    const body = concatBytes(Uint8Array.of(1, index), value); // version 1
+    const digest = new Uint8Array(await subtle.digest('SHA-256', body as BufferSource)).slice(0, 4);
+    shares.push(toHex(concatBytes(body, digest)));
+  }
+  return { name, secretHex: toHex(secret), k, n, shares };
+}
+
+// ---- Mode A vectors: duress (two live slots, two real regions) (SPEC §10.5) -----
+
+interface DuressVaultVector {
+  name: string;
+  realPassword: string;
+  duressPassword: string;
+  blobHex: string;
+  realFilename: string;
+  realContentHex: string;
+  decoyFilename: string;
+  decoyContentHex: string;
+  iterations: number;
+  memoryKiB: number;
+  parallelism: number;
+}
+
+/** Build one region block: contentSalt || IV || GCM_CEK(REGION_LEN || envelope || pad). */
+async function regionBlock(
+  dek: Uint8Array,
+  regionIndex: number,
+  filename: string,
+  content: Uint8Array,
+  bucket: number,
+  saltSeed: number,
+  ivSeed: number,
+): Promise<Uint8Array> {
+  const contentSalt = pattern(16, saltSeed);
+  const iv = pattern(12, ivSeed);
+  const envelope = await buildPayload(filename, content);
+  const cek = await hkdf(dek, REGION_INFO(regionIndex), 32, contentSalt);
+  const rp = new Uint8Array(bucket);
+  writeU32(rp, 0, envelope.length);
+  rp.set(envelope, 4);
+  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  return concatBytes(contentSalt, iv, ct);
+}
+
+async function makeDuressVaultVector(
+  name: string,
+  realPassword: string,
+  duressPassword: string,
+  realFilename: string,
+  realContent: Uint8Array,
+  decoyFilename: string,
+  decoyContent: Uint8Array,
+  bucket: number,
+  realRegionIndex: number,
+  seeds: Record<string, number>,
+  params: Argon2Params,
+): Promise<DuressVaultVector> {
+  const vaultSalt = pattern(16, seeds.vaultSalt!);
+  const realKek = fromHex(await kekHex(realPassword, vaultSalt, params));
+  const duressKek = fromHex(await kekHex(duressPassword, vaultSalt, params));
+  const dekReal = pattern(32, seeds.dekReal!);
+  const dekDecoy = pattern(32, seeds.dekDecoy!);
+  const decoyRegionIndex = 1 - realRegionIndex;
+
+  // Two live slots (real @ position 1, duress @ position 3), two dead slots.
+  const realSlot = await liveSlot(realKek, pattern(12, seeds.realNonce!), dekReal, realRegionIndex);
+  const duressSlot = await liveSlot(
+    duressKek,
+    pattern(12, seeds.duressNonce!),
+    dekDecoy,
+    decoyRegionIndex,
+  );
+  const slotArray = concatBytes(
+    pattern(76, seeds.dead0!),
+    realSlot,
+    pattern(76, seeds.dead1!),
+    duressSlot,
+  );
+
+  const realBlock = await regionBlock(
+    dekReal,
+    realRegionIndex,
+    realFilename,
+    realContent,
+    bucket,
+    seeds.realSalt!,
+    seeds.realIv!,
+  );
+  const decoyBlock = await regionBlock(
+    dekDecoy,
+    decoyRegionIndex,
+    decoyFilename,
+    decoyContent,
+    bucket,
+    seeds.decoySalt!,
+    seeds.decoyIv!,
+  );
+  const block0 = realRegionIndex === 0 ? realBlock : decoyBlock;
+  const block1 = realRegionIndex === 0 ? decoyBlock : realBlock;
+  const blob = concatBytes(vaultSalt, slotArray, block0, block1);
+
+  return {
+    name,
+    realPassword,
+    duressPassword,
+    blobHex: toHex(blob),
+    realFilename,
+    realContentHex: toHex(realContent),
+    decoyFilename,
+    decoyContentHex: toHex(decoyContent),
+    iterations: params.iterations,
+    memoryKiB: params.memoryKiB,
+    parallelism: params.parallelism,
+  };
+}
+
 // ---- Main -----------------------------------------------------------------------
 
 const PARAMS_FAST: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
@@ -379,6 +796,131 @@ async function main() {
     ),
   ];
 
+  // Multi-region access-structure blobs (SPEC §10), compact synthetic bucket.
+  const multiRegionVaultBlob: MultiRegionVaultVector[] = [
+    await makeMultiRegionVaultVector(
+      'embedded-region0',
+      'embedded',
+      'vault password',
+      'note.txt',
+      pattern(40, 300),
+      256,
+      0,
+      2, // live slot at position 2
+      {
+        vaultSalt: 301,
+        dek: 302,
+        slotNonce: 303,
+        dead: 310,
+        contentSalt: 304,
+        iv: 305,
+        deadRegion: 306,
+      },
+      PARAMS_FAST,
+    ),
+    await makeMultiRegionVaultVector(
+      'keyfile-region1',
+      'keyfile',
+      'vault password',
+      'wallet.dat',
+      pattern(48, 320),
+      256,
+      1, // live region is region 1
+      0, // live slot at position 0
+      {
+        vaultSalt: 321,
+        keyFactor: 322,
+        dek: 323,
+        slotNonce: 324,
+        dead: 330,
+        contentSalt: 325,
+        iv: 326,
+        deadRegion: 327,
+      },
+      PARAMS_FAST,
+    ),
+  ];
+
+  const multiRegionSegmentedBlob: MultiRegionSegmentedVector[] = [
+    await makeMultiRegionSegmentedVector(
+      'embedded-region0',
+      'embedded',
+      'db password',
+      'cache.bin',
+      pattern(40, 400),
+      256, // bucket
+      4096, // chunkSize (min); n = 1
+      0,
+      1, // live slot at position 1
+      {
+        vaultSalt: 401,
+        dek: 402,
+        slotNonce: 403,
+        dead: 410,
+        contentSalt: 404,
+        noncePrefix: 405,
+        deadRegion: 406,
+      },
+      PARAMS_FAST,
+    ),
+  ];
+
+  // Mode B (§10.6): a threshold-gated slot, plus a deterministic Shamir split KAT.
+  const gatedVaultBlob: GatedVaultVector[] = [
+    await makeGatedVaultVector(
+      'gated-region0',
+      'db password',
+      pattern(32, 500), // the threshold secret S (recovered from shares at unlock)
+      'ledger.txt',
+      pattern(40, 501),
+      256,
+      0,
+      3, // live slot at position 3
+      {
+        vaultSalt: 502,
+        dek: 503,
+        slotNonce: 504,
+        dead: 510,
+        contentSalt: 505,
+        iv: 506,
+        deadRegion: 507,
+      },
+      PARAMS_FAST,
+    ),
+  ];
+  const shamir: ShamirVector[] = [
+    await makeShamirVector('3-of-5', pattern(32, 600), 3, 5, 620),
+    await makeShamirVector('2-of-3', pattern(32, 610), 2, 3, 640),
+  ];
+  // Mode A (§10.5): two live slots (real + duress) over two real regions.
+  const duressVaultBlob: DuressVaultVector[] = [
+    await makeDuressVaultVector(
+      'real-region0',
+      'the-real-credential',
+      'the-duress-credential',
+      'real.txt',
+      pattern(40, 700),
+      'decoy.txt',
+      pattern(36, 710),
+      256,
+      0, // real region is region 0, decoy is region 1
+      {
+        vaultSalt: 701,
+        dekReal: 702,
+        dekDecoy: 712,
+        realNonce: 703,
+        duressNonce: 713,
+        dead0: 720,
+        dead1: 721,
+        realSalt: 704,
+        realIv: 705,
+        decoySalt: 714,
+        decoyIv: 715,
+      },
+      PARAMS_FAST,
+    ),
+  ];
+
   const out = {
     _comment:
       'Frozen cross-implementation vectors. Generated once by scripts/gen-vectors.ts; ' +
@@ -389,6 +931,11 @@ async function main() {
     aesGcm,
     keyBlock,
     vaultBlob,
+    multiRegionVaultBlob,
+    multiRegionSegmentedBlob,
+    gatedVaultBlob,
+    shamir,
+    duressVaultBlob,
   };
 
   const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'tests', 'vectors');
@@ -397,7 +944,9 @@ async function main() {
   writeFileSync(path, JSON.stringify(out, null, 2) + '\n');
   console.log(
     `wrote ${path}: ${argon2.length} argon2id, ${aesGcm.length} aes-gcm, ` +
-      `${keyBlock.length} key-block, ${vaultBlob.length} vault-blob vectors`,
+      `${keyBlock.length} key-block, ${vaultBlob.length} vault-blob, ` +
+      `${multiRegionVaultBlob.length} multi-region vault, ` +
+      `${multiRegionSegmentedBlob.length} multi-region segmented vectors`,
   );
 }
 

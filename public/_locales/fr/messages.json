@@ -220,6 +220,14 @@
     "message": "Requis seulement pour les jeux sauvegardés avec un fichier .key séparé (ignorez-le s'il est dans le .zip).",
     "description": "Popup: hint for the restore key file input."
   },
+  "labelShareFiles": {
+    "message": "Fichiers de parts à seuil (non-possession)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "Pour un coffre en non-possession, ajoutez k de vos n fichiers de parts (.txt) pour déverrouiller. Inutile sinon.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Regrouper le tout dans un seul .zip",
     "description": "Popup: toggle to download one zip instead of many files."
@@ -1031,5 +1039,65 @@
   },
   "statusRendering": {
     "message": "Rendu…"
+  },
+  "accessModeHeading": {
+    "message": "Mode d'accès",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Standard",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Sous contrainte (leurre)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "Non-possession (parts)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Mot de passe de contrainte (ouvre le leurre)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "Fichier leurre",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Produire un leurre sous contrainte peut, dans certains pays, constituer une fausse déclaration — un délit. Lisez d'abord le modèle de menace.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Contrainte et lois sur la divulgation de clés →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "Avec un fichier-clé ou un leurre stégo, ce facteur supplémentaire protège uniquement votre vrai fichier — le leurre s'ouvre toujours avec le seul mot de passe de contrainte.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Seuil (k parmi n détenteurs)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "Vous ne conservez rien qui l'ouvre seul — il faut k des n fichiers de parts.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Entrez un seuil k-parmi-n valide (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "Le mode contrainte nécessite un mot de passe de contrainte et un fichier leurre.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "La contrainte n'est pas disponible pour les galeries photo ; utilisez la base de données leurre (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "Ce mode d'accès est réservé à la base de données leurre (.db) ou aux galeries photo.",
+    "description": "Error: mode on an excluded path."
   }
 }

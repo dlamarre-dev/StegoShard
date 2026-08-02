@@ -371,6 +371,14 @@ button:disabled {
 .warn {
   color: var(--warn);
 }
+/* The duress → threat-model legal link, sitting under the duress warning. */
+.warn-link {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--warn);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
 .estimate-line {
   margin-top: 8px;

@@ -72,12 +72,22 @@
           <button id="choose-guided" class="chooser-card" type="button">
             <span class="chooser-card-title" data-i18n="workflowGuided"></span>
             <span class="chooser-card-desc muted" data-i18n="workflowGuidedDesc"></span>
-            <span id="rec-guided" class="pill pill-ok" data-i18n="workflowRecommended" hidden></span>
+            <span
+              id="rec-guided"
+              class="pill pill-ok"
+              data-i18n="workflowRecommended"
+              hidden
+            ></span>
           </button>
           <button id="choose-expert" class="chooser-card" type="button">
             <span class="chooser-card-title" data-i18n="workflowExpert"></span>
             <span class="chooser-card-desc muted" data-i18n="workflowExpertDesc"></span>
-            <span id="rec-expert" class="pill pill-ok" data-i18n="workflowRecommended" hidden></span>
+            <span
+              id="rec-expert"
+              class="pill pill-ok"
+              data-i18n="workflowRecommended"
+              hidden
+            ></span>
           </button>
         </div>
       </section>
@@ -215,7 +225,12 @@
                 ></label>
               </fieldset>
               <div id="gallery-stego-fields" hidden>
-                <div id="gallery-cover-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                <div
+                  id="gallery-cover-drop"
+                  class="dropzone dropzone-sm"
+                  tabindex="0"
+                  role="button"
+                >
                   <span class="dz-prompt">
                     <span class="dz-title" data-i18n="coverTitle"></span><br />
                     <span class="muted" data-i18n="dropPrompt"></span>
@@ -224,6 +239,65 @@
                   <input id="gallery-cover" type="file" accept="image/png,image/jpeg" />
                 </div>
                 <p class="muted warn" data-i18n="stegoWarning"></p>
+              </div>
+            </div>
+
+            <!-- Decoy .db (§10): a per-save password keys the multi-region slot. -->
+            <div id="sqlite-fields" hidden>
+              <label class="stack-gap" data-i18n="labelPassword" for="sqlite-save-pw"></label>
+              <input id="sqlite-save-pw" type="password" autocomplete="new-password" />
+              <p class="muted" data-i18n="destSqliteDesc"></p>
+            </div>
+
+            <!-- §10 access mode: plain / duress / non-possession (gallery + .db). -->
+            <div id="mode-fields" hidden>
+              <label class="muted" data-i18n="accessModeHeading"></label>
+              <fieldset class="segmented">
+                <label
+                  ><input type="radio" name="accessmode" value="plain" checked /><span
+                    data-i18n="accessModePlain"
+                  ></span
+                ></label>
+                <label id="mode-duress-label"
+                  ><input type="radio" name="accessmode" value="duress" /><span
+                    data-i18n="accessModeDuress"
+                  ></span
+                ></label>
+                <label
+                  ><input type="radio" name="accessmode" value="nonpossession" /><span
+                    data-i18n="accessModeNonpossession"
+                  ></span
+                ></label>
+              </fieldset>
+              <div id="duress-fields" hidden>
+                <label class="stack-gap" data-i18n="labelDuressPassword" for="duress-pw"></label>
+                <input id="duress-pw" type="password" autocomplete="new-password" />
+                <div id="decoy-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                  <span class="dz-prompt">
+                    <span class="dz-title" data-i18n="decoyTitle"></span><br />
+                    <span class="muted" data-i18n="dropPrompt"></span>
+                  </span>
+                  <span id="decoy-name" class="dz-file"></span>
+                  <input id="decoy-file" type="file" />
+                </div>
+                <p class="muted warn" data-i18n="duressWarning"></p>
+                <a
+                  class="warn-link"
+                  href="https://github.com/dlamarre-dev/StegoShard/blob/main/docs/THREAT-MODEL.md#duress-and-key-disclosure-law"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="duressLegalLink"
+                ></a>
+                <p id="factor-duress-hint" class="muted" data-i18n="factorDuressHint" hidden></p>
+              </div>
+              <div id="threshold-fields" hidden>
+                <label class="stack-gap" data-i18n="labelThreshold"></label>
+                <div class="field-row">
+                  <input id="threshold-k" type="number" min="1" max="255" value="2" />
+                  <span aria-hidden="true">/</span>
+                  <input id="threshold-n" type="number" min="1" max="255" value="3" />
+                </div>
+                <p class="muted" data-i18n="thresholdHint"></p>
               </div>
             </div>
 
@@ -250,8 +324,10 @@
                 <span id="cover-dz-file" class="dz-file"></span>
                 <input id="cover-file" type="file" accept="image/png,image/jpeg" />
               </div>
-              <label data-i18n="labelStegoPassword" for="stego-pw"></label>
-              <input id="stego-pw" type="password" autocomplete="current-password" />
+              <div id="stego-pw-field">
+                <label data-i18n="labelStegoPassword" for="stego-pw"></label>
+                <input id="stego-pw" type="password" autocomplete="current-password" />
+              </div>
               <p class="muted warn" data-i18n="stegoWarning"></p>
             </div>
 
@@ -375,6 +451,15 @@
               <input id="restore-key" type="file" accept=".key,image/png,image/jpeg" />
             </div>
             <p class="muted" data-i18n="keyFileHint"></p>
+            <div id="shares-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+              <span class="dz-prompt">
+                <span class="dz-title" data-i18n="labelShareFiles"></span><br />
+                <span class="muted" data-i18n="dropPrompt"></span>
+              </span>
+              <span id="shares-dz-file" class="dz-file"></span>
+              <input id="restore-shares" type="file" accept=".txt,text/plain" multiple />
+            </div>
+            <p class="muted" data-i18n="shareFilesHint"></p>
           </div>
 
           <button id="restore-btn" class="btn-primary btn-lg" data-i18n="btnRestore"></button>
@@ -400,7 +485,6 @@
             <p id="restore-result-note" class="result-note"></p>
           </div>
         </section>
-
       </div>
 
       <footer class="app-footer muted">
@@ -424,7 +508,12 @@
             <input id="new-pw" type="password" autocomplete="new-password" />
             <div class="pw-row">
               <p id="new-pw-strength" class="muted pw-meter-label" aria-live="polite"></p>
-              <button id="new-pw-gen" type="button" class="btn-link" data-i18n="pwGenerate"></button>
+              <button
+                id="new-pw-gen"
+                type="button"
+                class="btn-link"
+                data-i18n="pwGenerate"
+              ></button>
             </div>
             <label data-i18n="labelConfirmPassword" for="confirm-pw"></label>
             <input id="confirm-pw" type="password" autocomplete="new-password" />

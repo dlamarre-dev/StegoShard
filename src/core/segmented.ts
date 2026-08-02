@@ -38,18 +38,33 @@ import { concatBytes, readU16, readU32, readU64, writeU16, writeU32, writeU64 } 
 import {
   aeadOpen,
   aeadSeal,
+  type Argon2Params,
   CONTENT_SALT_LEN,
+  DEFAULT_ARGON2,
+  DEK_LEN,
   deriveContentKey,
+  deriveRegionKey,
+  deriveSlotKek,
+  slotKekCandidates,
   GCM_TAG_LEN,
   IV_LEN,
+  openSlotArray,
   parseKeyBlock,
   randomBytes,
+  REGION_COUNT,
+  SLOT_ARRAY_LEN,
+  type SlotEntry,
+  buildSlotArray,
   unlockKeyBlock,
+  VAULT_SALT_LEN,
+  WrongPasswordError,
 } from './crypto';
+import { DB_LADDER, pickBucket } from './buckets';
+import { REGION_LEN_FIELD, padRegionPlaintext, parseRegionPlaintext } from './regions';
 import { buildPayload, parsePayload } from './payload';
 import type { OnProgress } from './progress';
 import type { KeyMode } from './types';
-import type { VaultKey } from './vault';
+import type { LiveRegion, VaultKey } from './vault';
 import { MissingKeyError } from './vault';
 
 /** "SSCS" — StegoShard Chunked Segments. Distinct from SSBN/SSKY/SSHD. */
@@ -177,7 +192,13 @@ export async function buildSegmentedBlob(
   const noncePrefix = randomBytes(NONCE_PREFIX_LEN);
   const cek = await deriveContentKey(key.dek, contentSalt);
   const embeddedKeyBlock = keyMode === 'embedded' ? key.keyBlock : new Uint8Array(0);
-  const header = buildHeader(embeddedKeyBlock, contentSalt, noncePrefix, chunkSize, envelope.length);
+  const header = buildHeader(
+    embeddedKeyBlock,
+    contentSalt,
+    noncePrefix,
+    chunkSize,
+    envelope.length,
+  );
 
   const L = envelope.length;
   const n = Math.max(1, Math.ceil(L / chunkSize));
@@ -272,5 +293,321 @@ export async function decodeSegmentedBlobWithDek(
   const parsed = parseHeader(blob);
   const cek = await deriveContentKey(dek, parsed.contentSalt);
   const envelope = await decryptChunks(blob, parsed, cek, maxContentBytes, onProgress);
+  return parsePayload(envelope, maxContentBytes);
+}
+
+// --- Multi-region segmented blob (SPEC §10.4, the `.db` path) ----------------
+//
+// The always-on geometry for the SQLite decoy wrapper. Layout:
+//
+//   [ SEG_MAGIC 4 ][ SEG_VERSION 1 ][ FLAGS 1 ][ vault_salt 16 ][ slot_array 304 ]
+//   [ chunkSize u32 ][ bucketLen u64 ]                   <- container-level, shared
+//   [ region0_stream S ][ region1_stream S ]
+//
+// Each region stream (S bytes, identical for both):
+//   [ contentSalt 16 ][ noncePrefix 7 ][ chunk_0 .. chunk_{n-1} ]
+//
+// CRITICAL indistinguishability point: chunkSize and bucketLen live in the SHARED
+// container head, NOT per region. A region stream therefore contains only
+// pseudorandom bytes (a random salt + prefix + AES-GCM chunks), so a *dead* region
+// filled with S CSPRNG bytes is byte-indistinguishable from a live one. Storing
+// bucketLen per region would leak which region is real (a dead region's random
+// bytes almost never equal a ladder value). RS is not used on this path; the
+// SQLite container carries the whole blob intact.
+//
+// Geometry is selected by the caller (`variant === 'disguised'`), never sniffed
+// from a byte (SPEC §10 governing decision 2); FLAGS stays 0/reserved here.
+
+/** Container-level fixed head: magic+ver+flags + vault_salt + slot_array + chunkSize + bucketLen. */
+const MULTI_HEAD_LEN = SEG_MAGIC.length + 1 + 1 + VAULT_SALT_LEN + SLOT_ARRAY_LEN + 4 + 8; // 334
+/** Per-region cleartext prefix ahead of the sealed chunks. */
+const REGION_PREFIX_LEN = CONTENT_SALT_LEN + NONCE_PREFIX_LEN; // 23
+/** Hard structural cap on a region's padded (bucket) length: the .db ladder top. */
+const MULTI_MAX_BUCKET = DB_LADDER[DB_LADDER.length - 1]!;
+
+/** Region stream length for a given bucket + chunk size: prefix + body + tags. */
+function multiRegionStreamLen(bucket: number, chunkSize: number): number {
+  const n = Math.max(1, Math.ceil(bucket / chunkSize));
+  return REGION_PREFIX_LEN + bucket + n * GCM_TAG_LEN;
+}
+
+function buildMultiHead(
+  vaultSalt: Uint8Array,
+  slotArray: Uint8Array,
+  chunkSize: number,
+  bucketLen: number,
+): Uint8Array {
+  const head = new Uint8Array(MULTI_HEAD_LEN);
+  let o = 0;
+  head.set(SEG_MAGIC, o);
+  o += SEG_MAGIC.length;
+  head[o++] = SEG_VERSION;
+  head[o++] = 0; // FLAGS reserved — geometry is known from the path, not this byte
+  head.set(vaultSalt, o);
+  o += VAULT_SALT_LEN;
+  head.set(slotArray, o);
+  o += SLOT_ARRAY_LEN;
+  writeU32(head, o, chunkSize);
+  o += 4;
+  writeU64(head, o, bucketLen);
+  return head;
+}
+
+/** AAD binding every chunk to the whole container, its region index, and its salt/prefix. */
+function regionAad(
+  head: Uint8Array,
+  regionIndex: number,
+  contentSalt: Uint8Array,
+  noncePrefix: Uint8Array,
+): Uint8Array {
+  return concatBytes(head, Uint8Array.of(regionIndex), contentSalt, noncePrefix);
+}
+
+/** Seal one region's padded plaintext into a chunked STREAM stream. */
+async function buildRegionStream(
+  head: Uint8Array,
+  region: LiveRegion,
+  bucket: number,
+  chunkSize: number,
+  onChunk?: (done: number) => void,
+): Promise<Uint8Array> {
+  const contentSalt = randomBytes(CONTENT_SALT_LEN);
+  const noncePrefix = randomBytes(NONCE_PREFIX_LEN);
+  const cek = await deriveRegionKey(region.dek, contentSalt, region.regionIndex);
+  const aad = regionAad(head, region.regionIndex, contentSalt, noncePrefix);
+  const plaintext = padRegionPlaintext(region.envelope, bucket); // exactly `bucket` bytes
+  const n = Math.max(1, Math.ceil(bucket / chunkSize));
+  const parts: Uint8Array[] = [contentSalt, noncePrefix];
+  for (let i = 0; i < n; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, bucket);
+    const nonce = buildNonce(noncePrefix, i, i === n - 1);
+    parts.push(await aeadSeal(cek, nonce, plaintext.subarray(start, end), aad));
+    onChunk?.(end);
+  }
+  return concatBytes(...parts);
+}
+
+/**
+ * Assemble a multi-region segmented blob. Mode-agnostic: `live` decides which
+ * regions carry data (one for plain/non-possession, two for duress); dead regions
+ * are filled with S CSPRNG bytes.
+ */
+export async function buildMultiRegionSegmentedBlob(
+  vaultSalt: Uint8Array,
+  slotEntries: SlotEntry[],
+  live: LiveRegion[],
+  ladder: readonly number[],
+  onProgress?: OnProgress,
+  chunkSize: number = DEFAULT_CHUNK_SIZE,
+): Promise<Uint8Array> {
+  if (vaultSalt.length !== VAULT_SALT_LEN) throw new SegmentedFormatError('bad vault salt');
+  const lens: [number, number] = [0, 0];
+  for (const r of live) lens[r.regionIndex] = REGION_LEN_FIELD + r.envelope.length;
+  const bucket = pickBucket(lens[0], lens[1], ladder);
+  const slotArray = await buildSlotArray(slotEntries);
+  const head = buildMultiHead(vaultSalt, slotArray, chunkSize, bucket);
+  const S = multiRegionStreamLen(bucket, chunkSize);
+  const streams: [Uint8Array | null, Uint8Array | null] = [null, null];
+  const totalLive = live.length * bucket || 1;
+  let base = 0;
+  for (const r of live) {
+    streams[r.regionIndex] = await buildRegionStream(head, r, bucket, chunkSize, (done) =>
+      onProgress?.({ phase: 'encrypt', done: base + done, total: totalLive }),
+    );
+    base += bucket;
+  }
+  for (let i = 0; i < REGION_COUNT; i++) if (!streams[i]) streams[i] = randomBytes(S);
+  return concatBytes(head, streams[0]!, streams[1]!);
+}
+
+/**
+ * Plain single-payload multi-region segmented blob: one live slot, one real region
+ * at a CSPRNG index, the other dead. Every `.db` vault uses this in Phase 1. Returns
+ * the region index + DEK for post-save verification.
+ */
+export async function buildPlainSegmentedBlobMulti(
+  filename: string,
+  content: Uint8Array,
+  password: string,
+  ladder: readonly number[],
+  params: Argon2Params = DEFAULT_ARGON2,
+  onProgress?: OnProgress,
+  chunkSize: number = DEFAULT_CHUNK_SIZE,
+  keyFactor: Uint8Array | null = null,
+): Promise<{ blob: Uint8Array; regionIndex: number; dek: Uint8Array }> {
+  const vaultSalt = randomBytes(VAULT_SALT_LEN);
+  const kek = await deriveSlotKek(password, vaultSalt, keyFactor, params);
+  const dek = randomBytes(DEK_LEN);
+  const regionIndex = randomBytes(1)[0]! & 1;
+  const envelope = await buildPayload(filename, content);
+  onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
+  const blob = await buildMultiRegionSegmentedBlob(
+    vaultSalt,
+    [{ kek, dek, regionIndex }],
+    [{ regionIndex, dek, envelope }],
+    ladder,
+    onProgress,
+    chunkSize,
+  );
+  return { blob, regionIndex, dek };
+}
+
+interface ParsedMultiHead {
+  head: Uint8Array;
+  vaultSalt: Uint8Array;
+  slotArray: Uint8Array;
+  chunkSize: number;
+  bucketLen: number;
+  regionArea: Uint8Array;
+  S: number;
+}
+
+function parseMultiHead(blob: Uint8Array, maxContentBytes: number): ParsedMultiHead {
+  if (blob.length < MULTI_HEAD_LEN) throw new SegmentedFormatError('too short');
+  if (!looksLikeSegmented(blob)) throw new SegmentedFormatError('bad magic');
+  let o = SEG_MAGIC.length;
+  const version = blob[o]!;
+  o += 1;
+  if (version !== SEG_VERSION) throw new SegmentedFormatError(`unsupported version ${version}`);
+  o += 1; // FLAGS — reserved on this path
+  const vaultSalt = blob.slice(o, o + VAULT_SALT_LEN);
+  o += VAULT_SALT_LEN;
+  const slotArray = blob.slice(o, o + SLOT_ARRAY_LEN);
+  o += SLOT_ARRAY_LEN;
+  const chunkSize = readU32(blob, o);
+  o += 4;
+  const bucketLen = readU64(blob, o);
+  if (chunkSize < MIN_CHUNK_SIZE || chunkSize > MAX_CHUNK_SIZE) {
+    throw new SegmentedFormatError(`chunk size out of range (${chunkSize})`);
+  }
+  if (
+    bucketLen <= 0 ||
+    bucketLen > MULTI_MAX_BUCKET ||
+    bucketLen > maxContentBytes + REGION_LEN_FIELD
+  ) {
+    throw new SegmentedFormatError(`region length out of range (${bucketLen})`);
+  }
+  const S = multiRegionStreamLen(bucketLen, chunkSize);
+  // Exact length cross-check: the container is head + two equal region streams.
+  if (blob.length !== MULTI_HEAD_LEN + REGION_COUNT * S) {
+    throw new SegmentedFormatError('container length does not match header');
+  }
+  return {
+    head: blob.slice(0, MULTI_HEAD_LEN),
+    vaultSalt,
+    slotArray,
+    chunkSize,
+    bucketLen,
+    regionArea: blob.subarray(MULTI_HEAD_LEN),
+    S,
+  };
+}
+
+/** Decrypt one region stream to its envelope (parses the region framing). */
+async function decryptRegionStream(
+  head: Uint8Array,
+  stream: Uint8Array,
+  regionIndex: number,
+  dek: Uint8Array,
+  chunkSize: number,
+  bucketLen: number,
+  maxContentBytes: number,
+  onProgress?: OnProgress,
+): Promise<Uint8Array> {
+  const contentSalt = stream.subarray(0, CONTENT_SALT_LEN);
+  const noncePrefix = stream.subarray(CONTENT_SALT_LEN, REGION_PREFIX_LEN);
+  const cek = await deriveRegionKey(dek, contentSalt, regionIndex);
+  const aad = regionAad(head, regionIndex, contentSalt, noncePrefix);
+  const n = Math.max(1, Math.ceil(bucketLen / chunkSize));
+  const lastSegLen = bucketLen - (n - 1) * chunkSize;
+  const out = new Uint8Array(bucketLen);
+  let inOff = REGION_PREFIX_LEN;
+  let outOff = 0;
+  for (let i = 0; i < n; i++) {
+    const segLen = i === n - 1 ? lastSegLen : chunkSize;
+    const ct = stream.subarray(inOff, inOff + segLen + GCM_TAG_LEN);
+    inOff += segLen + GCM_TAG_LEN;
+    const nonce = buildNonce(noncePrefix, i, i === n - 1);
+    let pt: Uint8Array;
+    try {
+      pt = await aeadOpen(cek, nonce, ct, aad);
+    } catch {
+      throw new SegmentedFormatError(`region chunk ${i} failed authentication`);
+    }
+    out.set(pt, outOff);
+    outOff += pt.length;
+    onProgress?.({ phase: 'decrypt', done: outOff, total: bucketLen });
+  }
+  return parseRegionPlaintext(out, maxContentBytes);
+}
+
+/**
+ * Decode a multi-region segmented blob with a password: open the slot array
+ * (constant-work), then decrypt ONLY the one region the credential unlocks. No
+ * key-block option — the slot array is always embedded on this path.
+ */
+export async function decodeMultiRegionSegmentedBlob(
+  blob: Uint8Array,
+  password: string,
+  opts: {
+    params?: Argon2Params;
+    maxContentBytes: number;
+    keyFactor?: Uint8Array | null;
+    /** Recovered Shamir secret S for a Mode B (threshold-gated) slot (§10.6). */
+    secret?: Uint8Array | null;
+  },
+  onProgress?: OnProgress,
+): Promise<{ filename: string; content: Uint8Array }> {
+  const parsed = parseMultiHead(blob, opts.maxContentBytes);
+  onProgress?.({ phase: 'unlock', done: 0, total: 0 });
+  let candidates: CryptoKey[];
+  try {
+    candidates = await slotKekCandidates(
+      password,
+      parsed.vaultSalt,
+      opts.keyFactor ?? null,
+      opts.secret ?? null,
+      opts.params,
+    );
+  } catch {
+    throw new WrongPasswordError();
+  }
+  const { dek, regionIndex } = await openSlotArray(parsed.slotArray, candidates);
+  onProgress?.({ phase: 'unlock', done: 1, total: 1 });
+  const stream = parsed.regionArea.subarray(regionIndex * parsed.S, (regionIndex + 1) * parsed.S);
+  const envelope = await decryptRegionStream(
+    parsed.head,
+    stream,
+    regionIndex,
+    dek,
+    parsed.chunkSize,
+    parsed.bucketLen,
+    opts.maxContentBytes,
+    onProgress,
+  );
+  return parsePayload(envelope, opts.maxContentBytes);
+}
+
+/** Decode a specific region with a known DEK (post-save verification). */
+export async function decodeMultiRegionSegmentedBlobWithDek(
+  blob: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+  maxContentBytes: number,
+  onProgress?: OnProgress,
+): Promise<{ filename: string; content: Uint8Array }> {
+  const parsed = parseMultiHead(blob, maxContentBytes);
+  const stream = parsed.regionArea.subarray(regionIndex * parsed.S, (regionIndex + 1) * parsed.S);
+  const envelope = await decryptRegionStream(
+    parsed.head,
+    stream,
+    regionIndex,
+    dek,
+    parsed.chunkSize,
+    parsed.bucketLen,
+    maxContentBytes,
+    onProgress,
+  );
   return parsePayload(envelope, maxContentBytes);
 }

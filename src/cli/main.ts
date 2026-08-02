@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
+  type AccessMode,
   MissingKeyError,
   WrongPasswordError,
   runEstimate,
@@ -19,7 +20,25 @@ import {
   runSave,
   type SaveOptions,
 } from './commands';
-import { GalleryRestoreError, type KeyMode, type OnProgress, type Progress } from '@core';
+import {
+  CredentialsNotIndependentError,
+  GalleryRestoreError,
+  type KeyMode,
+  type OnProgress,
+  type Progress,
+} from '@core';
+
+const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
+
+/** Parse a `k-of-n` threshold spec. */
+function parseThreshold(spec: string): { k: number; n: number } {
+  const m = /^(\d+)-of-(\d+)$/.exec(spec.trim());
+  if (!m) fail(`--threshold must look like "2-of-3" (got "${spec}")`);
+  const k = Number(m[1]);
+  const n = Number(m[2]);
+  if (k < 1 || n < k || n > 255) fail(`--threshold out of range: ${spec} (need 1 ≤ k ≤ n ≤ 255)`);
+  return { k, n };
+}
 
 const USAGE = `StegoShard — encrypt a file into resilient images, an opaque binary
 file, or a decoy database, and restore it.
@@ -37,6 +56,12 @@ Save options:
   --zip                  Bundle the PNG set into a single .zip (disk mode)
   --binary               Output one opaque file instead of images (up to 1 GiB)
   --disguise             With --binary: give it a SQLite-database header (.db)
+  --mode <mode>          plain | duress | nonpossession   (.db only; default: plain)
+                         duress:        a decoy that opens under a 2nd password
+                         nonpossession: gate the vault on threshold shares you can't reach
+  --decoy <file>         --mode duress: the plausible decoy file
+  --duress-password-file <path>  --mode duress: the 2nd (duress) password
+  --threshold <k-of-n>   --mode nonpossession: e.g. 2-of-3 (writes n share files)
   --key-mode <mode>      embedded | keyfile | stego   (default: embedded)
   --cover <image>        Cover photo for --key-mode stego (key hidden in it)
   --title <text>         Human-readable label / PDF title
@@ -50,6 +75,7 @@ Save options:
 Restore options:
   --out <dir>            Output directory (default: current directory)
   --key <file|image>     A .key file, a stego image, or a binary key container
+  --share <file>         A threshold share file (repeatable) for a nonpossession vault
 
 Common:
   --force                Overwrite existing output files (default: refuse)
@@ -66,6 +92,9 @@ Gallery Mode (a secret hidden, fragmented, across many ordinary photos):
   --key-mode <mode>      embedded (default) | keyfile | stego   (gallery-save)
   --cover <image>        Cover photo for --key-mode stego (gallery-save)
   --key <file|image>     External key for a keyfile/stego gallery (gallery-restore)
+  --mode nonpossession   Gate the gallery on threshold shares (with --threshold k-of-n)
+  --share <file>         A threshold share file (repeatable) for gallery-restore
+  (duress is not available on gallery — use --binary --disguise --mode duress)
   Every photo is modified; the best K+M carry Reed-Solomon fragments and the
   rest become decoys (min 5 photos total, at least 2 decoys). Restore is blind:
   any photos that authenticate are used, and any K fragments reconstruct.
@@ -116,7 +145,12 @@ function makeProgress(quiet: boolean): { onProgress?: OnProgress; done: () => vo
       lastLabel = label;
     }
   };
-  return { onProgress, done: () => { if (tty && wroteTty) process.stderr.write('\r\x1b[2K'); } };
+  return {
+    onProgress,
+    done: () => {
+      if (tty && wroteTty) process.stderr.write('\r\x1b[2K');
+    },
+  };
 }
 
 /** Read a hidden line from a TTY; fall back to plain stdin when piped. */
@@ -186,6 +220,20 @@ async function resolvePassword(values: Record<string, unknown>): Promise<string>
   return pw;
 }
 
+/** The second (duress) password for Mode A: file, env, or an interactive prompt. */
+async function resolveDuressPassword(values: Record<string, unknown>): Promise<string> {
+  let pw: string;
+  if (typeof values['duress-password-file'] === 'string') {
+    pw = readFileSync(values['duress-password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
+  } else if (process.env.STEGOSHARD_DURESS_PASSWORD) {
+    pw = process.env.STEGOSHARD_DURESS_PASSWORD;
+  } else {
+    pw = await promptHidden('Duress password: ');
+  }
+  if (!pw) fail('no duress password provided (an empty password is not allowed)');
+  return pw;
+}
+
 const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
 
 async function main(argv: string[]): Promise<number> {
@@ -204,6 +252,11 @@ async function main(argv: string[]): Promise<number> {
       zip: { type: 'boolean' },
       binary: { type: 'boolean' },
       disguise: { type: 'boolean' },
+      mode: { type: 'string' },
+      decoy: { type: 'string' },
+      threshold: { type: 'string' },
+      'duress-password-file': { type: 'string' },
+      share: { type: 'string', multiple: true },
       'key-mode': { type: 'string' },
       cover: { type: 'string' },
       title: { type: 'string' },
@@ -236,7 +289,22 @@ async function main(argv: string[]): Promise<number> {
     if (values.disguise && !values.binary) fail('save: --disguise requires --binary');
     const binary = values.binary ? (values.disguise ? 'disguised' : 'branded') : undefined;
 
+    // §10 access mode (supported only on the disguised .db path for now).
+    const mode = ((values.mode as string | undefined) ?? 'plain') as AccessMode;
+    if (!ACCESS_MODES.includes(mode)) fail(`save: invalid --mode "${mode}"`);
+    if (mode !== 'plain' && binary !== 'disguised') {
+      fail(`save: --mode ${mode} requires --binary --disguise`);
+    }
+    let duressPassword: string | undefined;
+    let threshold: { k: number; n: number } | undefined;
+    if (mode === 'duress' && !values.decoy) fail('save: --mode duress requires --decoy <file>');
+    if (mode === 'nonpossession') {
+      if (!values.threshold) fail('save: --mode nonpossession requires --threshold k-of-n');
+      threshold = parseThreshold(values.threshold as string);
+    }
+
     const password = await resolvePassword(values);
+    if (mode === 'duress') duressPassword = await resolveDuressPassword(values);
     const opts: SaveOptions = {
       inputFile,
       outDir,
@@ -244,6 +312,10 @@ async function main(argv: string[]): Promise<number> {
       paper: Boolean(values.paper),
       zip: Boolean(values.zip),
       binary,
+      mode,
+      duressPassword,
+      decoyFile: values.decoy as string | undefined,
+      threshold,
       keyMode,
       cover: values.cover as string | undefined,
       title: values.title as string | undefined,
@@ -283,6 +355,7 @@ async function main(argv: string[]): Promise<number> {
         outDir,
         password,
         keyPath: values.key as string | undefined,
+        sharePaths: values.share as string[] | undefined,
         force,
       },
       progress.onProgress,
@@ -302,6 +375,19 @@ async function main(argv: string[]): Promise<number> {
     if (!KEY_MODES.includes(keyMode)) fail(`gallery-save: invalid --key-mode "${keyMode}"`);
     if (keyMode === 'stego' && !values.cover)
       fail('gallery-save: --key-mode stego requires --cover <image>');
+    // §10 mode: gallery supports plain + nonpossession; duress is blocked (§10.11).
+    const gMode = ((values.mode as string | undefined) ?? 'plain') as AccessMode;
+    if (gMode === 'duress') {
+      fail(
+        'gallery-save: duress mode is not available on gallery; use --binary --disguise --mode duress',
+      );
+    }
+    if (!ACCESS_MODES.includes(gMode)) fail(`gallery-save: invalid --mode "${gMode}"`);
+    let gThreshold: { k: number; n: number } | undefined;
+    if (gMode === 'nonpossession') {
+      if (!values.threshold) fail('gallery-save: --mode nonpossession requires --threshold k-of-n');
+      gThreshold = parseThreshold(values.threshold as string);
+    }
     const password = await resolvePassword(values);
     const res = await runGallerySave({
       secretFile,
@@ -310,6 +396,8 @@ async function main(argv: string[]): Promise<number> {
       password,
       keyMode,
       keyCover: values.cover as string | undefined,
+      mode: gMode as 'plain' | 'nonpossession',
+      threshold: gThreshold,
       force,
     });
     process.stdout.write(
@@ -332,6 +420,7 @@ async function main(argv: string[]): Promise<number> {
       outDir,
       password,
       keyPath: values.key as string | undefined,
+      sharePaths: values.share as string[] | undefined,
       force,
     });
     process.stderr.write(`scanned ${res.seen} photo(s)\n`);
@@ -359,6 +448,12 @@ main(process.argv.slice(2))
     }
     if (err instanceof MissingKeyError) {
       fail('this image set needs a separate key (use --key <file|image>)');
+    }
+    if (err instanceof CredentialsNotIndependentError) {
+      fail(
+        `the duress password is too similar to the real one (${err.reason}); ` +
+          'choose an unrelated duress password',
+      );
     }
     fail(err instanceof Error ? err.message : String(err));
   });

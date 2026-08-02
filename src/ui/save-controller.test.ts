@@ -14,7 +14,13 @@ const saveFileToBinary = vi.fn(
     variant: opts.variant,
   }),
 );
-const saveGalleryToDisk = vi.fn(async () => ({ imageCount: 5, k: 1, m: 2, decoys: 2, setId: 'cd' }));
+const saveGalleryToDisk = vi.fn(async () => ({
+  imageCount: 5,
+  k: 1,
+  m: 2,
+  decoys: 2,
+  setId: 'cd',
+}));
 vi.mock('./disk', () => ({ saveFileToDisk, saveFileToBinary, saveGalleryToDisk }));
 
 const { runSave } = await import('./save-controller');
@@ -52,10 +58,22 @@ describe('runSave routing', () => {
     expect(note).toBe('statusSavedBinary:binaryVariantBranded');
   });
 
-  it('routes sqlite saves as the disguised variant', async () => {
-    const { note } = await runSave({ dest: 'sqlite', file, key, keyMode: 'embedded' }, msg);
-    expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ variant: 'disguised' });
+  it('routes sqlite saves as the disguised variant with the per-save password', async () => {
+    const { note } = await runSave(
+      { dest: 'sqlite', file, key, keyMode: 'embedded', password: 'pw' },
+      msg,
+    );
+    expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({
+      variant: 'disguised',
+      password: 'pw',
+    });
     expect(note).toBe('statusSavedBinary:binaryVariantDisguised');
+  });
+
+  it('rejects a disguised .db save with no per-save password', async () => {
+    await expect(
+      runSave({ dest: 'sqlite', file, key, keyMode: 'embedded' }, msg),
+    ).rejects.toThrow();
   });
 
   it('routes gallery saves with the covers + gallery password, no vault key needed', async () => {
@@ -64,6 +82,8 @@ describe('runSave routing', () => {
     expect(saveGalleryToDisk).toHaveBeenCalledWith(file, covers, 'pw', {
       keyMode: 'embedded',
       stego: undefined,
+      mode: 'plain',
+      threshold: undefined,
     });
     expect(saveFileToDisk).not.toHaveBeenCalled();
     expect(note).toBe('statusGallerySaved:5');

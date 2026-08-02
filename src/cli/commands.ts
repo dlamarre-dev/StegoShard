@@ -34,6 +34,7 @@ import {
   estimateImages,
   exportVault,
   exportVaultBinary,
+  exportVaultBinaryDisguised,
   galleryDecode,
   galleryEncode,
   getCodec,
@@ -44,9 +45,17 @@ import {
   toHex,
   unwrapBinary,
   verifyBinaryExport,
+  verifyDisguisedExport,
   verifyGalleryExport,
   verifyImageExport,
   wrapBinary,
+  buildDuressDbContainer,
+  buildNonPossessionDbContainer,
+  shareFileText,
+  decodeShareText,
+  shamirRecover,
+  randomBytes,
+  KEY_FACTOR_LEN,
   type ImageDataLike,
   type KeyMode,
   type OnProgress,
@@ -54,7 +63,9 @@ import {
 } from '@core';
 import {
   embedKeyImage,
+  embedKeyFactorImage,
   extractKeyImage,
+  extractKeyFactorImage,
   fileToGalleryCover,
   galleryImageToFile,
   imageDataToPng,
@@ -104,6 +115,9 @@ async function makeKey(password: string): Promise<VaultKey> {
   return { dek, keyBlock: serializeKeyBlock(block) };
 }
 
+/** §10 access mode for the supported paths (.db, gallery). */
+export type AccessMode = 'plain' | 'duress' | 'nonpossession';
+
 export interface SaveOptions {
   inputFile: string;
   outDir: string;
@@ -112,6 +126,12 @@ export interface SaveOptions {
   zip: boolean;
   /** When set, output a single binary container file instead of images/PDF. */
   binary?: BinaryVariant | undefined;
+  /** Access mode (.db path). 'duress' needs decoyFile + duressPassword;
+   *  'nonpossession' needs threshold. Defaults to 'plain'. */
+  mode?: AccessMode;
+  duressPassword?: string | undefined;
+  decoyFile?: string | undefined;
+  threshold?: { k: number; n: number } | undefined;
   keyMode: KeyMode;
   cover?: string | undefined; // stego cover image path
   title?: string | undefined;
@@ -149,10 +169,16 @@ async function externalKey(
   setHex: string,
   password: string,
   cover: string | undefined,
+  // Single-region paths (branded .ssbn, disk, paper) hide a 92-byte key block;
+  // multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
+  variant: 'block' | 'factor' = 'block',
 ): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
   if (keyMode === 'stego') {
     if (!cover) throw new Error('stego mode requires a --cover image');
-    const key = await embedKeyImage(read(cover), basename(cover), keyBlock, password);
+    const key =
+      variant === 'factor'
+        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password)
+        : await embedKeyImage(read(cover), basename(cover), keyBlock, password);
     return { name: basename(cover), bytes: key.bytes, mimicPath: cover };
   }
   if (keyMode !== 'embedded') {
@@ -161,12 +187,123 @@ async function externalKey(
   return undefined;
 }
 
+/** Save the disguised .db vault in the requested access mode (§10). */
+async function runSaveDisguised(
+  opts: SaveOptions,
+  content: Uint8Array,
+  onProgress?: OnProgress,
+): Promise<SaveResult> {
+  const mode = opts.mode ?? 'plain';
+  const name = basename(opts.inputFile);
+  const outName = binaryVaultName('disguised');
+  const keyMode = opts.keyMode ?? 'embedded';
+  // keyfile/stego mint a 32-byte external key factor (§10.3); it composes with any
+  // access mode (an extra layer on top of the password / duress / shares).
+  const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+
+  /** Deliver the minted key factor as a .key container (keyfile) or hidden in a
+   *  cover photo (stego), keyed by the per-save password. */
+  async function deliverFactor(): Promise<string[]> {
+    if (!keyFactor) return [];
+    if (keyMode === 'keyfile') {
+      return [
+        writeOut(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised')),
+      ];
+    }
+    const ext = await externalKey('stego', keyFactor, '', opts.password, opts.cover, 'factor');
+    return ext ? [writeExternalKey(opts.outDir, ext)] : [];
+  }
+
+  if (mode === 'duress') {
+    if (!opts.decoyFile) throw new Error('save: --mode duress requires --decoy <file>');
+    if (!opts.duressPassword) throw new Error('save: --mode duress requires a duress password');
+    const decoyContent = read(opts.decoyFile);
+    const decoyName = basename(opts.decoyFile);
+    // Core builds + self-verifies both regions and wraps the container.
+    const { container } = await buildDuressDbContainer(
+      name,
+      content,
+      decoyName,
+      decoyContent,
+      opts.password,
+      opts.duressPassword,
+      keyFactor,
+      DEFAULT_ARGON2,
+      onProgress,
+    );
+    const files = [writeOut(opts.outDir, outName, container), ...(await deliverFactor())];
+    return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+  }
+
+  if (mode === 'nonpossession') {
+    if (!opts.threshold) throw new Error('save: --mode nonpossession requires --threshold k-of-n');
+    const { k, n } = opts.threshold;
+    const { container, shares } = await buildNonPossessionDbContainer(
+      name,
+      content,
+      opts.password,
+      k,
+      n,
+      keyFactor,
+      DEFAULT_ARGON2,
+      onProgress,
+    );
+    const files = [writeOut(opts.outDir, outName, container), ...(await deliverFactor())];
+    shares.forEach((share, i) => {
+      const body = shareFileText(
+        share,
+        i + 1,
+        n,
+        k,
+        'and load them at restore with --share <file>.',
+      );
+      files.push(
+        writeOut(opts.outDir, `stegoshard-share-${i + 1}.txt`, new TextEncoder().encode(body)),
+      );
+    });
+    return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+  }
+
+  // plain
+  const { container, keyBlock, regionIndex, dek } = await exportVaultBinaryDisguised(
+    name,
+    content,
+    opts.password,
+    { keyMode },
+    onProgress,
+  );
+  await verifyDisguisedExport(container, dek, regionIndex, name, content, onProgress);
+  const files = [writeOut(opts.outDir, outName, container)];
+  if (keyMode === 'keyfile') {
+    files.push(
+      writeOut(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyBlock, 'disguised')),
+    );
+  } else if (keyMode === 'stego') {
+    // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
+    // cover, keyed by the same per-save password that derives the slot KEK.
+    const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover, 'factor');
+    if (ext) files.push(writeExternalKey(opts.outDir, ext));
+  }
+  return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+}
+
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   allowOverwrite = Boolean(opts.force);
   const content = read(opts.inputFile);
+
+  // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
+  // region gets its own DEK — the managed key is not used on this supported path).
+  if (opts.binary === 'disguised') {
+    return runSaveDisguised(opts, content, onProgress);
+  }
+  // A non-plain access mode is only meaningful on the supported .db path.
+  if (opts.mode && opts.mode !== 'plain') {
+    throw new Error(`save: --mode ${opts.mode} is only supported with --binary --disguise`);
+  }
+
   const key = await makeKey(opts.password);
 
-  // Binary (non-image) output: a single container file, no image-count ceiling.
+  // Branded .ssbn output (excluded path): single-region, managed DEK, unchanged.
   if (opts.binary) {
     const variant = opts.binary;
     const { container, keyBlock, keyMode } = await exportVaultBinary(
@@ -263,8 +400,24 @@ export interface RestoreOptions {
   outDir: string;
   password: string;
   keyPath?: string | undefined;
+  /** Threshold share files for a Mode B (non-possession) .db vault (§10.6). */
+  sharePaths?: string[] | undefined;
   /** Overwrite an existing output file instead of refusing. */
   force?: boolean | undefined;
+}
+
+/** The dash-grouped base32 share token, so instruction prose in the file is ignored. */
+const SHARE_TOKEN = /[0-9A-Za-z]{5}(?:-[0-9A-Za-z]{1,5})+/;
+
+/** Recover the Shamir secret S from the supplied share files, or undefined if none. */
+function recoverSecret(sharePaths: string[] | undefined): Promise<Uint8Array> | undefined {
+  if (!sharePaths || sharePaths.length === 0) return undefined;
+  const shares = sharePaths.map((p) => {
+    const text = readFileSync(p, 'utf8');
+    const match = SHARE_TOKEN.exec(text);
+    return decodeShareText(match ? match[0] : text);
+  });
+  return shamirRecover(shares);
 }
 
 export interface RestoreResult {
@@ -302,8 +455,15 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
   const bytes = read(keyPath);
   const unwrapped = unwrapBinary(bytes); // branded/disguised key container
   if (unwrapped) return unwrapped.payload;
-  if (isKeyFile(keyPath)) return bytes; // raw .key (92 bytes)
-  return (await extractKeyImage(bytes, basename(keyPath), password)) ?? undefined; // stego image
+  if (isKeyFile(keyPath)) return bytes; // raw .key
+  // A stego cover carries either a 92-byte key block (single-region) or the 32-byte
+  // key factor (multi-region .db / gallery). The two self-distinguish by magic, so
+  // try block then factor; only the one actually embedded returns non-null.
+  const name = basename(keyPath);
+  const recovered =
+    (await extractKeyImage(bytes, name, password)) ??
+    (await extractKeyFactorImage(bytes, name, password));
+  return recovered ?? undefined;
 }
 
 export async function runRestore(
@@ -314,10 +474,12 @@ export async function runRestore(
   const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
   if (binaryVaultPath) {
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
+    // Threshold shares (Mode B) recover the secret that gates the .db slot.
+    const secret = await recoverSecret(opts.sharePaths);
     const { filename, content } = await importVaultBinary(
       read(binaryVaultPath),
       opts.password,
-      { keyBlock },
+      { keyBlock, secret: secret ?? null },
       onProgress,
     );
     const outName = basename(filename) || 'restored.bin';
@@ -351,6 +513,10 @@ export interface GallerySaveOptions {
   keyMode?: KeyMode;
   /** Cover photo for --key-mode stego (the key is hidden in it). */
   keyCover?: string | undefined;
+  /** §10 access mode: 'plain' (default) or 'nonpossession' (Mode B). Duress is not
+   *  available on gallery (winnowing key is password-derived, SPEC §10.11). */
+  mode?: 'plain' | 'nonpossession';
+  threshold?: { k: number; n: number } | undefined;
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
 }
@@ -372,16 +538,36 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
   if (coverPaths.length === 0) throw new Error('gallery: no cover images found in the given paths');
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
-  const res = await galleryEncode(basename(opts.secretFile), content, opts.password, covers, {
+  const mode = opts.mode ?? 'plain';
+  const secretName = basename(opts.secretFile);
+  const res = await galleryEncode(secretName, content, opts.password, covers, {
     keyMode,
+    mode,
+    threshold: opts.threshold,
   });
-  await verifyGalleryExport(
-    res.images,
-    opts.password,
-    keyMode === 'embedded' ? undefined : res.keyBlock,
-    basename(opts.secretFile),
-    content,
-  );
+  if (mode === 'nonpossession') {
+    // Verify by winnowing + recovering S from the freshly minted shares. A
+    // keyfile/stego gallery gates the real region on the key factor AS WELL AS the
+    // shares (§10.3), so the factor must be supplied to the verify too — otherwise
+    // the gated slot can't be opened and the self-check would spuriously fail.
+    const s = await shamirRecover(res.shares!);
+    await verifyGalleryExport(
+      res.images,
+      opts.password,
+      keyMode === 'embedded' ? undefined : res.keyBlock,
+      secretName,
+      content,
+      s,
+    );
+  } else {
+    await verifyGalleryExport(
+      res.images,
+      opts.password,
+      keyMode === 'embedded' ? undefined : res.keyBlock,
+      secretName,
+      content,
+    );
+  }
   const setHex = toHex(res.setId);
 
   const used = new Set<string>();
@@ -394,8 +580,32 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     return writeOut(opts.outDir, name, f.bytes);
   });
   // Deliver the external key alongside the photos for keyfile/stego galleries.
-  const ext = await externalKey(keyMode, res.keyBlock, setHex, opts.password, opts.keyCover);
+  // Gallery is a multi-region path → the external artifact is the 32-byte factor.
+  const ext = await externalKey(
+    keyMode,
+    res.keyBlock,
+    setHex,
+    opts.password,
+    opts.keyCover,
+    'factor',
+  );
   if (ext) files.push(writeExternalKey(opts.outDir, ext));
+  // Non-possession: write the n threshold share files to hand to holders.
+  if (res.shares && opts.threshold) {
+    const { k, n } = opts.threshold;
+    res.shares.forEach((share, i) => {
+      const body = shareFileText(
+        share,
+        i + 1,
+        n,
+        k,
+        'and load them at restore with --share <file>.',
+      );
+      files.push(
+        writeOut(opts.outDir, `stegoshard-share-${i + 1}.txt`, new TextEncoder().encode(body)),
+      );
+    });
+  }
   return { files, k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
 }
 
@@ -413,7 +623,9 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
 
   // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
   const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
-  const { filename, content } = await galleryDecode(covers, opts.password, { keyBlock });
+  // A non-possession gallery is gated on threshold shares (--share).
+  const secret = await recoverSecret(opts.sharePaths);
+  const { filename, content } = await galleryDecode(covers, opts.password, { keyBlock, secret });
   const outName = basename(filename) || 'restored.bin';
   const outPath = writeOut(opts.outDir, outName, content);
   return { outPath, filename, seen: covers.length };
