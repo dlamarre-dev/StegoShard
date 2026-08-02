@@ -29,6 +29,9 @@ from stegoshard.crypto import (
     unwrap_dek,
 )
 from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
+from stegoshard.pipeline import decode_multiregion_vault_blob
+from stegoshard.segmented import decode_multiregion_segmented_blob
+from stegoshard.shamir import shamir_recover
 
 VECTORS_PATH = pathlib.Path(__file__).parents[2] / "tests" / "vectors" / "crypto-vectors.json"
 VECTORS = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))
@@ -142,3 +145,115 @@ def test_vault_blob_decrypts_to_expected_content(v):
     filename, content = parse_envelope(decrypt_content(cek, iv, ciphertext))
     assert filename == v["filename"]
     assert content == _hx(v["contentHex"])
+
+
+# ---- Multi-region access structures (SPEC §10) -----------------------------------
+
+MAX = 1024 * 1024
+
+
+def _factor(v) -> bytes | None:
+    return _hx(v["keyFactorHex"]) if v["keyFactorHex"] else None
+
+
+@pytest.mark.parametrize("v", VECTORS["multiRegionVaultBlob"], ids=lambda v: v["name"])
+def test_multiregion_vault_blob_decodes_like_typescript(v):
+    """The gallery-geometry multi-region blob (§10.6) decodes to the same file the
+    TypeScript encoder produced — proving both stacks agree on the slot array, the
+    slot KEK (incl. the keyfile factor), the per-region key, and the region framing."""
+    restored = decode_multiregion_vault_blob(
+        _hx(v["blobHex"]), v["password"], _factor(v), MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+    )
+    assert restored.filename == v["filename"]
+    assert restored.content == _hx(v["contentHex"])
+
+
+@pytest.mark.parametrize("v", VECTORS["multiRegionVaultBlob"], ids=lambda v: v["name"])
+def test_multiregion_vault_blob_rejects_wrong_credential(v):
+    with pytest.raises(WrongPasswordError):
+        if v["keyFactorHex"]:
+            # keyfile vector: the correct password without the factor must not open.
+            decode_multiregion_vault_blob(
+                _hx(v["blobHex"]), v["password"], None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+            )
+        else:
+            decode_multiregion_vault_blob(
+                _hx(v["blobHex"]), v["password"] + "x", None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+            )
+
+
+@pytest.mark.parametrize("v", VECTORS["multiRegionSegmentedBlob"], ids=lambda v: v["name"])
+def test_multiregion_segmented_blob_decodes_like_typescript(v):
+    """The .db-geometry multi-region segmented blob (§10.7) decodes identically."""
+    filename, content = decode_multiregion_segmented_blob(
+        _hx(v["blobHex"]), v["password"], _factor(v), MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+    )
+    assert filename == v["filename"]
+    assert content == _hx(v["contentHex"])
+
+
+@pytest.mark.parametrize("v", VECTORS["gatedVaultBlob"], ids=lambda v: v["name"])
+def test_gated_slot_decodes_only_with_the_threshold_secret(v):
+    """Mode B (§10.6): the gated slot opens with the recovered secret S, and the
+    correct password WITHOUT S cannot open it — proving both stacks agree on the
+    gated-KEK HKDF (label 'stegoshard/v1/slot-kek')."""
+    restored = decode_multiregion_vault_blob(
+        _hx(v["blobHex"]),
+        v["password"],
+        None,
+        MAX,
+        v["iterations"],
+        v["memoryKiB"],
+        v["parallelism"],
+        secret=_hx(v["secretHex"]),
+    )
+    assert restored.filename == v["filename"]
+    assert restored.content == _hx(v["contentHex"])
+
+    with pytest.raises(WrongPasswordError):
+        decode_multiregion_vault_blob(
+            _hx(v["blobHex"]), v["password"], None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+        )
+
+
+@pytest.mark.parametrize("v", VECTORS["shamir"], ids=lambda v: v["name"])
+def test_shamir_recovers_like_typescript(v):
+    """Any k of n frozen shares recover S; k-1 reveal zero information — proving both
+    stacks agree on GF(2^8) Lagrange interpolation (§10.6.1)."""
+    shares = [_hx(h) for h in v["shares"]]
+    assert shamir_recover(shares[: v["k"]]) == _hx(v["secretHex"])
+    if v["k"] > 1:
+        assert shamir_recover(shares[: v["k"] - 1]) != _hx(v["secretHex"])
+
+
+def test_shamir_rejects_duplicate_shares():
+    """A repeated share index makes a Lagrange denominator zero. Both stacks must
+    reject it with a clean error, not a raw GF(256) division-by-zero."""
+    from stegoshard.shamir import ShareSetError
+
+    v = VECTORS["shamir"][0]
+    shares = [_hx(h) for h in v["shares"]]
+    with pytest.raises(ShareSetError):
+        shamir_recover([shares[0], shares[0]])
+
+
+@pytest.mark.parametrize("v", VECTORS["duressVaultBlob"], ids=lambda v: v["name"])
+def test_duress_each_credential_opens_its_own_region(v):
+    """Mode A (§10.5): the real credential yields the real region and the duress
+    credential yields ONLY the decoy — the two live slots decode independently in
+    both stacks (each region has its own DEK)."""
+    blob = _hx(v["blobHex"])
+
+    def decode(pw):
+        return decode_multiregion_vault_blob(
+            blob, pw, None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+        )
+
+    real = decode(v["realPassword"])
+    assert real.filename == v["realFilename"]
+    assert real.content == _hx(v["realContentHex"])
+
+    duress = decode(v["duressPassword"])
+    assert duress.filename == v["decoyFilename"]
+    assert duress.content == _hx(v["decoyContentHex"])
+    assert duress.content != _hx(v["realContentHex"])

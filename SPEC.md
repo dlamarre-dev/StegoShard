@@ -193,11 +193,11 @@ Derivation (all decoders MUST reproduce it bit-for-bit):
    `STEGO_SALT` is the fixed 16 bytes `53 74 65 67 6F 53 68 61 72 64 2D 73 74 65 67 6F`
    (ASCII `"StegoShard-stego"`) and `params` are the caller's Argon2id
    cost parameters (the extension uses the §5.1 production defaults).
-1a. **Cover fingerprint:** `fp = SHA-256(coverInvariant)`, where `coverInvariant`
+   1a. **Cover fingerprint:** `fp = SHA-256(coverInvariant)`, where `coverInvariant`
    is the concatenation, in pixel order, of each RGB channel byte with its LSB
    masked off (`byte & 0xFE`; alpha excluded) — i.e. exactly the bits embedding
    never changes. `key = HKDF-SHA256(ikm = seed, salt = fp,
-   info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
+info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    embedding-invariant bits it is identical at embed and extract, so **nothing is
    stored in the image** — the "no header/magic/length" property is preserved.
    This binds the keystream to the specific cover: the same password over two
@@ -347,6 +347,10 @@ chunks so encryption/decryption report byte-level progress and run off the UI
 thread; the container is pure packaging around the already-authenticated bytes,
 so it adds no secrecy.
 
+> The **disguised** (`.db`) variant is a supported access-structure path: it carries
+> the mandatory multi-region segmented blob of §10.7, not the single-region blob of
+> §8.1. The **branded** (`.ssbn`) variant is excluded and keeps §8.1 unchanged.
+
 ### 8.1 Segmented vault blob
 
 The binary path replaces the §6 single-shot vault blob with a **self-describing,
@@ -367,12 +371,12 @@ Rogaway–Vizár — the construction `age` uses).
   payload yields one empty final chunk). `chunkSize` is implementation-chosen
   within `[4096, 16·2²⁰]`; the reference encoder uses 1 MiB.
 - **Nonce_i** (12 bytes) = `noncePrefix (7, random per export) || u32_be(i) ||
-  finalByte`, where `finalByte = 1` only for the last chunk, else `0`.
+finalByte`, where `finalByte = 1` only for the last chunk, else `0`.
 - **AAD** for every chunk = the entire header prefix above (magic … plaintextLen,
   key block included), binding all chunks to the version, salt, nonce prefix,
   chunk size, length, and key.
 - **Decrypt**: verify `containerLen − headerLen == (n−1)·(chunkSize+16) +
-  (lastSegLen+16)` (rejects truncation / trailing bytes), then open each chunk in
+(lastSegLen+16)` (rejects truncation / trailing bytes), then open each chunk in
   order; a bad tag, a dropped final chunk (finalByte mismatch), or reordering all
   fail authentication. Each chunk is authenticated before its plaintext is kept.
 
@@ -394,7 +398,7 @@ disguised  a complete SQLite 3 database whose `cache` table holds the segmented 
   root fits one page). The header's page-count (offset 28) equals the real page
   count and the change counter (24) equals version-valid-for (92). Crucially there
   are **no trailing bytes past the database's logical end**: `file size ==
-  page_count × page_size`. So `sqlite3 cache.db "SELECT * FROM cache"` opens
+page_count × page_size`. So `sqlite3 cache.db "SELECT * FROM cache"` opens
   cleanly, `PRAGMA integrity_check` returns `ok`, and structural triage (size vs.
   page count, header scan) finds nothing amiss. The remaining tell is that the row
   values are high-entropy — a content-level observation, not a structural one;
@@ -428,6 +432,11 @@ secret **fragmented across many ordinary photos**, so the set tolerates partial
 loss and each photo stays deniable. It combines the vault blob (§6), Reed-Solomon
 erasure coding (§7), DCT/LSB stego (§5.3/§5.4), and decoy ("chaffing") images
 decoded blindly by trial-authentication ("winnowing").
+
+> Gallery Mode is an access-structure path: the blob each fragment carries is the
+> multi-region blob of §10.6 (not the §6 single-region blob), so every gallery vault
+> holds the mandatory 4-slot / 2-region geometry. The winnowing/AEAD layer described
+> here is unchanged and still password-keyed.
 
 ### 9.1 Keys
 
@@ -514,51 +523,326 @@ them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
 
 ---
 
-## 10. Constants summary
+## 10. Access structures (multi-region geometry, gallery + `.db`)
 
-| Name             | Value                                                         |
-| ---------------- | ------------------------------------------------------------- |
-| `FORMAT_VERSION` | 1                                                             |
-| Header magic     | `"SSHD"`                                                      |
-| Key block magic  | `"SSKY"`                                                      |
-| Binary magic     | `"SSBN"` (branded); SQLite DB, blob in `cache` table (disguised) (§8) |
-| Header length    | 33 bytes                                                      |
-| Codec IDs        | `0` QR-grid; `1` gallery (§9)                                 |
-| Cipher           | AES-256-GCM, 12-byte IV, 16-byte tag                          |
-| KDF              | Argon2id, 32-byte output, salt 16 bytes                       |
-| KDF defaults     | iterations 4, memory 256 MiB, parallelism 1                   |
-| GF polynomial    | `0x11D`, generator `0x02`                                     |
-| Parity           | `m = max(ceil(k·0.3), 2)`                                     |
-| Data per shard   | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)   |
-| Gallery salt     | `"StegoShard-gllry"` (16 bytes) (§9.1)                        |
-| Gallery slot     | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)   |
-| Limits           | file ≤ 1 MiB (images/PDF) or ≤ 1 GiB CLI / 256 MiB browser (binary); images ≤ 150 |
-| Gallery limits   | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)            |
-| Compression      | gzip (RFC 1952), opportunistic                                |
+This section generalises the single-payload container into a **fixed array of key
+slots over a fixed array of payload regions**, the mandatory geometry of two output
+paths — **Gallery Mode (§9)** and the **disguised `.db`** binary variant (§8). It is
+the substrate for the duress and non-possession product modes; this section defines
+only the geometry those modes share.
+
+**Folded into `FORMAT_VERSION = 1`, not a new version.** The geometry is intrinsic to
+these two paths — every gallery and every disguised `.db` vault carries it, so no field
+distinguishes a plain vault from one with a hidden alternative, and there is no version
+byte to leak the feature. The **excluded** paths (single cover image §5, PDF/paper,
+QR-grid §2, branded `.ssbn` §8) keep the single-slot / single-region geometry of §5.1
+and §6 unchanged, byte-for-byte.
+
+### 10.1 Key slot array
+
+```
+SLOT_COUNT   = 4          # constant for all multi-region containers
+SLOT_SIZE    = 76 bytes   # nonce[12] || AES-256-GCM(plaintext 48) = ct[48] || tag[16]
+SLOT_ARRAY   = 304 bytes  # SLOT_COUNT × SLOT_SIZE, magicless
+
+slot_plaintext (48) := dek[32] || region_index[1] || reserved[15]
+                       reserved MUST be zero on write, ignored on read
+```
+
+- Each live slot AES-GCM-wraps an **independent per-region DEK** and the index of the
+  region it unlocks. `region_index` is authenticated by the GCM tag, so a slot cannot be
+  redirected to another region by editing the container. **Per-region DEKs are
+  independent** — a shared DEK would let a slot opener derive every region's content key.
+- **All `SLOT_COUNT` slots are always written.** Slots with no live DEK are filled from
+  the CSPRNG (AES-GCM output is pseudorandom, so a random 76-byte block is
+  indistinguishable from a live slot). Slot order is randomised by an unbiased CSPRNG
+  permutation; slot position carries no meaning.
+- The array is magicless: geometry is known from the decode entrypoint (a gallery decode,
+  or the recovered `disguised` binary variant), never read from a byte.
+
+### 10.2 Slot KEK derivation
+
+```
+kek       := Argon2id(password, vault_salt, DEFAULT_ARGON2) → 32 bytes   # runs ONCE
+             (+ optional keyfile/stego factor, §10.3)
+CEK_r     := HKDF-SHA256(ikm = dek_r, salt = region_contentSalt_r,
+                         info = "stegoshard/vault/region" || region_index, len 32)
+```
+
+`vault_salt` is a fresh 16-byte per-vault CSPRNG value, shared across all slots (its job
+is to defeat cross-vault precomputation; distinct passwords yield distinct KEKs
+regardless). Unlike the §5.1 key block, the slot KEK's **Argon2 parameters are the frozen
+`DEFAULT_ARGON2` and are NOT stored** in the container — the geometry carries no cost
+field (as with the gallery/stego keys, §5.3, §9.1).
+
+### 10.3 Keyfile / stego as a key factor
+
+On these paths the `keyfile` and `stego` key modes do **not** externalise the slot array
+(that would shorten the container and become a distinguisher). Instead a random 32-byte
+**key factor** is generated, delivered externally (a `.key` file, or hidden in a cover),
+and mixed into the slot KEK:
+
+```
+kek := HKDF-SHA256(ikm = argon2_kek || key_factor, salt = vault_salt,
+                   info = "stegoshard/v1/keyfile-kek", len 32)
+```
+
+`embedded` mode uses no factor. Because the slot array is always present regardless of
+key mode, container length does not vary by key mode.
+
+**Delivery.** `keyfile` writes the factor as the raw 32 bytes (a `.key` file, or a binary
+key container). `stego` hides it in a cover photo using the same fixed, self-validating
+LSB/DCT path as the 92-byte key block (§5.3/§5.4), but wrapped in a **key-factor envelope**
+so a wrong-password extraction is indistinguishable from a cover that carries nothing:
+
+```
+SSKF envelope = "SSKF" (4) || version 1 (1) || key_factor (32)   # 37 bytes, whitened
+```
+
+The envelope is whitened (XORed with the keystream pad) before embedding, so its magic never
+appears in the carrier LSBs; on extraction, a wrong password de-whitens to noise that fails
+the magic check → reported as "no factor here". The raw `.key` file stays the bare 32 bytes
+(on disk a magic would itself be a distinguisher; under stego the whole envelope is whitened).
+
+**Composition with the access modes.** The key factor is mixed into the base slot KEK
+(`slot_kek_raw`) and therefore composes with every mode as an **independent extra layer**:
+
+- **Plain** (§10.6): the one live slot needs `password + factor`.
+- **Non-possession** (§10.8): the base KEK is `slot_kek_raw(password, factor)`, then gated on
+  the Shamir secret — so the real region needs `password + factor + a share quorum`. All three
+  are independent (a cracker who obtains any two learns nothing about the third).
+- **Duress** (§10.9): the factor gates the **real slot only**; the decoy slot takes **no**
+  factor. A decoy exists to be surrendered under coercion, so it MUST open on the duress
+  password alone — requiring an extra artifact to reveal the decoy would defeat its purpose.
+
+Because restore presents whatever `.key`/cover sits beside the vault for **either** credential
+(it cannot know which region a credential opens), the decoder's `slot_kek_candidates` offers
+BOTH the password-only KEK and — when a factor is supplied — the factor-mixed KEK (both from the
+single Argon2id output, plus their gated variants when a secret is supplied). This keeps a
+no-factor decoy slot openable even when the factor is presented, while the real slot still
+requires it. Credential independence (§10.9) guarantees the real and decoy KEKs never both match,
+so the exactly-one-match rule (§10.4) holds. Every derivation with a null factor is byte-identical
+to the password-only KEK, so `embedded` output — and every frozen vector — is unchanged.
+
+### 10.4 Constant-work unlock
+
+Argon2id runs once per candidate KEK, never per slot. Every candidate KEK is then
+attempted against **every** slot with no early exit, so wall-clock time is a function of
+the number of candidate KEKs only — never of which slot matched or whether any did. A
+well-formed container yields exactly one match; zero (wrong credential) and more than one
+(malformed — fail closed) both surface as one uniform `WrongPasswordError`. Implementations
+MUST NOT log, surface, or return which slot index or region matched.
+
+### 10.5 Payload regions and buckets
+
+```
+REGION_COUNT = 2          # constant
+
+region_plaintext (bucket bytes) := REGION_LEN[u32] || envelope (§4) || zero-pad → bucket
+bucket := smallest ladder entry ≥ max(REGION_LEN_FIELD + len(region_0),
+                                      REGION_LEN_FIELD + len(region_1))
+
+Gallery ladder: 4 KiB · 16 KiB · 64 KiB
+`.db` ladder:   64 KiB · 256 KiB · 1 MiB · 4 MiB · 16 MiB · 64 MiB
+```
+
+Each region is compressed (§4) first; a single shared bucket ≥ the larger compressed
+region is chosen, then **both** regions are padded to it, so ciphertext length reveals only
+the bucket and neither region's compression ratio is recoverable. The true length lives in
+the region's encrypted `REGION_LEN`, never in a container header. A region with no live
+payload is filled with CSPRNG bytes to the exact same length. Reed-Solomon (§7), where
+used (gallery), encodes the whole container as one stream — regions are never sharded
+independently.
+
+The ladders are capped to real capacity: gallery to 64 KiB/region (the doubled blob must
+fit `GALLERY_MAX_BLOB`); `.db` to 64 MiB/region (the SQLite writer allocates the database
+in one buffer). Both are frozen.
+
+### 10.6 Multi-region vault blob (gallery, single-shot GCM)
+
+```
+[ vault_salt 16 ][ slot_array 304 ][ region0 R ][ region1 R ]        R = 44 + bucket
+region block (R) := contentSalt[16] || IV[12] || AES-256-GCM_CEK(region_plaintext)
+                    (ciphertext = bucket + 16-byte tag)
+```
+
+A dead region is exactly `R` CSPRNG bytes. Both blocks are the same length `R`, so which
+region is real is invisible. This blob replaces the §6 vault blob inside each gallery
+fragment.
+
+### 10.7 Multi-region segmented blob (`.db`, chunked STREAM)
+
+```
+[ "SSCS" 4 ][ SEG_VERSION 1 ][ FLAGS 1 ][ vault_salt 16 ][ slot_array 304 ]
+[ chunkSize u32 ][ bucketLen u64 ]                       # SHARED — one per container
+[ region0_stream S ][ region1_stream S ]
+
+region_stream (S) := contentSalt[16] || noncePrefix[7] || chunk_0 … chunk_{n-1}
+                     n = ceil(bucketLen / chunkSize);  chunk_i = ct_i || tag_i(16)
+```
+
+`chunkSize` and `bucketLen` are container-level (shared by both regions) **on purpose**:
+if they lived per region, a dead region's random bytes at those offsets would almost never
+equal a valid value and would leak which region is real. With them hoisted, a region stream
+is all pseudorandom (salt, prefix, GCM chunks), so a dead region is `S` CSPRNG bytes,
+indistinguishable. Chunk nonce = `noncePrefix || u32_be(chunkIndex) || finalByte`; AAD binds
+each chunk to the container head, its `region_index`, and its `contentSalt || noncePrefix`.
+This blob is what the disguised `.db` container (§8) carries.
+
+### 10.8 Mode B — Non-possession (threshold gating)
+
+A product mode over the geometry above: **one live slot whose KEK is gated on threshold
+material the holder does not possess, one real region, and no decoy** (the second region
+is CSPRNG to the same bucket). "I cannot decrypt this" is then literally true below the
+threshold. The container is byte-indistinguishable from a plain vault of the same bucket.
+
+**Gated slot KEK (§10.6.2 of the design):**
+
+```
+slot_kek := HKDF-SHA256(ikm  = base_kek || S,
+                        salt = vault_salt,
+                        info = "stegoshard/v1/slot-kek", len 32)
+```
+
+`base_kek` is the ordinary slot KEK (§10.2, incl. any keyfile factor); `S` is a 32-byte
+CSPRNG secret. HKDF (not XOR) gives domain separation and no algebraic relation to the
+ungated KEK. At unlock the reader derives Argon2id **once** and tries `[ base_kek,
+gate(base_kek, S) ]` across all slots — so timing depends only on whether threshold
+material was supplied, never on the container.
+
+**Shamir secret sharing (GF(2^8), §10.6.1):** `S` is split `k`-of-`n` over the same field
+as Reed-Solomon (§7.1). Any `k` shares recover `S`; any `k-1` yield **zero** information
+(not a partial key), so the container cannot "notice" a sub-threshold set and degrade —
+`shamir_recover` has no notion of `k`. Share wire format (38 bytes):
+
+```
+share := version[1] || share_index[1] || share_value[32] || checksum[4]
+         checksum = SHA-256(version || index || value)[0..4]
+```
+
+`share_index` ∈ 1..255, distinct per share. The checksum detects transcription errors
+only; it does **not** authenticate a share against any container and MUST NOT be usable to
+test a candidate share. The writer retains neither `S` nor any share, and nothing about
+`k`, `n`, or a fingerprint enters the container.
+
+### 10.9 Mode A — Duress
+
+A product mode over the same geometry: **two live slots and two real regions**. One
+credential (real) opens one region; a second, independent credential (duress) opens the
+other, which holds a plausible decoy. Region indices are assigned by CSPRNG, so the decoy
+is as likely to be region 0 as region 1. Because each region has an **independent DEK**
+carried in its own slot (§10 governing decision), the duress credential yields **only** the
+decoy — the real region's key is never derivable from it.
+
+- **Independent credentials (author-time, normative).** The writer MUST reject a duress
+  password that is equal to, a case-variant of, a prefix/suffix of, the reversal of, or a
+  near-edit (small Levenshtein distance) of the real password — a cracker who recovers one
+  MUST NOT cheaply recover the other. This check runs only at authoring and its result is
+  never stored or encoded (a stored relation would itself be a distinguisher, §10.2).
+- **Silence on unlock.** A duress unlock and a real unlock take the identical code path and
+  return the same shape (`filename`, `content`) with no "duress mode" indicator — anything
+  else is observable over the user's shoulder.
+- **Mutual exclusivity.** A conforming UI MUST present Mode A and Mode B as a choice, not
+  both at once: Mode A works only under silence ("this is all there is"), Mode B only under
+  disclosure ("there is more, and here is why I can't reach it"); a decoy poisons a
+  non-possession defence.
+- **Path applicability (normative).** Mode A is available on the **`.db` path only**. It is
+  **excluded from Gallery Mode** — an author request for duress on a gallery MUST be refused
+  with no bytes written. Mode B (§10.8) is available on both `.db` and gallery. Plain (§10.6)
+  is available on both.
+
+#### 10.9.1 Why Mode A is excluded from Gallery Mode (resolved)
+
+This resolves the draft's open question on gallery duress. Gallery Mode has **two
+independently-keyed layers**: an outer _winnowing_ layer (§9.1 — `posKey`/`aeadKey` from
+`Argon2id(password, GALLERY_SALT)`, which locates and authenticates fragments across photos)
+and the inner access-structure blob (§10.6, the 4-slot / 2-region geometry those fragments
+carry). Duress requires **two independent credentials**, but the winnowing key is a pure
+function of _one_ password: only that password's `posKey`/`aeadKey` can be baked into the
+carriers. A second, independent duress password derives a different keystream, reads different
+carrier positions, and fails every fragment's AEAD tag — it cannot even _find_ the fragments,
+let alone reach a second region. (Mode B escapes this because its second factor is threshold
+_share_ material, not a second password — a single credential still winnows; see §10.8.)
+
+The only way to let both credentials winnow the _same_ fragments is a **credential-independent
+winnowing key** — a shared secret wrapped under both passwords at a fixed, credential-
+independent carrier location. That necessarily converts gallery's presence-hiding from _"no
+StegoShard structure is locatable without the password"_ (§9.5) to _"a fixed-position wrapped-
+key header exists in these photos,"_ measurably weakening the **one property the photo carrier
+uniquely provides**. Because duress is already available on the `.db` path — which has no
+winnowing layer, so both credentials reach the shared slot array directly (§10.9) — the
+resolution is to **keep gallery presence-hiding intact and host duress on `.db`**, rather than
+trade gallery's core guarantee for a mode that already has a stronger home.
 
 ---
 
-## 11. Reference implementation
+## 11. Constants summary
+
+| Name                  | Value                                                                             |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `FORMAT_VERSION`      | 1                                                                                 |
+| Header magic          | `"SSHD"`                                                                          |
+| Key block magic       | `"SSKY"`                                                                          |
+| Binary magic          | `"SSBN"` (branded); SQLite DB, blob in `cache` table (disguised) (§8)             |
+| Header length         | 33 bytes                                                                          |
+| Codec IDs             | `0` QR-grid; `1` gallery (§9)                                                     |
+| Cipher                | AES-256-GCM, 12-byte IV, 16-byte tag                                              |
+| KDF                   | Argon2id, 32-byte output, salt 16 bytes                                           |
+| KDF defaults          | iterations 4, memory 256 MiB, parallelism 1                                       |
+| GF polynomial         | `0x11D`, generator `0x02`                                                         |
+| Parity                | `m = max(ceil(k·0.3), 2)`                                                         |
+| Data per shard        | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)                       |
+| Gallery salt          | `"StegoShard-gllry"` (16 bytes) (§9.1)                                            |
+| Gallery slot          | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)                       |
+| Limits                | file ≤ 1 MiB (images/PDF) or ≤ 1 GiB CLI / 256 MiB browser (binary); images ≤ 150 |
+| Gallery limits        | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)                                |
+| Compression           | gzip (RFC 1952), opportunistic                                                    |
+| Access structure      | `SLOT_COUNT` 4, `SLOT_SIZE` 76, `SLOT_ARRAY` 304; `REGION_COUNT` 2 (§10)          |
+| Vault salt            | 16 bytes, per-vault (§10.2)                                                       |
+| Region key label      | `"stegoshard/vault/region"` ‖ region_index (§10.2)                                |
+| Keyfile factor        | 32 bytes; HKDF label `"stegoshard/v1/keyfile-kek"` (§10.3)                        |
+| Stego factor envelope | `"SSKF"` ‖ version 1 ‖ factor 32 = 37 bytes, whitened (§10.3)                     |
+| Gallery ladder        | 4 KiB · 16 KiB · 64 KiB (§10.5)                                                   |
+| `.db` ladder          | 64 KiB · 256 KiB · 1 MiB · 4 MiB · 16 MiB · 64 MiB (§10.5)                        |
+| Gate label (Mode B)   | `"stegoshard/v1/slot-kek"` (§10.8)                                                |
+| Share (Mode B)        | 38 B: version 1 ‖ index 1 ‖ value 32 ‖ checksum 4; Shamir k-of-n GF(2^8) (§10.8)  |
+
+---
+
+## 12. Reference implementation
 
 The TypeScript core in `src/core/` is the reference encoder/decoder:
 
-| Concern            | Module                          |
-| ------------------ | ------------------------------- |
-| GF(2^8) arithmetic | `gf256.ts`                      |
-| Reed-Solomon       | `reed-solomon.ts`, `erasure.ts` |
-| Crypto / key block | `crypto.ts`                     |
-| Compression        | `compress.ts`                   |
-| Payload envelope   | `payload.ts`                    |
-| Image header       | `header.ts`                     |
-| Vault blob & flow  | `vault.ts`                      |
-| QR-grid codec      | `codec/qr-grid.ts`              |
-| Variable-len stego | `stego.ts`                      |
-| Gallery Mode (§9)  | `gallery.ts`                    |
+| Concern                         | Module                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GF(2^8) arithmetic              | `gf256.ts`                                                                                                    |
+| Reed-Solomon                    | `reed-solomon.ts`, `erasure.ts`                                                                               |
+| Crypto / key block              | `crypto.ts`                                                                                                   |
+| Compression                     | `compress.ts`                                                                                                 |
+| Payload envelope                | `payload.ts`                                                                                                  |
+| Image header                    | `header.ts`                                                                                                   |
+| Vault blob & flow               | `vault.ts`                                                                                                    |
+| QR-grid codec                   | `codec/qr-grid.ts`                                                                                            |
+| Variable-len stego              | `stego.ts`                                                                                                    |
+| Gallery Mode (§9)               | `gallery.ts`                                                                                                  |
+| Access structures (§10)         | `crypto.ts` (slots + gated KEK), `buckets.ts`, `regions.ts`, `vault.ts` + `segmented.ts` (multi-region blobs) |
+| Mode B — non-possession (§10.8) | `shamir.ts` (k-of-n over `gf256.ts`), `access.ts` (writer)                                                    |
+| Mode A — duress (§10.9)         | `access.ts` (`buildDuress*`, `credentialsIndependent`)                                                        |
 
 A standalone **Python reference decoder** in `python/stegoshard/` implements this
 same specification independently (GF(2^8) + Reed-Solomon, header, key block,
-Argon2id + AES-GCM, gzip, QR decode, deniable stego + Gallery Mode §9). It
-restores a vault without the extension
+Argon2id + AES-GCM, gzip, QR decode, deniable stego + Gallery Mode §9, and the §10
+access structures — 4-slot / 2-region parse, gated + factor-mixed slot KEKs,
+per-region DEKs, and the duress + non-possession modes). It restores a vault without
+the extension
 and runs in CI as a cross-implementation conformance test: the extension encodes
 and renders fixtures, the Python decoder reads them back, and the two must agree.
 See `python/README.md`.
+
+> The §10 multi-region geometry is mirrored in the Python decoder — the 4-slot /
+> 2-region parse (`format.py` `split_multiregion_vault_blob` / `parse_region_plaintext`,
+> `crypto.py` `try_open_slot` / `open_slot_array` / `slot_kek_candidates`, `pipeline.py`
+> `decode_multiregion_vault_blob`, `segmented.py` `decode_multiregion_segmented_blob`),
+> with frozen cross-implementation vectors and gallery/`.db` conformance fixtures (incl.
+> the duress and non-possession modes and the keyfile/stego key factor). §10 is therefore
+> a normative cross-implementation contract, verified in CI like the rest of the format.

@@ -20,21 +20,41 @@
 import { concatBytes, readU16, toHex, writeU16 } from './bytes';
 import {
   CONTENT_SALT_LEN,
+  DEK_LEN,
+  KEY_FACTOR_LEN,
+  REGION_COUNT,
+  SLOT_ARRAY_LEN,
+  type SlotEntry,
+  VAULT_SALT_LEN,
+  buildSlotArray,
   decryptBytes,
   deriveContentKey,
+  deriveRegionKey,
+  deriveSlotKek,
+  slotKekCandidates,
   encryptBytes,
   GCM_TAG_LEN,
   IV_LEN,
   KEY_BLOCK_LEN,
+  type Argon2Params,
+  DEFAULT_ARGON2,
+  openSlotArray,
   parseKeyBlock,
   randomBytes,
   unlockKeyBlock,
+  WrongPasswordError,
 } from './crypto';
+import { BucketTooLargeError, DB_LADDER, pickBucket } from './buckets';
+import { REGION_LEN_FIELD, padRegionPlaintext, parseRegionPlaintext } from './regions';
 import type { KeyMode } from './types';
 import type { OnProgress } from './progress';
 import { type BinaryVariant, unwrapBinary, wrapBinary } from './binary-container';
 import {
+  DEFAULT_CHUNK_SIZE,
+  buildPlainSegmentedBlobMulti,
   buildSegmentedBlob,
+  decodeMultiRegionSegmentedBlob,
+  decodeMultiRegionSegmentedBlobWithDek,
   decodeSegmentedBlob,
   decodeSegmentedBlobWithDek,
 } from './segmented';
@@ -103,9 +123,7 @@ function dataPerShard(codecId: number, profile: number): number {
 /** Analytical vault blob length. `embedKey` includes the wrapped DEK block. */
 export function blobLenFor(envelopeLen: number, embedKey: boolean): number {
   // [ KB_LEN u16 ][ key block? ][ contentSalt 16 ][ IV ][ ciphertext = envelope + GCM tag ]
-  return (
-    2 + (embedKey ? KEY_BLOCK_LEN : 0) + CONTENT_SALT_LEN + IV_LEN + envelopeLen + GCM_TAG_LEN
-  );
+  return 2 + (embedKey ? KEY_BLOCK_LEN : 0) + CONTENT_SALT_LEN + IV_LEN + envelopeLen + GCM_TAG_LEN;
 }
 
 /** True when this key mode stores the wrapped DEK inside the images. */
@@ -267,6 +285,198 @@ export async function decodeVaultBlob(
   const cek = await deriveContentKey(dek, contentSalt);
   const envelope = await decryptBytes(cek, iv, ciphertext);
   return parsePayload(envelope, opts.maxContentBytes);
+}
+
+// --- Multi-region vault blob (SPEC §10.4, single-shot GCM path) --------------
+//
+// The always-on geometry for Gallery Mode. Layout:
+//   [ vault_salt 16 ][ slot_array 304 ][ region0 R ][ region1 R ]   R = 44 + bucket
+// Each region block = [ contentSalt 16 ][ IV 12 ][ GCM_CEK(region_plaintext) ]
+// (ciphertext = bucket + 16-byte tag). A *dead* region (one no slot points at) is
+// exactly R bytes of CSPRNG. The two blocks are always the same length R, so
+// which region is real is invisible. RS erasure coding runs over the WHOLE blob
+// as one stream (upstream, unchanged), so shard boundaries never partition by
+// region. Per SPEC §10 governing decision 3, each region has an INDEPENDENT DEK,
+// carried inside its slot — a shared DEK would let a decoy-slot opener derive the
+// other region's key.
+
+/** Per-region block overhead: content salt + IV + GCM tag (bucket adds the rest). */
+const REGION_OVERHEAD = CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN; // 44
+
+/** A live region to write: its independent DEK, target index, and plaintext envelope. */
+export interface LiveRegion {
+  regionIndex: number;
+  dek: Uint8Array;
+  envelope: Uint8Array;
+}
+
+/** Build the two equal-length region blocks; dead regions are filled from CSPRNG. */
+async function buildRegionBlocks(
+  live: LiveRegion[],
+  ladder: readonly number[],
+): Promise<{ blocks: [Uint8Array, Uint8Array]; R: number }> {
+  const lens: [number, number] = [0, 0];
+  for (const r of live) lens[r.regionIndex] = REGION_LEN_FIELD + r.envelope.length;
+  const bucket = pickBucket(lens[0], lens[1], ladder);
+  const R = REGION_OVERHEAD + bucket;
+  const blocks: [Uint8Array | null, Uint8Array | null] = [null, null];
+  for (const r of live) {
+    const contentSalt = randomBytes(CONTENT_SALT_LEN);
+    const cek = await deriveRegionKey(r.dek, contentSalt, r.regionIndex);
+    const { iv, ciphertext } = await encryptBytes(cek, padRegionPlaintext(r.envelope, bucket));
+    blocks[r.regionIndex] = concatBytes(contentSalt, iv, ciphertext);
+  }
+  for (let i = 0; i < REGION_COUNT; i++) if (!blocks[i]) blocks[i] = randomBytes(R);
+  return { blocks: [blocks[0]!, blocks[1]!], R };
+}
+
+/**
+ * Assemble a multi-region vault blob from an explicit slot array and live regions.
+ * The mode (plain / duress / non-possession) decides how many slots are live and
+ * which regions carry data; this assembler is mode-agnostic.
+ */
+export async function buildMultiRegionVaultBlob(
+  vaultSalt: Uint8Array,
+  slotEntries: SlotEntry[],
+  live: LiveRegion[],
+  ladder: readonly number[],
+): Promise<Uint8Array> {
+  if (vaultSalt.length !== VAULT_SALT_LEN) throw new RangeError('multi-region: bad vault salt');
+  const slotArray = await buildSlotArray(slotEntries);
+  const {
+    blocks: [b0, b1],
+  } = await buildRegionBlocks(live, ladder);
+  return concatBytes(vaultSalt, slotArray, b0, b1);
+}
+
+/**
+ * Plain single-payload multi-region blob (no decoy, no threshold): one live slot,
+ * one real region at a CSPRNG-chosen index, the other region dead. Every gallery
+ * vault uses this in Phase 1 — the 2× cost is mandatory, not optional (§10.9).
+ * Returns the blob plus the live region index and DEK for post-save verification.
+ */
+export async function buildPlainVaultBlobMulti(
+  filename: string,
+  content: Uint8Array,
+  password: string,
+  ladder: readonly number[],
+  params: Argon2Params = DEFAULT_ARGON2,
+  keyFactor: Uint8Array | null = null,
+): Promise<{ blob: Uint8Array; regionIndex: number; dek: Uint8Array }> {
+  const vaultSalt = randomBytes(VAULT_SALT_LEN);
+  const kek = await deriveSlotKek(password, vaultSalt, keyFactor, params);
+  const dek = randomBytes(DEK_LEN);
+  const regionIndex = randomBytes(1)[0]! & 1; // CSPRNG bit: real region equally likely 0 or 1
+  const envelope = await buildPayload(filename, content);
+  const blob = await buildMultiRegionVaultBlob(
+    vaultSalt,
+    [{ kek, dek, regionIndex }],
+    [{ regionIndex, dek, envelope }],
+    ladder,
+  );
+  return { blob, regionIndex, dek };
+}
+
+/** Analytical multi-region blob length for capacity estimates (no crypto run). */
+export function multiRegionBlobLen(
+  env0Len: number,
+  env1Len: number,
+  ladder: readonly number[],
+): number {
+  const l0 = env0Len > 0 ? REGION_LEN_FIELD + env0Len : 0;
+  const l1 = env1Len > 0 ? REGION_LEN_FIELD + env1Len : 0;
+  const R = REGION_OVERHEAD + pickBucket(l0, l1, ladder);
+  return VAULT_SALT_LEN + SLOT_ARRAY_LEN + REGION_COUNT * R;
+}
+
+/** Split a multi-region blob into its fixed sections; validates geometry before use. */
+function splitMultiRegionBlob(blob: Uint8Array): {
+  vaultSalt: Uint8Array;
+  slotArray: Uint8Array;
+  regionArea: Uint8Array;
+  R: number;
+} {
+  const head = VAULT_SALT_LEN + SLOT_ARRAY_LEN;
+  // Two regions, each at least the fixed overhead plus a non-empty bucket.
+  if (blob.length < head + REGION_COUNT * (REGION_OVERHEAD + 1)) {
+    throw new Error('multi-region blob: too short');
+  }
+  const regionArea = blob.subarray(head);
+  if (regionArea.length % REGION_COUNT !== 0) throw new Error('multi-region blob: odd region area');
+  const R = regionArea.length / REGION_COUNT;
+  if (R < REGION_OVERHEAD + 1) throw new Error('multi-region blob: region too small');
+  return {
+    vaultSalt: blob.subarray(0, VAULT_SALT_LEN),
+    slotArray: blob.subarray(VAULT_SALT_LEN, head),
+    regionArea,
+    R,
+  };
+}
+
+/** Decrypt one region block with its independent DEK. */
+async function decodeRegion(
+  regionArea: Uint8Array,
+  R: number,
+  regionIndex: number,
+  dek: Uint8Array,
+  maxContentBytes: number,
+): Promise<{ filename: string; content: Uint8Array }> {
+  const block = regionArea.subarray(regionIndex * R, (regionIndex + 1) * R);
+  const contentSalt = block.subarray(0, CONTENT_SALT_LEN);
+  const iv = block.subarray(CONTENT_SALT_LEN, CONTENT_SALT_LEN + IV_LEN);
+  const ciphertext = block.subarray(CONTENT_SALT_LEN + IV_LEN);
+  const cek = await deriveRegionKey(dek, contentSalt, regionIndex);
+  const plaintext = await decryptBytes(cek, iv, ciphertext);
+  const envelope = parseRegionPlaintext(plaintext, maxContentBytes);
+  return parsePayload(envelope, maxContentBytes);
+}
+
+/**
+ * Decode a multi-region blob with a password: open the slot array (constant-work,
+ * §10.3.1), then decrypt ONLY the one region the credential's slot points at. The
+ * return value carries no region index, slot index, or mode — a plain, duress, and
+ * non-possession unlock are indistinguishable to the caller.
+ */
+export async function decodeMultiRegionVaultBlob(
+  blob: Uint8Array,
+  password: string,
+  opts: {
+    params?: Argon2Params;
+    maxContentBytes: number;
+    keyFactor?: Uint8Array | null;
+    /** Recovered Shamir secret S for a Mode B (threshold-gated) slot (§10.6). */
+    secret?: Uint8Array | null;
+  },
+): Promise<{ filename: string; content: Uint8Array }> {
+  const { vaultSalt, slotArray, regionArea, R } = splitMultiRegionBlob(blob);
+  let candidates: CryptoKey[];
+  try {
+    candidates = await slotKekCandidates(
+      password,
+      vaultSalt,
+      opts.keyFactor ?? null,
+      opts.secret ?? null,
+      opts.params,
+    );
+  } catch {
+    throw new WrongPasswordError();
+  }
+  const { dek, regionIndex } = await openSlotArray(slotArray, candidates);
+  return decodeRegion(regionArea, R, regionIndex, dek, opts.maxContentBytes);
+}
+
+/**
+ * Decode a specific region with an already-known DEK (no password, no Argon2).
+ * Used by post-save verification, which holds the authoring region DEK + index.
+ */
+export async function decodeMultiRegionVaultBlobWithDek(
+  blob: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+  maxContentBytes = MAX_FILE_BYTES_BINARY,
+): Promise<{ filename: string; content: Uint8Array }> {
+  const { regionArea, R } = splitMultiRegionBlob(blob);
+  return decodeRegion(regionArea, R, regionIndex, dek, maxContentBytes);
 }
 
 export async function exportVault(
@@ -435,6 +645,12 @@ function* kSubsets(items: number[], k: number): Generator<number[]> {
  * separately for keyfile/stego/binary-key modes). The 100 MiB cap applies here;
  * there is no image-count ceiling on this path.
  */
+/**
+ * Export the vault as a **branded** `.ssbn` container (§8) — an EXCLUDED path, so
+ * it keeps the single-region v1 geometry with the managed DEK, byte-for-byte
+ * unchanged. The disguised `.db` path is supported by §10 and uses the separate
+ * multi-region function below (it needs the password, not the managed key).
+ */
 export async function exportVaultBinary(
   filename: string,
   content: Uint8Array,
@@ -442,30 +658,110 @@ export async function exportVaultBinary(
   options: { keyMode?: KeyMode; variant?: BinaryVariant; maxBytes?: number } = {},
   onProgress?: OnProgress,
 ): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
+  const variant = options.variant ?? 'branded';
+  if (variant !== 'branded') {
+    // The disguised path is a §10 multi-region container — use exportVaultBinaryDisguised.
+    throw new Error('exportVaultBinary handles only the branded (.ssbn) variant');
+  }
   const maxBytes = options.maxBytes ?? MAX_FILE_BYTES_BINARY;
   if (content.length > maxBytes) {
     throw new FileTooLargeError(content.length, maxBytes);
   }
   const keyMode = options.keyMode ?? 'embedded';
-  const variant = options.variant ?? 'branded';
   const blob = await buildSegmentedBlob(filename, content, key, keyMode, onProgress);
   return { container: wrapBinary(blob, variant), keyMode, keyBlock: key.keyBlock };
 }
 
-/** Restore a file from a binary container produced by exportVaultBinary. */
+/**
+ * Export the vault as a **disguised** `.db` container (§8 + §10): the mandatory
+ * 4-slot / 2-region geometry inside a valid SQLite database. Needs the PASSWORD
+ * (to derive the slot KEK), not the managed DEK — each region gets its own fresh
+ * DEK. `embedded` mode is password-only; `keyfile`/`stego` return a 32-byte key
+ * factor to deliver externally (SPEC §10; keyMode carries no length signal). The
+ * returned `regionIndex` + `dek` are for post-save verification only.
+ */
+export async function exportVaultBinaryDisguised(
+  filename: string,
+  content: Uint8Array,
+  password: string,
+  options: { keyMode?: KeyMode; maxBytes?: number } = {},
+  onProgress?: OnProgress,
+): Promise<{
+  container: Uint8Array;
+  keyMode: KeyMode;
+  keyBlock: Uint8Array;
+  regionIndex: number;
+  dek: Uint8Array;
+}> {
+  const maxBytes = options.maxBytes ?? MAX_FILE_BYTES_BINARY;
+  if (content.length > maxBytes) throw new FileTooLargeError(content.length, maxBytes);
+  const keyMode = options.keyMode ?? 'embedded';
+  // `keyfile` and `stego` both externalise the same 32-byte key factor (§10.3);
+  // they differ only in HOW it is delivered (a raw `.key` vs. hidden in a cover),
+  // which is the caller's job. The core just mints and returns the factor.
+  const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+  let built: { blob: Uint8Array; regionIndex: number; dek: Uint8Array };
+  try {
+    built = await buildPlainSegmentedBlobMulti(
+      filename,
+      content,
+      password,
+      DB_LADDER,
+      DEFAULT_ARGON2,
+      onProgress,
+      DEFAULT_CHUNK_SIZE,
+      keyFactor,
+    );
+  } catch (err) {
+    if (err instanceof BucketTooLargeError) {
+      throw new FileTooLargeError(content.length, DB_LADDER[DB_LADDER.length - 1]!);
+    }
+    throw err;
+  }
+  return {
+    container: wrapBinary(built.blob, 'disguised'),
+    keyMode,
+    keyBlock: keyFactor ?? new Uint8Array(0),
+    regionIndex: built.regionIndex,
+    dek: built.dek,
+  };
+}
+
+/**
+ * Restore a file from a binary container. Geometry is chosen by the recovered
+ * variant, never sniffed (§10 governing decision 2): a disguised `.db` is decoded
+ * as multi-region (opts.keyBlock is the 32-byte key factor for keyfile/stego);
+ * branded `.ssbn` and bare payloads stay single-region (opts.keyBlock is the SSKY
+ * key block).
+ */
 export async function importVaultBinary(
   container: Uint8Array,
   password: string,
-  opts: { keyBlock?: Uint8Array | undefined; maxBytes?: number } = {},
+  opts: {
+    keyBlock?: Uint8Array | undefined;
+    maxBytes?: number;
+    /** Recovered Shamir secret S for a Mode B (threshold-gated) .db vault (§10.6). */
+    secret?: Uint8Array | null;
+  } = {},
   onProgress?: OnProgress,
 ): Promise<{ filename: string; content: Uint8Array }> {
-  // Strip the container; bytes matching neither variant are treated as a bare
-  // blob, letting AES-GCM be the final arbiter of whether they are ours.
-  const blob = unwrapBinary(container)?.payload ?? container;
+  const unwrapped = unwrapBinary(container);
+  const blob = unwrapped?.payload ?? container;
+  const maxContentBytes = opts.maxBytes ?? MAX_FILE_BYTES_BINARY;
+  if (unwrapped?.variant === 'disguised') {
+    return decodeMultiRegionSegmentedBlob(
+      blob,
+      password,
+      { keyFactor: opts.keyBlock ?? null, secret: opts.secret ?? null, maxContentBytes },
+      onProgress,
+    );
+  }
+  // Branded, or bytes matching neither variant (bare blob — AES-GCM is the final
+  // arbiter): single-region geometry.
   return decodeSegmentedBlob(
     blob,
     password,
-    { keyBlock: opts.keyBlock, maxContentBytes: opts.maxBytes ?? MAX_FILE_BYTES_BINARY },
+    { keyBlock: opts.keyBlock, maxContentBytes },
     onProgress,
   );
 }
@@ -538,7 +834,7 @@ export async function verifyImageExport(
   await assertRestores(blob, dek, filename, content);
 }
 
-/** Verify a freshly produced binary/disguised container round-trips. */
+/** Verify a freshly produced branded (.ssbn) container round-trips (single-region). */
 export async function verifyBinaryExport(
   container: Uint8Array,
   dek: CryptoKey,
@@ -550,6 +846,35 @@ export async function verifyBinaryExport(
   let got: { filename: string; content: Uint8Array };
   try {
     got = await decodeSegmentedBlobWithDek(blob, dek, MAX_FILE_BYTES_BINARY, onProgress);
+  } catch {
+    throw new VerificationError();
+  }
+  if (got.filename !== filename || !bytesEqual(got.content, content)) throw new VerificationError();
+}
+
+/**
+ * Verify a freshly produced disguised (.db) container round-trips. Uses the
+ * authoring region DEK + index directly (no password, no Argon2), decoding just
+ * the live region — mirrors `decodeMultiRegionSegmentedBlobWithDek`.
+ */
+export async function verifyDisguisedExport(
+  container: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+  filename: string,
+  content: Uint8Array,
+  onProgress?: OnProgress,
+): Promise<void> {
+  const blob = unwrapBinary(container)?.payload ?? container;
+  let got: { filename: string; content: Uint8Array };
+  try {
+    got = await decodeMultiRegionSegmentedBlobWithDek(
+      blob,
+      dek,
+      regionIndex,
+      MAX_FILE_BYTES_BINARY,
+      onProgress,
+    );
   } catch {
     throw new VerificationError();
   }

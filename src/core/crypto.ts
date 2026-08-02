@@ -75,9 +75,22 @@ export const DEFAULT_ARGON2: Argon2Params = {
   parallelism: 1,
 };
 
-/** Cryptographically secure random bytes. */
+/**
+ * Cryptographically secure random bytes. `getRandomValues` caps at 65536 bytes
+ * per call, so larger requests (e.g. filling a dead region up to the .db bucket
+ * ceiling, §10.4) are filled in windows.
+ */
 export function randomBytes(len: number): Uint8Array {
-  return globalThis.crypto.getRandomValues(new Uint8Array(len));
+  const out = new Uint8Array(len);
+  const MAX = 65536;
+  if (len <= MAX) {
+    globalThis.crypto.getRandomValues(out);
+    return out;
+  }
+  for (let off = 0; off < len; off += MAX) {
+    globalThis.crypto.getRandomValues(out.subarray(off, Math.min(off + MAX, len)));
+  }
+  return out;
 }
 
 /**
@@ -410,4 +423,385 @@ export async function rewrapKeyBlock(
   const kek = await deriveKEK(newPassword, salt, params);
   const { iv, wrapped } = await wrapDEK(dek, kek);
   return { salt, params, iv, wrapped };
+}
+
+// --- Access structures: key-slot array (SPEC §10.3) --------------------------
+//
+// On the gallery and .db paths a container carries a fixed array of SLOT_COUNT
+// key slots over REGION_COUNT payload regions, instead of the single 92-byte
+// "SSKY" key block above. Each live slot AES-GCM-wraps an INDEPENDENT per-region
+// DEK plus the index of the region it unlocks; dead slots are indistinguishable
+// CSPRNG. The array is magicless — the geometry is known from the decode
+// entrypoint (a gallery decode / a `.db` variant), never read from a byte, so no
+// field can distinguish a decoy container from a plain one (§10.2).
+
+/** Slots and regions are fixed constants for ALL containers on the two paths. */
+export const SLOT_COUNT = 4;
+export const REGION_COUNT = 2;
+/** Slot plaintext: dek[32] || region_index[1] || reserved[15] (zero on write). */
+export const SLOT_PLAINTEXT_LEN = DEK_LEN + 1 + 15; // 48
+const REGION_INDEX_OFF = DEK_LEN; // 32
+/** Serialized slot: nonce[12] || AES-GCM(plaintext = 48) → ct[48]+tag[16] = 64. */
+export const SLOT_SIZE = IV_LEN + SLOT_PLAINTEXT_LEN + GCM_TAG_LEN; // 76
+export const SLOT_ARRAY_LEN = SLOT_COUNT * SLOT_SIZE; // 304
+/** Per-vault salt for the slot KEK(s). Reuses the 16-byte salt convention. */
+export const VAULT_SALT_LEN = SALT_LEN; // 16
+
+const EMPTY_AAD = new Uint8Array(0);
+const REGION_INFO_PREFIX = new TextEncoder().encode('stegoshard/vault/region');
+const KEYFILE_KEK_INFO = new TextEncoder().encode('stegoshard/v1/keyfile-kek');
+const SLOT_KEK_INFO = new TextEncoder().encode('stegoshard/v1/slot-kek');
+/**
+ * Length of the external key factor (the keyfile / stego secret) mixed into the
+ * slot KEK on the multi-region paths. A fresh random 32-byte secret, delivered as
+ * a `.key` file or hidden in a cover image — it looks like random bytes, unlike
+ * the old serialized key block, which aids the deniability it serves.
+ */
+export const KEY_FACTOR_LEN = 32;
+
+// --- Stego key-factor envelope (SSKF) ----------------------------------------
+//
+// When the external key factor is delivered by stego (hidden in a cover photo)
+// rather than a raw `.key` file, it needs the same wrong-password-indistinguish-
+// able self-check the 92-byte key block has: after de-whitening, a wrong password
+// yields random bytes, so extraction must be able to tell "this is a factor" from
+// "this is noise". A raw 32-byte factor has no such structure, so stego wraps it
+// in a fixed, magic-framed envelope. (The `.key` file stays the bare 32 bytes —
+// on disk a magic would be a distinguisher; under stego the whole envelope is
+// whitened, so its structure never appears on the wire.)
+const KEY_FACTOR_MAGIC = Uint8Array.from([0x53, 0x53, 0x4b, 0x46]); // "SSKF"
+const KEY_FACTOR_BLOCK_VERSION = 1;
+/** Fixed length of the SSKF envelope: magic(4) + version(1) + factor(32) = 37. */
+export const KEY_FACTOR_BLOCK_LEN = KEY_FACTOR_MAGIC.length + 1 + KEY_FACTOR_LEN;
+
+/** Wrap a raw 32-byte key factor in the fixed, self-validating SSKF envelope. */
+export function serializeKeyFactorBlock(factor: Uint8Array): Uint8Array {
+  if (factor.length !== KEY_FACTOR_LEN) throw new RangeError('key factor: bad length');
+  return concatBytes(KEY_FACTOR_MAGIC, Uint8Array.of(KEY_FACTOR_BLOCK_VERSION), factor);
+}
+
+/**
+ * Recover the 32-byte factor from an SSKF envelope, or null when the bytes are
+ * not one (a wrong stego password de-whitens to noise → reported as "no factor
+ * here", indistinguishable from a cover that never carried one).
+ */
+export function parseKeyFactorBlock(bytes: Uint8Array): Uint8Array | null {
+  if (bytes.length !== KEY_FACTOR_BLOCK_LEN) return null;
+  for (let i = 0; i < KEY_FACTOR_MAGIC.length; i++) {
+    if (bytes[i] !== KEY_FACTOR_MAGIC[i]) return null;
+  }
+  if (bytes[KEY_FACTOR_MAGIC.length] !== KEY_FACTOR_BLOCK_VERSION) return null;
+  return bytes.slice(KEY_FACTOR_MAGIC.length + 1);
+}
+
+/** Import raw key bytes as a non-extractable AES-GCM key. */
+export function importAesGcmKey(raw: Uint8Array): Promise<CryptoKey> {
+  return subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+}
+
+/**
+ * Derive the raw KEK bytes (Argon2id output) from a password + per-vault salt.
+ * Unlike `deriveKEK` (which imports and zeroizes), this hands back the 32 raw
+ * bytes so a caller can both import an AES-GCM key AND feed them to `gateKek`
+ * (SPEC §10.6.2) — running Argon2id exactly once per candidate. The caller MUST
+ * zeroize the returned buffer.
+ */
+export async function deriveKekBytes(
+  password: string,
+  salt: Uint8Array,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<Uint8Array> {
+  return (await argon2id({
+    password: normalizePassword(password),
+    salt,
+    parallelism: params.parallelism,
+    iterations: params.iterations,
+    memorySize: params.memoryKiB,
+    hashLength: DEK_LEN,
+    outputType: 'binary',
+  })) as Uint8Array;
+}
+
+/**
+ * Derive the slot-array KEK from a password (Argon2id, run exactly once) plus an
+ * OPTIONAL external key factor (a random keyfile / stego secret) mixed in via HKDF
+ * for domain separation. With no factor this is the password-only ("embedded")
+ * KEK. The slot KEK's Argon2 parameters are the frozen DEFAULT_ARGON2 and are NOT
+ * stored in the container (like the gallery/stego keys) — the geometry carries no
+ * cost field, so the decoder uses the same frozen cost.
+ */
+/**
+ * The RAW base slot-KEK bytes: Argon2id(password, vault_salt) run ONCE, plus an
+ * optional keyfile/stego factor mixed in via HKDF. The caller MUST zeroize the
+ * returned buffer. Used both to import the ungated KEK and to feed `gateKek`
+ * (SPEC §10.6.2), so Argon2id never runs more than once per unlock.
+ */
+export async function slotKekRaw(
+  password: string,
+  vaultSalt: Uint8Array,
+  keyFactor: Uint8Array | null,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<Uint8Array> {
+  const kekBytes = await deriveKekBytes(password, vaultSalt, params);
+  if (!keyFactor) return kekBytes;
+  const mixed = await hkdf(concatBytes(kekBytes, keyFactor), KEYFILE_KEK_INFO, DEK_LEN, vaultSalt);
+  kekBytes.fill(0);
+  return mixed;
+}
+
+export async function deriveSlotKek(
+  password: string,
+  vaultSalt: Uint8Array,
+  keyFactor: Uint8Array | null,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<CryptoKey> {
+  const raw = await slotKekRaw(password, vaultSalt, keyFactor, params);
+  const key = await importAesGcmKey(raw);
+  raw.fill(0);
+  return key;
+}
+
+/**
+ * Gate a base KEK on threshold material (SPEC §10.6.2): the slot KEK becomes
+ * HKDF-SHA256(ikm = baseKek || secret, salt = vault_salt, info = "…/v1/slot-kek").
+ * HKDF (not XOR) for domain separation and to avoid any algebraic relation between
+ * the gated and ungated KEK. `secret` is the recovered Shamir S (§10.6.1).
+ */
+export async function gateKek(
+  baseKek: Uint8Array,
+  secret: Uint8Array,
+  vaultSalt: Uint8Array,
+): Promise<CryptoKey> {
+  const gated = await hkdf(concatBytes(baseKek, secret), SLOT_KEK_INFO, DEK_LEN, vaultSalt);
+  const key = await importAesGcmKey(gated);
+  gated.fill(0);
+  return key;
+}
+
+/**
+ * Candidate slot KEKs for an unlock: the ungated KEK, plus — when threshold
+ * material is supplied — the gated KEK, derived from the SAME single Argon2id
+ * output. So a with-shares unlock adds only cheap HKDF over a without-shares one,
+ * preserving the constant-work timing property (§10.3.1). Sub-threshold shares
+ * yield a wrong `secret` → a wrong gated KEK → no slot opens (inability, §10.6.1).
+ */
+export async function slotKekCandidates(
+  password: string,
+  vaultSalt: Uint8Array,
+  keyFactor: Uint8Array | null,
+  secret: Uint8Array | null,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<CryptoKey[]> {
+  // Argon2id runs EXACTLY ONCE; every candidate below is a cheap HKDF/import over
+  // its output, so the constant-work timing property is Argon2-bound (§10.4).
+  const kekBytes = await deriveKekBytes(password, vaultSalt, params);
+  // Base KEKs to attempt: the password-only KEK, and — when a factor is supplied —
+  // the factor-mixed KEK. BOTH are offered because a duress decoy slot (§10.9) is
+  // sealed WITHOUT the factor while the real slot is sealed WITH it, and restore
+  // presents the factor for either credential (it can't know which region a
+  // credential opens, nor that a `.key`/cover sitting beside the vault is only for
+  // the real region). Offering the no-factor base keeps the decoy openable even
+  // when the factor is present. The extra base matches nothing in plain/Mode B (no
+  // no-factor live slot exists there), so it is harmless; credential independence
+  // (§10.9) guarantees the real and decoy KEKs never both match.
+  const bases: Uint8Array[] = [kekBytes];
+  if (keyFactor) {
+    bases.push(await hkdf(concatBytes(kekBytes, keyFactor), KEYFILE_KEK_INFO, DEK_LEN, vaultSalt));
+  }
+  const candidates: CryptoKey[] = [];
+  for (const base of bases) {
+    candidates.push(await importAesGcmKey(base));
+    if (secret) candidates.push(await gateKek(base, secret, vaultSalt));
+  }
+  for (const base of bases) base.fill(0);
+  return candidates;
+}
+
+/**
+ * Derive a per-region content key from that region's INDEPENDENT DEK. A distinct
+ * `info` label per region gives domain separation even in the (single-real-region)
+ * case where a DEK is not shared; `salt` is the region's own content salt. The
+ * raw DEK never leaves this function. Frozen format; mirrored by the Python decoder.
+ */
+export async function deriveRegionKey(
+  dek: Uint8Array,
+  salt: Uint8Array,
+  regionIndex: number,
+): Promise<CryptoKey> {
+  const info = concatBytes(REGION_INFO_PREFIX, Uint8Array.of(regionIndex));
+  const cekBytes = await hkdf(dek, info, DEK_LEN, salt);
+  const key = await importAesGcmKey(cekBytes);
+  cekBytes.fill(0);
+  return key;
+}
+
+/**
+ * Seal one slot: nonce[12] || AES-GCM_kek(dek[32] || region_index[1] ||
+ * reserved[15]). `region_index` is authenticated by the GCM tag, so an adversary
+ * cannot redirect a slot to another region by editing the container (§10.3 rule 3).
+ * The 12-byte nonce is caller-supplied (fresh per slot on write; explicit bytes
+ * for deterministic test vectors).
+ */
+export async function serializeSlot(
+  kek: CryptoKey,
+  nonce: Uint8Array,
+  dek: Uint8Array,
+  regionIndex: number,
+): Promise<Uint8Array> {
+  if (nonce.length !== IV_LEN) throw new RangeError('slot: bad nonce length');
+  if (dek.length !== DEK_LEN) throw new RangeError('slot: bad dek length');
+  const pt = new Uint8Array(SLOT_PLAINTEXT_LEN); // reserved bytes stay zero
+  pt.set(dek, 0);
+  pt[REGION_INDEX_OFF] = regionIndex;
+  const sealed = await aeadSeal(kek, nonce, pt, EMPTY_AAD);
+  pt.fill(0); // zeroize the transient plaintext DEK
+  return concatBytes(nonce, sealed);
+}
+
+/** A live slot to write: a KEK that wraps `dek`, which unlocks `regionIndex`. */
+export interface SlotEntry {
+  kek: CryptoKey;
+  dek: Uint8Array;
+  regionIndex: number;
+}
+
+/**
+ * Build the fixed SLOT_ARRAY_LEN slot array. Live entries are sealed with fresh
+ * CSPRNG nonces; the remaining slots are filled from the CSPRNG (a random 76-byte
+ * block is indistinguishable from a live slot without the KEK); then ALL slots are
+ * shuffled by an unbiased permutation, so slot position carries no meaning.
+ */
+export async function buildSlotArray(entries: SlotEntry[]): Promise<Uint8Array> {
+  if (entries.length < 1 || entries.length > SLOT_COUNT) {
+    throw new RangeError(`slot array: ${entries.length} live entries (want 1..${SLOT_COUNT})`);
+  }
+  const slots: Uint8Array[] = [];
+  for (const e of entries) {
+    if (e.regionIndex < 0 || e.regionIndex >= REGION_COUNT) {
+      throw new RangeError(`slot: region index ${e.regionIndex} out of range`);
+    }
+    slots.push(await serializeSlot(e.kek, randomBytes(IV_LEN), e.dek, e.regionIndex));
+  }
+  while (slots.length < SLOT_COUNT) slots.push(randomBytes(SLOT_SIZE));
+  secureShuffle(slots);
+  return concatBytes(...slots);
+}
+
+/**
+ * Try to open one 76-byte slot with a candidate KEK. Non-throwing: a GCM auth
+ * failure (wrong KEK, or a dead/random slot) returns null. Validates the region
+ * index. Returns the recovered independent DEK and its region index on success.
+ */
+export async function tryOpenSlot(
+  kek: CryptoKey,
+  slot: Uint8Array,
+): Promise<{ dek: Uint8Array; regionIndex: number } | null> {
+  if (slot.length !== SLOT_SIZE) return null;
+  const nonce = slot.subarray(0, IV_LEN);
+  const sealed = slot.subarray(IV_LEN);
+  let pt: Uint8Array;
+  try {
+    pt = await aeadOpen(kek, nonce, sealed, EMPTY_AAD);
+  } catch {
+    return null;
+  }
+  if (pt.length !== SLOT_PLAINTEXT_LEN) {
+    pt.fill(0);
+    return null;
+  }
+  const regionIndex = pt[REGION_INDEX_OFF]!;
+  if (regionIndex >= REGION_COUNT) {
+    pt.fill(0);
+    return null;
+  }
+  const dek = pt.slice(0, DEK_LEN);
+  pt.fill(0);
+  return { dek, regionIndex };
+}
+
+/**
+ * Constant-work slot open (SPEC §10.3.1). Attempts EVERY candidate KEK against
+ * EVERY slot with no early exit, so total work depends only on the number of
+ * candidate KEKs — never on which slot matched or whether any did. A well-formed
+ * container yields exactly one match; zero (wrong credential) and more than one
+ * (malformed — fail closed) both surface as the single uniform `WrongPasswordError`,
+ * leaking nothing about the cause, which slot index matched, or the region.
+ */
+export async function openSlotArray(
+  slotArray: Uint8Array,
+  candidateKeks: CryptoKey[],
+): Promise<{ dek: Uint8Array; regionIndex: number }> {
+  if (slotArray.length !== SLOT_ARRAY_LEN) throw new WrongPasswordError();
+  let found: { dek: Uint8Array; regionIndex: number } | null = null;
+  let matches = 0;
+  for (const kek of candidateKeks) {
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const slot = slotArray.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE);
+      const opened = await tryOpenSlot(kek, slot); // never throws; no early exit
+      if (opened) {
+        matches++;
+        if (!found) found = opened;
+      }
+    }
+  }
+  if (matches !== 1 || !found) throw new WrongPasswordError();
+  return found;
+}
+
+/**
+ * Unlock a slot array from a password: derive one KEK (Argon2id runs ONCE) over
+ * the shared per-vault salt and open the array. Salt reuse across slots is sound —
+ * the per-vault CSPRNG salt already defeats cross-vault precomputation, and
+ * distinct passwords yield distinct KEKs regardless. Any failure maps to the
+ * uniform `WrongPasswordError`. For the threshold (Mode B) path a caller instead
+ * derives the candidate list itself (via `deriveKekBytes` + `gateKek`) and calls
+ * `openSlotArray` directly, so Argon2id still runs exactly once.
+ */
+export async function unlockSlotArray(
+  slotArray: Uint8Array,
+  vaultSalt: Uint8Array,
+  password: string,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<{ dek: Uint8Array; regionIndex: number }> {
+  let kekBytes: Uint8Array;
+  try {
+    kekBytes = await deriveKekBytes(password, vaultSalt, params);
+  } catch {
+    throw new WrongPasswordError();
+  }
+  try {
+    const kek = await importAesGcmKey(kekBytes);
+    return await openSlotArray(slotArray, [kek]);
+  } finally {
+    kekBytes.fill(0);
+  }
+}
+
+/**
+ * Unbiased in-place Fisher–Yates shuffle using rejection-sampled indices from the
+ * CSPRNG, so live-slot position is uniform over authorings (a biased shuffle would
+ * leak the live slot's location — §10.10 slot-randomness test).
+ */
+export function secureShuffle<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomIntBelow(i + 1);
+    const tmp = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = tmp;
+  }
+}
+
+/** Uniform integer in [0, n) via rejection sampling over a u32 (no modulo bias). */
+function randomIntBelow(n: number): number {
+  if (n <= 0) throw new RangeError('randomIntBelow: n must be positive');
+  if (n === 1) return 0;
+  const limit = Math.floor(0x1_0000_0000 / n) * n; // largest multiple of n ≤ 2^32
+  for (;;) {
+    const b = randomBytes(4);
+    const v = ((b[0]! << 24) | (b[1]! << 16) | (b[2]! << 8) | b[3]!) >>> 0;
+    if (v < limit) return v % n;
+  }
 }

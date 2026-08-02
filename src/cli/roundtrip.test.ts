@@ -260,6 +260,45 @@ describe('CLI round-trips', () => {
     expect([...readFileSync(outPath)]).toEqual([...content]);
   });
 
+  it(
+    'binary disguised stego: .db vault + key factor hidden in a cover → restore',
+    SLOW,
+    async () => {
+      const dir = tmp();
+      const content = pattern(2000, 41);
+      const input = writeSecret(dir, content);
+      const cover = writeCover(dir); // named cover.png
+      const { files } = await runSave({
+        inputFile: input,
+        outDir: join(dir, 'out'),
+        password: PW,
+        paper: false,
+        zip: false,
+        binary: 'disguised',
+        keyMode: 'stego',
+        cover,
+      });
+      const vault = files.find((f) => f.endsWith('cache.db'))!;
+      // The stego key image keeps the cover's own filename (blends into a photo roll).
+      const keyImage = files.find((f) => f.endsWith('cover.png'))!;
+      expect(vault).toBeTruthy();
+      expect(keyImage).toBeTruthy();
+
+      // Vault alone → cannot restore (the 32-byte factor is not in the .db).
+      await expect(
+        runRestore({ inputs: [vault], outDir: join(dir, 'r1'), password: PW }),
+      ).rejects.toBeTruthy();
+
+      const { outPath } = await runRestore({
+        inputs: [vault],
+        outDir: join(dir, 'r2'),
+        password: PW,
+        keyPath: keyImage,
+      });
+      expect([...readFileSync(outPath)]).toEqual([...content]);
+    },
+  );
+
   it('warns when a secret over 256 KiB is saved as images', SLOW, async () => {
     const dir = tmp();
     // Over the warn threshold by raw size, but highly compressible so it still

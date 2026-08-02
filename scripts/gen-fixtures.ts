@@ -19,12 +19,19 @@ import {
   binaryVaultName,
   createKeyBlock,
   DEFAULT_ARGON2,
+  DB_LADDER,
+  KEY_FACTOR_LEN,
+  buildNonPossessionSegmentedBlob,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  embedKeyFactorStego,
+  estimateGalleryCovers,
   galleryEncode,
+  randomBytes,
   serializeKeyBlock,
   exportVault,
   exportVaultBinary,
+  exportVaultBinaryDisguised,
   getCodec,
   decodeHeader,
   PROFILE_DISK,
@@ -105,8 +112,13 @@ async function generateGallery(
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
 
+  // A small gallery secret so the §10 2× geometry needs a modest photo count.
+  const gallerySecret = pseudoRandom(300, 0x600d);
+  // Provision enough covers for the multi-region carrier + decoy floor (+2 spare
+  // so the "drop some photos" conformance test still leaves ≥ k carriers).
+  const { needed } = await estimateGalleryCovers(FILENAME, gallerySecret, 'embedded');
   const covers: GalleryCover[] = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < needed + 2; i++) {
     if (coverJpeg) {
       covers.push({
         kind: 'jpeg',
@@ -124,9 +136,22 @@ async function generateGallery(
     }
   }
 
-  const res = await galleryEncode(FILENAME, content, PASSWORD, covers, { keyMode });
-  // Keyfile gallery: the key block is delivered separately, not embedded.
+  const res = await galleryEncode(FILENAME, gallerySecret, PASSWORD, covers, { keyMode });
+  // Keyfile gallery: the 32-byte key factor is delivered separately as a raw .key.
   if (keyMode === 'keyfile') writeFileSync(join(dir, 'vault.key'), res.keyBlock);
+  // Stego gallery: the 32-byte key factor is hidden in a separate cover photo
+  // (SSKF envelope, §10.3), keyed by the password.
+  if (keyMode === 'stego') {
+    const w = 256;
+    const h = 256;
+    const keyCover = makeRgbaCover(w, h, 0x5150);
+    await embedKeyFactorStego(keyCover, w, h, res.keyBlock, PASSWORD, DEFAULT_ARGON2);
+    writePng(join(dir, 'key-cover.png'), {
+      data: new Uint8ClampedArray(keyCover),
+      width: w,
+      height: h,
+    });
+  }
   res.images.forEach((img, i) => {
     const idx = String(i + 1).padStart(2, '0');
     if (img.kind === 'jpeg') {
@@ -145,7 +170,7 @@ async function generateGallery(
     // drain the position keystream. The decoder must skip it, not abort.
     writeFileSync(join(dir, 'foreign.jpg'), makeJpegCover(112, 112, 0x333));
   }
-  writeFileSync(join(dir, 'expected.bin'), content);
+  writeFileSync(join(dir, 'expected.bin'), gallerySecret);
   writeFileSync(
     join(dir, 'manifest.json'),
     JSON.stringify(
@@ -240,17 +265,40 @@ async function generateBinary(
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
 
-  const key = await makeKey();
-  const { container, keyBlock } = await exportVaultBinary(FILENAME, content, key, {
-    keyMode,
-    variant,
-  });
+  // Disguised .db is a §10 multi-region container keyed by the password; branded
+  // .ssbn is the excluded single-region path keyed by the managed key.
+  let container: Uint8Array;
+  let keyBlock: Uint8Array;
+  if (variant === 'disguised') {
+    ({ container, keyBlock } = await exportVaultBinaryDisguised(FILENAME, content, PASSWORD, {
+      keyMode,
+    }));
+  } else {
+    const key = await makeKey();
+    ({ container, keyBlock } = await exportVaultBinary(FILENAME, content, key, {
+      keyMode,
+      variant,
+    }));
+  }
   const vaultName = binaryVaultName(variant);
   writeFileSync(join(dir, vaultName), container);
   let keyName: string | undefined;
   if (keyMode === 'keyfile') {
     keyName = binaryKeyName(variant);
     writeFileSync(join(dir, keyName), wrapBinary(keyBlock, variant));
+  } else if (keyMode === 'stego') {
+    // Disguised .db is a multi-region path → the external artifact is the 32-byte
+    // key factor, hidden in a cover photo (SSKF, §10.3), keyed by the password.
+    const w = 256;
+    const h = 256;
+    const keyCover = makeRgbaCover(w, h, 0x5250);
+    await embedKeyFactorStego(keyCover, w, h, keyBlock, PASSWORD, DEFAULT_ARGON2);
+    keyName = 'key-cover.png';
+    writePng(join(dir, keyName), {
+      data: new Uint8ClampedArray(keyCover),
+      width: w,
+      height: h,
+    });
   }
   writeFileSync(join(dir, 'expected.bin'), content);
   writeFileSync(
@@ -264,6 +312,55 @@ async function generateBinary(
   console.log(`fixture ${name}: binary ${variant}, keyMode=${keyMode}`);
 }
 
+/**
+ * A disguised .db in NON-POSSESSION (Mode B) + STEGO: the real region is gated on
+ * BOTH the Shamir secret S (recovered from `k` shares) AND the 32-byte key factor
+ * hidden in a cover photo. Proves the factor + threshold layers compose across
+ * implementations (Python must recover S from the shares, extract the factor from
+ * the cover, and open the slot with both).
+ */
+async function generateDisguisedNpStego(name: string, content: Uint8Array): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const k = 2;
+  const n = 3;
+  const keyFactor = randomBytes(KEY_FACTOR_LEN);
+  const { blob, shares } = await buildNonPossessionSegmentedBlob(
+    FILENAME,
+    content,
+    PASSWORD,
+    k,
+    n,
+    DB_LADDER,
+    DEFAULT_ARGON2,
+    undefined,
+    undefined,
+    keyFactor,
+  );
+  const vaultName = binaryVaultName('disguised');
+  writeFileSync(join(dir, vaultName), wrapBinary(blob, 'disguised'));
+  // Raw 38-byte Shamir shares — the Python test parses + recovers S from any k.
+  shares.forEach((s, i) => writeFileSync(join(dir, `share-${i + 1}.bin`), s));
+  // The key factor, hidden in a cover photo (SSKF), keyed by the password.
+  const w = 256;
+  const h = 256;
+  const keyCover = makeRgbaCover(w, h, 0x5350);
+  await embedKeyFactorStego(keyCover, w, h, keyFactor, PASSWORD, DEFAULT_ARGON2);
+  writePng(join(dir, 'key-cover.png'), {
+    data: new Uint8ClampedArray(keyCover),
+    width: w,
+    height: h,
+  });
+  writeFileSync(join(dir, 'expected.bin'), content);
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify({ password: PASSWORD, filename: FILENAME, k, n, vault: vaultName }, null, 2),
+  );
+  console.log(`fixture ${name}: disguised non-possession + stego (k=${k} n=${n})`);
+}
+
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
 await generate('keyfile', 'keyfile', content);
@@ -274,4 +371,7 @@ await generateBinary('binary-disguised', 'keyfile', 'disguised', content);
 await generateGallery('gallery-png', false);
 await generateGallery('gallery-jpeg', true);
 await generateGallery('gallery-keyfile', false, 'keyfile');
+await generateGallery('gallery-stego', false, 'stego');
+await generateBinary('binary-disguised-stego', 'stego', 'disguised', content);
+await generateDisguisedNpStego('binary-disguised-np-stego', content);
 console.log(`fixtures written to ${outRoot}`);

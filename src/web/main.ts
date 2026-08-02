@@ -10,7 +10,7 @@
 import { createKeyBlock, serializeKeyBlock, type KeyMode, type VaultKey } from '@core';
 import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import { type Estimates, computeEstimates, formatSize } from '../ui/estimate';
-import { runSave, type SaveRequest, type StegoInput } from '../ui/save-controller';
+import { runSave, type AccessMode, type SaveRequest, type StegoInput } from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
@@ -56,6 +56,17 @@ const galleryStegoFields = el('gallery-stego-fields');
 const galleryCover = el<HTMLInputElement>('gallery-cover');
 const galleryCoverDrop = el('gallery-cover-drop');
 const galleryCoverName = el('gallery-cover-name');
+const modeFields = el('mode-fields');
+const modeDuressLabel = el('mode-duress-label');
+const duressFields = el('duress-fields');
+const duressPw = el<HTMLInputElement>('duress-pw');
+const decoyDrop = el('decoy-drop');
+const decoyName = el('decoy-name');
+const decoyFile = el<HTMLInputElement>('decoy-file');
+const thresholdFields = el('threshold-fields');
+const thresholdK = el<HTMLInputElement>('threshold-k');
+const thresholdN = el<HTMLInputElement>('threshold-n');
+const factorDuressHint = el('factor-duress-hint');
 const addBand = el<HTMLInputElement>('add-band');
 const addBandLabel = el('add-band-label');
 const bandFields = el('band-fields');
@@ -79,6 +90,9 @@ const restoreDzFile = el('restore-dz-file');
 const restoreKey = el<HTMLInputElement>('restore-key');
 const keyDrop = el('key-drop');
 const keyDzFile = el('key-dz-file');
+const restoreShares = el<HTMLInputElement>('restore-shares');
+const sharesDrop = el('shares-drop');
+const sharesDzFile = el('shares-dz-file');
 const cameraCaptured = el('camera-captured');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
@@ -94,6 +108,17 @@ const selectedDest = () => pick<Dest>('dest', 'disk');
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
 const selectedGalleryKeyMode = () => pick<KeyMode>('gallery-keymode', 'embedded');
 const selectedRestoreMode = () => pick<RestoreMode>('restore-mode', 'standard');
+const selectedAccessMode = () => pick<AccessMode>('accessmode', 'plain');
+
+/** Read + validate the k-of-n threshold; null if either field is out of range. */
+function readThreshold(): { k: number; n: number } | undefined {
+  const k = Number(thresholdK.value);
+  const n = Number(thresholdN.value);
+  if (!Number.isInteger(k) || !Number.isInteger(n) || k < 1 || n < 1 || k > n || n > 255) {
+    return undefined;
+  }
+  return { k, n };
+}
 
 function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputElement): void {
   const file = input.files?.[0];
@@ -107,14 +132,36 @@ function reflectDestination(): void {
   // Gallery has its own key mode + password; the band/zip/estimate don't apply
   // to it (nor to binary/sqlite, which are single opaque files).
   show(galleryFields, gallery);
+  // The .db path offers key-mode delivery (embedded / keyfile / stego) in every
+  // access mode — the factor is an extra layer on top of the mode (§10.3).
   show(keymodeFields, !gallery);
   show(estimateLine, !gallery);
   show(zipField, dest === 'disk');
   show(addBandLabel, dest === 'disk');
   show(bandFields, dest === 'paper' || (dest === 'disk' && addBand.checked));
   show(paperFields, dest === 'paper');
+  // §10 access modes live on the deniable paths only (gallery + .db). Duress is
+  // .db-only (gallery's winnowing key is password-derived), so hide that radio
+  // for gallery and snap a stale duress selection back to plain.
+  const modeCapable = gallery || dest === 'sqlite';
+  show(modeFields, modeCapable);
+  show(modeDuressLabel, dest === 'sqlite');
+  if (!modeCapable || (gallery && selectedAccessMode() === 'duress')) {
+    const plain = document.querySelector<HTMLInputElement>(
+      'input[name="accessmode"][value="plain"]',
+    );
+    if (plain) plain.checked = true;
+  }
+  reflectAccessMode();
   reflectKeyMode();
   reflectGalleryKeyMode();
+}
+
+/** Reveal the duress / threshold inputs for the selected access mode. */
+function reflectAccessMode(): void {
+  const mode = selectedAccessMode();
+  show(duressFields, mode === 'duress');
+  show(thresholdFields, mode === 'nonpossession');
 }
 
 // Cached per-file availability, so switching destination doesn't recompress.
@@ -169,7 +216,14 @@ function renderEstimate(): void {
 }
 
 function reflectKeyMode(): void {
-  show(stegoFields, selectedDest() !== 'gallery' && selectedKeyMode() === 'stego');
+  const dest = selectedDest();
+  show(stegoFields, dest !== 'gallery' && selectedKeyMode() === 'stego');
+  // A duress .db with a key-file/stego factor: that factor protects the REAL file
+  // only — the decoy still opens on the duress password alone.
+  show(
+    factorDuressHint,
+    dest === 'sqlite' && selectedAccessMode() === 'duress' && selectedKeyMode() !== 'embedded',
+  );
 }
 
 /** Gallery has its own key mode; show its stego cover picker only for stego. */
@@ -200,6 +254,10 @@ for (const r of document.querySelectorAll('input[name="keymode"]')) {
 for (const r of document.querySelectorAll('input[name="gallery-keymode"]')) {
   r.addEventListener('change', reflectGalleryKeyMode);
 }
+for (const r of document.querySelectorAll('input[name="accessmode"]')) {
+  // On .db, key-mode availability depends on the access mode; recompute the view.
+  r.addEventListener('change', reflectDestination);
+}
 for (const r of document.querySelectorAll('input[name="restore-mode"]')) {
   r.addEventListener('change', reflectRestoreMode);
 }
@@ -216,10 +274,14 @@ wireDropzone(galleryCoversDrop, galleryCovers, () =>
 wireDropzone(galleryCoverDrop, galleryCover, () =>
   reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
 );
+wireDropzone(decoyDrop, decoyFile, () => reflectFile(decoyDrop, decoyName, decoyFile));
 wireDropzone(restoreDrop, restoreFiles, () =>
   reflectFile(restoreDrop, restoreDzFile, restoreFiles),
 );
 wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
+wireDropzone(sharesDrop, restoreShares, () =>
+  reflectFiles(sharesDrop, sharesDzFile, restoreShares),
+);
 
 // Subscribers notified whenever the capture count changes (e.g. the wizard).
 const cameraCountSubs: ((count: number) => void)[] = [];
@@ -260,6 +322,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     saveResultNote.textContent = note;
     show(saveResult, true);
     savePw.value = ''; // don't leave the secret in the field after use
+    duressPw.value = '';
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -284,6 +347,15 @@ saveBtn.addEventListener('click', async () => {
       if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
       gStego = { cover, password: savePw.value };
     }
+    // Gallery supports plain + non-possession (duress is snapped to plain by the
+    // destination guard, so it never reaches here).
+    const gMode = selectedAccessMode();
+    let gThreshold: { k: number; n: number } | undefined;
+    if (gMode === 'nonpossession') {
+      const t = readThreshold();
+      if (!t) return setStatus(saveStatus, msg('errNoThreshold'), true);
+      gThreshold = t;
+    }
     await doSave(async () => ({
       dest,
       file,
@@ -291,15 +363,34 @@ saveBtn.addEventListener('click', async () => {
       galleryPassword: savePw.value,
       keyMode: gKeyMode,
       stego: gStego,
+      accessMode: gMode === 'duress' ? 'plain' : gMode,
+      threshold: gThreshold,
     }));
     return;
   }
 
+  // §10 access mode for the disguised .db path (other dests stay plain).
+  const accessMode = dest === 'sqlite' ? selectedAccessMode() : 'plain';
+  let duressPassword: string | undefined;
+  let decoy: File | undefined;
+  let threshold: { k: number; n: number } | undefined;
+  if (accessMode === 'duress') {
+    const d = decoyFile.files?.[0];
+    if (!duressPw.value || !d) return setStatus(saveStatus, msg('errDuressInputs'), true);
+    duressPassword = duressPw.value;
+    decoy = d;
+  } else if (accessMode === 'nonpossession') {
+    const t = readThreshold();
+    if (!t) return setStatus(saveStatus, msg('errNoThreshold'), true);
+    threshold = t;
+  }
+
+  // key-file / stego delivery composes with every .db access mode (§10.3).
   const keyMode = selectedKeyMode();
   const cover = coverFile.files?.[0];
   if (keyMode === 'stego' && !cover) return setStatus(saveStatus, msg('errNoCover'), true);
   // On the web the vault key is minted from the save password, so the stego
-  // password is that same password (no separate managed key to reconcile with).
+  // password is that same password (also the .db per-save password on that path).
   const stego: StegoInput | undefined =
     keyMode === 'stego' && cover ? { cover, password: savePw.value } : undefined;
   const date = new Date().toISOString().slice(0, 10);
@@ -310,7 +401,13 @@ saveBtn.addEventListener('click', async () => {
     dest,
     file,
     key: await makeKey(savePw.value),
+    // The disguised .db path derives its slot KEK from the per-save password.
+    password: dest === 'sqlite' ? savePw.value : undefined,
     keyMode,
+    accessMode,
+    duressPassword,
+    decoy,
+    threshold,
     label: useLabel ? { title, date } : undefined,
     asZip: asZip.checked,
     includeInstructions: addInstructions.checked,
@@ -339,6 +436,7 @@ restoreBtn.addEventListener('click', async () => {
         files,
         password: restorePw.value,
         keyFile: restoreKey.files?.[0],
+        shareFiles: restoreShares.files ? Array.from(restoreShares.files) : undefined,
         extraPayloads: capturedPayloads(),
         onProgress: prog.onProgress,
       },

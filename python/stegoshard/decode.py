@@ -57,9 +57,14 @@ def _resolve_key(path: str, password: str) -> bytes | None:
     if unwrapped:
         return unwrapped[0]
     if raw[:2] == b"\xff\xd8" or raw[:8] == b"\x89PNG\r\n\x1a\n":
-        from .stego import extract_key_block_from_image
+        # A stego cover carries either a 92-byte key block (single-region) or the
+        # 32-byte key factor (multi-region .db / gallery). They self-distinguish by
+        # magic, so try block then factor; only the one embedded returns non-None.
+        from .stego import extract_key_block_from_image, extract_key_factor_from_image
 
-        return extract_key_block_from_image(raw, password)
+        return extract_key_block_from_image(raw, password) or extract_key_factor_from_image(
+            raw, password
+        )
     return raw  # raw .key
 
 

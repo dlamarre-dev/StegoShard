@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": "僅在以獨立 .key 檔案儲存的組合才需要（若已在 .zip 中則略過）。"
   },
+  "labelShareFiles": {
+    "message": "門檻分片檔案（非持有）",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "對於非持有保險庫，加入 n 個分片檔案（.txt）中的任意 k 個即可解鎖。其他情況不需要。",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "全部打包成單一 .zip"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "產生中…"
+  },
+  "accessModeHeading": {
+    "message": "存取模式",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "一般",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "脅迫（誘餌）",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "非持有（分片）",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "脅迫密碼（開啟誘餌）",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "誘餌檔案",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "在脅迫下提供誘餌，在某些地區可能構成虛偽陳述——一種犯罪。請先閱讀威脅模型。",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "脅迫與金鑰揭露法 →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "使用金鑰檔案或隱寫封面時，此額外因素僅保護您的真實檔案——誘餌仍可僅憑脅迫密碼開啟。",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "門檻（n 份中的 k 份）",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "您不會保留任何能單獨開啟它的東西——n 個分片檔案中的任意 k 個即可。",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "請輸入有效的 k-of-n 門檻（1 ≤ k ≤ n）。",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "脅迫模式需要脅迫密碼與誘餌檔案。",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "脅迫模式不適用於相簿；請使用誘餌資料庫（.db）。",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "此存取模式僅適用於誘餌資料庫（.db）或相簿。",
+    "description": "Error: mode on an excluded path."
   }
 }
