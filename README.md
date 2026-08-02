@@ -102,8 +102,8 @@ like on disk:
 | ----------- | :---: | ---------- |
 | **QR-grid images** (disk / paper / cloud) | 🛡 Resilient | Openly artificial images; survive recompression, printing, and cloud storage. |
 | **Opaque binary file** (`.ssbn`) | 🛡 Resilient | One compact file for larger secrets (up to 1 GiB in the CLI, 256 MiB in the browser; no image-count ceiling). Not deniable — clearly a StegoShard vault. |
-| **Decoy database** (`.db`) | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Survives copying; deniability is shallow against a tool that actually opens it. |
-| **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. |
+| **Decoy database** (`.db`) | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Optional **duress** (a plausible decoy opens under a 2nd password) or **non-possession** (gated on threshold shares you don't hold) access modes (SPEC §10). Survives copying; deniability is shallow against a tool that actually opens it. |
+| **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. Also supports **non-possession** access mode (SPEC §10); duress mode is `.db`-only. |
 
 The binary file and decoy database are peers of the image output, not afterthoughts:
 they are how you store a **larger** secret (up to 1 GiB), resiliently or deniably, when
@@ -235,6 +235,13 @@ an external review, not features.
   as an ordinary `.db` _(🎭 Deniable)_ (SPEC §8). Plus **Gallery Mode** _(🎭 Deniable)_
   (SPEC §9), which fragments a small secret across a folder of ordinary photos plus
   decoys, Reed-Solomon-protected and decoded blindly.
+- **Access structures** _(🎭 Deniable — SPEC §10)_ — on `.db` and Gallery: **duress
+  mode**, a plausible decoy payload that opens under a second, independent password
+  while the real region stays unreachable from that credential (`.db` only); and
+  **non-possession mode**, gating the real payload on Shamir *k*-of-*n* threshold
+  shares the writer never keeps, so "I cannot decrypt this" is literally true below
+  threshold. Unlock is constant-work and region-blind — no slot, region, or mode ever
+  leaks to the caller, logs, or errors.
 - **Independent recovery** — a standalone **[Python reference decoder](python/README.md)**
   restores a vault without the extension and runs in CI as a cross-implementation
   conformance test, and a headless **CLI** (below) creates and restores the same format.
