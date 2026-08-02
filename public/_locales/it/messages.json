@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": "Necessario solo per i set salvati con un file .key separato (ignoralo se è nello .zip)."
   },
+  "labelShareFiles": {
+    "message": "File di quote a soglia (non possesso)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "Per un caveau in non possesso, aggiungi k dei tuoi n file di quote (.txt) per sbloccare. Altrimenti non serve.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Raggruppa tutto in un unico .zip"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "Rendering…"
+  },
+  "accessModeHeading": {
+    "message": "Modalità di accesso",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Semplice",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Coercizione (esca)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "Non possesso (quote)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Password di coercizione (apre l'esca)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "File esca",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Produrre un'esca sotto coercizione può, in alcuni luoghi, costituire una falsa dichiarazione — un reato. Leggi prima il modello di minaccia.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Coercizione e leggi sulla divulgazione delle chiavi →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "Con un file chiave o una copertura stego, il fattore aggiuntivo protegge solo il tuo file reale — l'esca si apre comunque con la sola password di coercizione.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Soglia (k di n detentori)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "Non conservi nulla che lo apra da solo: bastano k qualsiasi degli n file di quote.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Inserisci una soglia k-di-n valida (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "La modalità coercizione richiede una password di coercizione e un file esca.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "La coercizione non è disponibile per le gallerie fotografiche; usa il database esca (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "Questa modalità di accesso è solo per il database esca (.db) o le gallerie fotografiche.",
+    "description": "Error: mode on an excluded path."
   }
 }

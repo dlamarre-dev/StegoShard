@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": "Solo necesario para conjuntos guardados con un archivo .key aparte (ignóralo si está en el .zip)."
   },
+  "labelShareFiles": {
+    "message": "Archivos de partes de umbral (no posesión)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "Para una bóveda de no posesión, añade k de tus n archivos de partes (.txt) para desbloquear. No es necesario en otros casos.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Agrupar todo en un único .zip"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "Procesando…"
+  },
+  "accessModeHeading": {
+    "message": "Modo de acceso",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Simple",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Coacción (señuelo)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "No posesión (partes)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Contraseña de coacción (abre el señuelo)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "Archivo señuelo",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Producir un señuelo bajo coacción puede, en algunos lugares, constituir una declaración falsa — un delito. Lee primero el modelo de amenazas.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Coacción y leyes de divulgación de claves →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "Con un archivo de clave o una portada estego, el factor adicional protege solo tu archivo real: el señuelo sigue abriéndose solo con la contraseña de coacción.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Umbral (k de n titulares)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "No conservas nada que lo abra por sí solo: cualquier k de los n archivos de partes lo hace.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Introduce un umbral k-de-n válido (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "El modo coacción necesita una contraseña de coacción y un archivo señuelo.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "La coacción no está disponible para galerías de fotos; usa la base de datos señuelo (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "Este modo de acceso es solo para la base de datos señuelo (.db) o galerías de fotos.",
+    "description": "Error: mode on an excluded path."
   }
 }

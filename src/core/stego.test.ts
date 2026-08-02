@@ -11,9 +11,12 @@ import {
   createKeyBlock,
   embedKeyBlockStego,
   extractKeyBlockStego,
+  embedKeyFactorStego,
+  extractKeyFactorStego,
   isSerializedKeyBlock,
   serializeKeyBlock,
   KEY_BLOCK_LEN,
+  KEY_FACTOR_LEN,
 } from './index';
 
 // Cheap Argon2 keeps the suite fast; production uses DEFAULT_ARGON2.
@@ -86,6 +89,36 @@ describe('stego rejection (deniability of failure)', () => {
     await embedKeyBlockStego(b, W, H, await makeKeyBlockBytes('bravo'), 'bravo', FAST);
     expect(await extractKeyBlockStego(a, W, H, 'bravo', FAST)).toBeNull();
     expect(await extractKeyBlockStego(b, W, H, 'alpha', FAST)).toBeNull();
+  });
+});
+
+describe('stego key-factor envelope (SSKF, §10.3)', () => {
+  const factor = Uint8Array.from({ length: KEY_FACTOR_LEN }, (_, i) => (i * 37 + 5) & 0xff);
+
+  it('embeds and extracts the exact 32-byte factor with the right password', async () => {
+    const rgba = makeCover(W, H);
+    await embedKeyFactorStego(rgba, W, H, factor, 'pw', FAST);
+    const out = await extractKeyFactorStego(rgba, W, H, 'pw', FAST);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(KEY_FACTOR_LEN);
+    expect([...out!]).toEqual([...factor]);
+  });
+
+  it('returns null for a wrong password (indistinguishable from no factor)', async () => {
+    const rgba = makeCover(W, H);
+    await embedKeyFactorStego(rgba, W, H, factor, 'right', FAST);
+    expect(await extractKeyFactorStego(rgba, W, H, 'wrong', FAST)).toBeNull();
+  });
+
+  it('returns null for an untouched cover', async () => {
+    expect(await extractKeyFactorStego(makeCover(W, H, 42), W, H, 'anything', FAST)).toBeNull();
+  });
+
+  it('a factor cover is not misread as a key block (and vice versa)', async () => {
+    const rgba = makeCover(W, H);
+    await embedKeyFactorStego(rgba, W, H, factor, 'pw', FAST);
+    // The 37-byte envelope has no SSKY magic at the key-block length → null.
+    expect(await extractKeyBlockStego(rgba, W, H, 'pw', FAST)).toBeNull();
   });
 });
 

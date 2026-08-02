@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": "Nur nötig für Sätze, die du als separate .key-Datei gespeichert hast (überspringen, wenn sie im .zip ist)."
   },
+  "labelShareFiles": {
+    "message": "Schwellenwert-Anteilsdateien (Nicht-Besitz)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "Für einen Nicht-Besitz-Tresor fügen Sie k Ihrer n Anteilsdateien (.txt) zum Entsperren hinzu. Sonst nicht nötig.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Alles in eine einzige .zip packen"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "Rendern…"
+  },
+  "accessModeHeading": {
+    "message": "Zugriffsmodus",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Einfach",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Zwang (Täuschung)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "Nicht-Besitz (Anteile)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Zwangspasswort (öffnet die Täuschung)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "Täuschungsdatei",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Eine Täuschung unter Zwang zu erzeugen kann mancherorts eine Falschaussage sein — eine Straftat. Lesen Sie zuerst das Bedrohungsmodell.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Zwang und Gesetze zur Schlüsselherausgabe →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "Mit einer Schlüsseldatei oder einem Stego-Cover schützt der zusätzliche Faktor nur Ihre echte Datei — die Täuschung öffnet sich weiterhin allein mit dem Zwangspasswort.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Schwellenwert (k von n Inhabern)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "Sie behalten nichts, das dies allein öffnet — beliebige k der n Anteilsdateien genügen.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Geben Sie einen gültigen k-von-n-Schwellenwert ein (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "Der Zwangsmodus benötigt ein Zwangspasswort und eine Täuschungsdatei.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "Zwang ist für Fotogalerien nicht verfügbar; verwenden Sie die Täuschungsdatenbank (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "Dieser Zugriffsmodus ist nur für die Täuschungsdatenbank (.db) oder Fotogalerien.",
+    "description": "Error: mode on an excluded path."
   }
 }

@@ -18,8 +18,12 @@ import {
   type ImageDataLike,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  embedKeyFactorStego,
+  embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
   extractKeyBlockStegoJpeg,
+  extractKeyFactorStego,
+  extractKeyFactorStegoJpeg,
   getCodec,
   isJpeg as isJpegBytes,
 } from '@core';
@@ -238,6 +242,48 @@ export async function extractKeyImage(
   if (isPngBytes(bytes)) {
     const img = fileToImageData(bytes, filename);
     return extractKeyBlockStego(img.data, img.width, img.height, password);
+  }
+  return null;
+}
+
+/**
+ * Hide the 32-byte external key factor (§10.3) in a cover photo, keeping its
+ * format — the stego-delivery counterpart of a raw `.key` file on the
+ * multi-region paths (gallery, disguised `.db`).
+ */
+export async function embedKeyFactorImage(
+  coverBytes: Uint8Array,
+  coverName: string,
+  factor: Uint8Array,
+  password: string,
+): Promise<StegoKeyImage> {
+  if (isJpegBytes(coverBytes)) {
+    try {
+      const out = await embedKeyFactorStegoJpeg(coverBytes, factor, password);
+      return { bytes: out, ext: 'jpg' };
+    } catch (err) {
+      if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
+      throw err;
+    }
+  }
+  if (isPngBytes(coverBytes)) {
+    const img = fileToImageData(coverBytes, coverName);
+    await embedKeyFactorStego(img.data, img.width, img.height, factor, password);
+    return { bytes: imageDataToPng(img), ext: 'png' };
+  }
+  throw new StegoCoverFormatError();
+}
+
+/** Recover the 32-byte key factor hidden in a stego cover (JPEG or PNG), or null. */
+export async function extractKeyFactorImage(
+  bytes: Uint8Array,
+  filename: string,
+  password: string,
+): Promise<Uint8Array | null> {
+  if (isJpegBytes(bytes)) return extractKeyFactorStegoJpeg(bytes, password);
+  if (isPngBytes(bytes)) {
+    const img = fileToImageData(bytes, filename);
+    return extractKeyFactorStego(img.data, img.width, img.height, password);
   }
   return null;
 }

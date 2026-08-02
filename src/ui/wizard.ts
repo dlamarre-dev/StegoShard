@@ -176,6 +176,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
 
   function needsPasswordStep(): boolean {
     if (state.dest === 'gallery') return true;
+    // The disguised .db path is keyed by a per-save password (§10), not the
+    // managed key — collect it on every surface.
+    if (state.dest === 'sqlite') return true;
     if (env.needsSavePassword) return true;
     return state.keyMode === 'stego';
   }
@@ -332,7 +335,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       const s = passwordStrength(input.value);
       bar.className = `pw-meter-bar pw-score-${s.score}`;
       bar.style.width = `${input.value ? Math.max(8, s.score * 25) : 0}%`;
-      label.textContent = input.value ? `${msg(STRENGTH_KEYS[s.score]!)} · ~${s.bits} ${msg('pwBits')}` : '';
+      label.textContent = input.value
+        ? `${msg(STRENGTH_KEYS[s.score]!)} · ~${s.bits} ${msg('pwBits')}`
+        : '';
     };
     input.addEventListener('input', () => {
       onInput(input.value);
@@ -361,7 +366,11 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             'wiz-action',
             [
               { value: 'save', label: msg('wizActionSave'), desc: msg('wizActionSaveDesc') },
-              { value: 'restore', label: msg('wizActionRestore'), desc: msg('wizActionRestoreDesc') },
+              {
+                value: 'restore',
+                label: msg('wizActionRestore'),
+                desc: msg('wizActionRestoreDesc'),
+              },
             ],
             state.action ?? '',
             (v) => chooseAction(v as Action),
@@ -454,9 +463,15 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
               class: 'muted',
               text: needed ? msg('wizGalleryCovers', String(needed)) : msg('galleryIntro'),
             }),
-            filePicker(msg('galleryCoversTitle'), true, 'image/png,image/jpeg', state.covers, (f) => {
-              state.covers = f;
-            }),
+            filePicker(
+              msg('galleryCoversTitle'),
+              true,
+              'image/png,image/jpeg',
+              state.covers,
+              (f) => {
+                state.covers = f;
+              },
+            ),
           ),
         };
       }
@@ -516,8 +531,16 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           body: optionList(
             'wiz-restore-mode',
             [
-              { value: 'standard', label: msg('restoreModeStandard'), desc: msg('wizRestoreStandardDesc') },
-              { value: 'gallery', label: msg('restoreModeGallery'), desc: msg('wizRestoreGalleryDesc') },
+              {
+                value: 'standard',
+                label: msg('restoreModeStandard'),
+                desc: msg('wizRestoreStandardDesc'),
+              },
+              {
+                value: 'gallery',
+                label: msg('restoreModeGallery'),
+                desc: msg('wizRestoreGalleryDesc'),
+              },
             ],
             state.restoreMode,
             (v) => {
@@ -529,7 +552,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         const title =
           state.restoreMode === 'gallery' ? msg('galleryPhotosTitle') : msg('labelImagesOrZip');
         const accept =
-          state.restoreMode === 'gallery' ? 'image/png,image/jpeg' : 'image/*,.zip,.pdf,application/pdf';
+          state.restoreMode === 'gallery'
+            ? 'image/png,image/jpeg'
+            : 'image/*,.zip,.pdf,application/pdf';
         const body = h(
           'div',
           {},
@@ -590,10 +615,13 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     if (state.action === 'save') {
       lines.push(`${msg('wizReviewFile')}: ${state.file?.name ?? '—'}`);
       lines.push(`${msg('destHeading')}: ${destLabel(state.dest)}`);
-      if (state.dest === 'gallery') lines.push(`${msg('galleryCoversTitle')}: ${state.covers.length}`);
+      if (state.dest === 'gallery')
+        lines.push(`${msg('galleryCoversTitle')}: ${state.covers.length}`);
       else lines.push(`${msg('keyModeHeading')}: ${keyModeLabel(state.keyMode)}`);
     } else {
-      lines.push(`${msg('restoreModeStandard')}/${msg('restoreModeGallery')}: ${state.restoreMode}`);
+      lines.push(
+        `${msg('restoreModeStandard')}/${msg('restoreModeGallery')}: ${state.restoreMode}`,
+      );
       const n = state.restoreFiles.length + (env.camera?.capturedCount() ?? 0);
       lines.push(`${msg('labelImagesOrZip')}: ${n}`);
     }
@@ -631,6 +659,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       dest: state.dest,
       file: state.file!,
       key,
+      // The disguised .db path derives its slot KEK from this per-save password.
+      password: state.dest === 'sqlite' ? state.savePassword : undefined,
       keyMode: state.keyMode,
       // Guided uses friendly defaults for the advanced knobs the expert UI exposes.
       asZip: state.dest === 'disk' ? true : undefined,
@@ -764,7 +794,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
                   { class: 'recovery-list' },
                   ...guidance.items.map((k) => h('li', { text: msg(k) })),
                 ),
-                guidance.lossless ? h('p', { class: 'muted warn', text: msg('recoveryLossless') }) : null,
+                guidance.lossless
+                  ? h('p', { class: 'muted warn', text: msg('recoveryLossless') })
+                  : null,
               )
             : null,
         ),
@@ -829,7 +861,10 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       h(
         'section',
         { class: 'card wiz' },
-        h('p', { class: 'wiz-step muted', text: msg('wizStep', [String(stepNo), String(list.length)]) }),
+        h('p', {
+          class: 'wiz-step muted',
+          text: msg('wizStep', [String(stepNo), String(list.length)]),
+        }),
         h('h2', { class: 'wiz-title', text: title }),
         body,
         status,

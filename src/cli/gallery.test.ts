@@ -36,8 +36,11 @@ function writePngCover(dir: string, name: string, seed: number): void {
 
 describe('CLI gallery round-trip', () => {
   it('saves a secret across a folder of photos and restores it blindly', SLOW, async () => {
+    // The §10 geometry doubles the blob, so a tiny secret spans ~5 data shards;
+    // provision 12 photos to clear the carrier + decoy floor.
     const coverDir = tmp();
-    for (let i = 0; i < 6; i++) writePngCover(coverDir, `photo-${i}.png`, i + 1);
+    const COVERS = 12;
+    for (let i = 0; i < COVERS; i++) writePngCover(coverDir, `photo-${i}.png`, i + 1);
 
     const secretDir = tmp();
     const secretPath = join(secretDir, 'note.txt');
@@ -51,20 +54,20 @@ describe('CLI gallery round-trip', () => {
       outDir: albumDir,
       password: PW,
     });
-    expect(save.files.length).toBe(6);
-    expect(save.k + save.m + save.decoys).toBe(6);
+    expect(save.files.length).toBe(COVERS);
+    expect(save.k + save.m + save.decoys).toBe(COVERS);
     expect(save.decoys).toBeGreaterThanOrEqual(2);
 
     const restoreDir = tmp();
     const res = await runGalleryRestore({ inputs: [albumDir], outDir: restoreDir, password: PW });
     expect(res.filename).toBe('note.txt');
-    expect(res.seen).toBe(6);
+    expect(res.seen).toBe(COVERS);
     expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
   });
 
   it('round-trips a keyfile gallery: the separate .key is needed to restore', SLOW, async () => {
     const coverDir = tmp();
-    for (let i = 0; i < 6; i++) writePngCover(coverDir, `photo-${i}.png`, i + 10);
+    for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 10);
     const secretDir = tmp();
     const secretPath = join(secretDir, 'note.txt');
     const secret = Buffer.from('the key rides separately');
@@ -95,6 +98,140 @@ describe('CLI gallery round-trip', () => {
       outDir: tmp(),
       password: PW,
       keyPath,
+    });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+  });
+
+  it(
+    'round-trips a stego gallery: the 32-byte key factor hides in a cover photo',
+    SLOW,
+    async () => {
+      const coverDir = tmp();
+      for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 50);
+      const secretDir = tmp();
+      const secretPath = join(secretDir, 'note.txt');
+      const secret = Buffer.from('the key hides in plain sight');
+      writeFileSync(secretPath, secret);
+      // A separate cover photo carries the SSKF-wrapped key factor.
+      writePngCover(secretDir, 'keycover.png', 999);
+      const keyCoverPath = join(secretDir, 'keycover.png');
+
+      const albumDir = tmp();
+      const save = await runGallerySave({
+        secretFile: secretPath,
+        covers: [coverDir],
+        outDir: albumDir,
+        password: PW,
+        keyMode: 'stego',
+        keyCover: keyCoverPath,
+      });
+      expect(save.keyMode).toBe('stego');
+      // The produced stego key image keeps the cover's own filename (blends in).
+      const stegoKeyPath = save.files.find((f) => f.endsWith('keycover.png'));
+      expect(stegoKeyPath).toBeTruthy();
+
+      // Without the key cover, restore fails (the factor is not embedded in fragments).
+      await expect(
+        runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW }),
+      ).rejects.toThrow();
+
+      // With the stego cover as the key, it restores.
+      const photos = save.files.filter((f) => f !== stegoKeyPath);
+      const res = await runGalleryRestore({
+        inputs: photos,
+        outDir: tmp(),
+        password: PW,
+        keyPath: stegoKeyPath,
+      });
+      expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+    },
+  );
+
+  it('non-possession gallery: threshold shares gate the restore', SLOW, async () => {
+    const coverDir = tmp();
+    for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 30);
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    const secret = Buffer.from('gated across a photo album');
+    writeFileSync(secretPath, secret);
+
+    const albumDir = tmp();
+    const save = await runGallerySave({
+      secretFile: secretPath,
+      covers: [coverDir],
+      outDir: albumDir,
+      password: PW,
+      mode: 'nonpossession',
+      threshold: { k: 2, n: 3 },
+    });
+    const shares = save.files.filter((f) => f.endsWith('.txt') && f.includes('share'));
+    expect(shares.length).toBe(3);
+    const photos = save.files.filter((f) => f.endsWith('.png'));
+
+    // Password + photos alone cannot restore (no threshold material).
+    await expect(
+      runGalleryRestore({ inputs: photos, outDir: tmp(), password: PW }),
+    ).rejects.toThrow();
+
+    // Any 2 of the 3 shares open it.
+    const res = await runGalleryRestore({
+      inputs: photos,
+      outDir: tmp(),
+      password: PW,
+      sharePaths: [shares[0]!, shares[2]!],
+    });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+  });
+
+  it('non-possession + keyfile gallery: needs BOTH the .key and a share quorum', SLOW, async () => {
+    const coverDir = tmp();
+    for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 70);
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    const secret = Buffer.from('double-gated: key file plus shares');
+    writeFileSync(secretPath, secret);
+
+    // Exercises the save-time verify that previously passed an undefined key factor
+    // for a keyfile non-possession gallery — the self-check would have thrown.
+    const albumDir = tmp();
+    const save = await runGallerySave({
+      secretFile: secretPath,
+      covers: [coverDir],
+      outDir: albumDir,
+      password: PW,
+      keyMode: 'keyfile',
+      mode: 'nonpossession',
+      threshold: { k: 2, n: 3 },
+    });
+    expect(save.keyMode).toBe('keyfile');
+    const keyPath = save.files.find((f) => f.endsWith('.key'))!;
+    const shares = save.files.filter((f) => f.endsWith('.txt') && f.includes('share'));
+    const photos = save.files.filter((f) => f.endsWith('.png'));
+    expect(keyPath).toBeTruthy();
+    expect(shares.length).toBe(3);
+
+    // A share quorum WITHOUT the key file → fail (the factor is missing).
+    await expect(
+      runGalleryRestore({
+        inputs: photos,
+        outDir: tmp(),
+        password: PW,
+        sharePaths: [shares[0]!, shares[1]!],
+      }),
+    ).rejects.toThrow();
+
+    // The key file WITHOUT a share quorum → fail (the gate stays closed).
+    await expect(
+      runGalleryRestore({ inputs: photos, outDir: tmp(), password: PW, keyPath }),
+    ).rejects.toThrow();
+
+    // Key file + any 2 shares → restore.
+    const res = await runGalleryRestore({
+      inputs: photos,
+      outDir: tmp(),
+      password: PW,
+      keyPath,
+      sharePaths: [shares[0]!, shares[2]!],
     });
     expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
   });

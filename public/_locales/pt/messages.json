@@ -147,6 +147,14 @@
   "keyFileHint": {
     "message": "Necessário apenas para conjuntos salvos com um arquivo .key separado (ignore se estiver no .zip)."
   },
+  "labelShareFiles": {
+    "message": "Arquivos de partes de limite (não posse)",
+    "description": "Restore: label for the threshold share files input (non-possession)."
+  },
+  "shareFilesHint": {
+    "message": "Para um cofre de não posse, adicione k dos seus n arquivos de partes (.txt) para desbloquear. Caso contrário, não é necessário.",
+    "description": "Restore: hint under the threshold share files input."
+  },
   "labelAsZip": {
     "message": "Agrupar tudo em um único .zip"
   },
@@ -935,5 +943,65 @@
   },
   "statusRendering": {
     "message": "Renderizando…"
+  },
+  "accessModeHeading": {
+    "message": "Modo de acesso",
+    "description": "Heading for the §10 access-mode selector (deniable paths)."
+  },
+  "accessModePlain": {
+    "message": "Simples",
+    "description": "Access mode: a single password, no decoy."
+  },
+  "accessModeDuress": {
+    "message": "Coação (isca)",
+    "description": "Access mode: a decoy opens under a second password."
+  },
+  "accessModeNonpossession": {
+    "message": "Não posse (partes)",
+    "description": "Access mode: gated on threshold shares."
+  },
+  "labelDuressPassword": {
+    "message": "Senha de coação (abre a isca)",
+    "description": "Label for the second/duress password."
+  },
+  "decoyTitle": {
+    "message": "Arquivo isca",
+    "description": "Dropzone title for the plausible decoy content."
+  },
+  "duressWarning": {
+    "message": "Produzir uma isca sob coação pode, em alguns lugares, constituir declaração falsa — um crime. Leia primeiro o modelo de ameaças.",
+    "description": "Warning shown before enabling duress mode."
+  },
+  "duressLegalLink": {
+    "message": "Coação e leis de divulgação de chaves →",
+    "description": "Link to the threat-model duress/legal section, shown under the duress warning."
+  },
+  "factorDuressHint": {
+    "message": "Com um arquivo de chave ou capa estego, o fator extra protege apenas o seu arquivo real — a isca ainda abre apenas com a senha de coação.",
+    "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
+  },
+  "labelThreshold": {
+    "message": "Limite (k de n detentores)",
+    "description": "Label for the Shamir k-of-n threshold."
+  },
+  "thresholdHint": {
+    "message": "Você não guarda nada que abra isto sozinho — quaisquer k dos n arquivos de partes abrem.",
+    "description": "Hint under the threshold inputs."
+  },
+  "errNoThreshold": {
+    "message": "Insira um limite k-de-n válido (1 ≤ k ≤ n).",
+    "description": "Error: invalid threshold."
+  },
+  "errDuressInputs": {
+    "message": "O modo coação precisa de uma senha de coação e um arquivo isca.",
+    "description": "Error: missing duress inputs."
+  },
+  "errDuressGallery": {
+    "message": "A coação não está disponível para galerias de fotos; use o banco de dados isca (.db).",
+    "description": "Error: duress on gallery."
+  },
+  "errModeExcluded": {
+    "message": "Este modo de acesso é apenas para o banco de dados isca (.db) ou galerias de fotos.",
+    "description": "Error: mode on an excluded path."
   }
 }

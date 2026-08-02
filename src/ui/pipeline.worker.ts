@@ -20,9 +20,11 @@ import {
   type KeyMode,
   type OnProgress,
   exportVaultBinary,
+  exportVaultBinaryDisguised,
   importDek,
   importVaultBinary,
   verifyBinaryExport,
+  verifyDisguisedExport,
 } from '@core';
 
 type RunReq =
@@ -38,10 +40,19 @@ type RunReq =
     }
   | {
       id: number;
+      op: 'encryptBinaryDisguised';
+      filename: string;
+      content: Uint8Array;
+      password: string;
+      keyMode: KeyMode;
+    }
+  | {
+      id: number;
       op: 'decryptBinary';
       container: Uint8Array;
       password: string;
       keyBlock?: Uint8Array;
+      secret?: Uint8Array;
     };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -72,12 +83,33 @@ async function runEncrypt(req: Extract<RunReq, { op: 'encryptBinary' }>): Promis
   return { message: { id: req.id, type: 'result', container }, transfer: [container.buffer] };
 }
 
+async function runEncryptDisguised(
+  req: Extract<RunReq, { op: 'encryptBinaryDisguised' }>,
+): Promise<Reply> {
+  const onProgress: OnProgress = (p) => ctx.postMessage({ id: req.id, type: 'progress', p });
+  // The disguised .db path derives its slot KEK from the password (each region has
+  // its own DEK), so no managed key crosses to the worker here. The generated key
+  // factor (keyfile mode) is returned so the page can deliver the .key.
+  const { container, keyBlock, regionIndex, dek } = await exportVaultBinaryDisguised(
+    req.filename,
+    req.content,
+    req.password,
+    { keyMode: req.keyMode, maxBytes: MAX_FILE_BYTES_BINARY_UI },
+    onProgress,
+  );
+  await verifyDisguisedExport(container, dek, regionIndex, req.filename, req.content, onProgress);
+  return {
+    message: { id: req.id, type: 'result', container, keyBlock },
+    transfer: [container.buffer],
+  };
+}
+
 async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promise<Reply> {
   const onProgress: OnProgress = (p) => ctx.postMessage({ id: req.id, type: 'progress', p });
   const { filename, content } = await importVaultBinary(
     req.container,
     req.password,
-    req.keyBlock ? { keyBlock: req.keyBlock } : {},
+    { keyBlock: req.keyBlock, secret: req.secret ?? null },
     onProgress,
   );
   return { message: { id: req.id, type: 'result', filename, content }, transfer: [content.buffer] };
@@ -88,6 +120,7 @@ async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promis
 // guarding a crypto action.
 const HANDLERS: { [K in RunReq['op']]: (req: Extract<RunReq, { op: K }>) => Promise<Reply> } = {
   encryptBinary: runEncrypt,
+  encryptBinaryDisguised: runEncryptDisguised,
   decryptBinary: runDecrypt,
 };
 
