@@ -24,6 +24,9 @@ import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
 
 export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'cloud' | 'gallery';
 
+/** §10 access mode for the deniable paths (gallery, .db). Mutually exclusive. */
+export type AccessMode = 'plain' | 'duress' | 'nonpossession';
+
 /** A localizer with the same shape in both the extension and the web app. */
 export type Msg = (key: string, subs?: string | string[]) => string;
 
@@ -55,6 +58,22 @@ export interface SaveRequest {
   /** Gallery Mode only: the cover photos and its own password. */
   covers?: File[];
   galleryPassword?: string;
+  /**
+   * Per-save password for the disguised `.db` path (§10 multi-region). Required
+   * for `dest: 'sqlite'`; ignored elsewhere (those paths use the managed key).
+   */
+  password?: string | undefined;
+  /**
+   * §10 access mode for the deniable paths. 'plain' (default), 'duress' (Mode A,
+   * `.db` only — needs `duressPassword` + `decoy`), or 'nonpossession' (Mode B,
+   * gallery or `.db` — needs `threshold`, delivers Shamir shares).
+   */
+  accessMode?: AccessMode | undefined;
+  /** Mode A: the duress password + the plausible decoy file it reveals. */
+  duressPassword?: string | undefined;
+  decoy?: File | undefined;
+  /** Mode B: the k-of-n threshold. */
+  threshold?: { k: number; n: number } | undefined;
   /** Progress callback for the binary path (the slow, large-file destination). */
   onProgress?: OnProgress;
 }
@@ -137,9 +156,18 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
     const covers = req.covers ?? [];
     if (!req.galleryPassword) throw new Error('gallery mode requires a password');
     const keyMode = req.keyMode ?? 'embedded';
+    const accessMode = req.accessMode ?? 'plain';
+    // Duress is not available on gallery: the winnowing key is password-derived,
+    // so two credentials would find different fragment sets (SPEC §10.11).
+    if (accessMode === 'duress') throw new Error(msg('errDuressGallery'));
+    if (accessMode === 'nonpossession' && !req.threshold) {
+      throw new Error(msg('errNoThreshold'));
+    }
     const res = await saveGalleryToDisk(req.file, covers, req.galleryPassword, {
       keyMode,
       stego: req.stego,
+      mode: accessMode,
+      threshold: req.threshold,
     });
     return { note: galleryNote(msg, keyMode, res.imageCount) };
   }
@@ -174,12 +202,28 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
 
   if (req.dest === 'binary' || req.dest === 'sqlite') {
     // Two destinations map to the one binary container: 'binary' is a branded
-    // .ssbn, 'sqlite' is disguised with a valid SQLite header (.db).
+    // .ssbn (an EXCLUDED path — single-region, managed key), 'sqlite' is the
+    // disguised .db, which under §10 is a mandatory multi-region container keyed
+    // by a per-save PASSWORD (each region gets its own DEK; the managed key is
+    // not used on this supported path).
     const variant: BinaryVariant = req.dest === 'sqlite' ? 'disguised' : 'branded';
+    const accessMode = req.accessMode ?? 'plain';
+    // Access modes exist only on the supported .db path, never on branded .ssbn.
+    if (variant === 'branded' && accessMode !== 'plain') throw new Error(msg('errModeExcluded'));
+    if (variant === 'disguised' && !req.password) throw new Error(msg('errNoPassword'));
+    if (accessMode === 'duress' && (!req.duressPassword || !req.decoy)) {
+      throw new Error(msg('errDuressInputs'));
+    }
+    if (accessMode === 'nonpossession' && !req.threshold) throw new Error(msg('errNoThreshold'));
     const { variant: saved } = await saveFileToBinary(req.file, req.key, {
       keyMode,
       variant,
       stego: req.stego,
+      password: req.password,
+      mode: accessMode,
+      duressPassword: req.duressPassword,
+      decoy: req.decoy,
+      threshold: req.threshold,
       onProgress: req.onProgress,
     });
     return { note: binaryNote(msg, keyMode, saved) };

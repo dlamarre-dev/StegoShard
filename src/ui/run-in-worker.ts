@@ -116,15 +116,37 @@ export async function encryptBinaryInWorker(
   return res.container;
 }
 
-/** Decrypt a binary container back to { filename, content }, off the main thread. */
+/**
+ * Encrypt + verify a file into a disguised `.db` container (§10 multi-region),
+ * off the main thread. Keyed by the password (no managed DEK); returns the
+ * container plus the generated 32-byte key factor (empty for embedded mode).
+ */
+export async function encryptBinaryDisguisedInWorker(
+  filename: string,
+  content: Uint8Array,
+  password: string,
+  keyMode: KeyMode,
+  onProgress?: OnProgress,
+): Promise<{ container: Uint8Array; keyBlock: Uint8Array }> {
+  const res = await call<{ container: Uint8Array; keyBlock: Uint8Array }>(
+    { op: 'encryptBinaryDisguised', filename, content, password, keyMode },
+    [content.buffer],
+    onProgress,
+  );
+  return { container: res.container, keyBlock: res.keyBlock };
+}
+
+/** Decrypt a binary container back to { filename, content }, off the main thread.
+ *  `secret` is the recovered Shamir S for a Mode B (threshold-gated) .db vault. */
 export async function decryptBinaryInWorker(
   container: Uint8Array,
   password: string,
   keyBlock: Uint8Array | undefined,
+  secret?: Uint8Array | undefined,
   onProgress?: OnProgress,
 ): Promise<{ filename: string; content: Uint8Array }> {
   return call<{ filename: string; content: Uint8Array }>(
-    { op: 'decryptBinary', container, password, keyBlock },
+    { op: 'decryptBinary', container, password, keyBlock, secret },
     [container.buffer],
     onProgress,
   );

@@ -112,7 +112,7 @@ Rogaway–Vizár, as used by `age`). Points a reviewer should check
   no new KDF. A fresh `contentSalt` **and** a fresh 7-byte `noncePrefix` are drawn
   per export.
 - **Nonce uniqueness** (GCM's one hard requirement): `nonce_i = noncePrefix ‖
-  u32_be(i) ‖ finalByte`. Within an export the counter makes every nonce distinct;
+u32_be(i) ‖ finalByte`. Within an export the counter makes every nonce distinct;
   across exports the random prefix and per-export CEK mean no `(key, nonce)` reuse
   even under a salt collision.
 - **AAD** = the full header prefix (version, salt, nonce prefix, chunk size,
@@ -197,7 +197,7 @@ photo with natural LSB noise; the layer is not a cheap password oracle.**
 bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
 
 - **Password-keyed positions + whitening, bound to the cover.** `Argon2id(NFC(password),
-  fixed salt)` produces a seed, which is combined with a **fingerprint of the cover**
+fixed salt)` produces a seed, which is combined with a **fingerprint of the cover**
   via `HKDF-SHA256(seed, salt = fp, info = "stegoshard/stego/cover")` to key an
   AES-256-CTR stream that both XOR-whitens the payload and chooses the ~736 carrier
   LSBs by unbiased rejection sampling. Carrier bits are uniform and their locations
@@ -216,6 +216,16 @@ bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
   key-block magic check and is reported identically to "no key here"
   (`extractKeyBlockStego` → `null`) — proven in `stego.test.ts` (wrong password,
   untouched cover, and cross-password covers all return null).
+- **Two fixed payloads, one path.** The same fixed, self-validating machinery now
+  carries either the 92-byte key block (single-region: disk / paper / branded
+  `.ssbn`) or the 37-byte **SSKF key-factor envelope** (multi-region: gallery,
+  disguised `.db` — SPEC §10.3). The magic **is** whitened in this case (the factor
+  is a raw secret, unlike a `.key` file which stays bare bytes), so it never appears
+  in the carrier; a wrong password de-whitens to noise that fails the SSKF magic →
+  `null`, the same indistinguishability as the key block. The two envelopes differ in
+  length and magic, so an extractor tries block then factor and only the one embedded
+  returns non-null — no ambiguity, and the 92-byte derivation is byte-identical to
+  before (proven by the unchanged `stego`/`stego-jpeg` fixtures still decoding).
 - **Argon2-gated, not a fast oracle.** Locating/de-whitening costs one Argon2id
   derivation per guess — the same cost as unwrapping the key block — so the
   stego layer does not cheapen a password search.
@@ -225,7 +235,9 @@ bits of a cover photo (SPEC §5.3). Reviewer-relevant properties:
 - **Cross-implementation:** the Python reference decoder
   (`python/stegoshard/stego.py`) extracts the key from a TS-generated stego PNG
   and restores the vault (`python/tests/test_conformance.py::test_stego_key_image_round_trip`),
-  proving the derivation matches bit-for-bit.
+  proving the derivation matches bit-for-bit. The SSKF factor path is proven the same
+  way — TS embeds the factor, Python's `extract_key_factor_from_image` recovers it and
+  decodes the vault (`test_gallery_stego_round_trip`, `test_binary_disguised_stego_round_trip`).
 
 **JPEG covers (§5.4).** A PNG in a phone's photo library is itself an anomaly
 (and ~3–10× the size of a JPEG), so `src/core/jpeg-coeff.ts` +
@@ -294,7 +306,7 @@ no page references) is **gone**.
 
 **Honest limit (stated in the module and docs):** the row values are still
 high-entropy ciphertext. Splitting the vault across several ordinary-sized rows
-softens the "one giant opaque BLOB" tell, but an examiner who inspects *values*
+softens the "one giant opaque BLOB" tell, but an examiner who inspects _values_
 (not just structure) can still observe that a `cache` full of incompressible
 random bytes is unusual. This is a **content-level** observation, not a structural
 one — the file is a bona-fide database. So the bar is raised from "casual open" to
@@ -339,6 +351,16 @@ Three design points carry the security:
    default and is not stored (like §6a); the WebCrypto/TS and Python
    implementations agree bit-for-bit — proven by the `gallery-png` / `gallery-jpeg`
    conformance fixtures (TS encodes, Python `decode_gallery` restores).
+
+4. **Duress (Mode A) is excluded from gallery, by design (SPEC §10.9.1).** The
+   password-only winnowing key is what makes presence-hiding work — wrong
+   password ⇒ zero survivors ⇒ indistinguishable from "no gallery here." Duress
+   needs two independent credentials winnowing the same fragments, which is only
+   possible with a credential-independent winnowing key; that would place a
+   fixed-location wrapped-key header in the photos and make gallery presence
+   _provable_ without any password — surrendering the carrier's defining
+   property. Duress is therefore hosted on the `.db` path (no winnowing layer),
+   and the writer refuses a gallery duress request outright (`errDuressGallery`).
 
 **Honest limit (amplified vs. §6a):** Gallery Mode modifies **every** selected
 photo, so an adversary who holds the untouched originals can diff each one — a
@@ -422,13 +444,13 @@ cryptodeps analyze .              # dependency view (capability-based, informati
 **Reading the results honestly.** These are keyword/dependency scanners, so a raw run
 reports expected noise that `.cryptoscan.yaml` documents and suppresses:
 
-- **"ECC" (flagged VULNERABLE) is a false positive** — it matches the QR *Error
-  Correction Code* level (`ecc: 'L'|'M'|'Q'|'H'`), not elliptic-curve crypto.
+- **"ECC" (flagged VULNERABLE) is a false positive** — it matches the QR _Error
+  Correction Code_ level (`ecc: 'L'|'M'|'Q'|'H'`), not elliptic-curve crypto.
 - **"PBKDF-001 / low iterations" is a false positive** — it matches the Argon2id
-  *time-cost* (`t=3`, plus deliberate `0/1/16/17` boundary values in the hardening
+  _time-cost_ (`t=3`, plus deliberate `0/1/16/17` boundary values in the hardening
   tests), not a weak PBKDF2 iteration count.
 - **cryptodeps flags `hash-wasm` (MD5/SHA-1) and `cryptography` (RSA/ECC)** by library
-  *capability*: those algorithms exist in the libraries but StegoShard calls only
+  _capability_: those algorithms exist in the libraries but StegoShard calls only
   Argon2id (hash-wasm) and AES-256-GCM (pyca `cryptography`). npm/pypi reachability
   analysis is not available (it is Go-only in the tool), hence the over-report.
 

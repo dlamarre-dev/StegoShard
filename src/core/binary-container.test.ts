@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, WrongPasswordError, createKeyBlock, serializeKeyBlock } from './crypto';
 import { BINARY_MAGIC, binaryExtension, unwrapBinary, wrapBinary } from './binary-container';
-import { MissingKeyError, type VaultKey, exportVaultBinary, importVaultBinary } from './vault';
+import {
+  MissingKeyError,
+  type VaultKey,
+  exportVaultBinary,
+  exportVaultBinaryDisguised,
+  importVaultBinary,
+} from './vault';
 
 const TEST_PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 
@@ -54,25 +60,54 @@ describe('binary container wrap/unwrap', () => {
 describe('binary vault export/import round-trip', () => {
   const content = new TextEncoder().encode('seed phrase: alpha bravo charlie delta');
 
-  for (const variant of ['branded', 'disguised'] as const) {
-    it(`restores an embedded-key vault (${variant})`, async () => {
-      const key = await makeKey('pw');
-      const { container } = await exportVaultBinary('seed.txt', content, key, { variant });
-      const out = await importVaultBinary(container, 'pw');
-      expect(out.filename).toBe('seed.txt');
-      expect([...out.content]).toEqual([...content]);
-    });
-  }
+  it('restores an embedded-key branded (.ssbn) vault (single-region, managed key)', async () => {
+    const key = await makeKey('pw');
+    const { container } = await exportVaultBinary('seed.txt', content, key, { variant: 'branded' });
+    const out = await importVaultBinary(container, 'pw');
+    expect(out.filename).toBe('seed.txt');
+    expect([...out.content]).toEqual([...content]);
+  });
 
-  it('restores a keyfile-mode vault only with its external key block', async () => {
+  it('restores an embedded disguised (.db) vault (§10 multi-region, password-keyed)', async () => {
+    const { container } = await exportVaultBinaryDisguised(
+      'seed.txt',
+      content,
+      'pw',
+      {},
+      undefined,
+    );
+    const out = await importVaultBinary(container, 'pw');
+    expect(out.filename).toBe('seed.txt');
+    expect([...out.content]).toEqual([...content]);
+    // No managed key involved on the supported path — each region has its own DEK.
+  }, 20000);
+
+  it('rejects a wrong password on a disguised (.db) vault', async () => {
+    const { container } = await exportVaultBinaryDisguised('seed.txt', content, 'right', {});
+    await expect(importVaultBinary(container, 'wrong')).rejects.toBeInstanceOf(WrongPasswordError);
+  }, 20000);
+
+  it('restores a keyfile-mode branded vault only with its external key block', async () => {
     const key = await makeKey('pw');
     const { container, keyBlock } = await exportVaultBinary('seed.txt', content, key, {
       keyMode: 'keyfile',
+      variant: 'branded',
     });
     await expect(importVaultBinary(container, 'pw')).rejects.toBeInstanceOf(MissingKeyError);
     const out = await importVaultBinary(container, 'pw', { keyBlock });
     expect([...out.content]).toEqual([...content]);
   });
+
+  it('restores a keyfile-mode disguised (.db) vault only with its key factor', async () => {
+    const { container, keyBlock } = await exportVaultBinaryDisguised('seed.txt', content, 'pw', {
+      keyMode: 'keyfile',
+    });
+    expect(keyBlock.length).toBe(32); // the random key factor, not a serialized block
+    // Without the factor the slot KEK is wrong → uniform wrong-password failure.
+    await expect(importVaultBinary(container, 'pw')).rejects.toBeInstanceOf(WrongPasswordError);
+    const out = await importVaultBinary(container, 'pw', { keyBlock });
+    expect([...out.content]).toEqual([...content]);
+  }, 20000);
 
   it('tolerates a bare (unwrapped) blob for forward-compatibility', async () => {
     const key = await makeKey('pw');

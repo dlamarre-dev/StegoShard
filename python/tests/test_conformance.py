@@ -160,6 +160,24 @@ def test_gallery_keyfile_round_trip():
     assert restored.content == expected
 
 
+def test_gallery_stego_round_trip():
+    """A stego gallery (TS encode): the 32-byte key factor is hidden in a separate
+    cover photo (SSKF, §10.3). Python extracts it with the password, then restores."""
+    from stegoshard import decode_gallery, extract_key_factor_from_image
+
+    manifest, images, expected = _gallery_photos("gallery-stego")
+    assert manifest["keyMode"] == "stego"
+    cover = (FIXTURES / "gallery-stego" / "key-cover.png").read_bytes()
+
+    # A wrong password finds no factor in the cover (indistinguishable from none).
+    assert extract_key_factor_from_image(cover, "not the password") is None
+
+    factor = extract_key_factor_from_image(cover, manifest["password"])
+    assert factor is not None and len(factor) == 32
+    restored = decode_gallery(images, manifest["password"], factor)
+    assert restored.content == expected
+
+
 def test_gallery_keyfile_without_key_fails():
     """Without the external key, a keyfile gallery cannot be restored."""
     from stegoshard import GalleryRestoreError, decode_gallery
@@ -216,10 +234,10 @@ def test_binary_branded_round_trip():
 
 
 def test_binary_disguised_needs_key_container():
-    """A disguised (SQLite-header) vault plus its key container round-trips; the
-    vault alone is rejected (SPEC §8)."""
-    from stegoshard import decode_vault_binary, unwrap_binary
-    from stegoshard.pipeline import MissingKeyError
+    """A disguised (SQLite-header) .db vault is a §10 multi-region container keyed
+    by the password plus a 32-byte key factor (keyfile mode). Without the factor the
+    slot KEK is wrong, so it fails with the uniform WrongPasswordError (SPEC §8, §10)."""
+    from stegoshard import WrongPasswordError, decode_vault_binary, unwrap_binary
 
     d = FIXTURES / "binary-disguised"
     manifest = json.loads((d / "manifest.json").read_text())
@@ -230,10 +248,62 @@ def test_binary_disguised_needs_key_container():
     assert container[:16] == b"SQLite format 3\x00"
     assert unwrap_binary(container)[1] == "disguised"
 
-    with pytest.raises(MissingKeyError):
+    with pytest.raises(WrongPasswordError):
         decode_vault_binary(container, manifest["password"])
 
     key_container = (d / manifest["key"]).read_bytes()
-    key_block = unwrap_binary(key_container)[0]
-    restored = decode_vault_binary(container, manifest["password"], key_block)
+    key_factor = unwrap_binary(key_container)[0]
+    restored = decode_vault_binary(container, manifest["password"], key_factor=key_factor)
+    assert restored.content == expected
+
+
+def test_binary_disguised_stego_round_trip():
+    """A disguised .db in stego key mode: the 32-byte key factor is hidden in a
+    cover photo (SSKF, §10.3) instead of a .key container. Python extracts it with
+    the password, then decodes the multi-region vault (SPEC §8, §10)."""
+    from stegoshard import decode_vault_binary, extract_key_factor_from_image, unwrap_binary
+
+    d = FIXTURES / "binary-disguised-stego"
+    manifest = json.loads((d / "manifest.json").read_text())
+    assert manifest["keyMode"] == "stego"
+    container = (d / manifest["vault"]).read_bytes()
+    expected = (d / "expected.bin").read_bytes()
+    assert unwrap_binary(container)[1] == "disguised"
+
+    cover = (d / manifest["key"]).read_bytes()
+    assert extract_key_factor_from_image(cover, "not the password") is None
+    key_factor = extract_key_factor_from_image(cover, manifest["password"])
+    assert key_factor is not None and len(key_factor) == 32
+    restored = decode_vault_binary(container, manifest["password"], key_factor=key_factor)
+    assert restored.content == expected
+
+
+def test_binary_disguised_np_stego_composes():
+    """A disguised .db in non-possession + stego: the real region is gated on BOTH
+    the Shamir secret (k shares) AND the 32-byte key factor hidden in a cover photo
+    (§10.3). Python must recover S, extract the factor, and open only with both."""
+    from stegoshard import decode_vault_binary, extract_key_factor_from_image, unwrap_binary
+    from stegoshard.shamir import shamir_recover
+
+    d = FIXTURES / "binary-disguised-np-stego"
+    manifest = json.loads((d / "manifest.json").read_text())
+    container = (d / manifest["vault"]).read_bytes()
+    expected = (d / "expected.bin").read_bytes()
+    assert unwrap_binary(container)[1] == "disguised"
+
+    factor = extract_key_factor_from_image((d / "key-cover.png").read_bytes(), manifest["password"])
+    assert factor is not None and len(factor) == 32
+    shares = [p.read_bytes() for p in sorted(d.glob("share-*.bin"))]
+    secret = shamir_recover(shares[: manifest["k"]])
+
+    # The factor alone (no shares) leaves the gate closed.
+    with pytest.raises(WrongPasswordError):
+        decode_vault_binary(container, manifest["password"], key_factor=factor)
+    # The shares alone (no factor) also fail — the base KEK is missing the factor.
+    with pytest.raises(WrongPasswordError):
+        decode_vault_binary(container, manifest["password"], secret=secret)
+    # Factor + a share quorum → restore.
+    restored = decode_vault_binary(
+        container, manifest["password"], key_factor=factor, secret=secret
+    )
     assert restored.content == expected

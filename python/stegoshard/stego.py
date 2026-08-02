@@ -19,8 +19,22 @@ from .crypto import normalize_password
 from .format import KEY_BLOCK_VERSION, KEY_MAGIC
 
 KEY_BLOCK_LEN = 92
-PAYLOAD_BITS = KEY_BLOCK_LEN * 8
-MIN_CAPACITY = PAYLOAD_BITS * 16
+
+# Stego key-factor envelope (SSKF, §10.3): the 32-byte external key factor, wrapped
+# with a magic + version so a stego extraction self-validates (wrong password →
+# de-whitened noise → no magic → None), mirroring the 92-byte key block's check.
+KEY_FACTOR_LEN = 32
+KEY_FACTOR_MAGIC = b"SSKF"
+KEY_FACTOR_BLOCK_VERSION = 1
+KEY_FACTOR_BLOCK_LEN = len(KEY_FACTOR_MAGIC) + 1 + KEY_FACTOR_LEN  # 37
+
+
+def _min_capacity_rgba(payload_len: int) -> int:
+    return payload_len * 8 * 16
+
+
+def _min_capacity_jpeg(payload_len: int) -> int:
+    return payload_len * 8 * 2
 
 # Fixed application salt: ASCII "StegoShard-stego" (exactly 16 bytes) (SPEC §5.3).
 STEGO_SALT = b"StegoShard-stego"
@@ -112,8 +126,90 @@ def _pick_positions(stream: bytes, offset: int, capacity: int, count: int) -> li
     return positions
 
 
-def _stream_len() -> int:
-    return KEY_BLOCK_LEN + PAYLOAD_BITS * 8 + 1024
+def _stream_len(payload_len: int) -> int:
+    return payload_len + payload_len * 8 * 8 + 1024
+
+
+def _extract_fixed_rgba(
+    rgba: bytes,
+    width: int,
+    height: int,
+    length: int,
+    password: str,
+    iterations: int,
+    memory_kib: int,
+    parallelism: int,
+) -> bytes | None:
+    """De-whitened fixed-length payload from an RGBA cover, or None if too small.
+    Magic validation is the caller's job. Mirrors extractFixedStego in stego.ts."""
+    capacity = width * height * 3
+    if capacity < _min_capacity_rgba(length):
+        return None
+    bits = length * 8
+    fingerprint = _cover_fingerprint_rgba(rgba, width, height)
+    stream = _keystream(
+        password, _stream_len(length), iterations, memory_kib, parallelism, fingerprint
+    )
+    pad = stream[:length]
+    positions = _pick_positions(stream, length, capacity, bits)
+    out = bytearray(length)
+    for i, pos in enumerate(positions):
+        byte_index = (pos // 3) * 4 + (pos % 3)
+        if rgba[byte_index] & 1:
+            out[i >> 3] |= 1 << (7 - (i & 7))
+    for j in range(length):
+        out[j] ^= pad[j]
+    return bytes(out)
+
+
+def _extract_fixed_jpeg(
+    jpeg_bytes: bytes,
+    length: int,
+    password: str,
+    iterations: int,
+    memory_kib: int,
+    parallelism: int,
+) -> bytes | None:
+    """De-whitened fixed-length payload from a baseline JPEG, or None. Magic
+    validation is the caller's job. Mirrors extractFixedStegoJpeg in stego.ts."""
+    from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+
+    try:
+        carriers = eligible_coefficients(decode(jpeg_bytes))
+    except JpegUnsupported:
+        return None
+    capacity = len(carriers)
+    if capacity < _min_capacity_jpeg(length):
+        return None
+    bits = length * 8
+    fingerprint = _cover_fingerprint_jpeg(carriers)
+    stream = _keystream(
+        password, _stream_len(length), iterations, memory_kib, parallelism, fingerprint
+    )
+    pad = stream[:length]
+    positions = _pick_positions(stream, length, capacity, bits)
+    out = bytearray(length)
+    for i, pos in enumerate(positions):
+        block, k = carriers[pos]
+        if abs(block[k]) & 1:
+            out[i >> 3] |= 1 << (7 - (i & 7))
+    for j in range(length):
+        out[j] ^= pad[j]
+    return bytes(out)
+
+
+def _is_key_block(b: bytes) -> bool:
+    return len(b) == KEY_BLOCK_LEN and b[:4] == KEY_MAGIC and b[4] == KEY_BLOCK_VERSION
+
+
+def _parse_key_factor(b: bytes) -> bytes | None:
+    if (
+        len(b) == KEY_FACTOR_BLOCK_LEN
+        and b[:4] == KEY_FACTOR_MAGIC
+        and b[4] == KEY_FACTOR_BLOCK_VERSION
+    ):
+        return b[5:]
+    return None
 
 
 def extract_key_block(
@@ -129,30 +225,10 @@ def extract_key_block(
 
     `rgba` is the cover image as RGBA bytes (4 bytes/pixel).
     """
-    capacity = width * height * 3
-    if capacity < MIN_CAPACITY:
-        return None
-
-    fingerprint = _cover_fingerprint_rgba(rgba, width, height)
-    stream = _keystream(password, _stream_len(), iterations, memory_kib, parallelism, fingerprint)
-    pad = stream[:KEY_BLOCK_LEN]
-    positions = _pick_positions(stream, KEY_BLOCK_LEN, capacity, PAYLOAD_BITS)
-
-    out = bytearray(KEY_BLOCK_LEN)
-    for i, pos in enumerate(positions):
-        byte_index = (pos // 3) * 4 + (pos % 3)
-        if rgba[byte_index] & 1:
-            out[i >> 3] |= 1 << (7 - (i & 7))
-    for j in range(KEY_BLOCK_LEN):
-        out[j] ^= pad[j]
-
-    result = bytes(out)
-    if len(result) == KEY_BLOCK_LEN and result[:4] == KEY_MAGIC and result[4] == KEY_BLOCK_VERSION:
-        return result
-    return None
-
-
-JPEG_MIN_CAPACITY = PAYLOAD_BITS * 2  # matches src/core/stego.ts
+    out = _extract_fixed_rgba(
+        rgba, width, height, KEY_BLOCK_LEN, password, iterations, memory_kib, parallelism
+    )
+    return out if out is not None and _is_key_block(out) else None
 
 
 def extract_key_block_jpeg(
@@ -164,38 +240,43 @@ def extract_key_block_jpeg(
 ) -> bytes | None:
     """Recover a key block hidden in a baseline JPEG's DCT coefficients (SPEC §5.4).
 
-    Mirrors src/core/stego.ts embedKeyBlockStegoJpeg: the carriers are the AC
-    coefficients with |coef| >= 2, in scan order; the payload bit is the LSB of
-    each coefficient's magnitude. Returns None for a wrong password, no key, or a
-    non-baseline JPEG.
+    Returns None for a wrong password, no key, or a non-baseline JPEG.
     """
-    from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+    out = _extract_fixed_jpeg(
+        jpeg_bytes, KEY_BLOCK_LEN, password, iterations, memory_kib, parallelism
+    )
+    return out if out is not None and _is_key_block(out) else None
 
-    try:
-        carriers = eligible_coefficients(decode(jpeg_bytes))
-    except JpegUnsupported:
-        return None
-    capacity = len(carriers)
-    if capacity < JPEG_MIN_CAPACITY:
-        return None
 
-    fingerprint = _cover_fingerprint_jpeg(carriers)
-    stream = _keystream(password, _stream_len(), iterations, memory_kib, parallelism, fingerprint)
-    pad = stream[:KEY_BLOCK_LEN]
-    positions = _pick_positions(stream, KEY_BLOCK_LEN, capacity, PAYLOAD_BITS)
+def extract_key_factor(
+    rgba: bytes,
+    width: int,
+    height: int,
+    password: str,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
+    parallelism: int = 1,
+) -> bytes | None:
+    """Recover the 32-byte external key factor from an SSKF-wrapped stego cover
+    (RGBA / PNG), or None if absent / wrong password. Mirrors extractKeyFactorStego."""
+    out = _extract_fixed_rgba(
+        rgba, width, height, KEY_FACTOR_BLOCK_LEN, password, iterations, memory_kib, parallelism
+    )
+    return _parse_key_factor(out) if out is not None else None
 
-    out = bytearray(KEY_BLOCK_LEN)
-    for i, pos in enumerate(positions):
-        block, k = carriers[pos]
-        if abs(block[k]) & 1:
-            out[i >> 3] |= 1 << (7 - (i & 7))
-    for j in range(KEY_BLOCK_LEN):
-        out[j] ^= pad[j]
 
-    result = bytes(out)
-    if len(result) == KEY_BLOCK_LEN and result[:4] == KEY_MAGIC and result[4] == KEY_BLOCK_VERSION:
-        return result
-    return None
+def extract_key_factor_jpeg(
+    jpeg_bytes: bytes,
+    password: str,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
+    parallelism: int = 1,
+) -> bytes | None:
+    """Recover the 32-byte key factor from a baseline JPEG (SSKF), or None."""
+    out = _extract_fixed_jpeg(
+        jpeg_bytes, KEY_FACTOR_BLOCK_LEN, password, iterations, memory_kib, parallelism
+    )
+    return _parse_key_factor(out) if out is not None else None
 
 
 # --- Variable-length payload stego (Gallery Mode, SPEC §9) -------------------
@@ -282,3 +363,26 @@ def extract_key_block_from_image(
         width, height = rgba.size
         data = rgba.tobytes()
     return extract_key_block(data, width, height, password, iterations, memory_kib, parallelism)
+
+
+def extract_key_factor_from_image(
+    image_bytes: bytes,
+    password: str,
+    iterations: int = 4,
+    memory_kib: int = 256 * 1024,
+    parallelism: int = 1,
+) -> bytes | None:
+    """Extract the 32-byte key factor from a stego cover (PNG or baseline JPEG),
+    sniffing the format. Mirrors extractKeyFactorImage in src/ui/image-io.ts."""
+    if image_bytes[:2] == b"\xff\xd8":  # JPEG
+        return extract_key_factor_jpeg(image_bytes, password, iterations, memory_kib, parallelism)
+
+    import io
+
+    from PIL import Image
+
+    with Image.open(io.BytesIO(image_bytes)) as img:
+        rgba = img.convert("RGBA")
+        width, height = rgba.size
+        data = rgba.tobytes()
+    return extract_key_factor(data, width, height, password, iterations, memory_kib, parallelism)
