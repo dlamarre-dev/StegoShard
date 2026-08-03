@@ -23,6 +23,13 @@ Key modes and paper output mirror the apps:
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
 npm run cli -- restore ./vault --key ./vault/cat.jpg --out ./restored
 
+# Image code: 'color' (default) is an 8-colour grid — about 3x the bytes per
+# image, so roughly a third as many files. 'qr' is a plain QR code any phone can
+# read. Restore reads either automatically; printed pages always use QR.
+npm run cli -- save secret.txt --codec color      # the default
+npm run cli -- save secret.txt --codec qr
+npm run cli -- estimate secret.txt --codec qr    # compare the file counts
+
 # Printable PDF with a localized instruction sheet.
 npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print
 

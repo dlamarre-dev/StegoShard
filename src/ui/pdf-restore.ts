@@ -13,7 +13,7 @@
 
 import { PDFDocument, PDFName, PDFRawStream, PDFNumber, PDFArray, PDFStream } from 'pdf-lib';
 import { unzlibSync } from 'fflate';
-import { CODEC_QR_GRID, getCodec, type ImageDataLike } from '@core';
+import { decodeWithAnyCodec, type ImageDataLike } from '@core';
 
 /** Resource guards for an untrusted PDF (mirrors the .zip restore bounds). */
 const MAX_PDF_IMAGES = 400; // pages + SMasks + logos in a generous scan
@@ -142,7 +142,6 @@ function downscale(img: ImageDataLike, maxSide: number): ImageDataLike {
  * Unreadable images are dropped — erasure coding tolerates losses.
  */
 export async function extractPdfPayloads(bytes: Uint8Array): Promise<Uint8Array[]> {
-  const codec = getCodec(CODEC_QR_GRID);
   // Lazy import keeps image-io (and its canvas helpers) off this module's
   // node-testable path; the function itself is browser-only anyway.
   const { decodeImageBytes } = await import('./image-io');
@@ -156,7 +155,7 @@ export async function extractPdfPayloads(bytes: Uint8Array): Promise<Uint8Array[
     }
     for (const maxSide of [Infinity, 1400, 1000]) {
       try {
-        payloads.push(codec.decode(downscale(image.img, maxSide)));
+        payloads.push(decodeWithAnyCodec(downscale(image.img, maxSide)));
         break;
       } catch {
         // Try the next scale; give up after the last.

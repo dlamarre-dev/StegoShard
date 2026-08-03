@@ -10,12 +10,12 @@
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
 import {
-  CODEC_QR_GRID,
   JpegUnsupportedError,
   StegoCoverFormatError,
   type GalleryCover,
   type GalleryImage,
   type ImageDataLike,
+  decodeWithAnyCodec,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
   embedKeyFactorStego,
@@ -24,7 +24,6 @@ import {
   extractKeyBlockStegoJpeg,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
-  getCodec,
   isJpeg as isJpegBytes,
 } from '@core';
 
@@ -145,29 +144,20 @@ const DECODE_MAX_SIDES = [Infinity, 1400, 1000, 1800];
  * null when no QR is readable (a lost image is tolerated by erasure coding).
  */
 export function decodeImageToPayload(bytes: Uint8Array, filename: string): Uint8Array | null {
-  const codec = getCodec(CODEC_QR_GRID);
   let base: ImageDataLike;
   try {
     base = fileToImageData(bytes, filename);
   } catch {
     return null; // not a decodable image
   }
-  for (const maxSide of DECODE_MAX_SIDES) {
-    try {
-      return codec.decode(maxSide === Infinity ? base : downscale(base, maxSide));
-    } catch {
-      // try the next scale
-    }
-  }
-  return null;
+  return decodePixelsToPayload(base);
 }
 
 /** Decode already-RGBA pixels (e.g. a PDF raster) to a payload, with downscales. */
 export function decodePixelsToPayload(img: ImageDataLike): Uint8Array | null {
-  const codec = getCodec(CODEC_QR_GRID);
   for (const maxSide of DECODE_MAX_SIDES) {
     try {
-      return codec.decode(maxSide === Infinity ? img : downscale(img, maxSide));
+      return decodeWithAnyCodec(maxSide === Infinity ? img : downscale(img, maxSide));
     } catch {
       // try the next scale
     }

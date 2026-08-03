@@ -33,7 +33,12 @@ import {
   exportVaultBinary,
   exportVaultBinaryDisguised,
   getCodec,
+  codecName,
+  drawBrandBand,
+  recoveryLines,
   decodeHeader,
+  CODEC_COLOR_GRID,
+  CODEC_QR_GRID,
   PROFILE_DISK,
   wrapBinary,
   type GalleryCover,
@@ -197,6 +202,7 @@ async function generate(
   keyMode: KeyMode,
   content: Uint8Array,
   coverJpeg = false,
+  codecId: number = CODEC_QR_GRID,
 ): Promise<void> {
   const dir = join(outRoot, name);
   rmSync(dir, { recursive: true, force: true });
@@ -205,12 +211,18 @@ async function generate(
   const key = await makeKey();
   const { imagePayloads, keyBlock } = await exportVault(FILENAME, content, key, {
     profile: PROFILE_DISK,
+    codecId,
     keyMode,
   });
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
 
   imagePayloads.forEach((payload, i) => {
-    const img = codec.encode(payload, PROFILE_DISK);
+    // Branded exactly as the apps write them, so the fixture also proves the
+    // Python detector is not fooled by the strip above the symbol.
+    const img = drawBrandBand(codec.encode(payload, PROFILE_DISK), {
+      recovery: recoveryLines(codecName(codecId)),
+      lines: [`${i + 1} / ${imagePayloads.length}`],
+    });
     writePng(join(dir, `page-${String(i + 1).padStart(2, '0')}.png`), img);
   });
 
@@ -245,12 +257,20 @@ async function generate(
   writeFileSync(
     join(dir, 'manifest.json'),
     JSON.stringify(
-      { password: PASSWORD, filename: FILENAME, keyMode, images: imagePayloads.length },
+      {
+        password: PASSWORD,
+        filename: FILENAME,
+        keyMode,
+        images: imagePayloads.length,
+        codec: codecName(codecId),
+      },
       null,
       2,
     ),
   );
-  console.log(`fixture ${name}: ${imagePayloads.length} image(s), keyMode=${keyMode}`);
+  console.log(
+    `fixture ${name}: ${imagePayloads.length} image(s), keyMode=${keyMode}, codec=${codecName(codecId)}`,
+  );
 }
 
 /** Binary-container fixture (SPEC §8): a single file the Python decoder must
@@ -363,6 +383,10 @@ async function generateDisguisedNpStego(name: string, content: Uint8Array): Prom
 
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
+// The 8-colour grid (SPEC §2.2) — a much larger payload per image, so this also
+// exercises the Python decoder on a multi-image colour set.
+await generate('color-grid', 'embedded', pseudoRandom(20_000, 77), false, CODEC_COLOR_GRID);
+await generate('color-grid-keyfile', 'keyfile', content, false, CODEC_COLOR_GRID);
 await generate('keyfile', 'keyfile', content);
 await generate('stego', 'stego', content);
 await generate('stego-jpeg', 'stego', content, true);

@@ -9,8 +9,24 @@
 
 import { createKeyBlock, serializeKeyBlock, type KeyMode, type VaultKey } from '@core';
 import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/domhelpers';
-import { type Estimates, computeEstimates, formatSize } from '../ui/estimate';
-import { runSave, type AccessMode, type SaveRequest, type StegoInput } from '../ui/save-controller';
+import {
+  type Estimates,
+  envelopeLenFor,
+  estimatesFrom,
+  firstCodecThatFits,
+  formatSize,
+} from '../ui/estimate';
+import {
+  CODEC_CHOICES,
+  type CodecChoice,
+  codecApplies,
+  destKey,
+  runSave,
+  writesOneFile,
+  type AccessMode,
+  type SaveRequest,
+  type StegoInput,
+} from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
@@ -44,6 +60,7 @@ const estimateLine = el('estimate-line');
 const saveSize = el('save-size');
 const noFormat = el('no-format');
 const keymodeFields = el('keymode-fields');
+const codecFields = el('codec-fields');
 const stegoFields = el('stego-fields');
 const coverDrop = el('cover-drop');
 const coverFile = el<HTMLInputElement>('cover-file');
@@ -106,6 +123,7 @@ const restoreGalleryHint = el('restore-gallery-hint');
 
 const selectedDest = () => pick<Dest>('dest', 'disk');
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
+const selectedCodec = () => pick<CodecChoice>('codec', storedCodec());
 const selectedGalleryKeyMode = () => pick<KeyMode>('gallery-keymode', 'embedded');
 const selectedRestoreMode = () => pick<RestoreMode>('restore-mode', 'standard');
 const selectedAccessMode = () => pick<AccessMode>('accessmode', 'plain');
@@ -136,6 +154,14 @@ function reflectDestination(): void {
   // access mode — the factor is an extra layer on top of the mode (§10.3).
   show(keymodeFields, !gallery);
   show(estimateLine, !gallery);
+  // The codec choice only exists where we render image symbols.
+  show(codecFields, codecApplies(dest));
+  // Swap the pre-save copy between the image and single-file wordings.
+  for (const node of document.querySelectorAll<HTMLElement>('[data-i18n-file]')) {
+    const base = node.dataset.i18n;
+    const single = node.dataset.i18nFile;
+    if (base && single) node.textContent = msg(writesOneFile(dest) ? single : base);
+  }
   show(zipField, dest === 'disk');
   show(addBandLabel, dest === 'disk');
   show(bandFields, dest === 'paper' || (dest === 'disk' && addBand.checked));
@@ -166,6 +192,15 @@ function reflectAccessMode(): void {
 
 // Cached per-file availability, so switching destination doesn't recompress.
 let estimates: Estimates | null = null;
+// The envelope length is the one expensive step; cache it so switching codec or
+// key mode re-renders the counts instantly.
+let envelope: { file: File; len: number } | null = null;
+
+/** The web app has no prefs module, so the codec sticks in localStorage. */
+const CODEC_KEY = 'stegoshard.codec';
+function storedCodec(): CodecChoice {
+  return localStorage.getItem(CODEC_KEY) === 'qr' ? 'qr' : 'color';
+}
 
 const destRadios = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[name="dest"]'));
@@ -179,25 +214,81 @@ async function refreshEstimates(): Promise<void> {
     renderEstimate();
     return;
   }
-  const dests = destRadios().map((r) => r.value as Dest);
-  let est: Estimates;
+  let len: number;
   try {
-    est = await computeEstimates(file, dests, msg);
+    len = await envelopeLenFor(file);
   } catch {
     return; // couldn't read the file — leave destinations enabled, no estimate
   }
   if (saveFile.files?.[0] !== file) return; // a newer file superseded this
-  estimates = est;
-  for (const r of destRadios()) r.disabled = !est[r.value as Dest]?.available;
+  envelope = { file, len };
+  recomputeEstimates(); // also applies the gating
+  const est = estimates;
+  if (!est) return;
+  // A newly dropped file carries no prior intent about the destination, so this
+  // one may move it; a codec toggle never does.
   if (!est[selectedDest()]?.available) {
-    const ok = dests.find((d) => est[d]?.available);
+    const ok = destRadios()
+      .map((r) => r.value as Dest)
+      .find((d) => est[d]?.available);
     if (ok) {
       const radio = document.querySelector<HTMLInputElement>(`input[name="dest"][value="${ok}"]`);
       if (radio) radio.checked = true;
       reflectDestination();
+      renderEstimate();
     }
   }
+}
+
+/**
+ * Re-derive the counts from the cached envelope for the current selections, then
+ * re-apply the gating. Both the codec and the key mode move the image count, so
+ * either can make an option stop fitting — see the extension's copy for why this
+ * cannot live in `refreshEstimates` alone.
+ */
+function recomputeEstimates(): void {
+  const file = saveFile.files?.[0];
+  if (file && envelope?.file === file) {
+    estimates = estimatesFrom(
+      file.size,
+      envelope.len,
+      destRadios().map((r) => r.value as Dest),
+      msg,
+      { keyMode: selectedKeyMode(), codec: selectedCodec() },
+    );
+    applyAvailability();
+  }
   renderEstimate();
+}
+
+/** Grey out the destinations and codecs the current file cannot use. */
+function applyAvailability(): void {
+  const est = estimates;
+  if (!est) return;
+  for (const r of destRadios()) r.disabled = !est[r.value as Dest]?.available;
+
+  const here = est[selectedDest()];
+  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="codec"]')) {
+    radio.disabled = here?.codecFits ? here.codecFits[radio.value as CodecChoice] === false : false;
+  }
+  const usable = firstCodecThatFits(here, selectedCodec());
+  if (usable !== selectedCodec()) {
+    const radio = document.querySelector<HTMLInputElement>(
+      `input[name="codec"][value="${usable}"]`,
+    );
+    if (radio) radio.checked = true;
+  }
+}
+
+/** Label each codec option with the file count it would produce. */
+function renderCodecCounts(): void {
+  const e = estimates?.[selectedDest()];
+  for (const codec of CODEC_CHOICES) {
+    const slot = document.getElementById(`codec-count-${codec}`);
+    if (!slot) continue;
+    const n = e?.available ? e.counts?.[codec] : undefined;
+    slot.textContent = n === undefined ? '' : msg('codecCount', String(n));
+  }
 }
 
 /** Render the size line and the estimate / no-format line. */
@@ -207,10 +298,13 @@ function renderEstimate(): void {
   const anyOk = !estimates || destRadios().some((r) => estimates![r.value as Dest]?.available);
   show(noFormat, Boolean(file) && !anyOk);
   if (file && !anyOk) noFormat.textContent = msg('wizNoFormat');
-  // When nothing fits, the no-format error stands in for the estimate line.
-  show(estimateLine, selectedDest() !== 'gallery' && anyOk);
+  // When nothing fits, the no-format error stands in for the estimate line. The
+  // binary destinations write exactly one file, so a count there says nothing.
   const dest = selectedDest();
-  if (!file || dest === 'gallery' || !anyOk) return void (estimate.textContent = '—');
+  const counted = dest !== 'gallery' && dest !== 'binary' && dest !== 'sqlite';
+  show(estimateLine, counted && anyOk);
+  renderCodecCounts();
+  if (!file || !counted || !anyOk) return void (estimate.textContent = '—');
   const e = estimates?.[dest];
   estimate.textContent = e?.available ? String(e.count) : '—';
 }
@@ -242,13 +336,19 @@ addBand.addEventListener('change', () => show(bandFields, addBand.checked));
 for (const r of document.querySelectorAll('input[name="dest"]')) {
   r.addEventListener('change', () => {
     reflectDestination();
-    renderEstimate();
+    recomputeEstimates();
   });
 }
 for (const r of document.querySelectorAll('input[name="keymode"]')) {
   r.addEventListener('change', () => {
     reflectKeyMode();
-    renderEstimate();
+    recomputeEstimates();
+  });
+}
+for (const r of document.querySelectorAll('input[name="codec"]')) {
+  r.addEventListener('change', () => {
+    localStorage.setItem(CODEC_KEY, selectedCodec());
+    recomputeEstimates();
   });
 }
 for (const r of document.querySelectorAll('input[name="gallery-keymode"]')) {
@@ -313,7 +413,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
   saveBtn.disabled = true;
   show(saveResult, false);
   const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
-  setStatus(saveStatus, msg('statusSaving'));
+  setStatus(saveStatus, msg(destKey('statusSaving', selectedDest())));
   try {
     const req = await build();
     req.onProgress = prog.onProgress;
@@ -404,6 +504,7 @@ saveBtn.addEventListener('click', async () => {
     // The disguised .db path derives its slot KEK from the per-save password.
     password: dest === 'sqlite' ? savePw.value : undefined,
     keyMode,
+    codec: selectedCodec(),
     accessMode,
     duressPassword,
     decoy,
@@ -521,6 +622,14 @@ workflowsBtn.addEventListener('click', () => {
   view = 'chooser';
   showView();
 });
+
+// Restore the remembered codec before the first estimate render.
+{
+  const saved = document.querySelector<HTMLInputElement>(
+    `input[name="codec"][value="${storedCodec()}"]`,
+  );
+  if (saved) saved.checked = true;
+}
 
 // Highlight the last-used workflow as recommended.
 try {

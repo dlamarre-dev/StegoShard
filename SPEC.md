@@ -24,7 +24,7 @@ file bytes
   → vault blob               (§6)   [KB_LEN][key block][IV][ciphertext]
   → Reed-Solomon erasure     (§7)   k data + m parity shards, equal length
   → per-image payload        (§3)   header ‖ shard
-  → codec render             (§2)   one QR symbol per image
+  → codec render             (§2)   one symbol per image (qr-grid or color-grid)
 ```
 
 **Import** reverses each step. Reconstruction succeeds if **any k of the k+m**
@@ -32,7 +32,17 @@ shards survive (§7).
 
 ---
 
-## 2. Image codec — `qr-grid` (`CODEC_ID = 0`)
+## 2. Image codecs
+
+Two codecs turn the per-image payload of §3 into pixels. `CODEC_ID` in the header
+records which one produced an image, but it is **descriptive, not dispatch** —
+the header lives inside the payload, so a decoder cannot read it until it has
+already decoded the image. Decoders therefore sniff: mean chroma over a sparse
+sample of the pixels separates a greyscale QR from a saturated color grid, the
+likelier codec is tried first, and the other is the fallback. A wrong guess costs
+one extra attempt, never a failure.
+
+### 2.1 `qr-grid` (`CODEC_ID = 0`)
 
 Each image carries one **standard QR code** (a 1×1 grid in v1). The QR payload is
 the per-image payload of §3, placed in **byte mode**. QR's built-in Reed-Solomon
@@ -58,8 +68,122 @@ separate and additional.
   payload. (The Python reference decoder uses `zxing-cpp`, which returns the raw
   byte content — important for binary payloads.)
 
-Profiles: `DISK = 0`, `CLOUD = 1`, `PAPER = 2`. (Cloud and Paper profiles are
-defined here but exercised in later phases.)
+**Paper output always uses this codec.** Print, ink and camera white balance make
+colour a liability, so §2.2 is refused for `PROFILE_PAPER`.
+
+### 2.2 `color-grid` (`CODEC_ID = 2`)
+
+The digital-output codec. Each module is one of **eight colours** — the corners of
+the RGB cube — and so carries **3 bits**, against QR byte mode's ~0.75 bits per
+module. In practice that is ~3x the payload per image at Disk and ~2.3x at Cloud.
+
+The eight colours are maximally separated in RGB, which is what lets this survive
+JPEG. But chroma is the first thing a lossy codec discards (4:2:0 halves chroma
+resolution spatially, then quantizes it more coarsely than luma), so the Cloud
+profile uses large modules, samples only the middle of each one, and carries a
+much higher parity ratio.
+
+#### Palette
+
+Value `v` maps to `(bit2 = R, bit1 = G, bit0 = B)`, each channel fully off or on:
+
+| `v` | 0     | 1    | 2     | 3    | 4   | 5       | 6      | 7     |
+| --- | ----- | ---- | ----- | ---- | --- | ------- | ------ | ----- |
+|     | black | blue | green | cyan | red | magenta | yellow | white |
+
+#### Symbol layout
+
+A square grid of `n` modules, with a 4-module white quiet zone.
+
+- **Finders.** Four 7x7 concentric bullseyes at the corners, in black and white
+  only, so they survive chroma damage and are locatable by plain greyscale
+  thresholding. The centre line of each reads `1:1:3:1:1`
+  dark-light-dark-light-dark, as in QR. Each finder reserves an **8x8 box**: one
+  extra module of white separator on its two inner sides, without which an
+  adjacent dark data module merges with the outer ring and destroys the run
+  signature.
+- **Palette calibration.** Row `y = 8`, columns `x = 0…7`, holding values `0…7` in
+  canonical order. The decoder classifies data modules against these **observed**
+  colours rather than the nominal ones, which is what absorbs JPEG chroma shift,
+  gamma and white-balance drift.
+- **Data modules.** Everything else, read **column-major** (`x` outer, `y` inner),
+  skipping reserved modules. Each contributes 3 bits, packed MSB-first. The byte
+  stream is rarely a whole number of modules, so the final module carries one or
+  two real bits and zero padding.
+- **No format-information region.** Everything the decoder needs comes from the
+  geometry: the finder run lengths give the module pitch, the pitch and the
+  finder-centre span give `n`, and `n` selects the whole layout.
+
+#### Error correction
+
+Intra-image protection reuses the same Cauchy Reed-Solomon code as §7. That code
+corrects **erasures**, not errors — it must be told which blocks are bad — so each
+block carries its own checksum:
+
+1. The image payload is prefixed with a `u32` length and padded to `k·64`.
+2. It is split into `k` data blocks of **64 bytes**.
+3. `m` parity blocks are computed with the §7 encoding matrix.
+4. Every block, data and parity alike, is stored as `block ‖ CRC-32(block)`, i.e.
+   68 bytes. The CRC is IEEE 802.3 (reflected, polynomial `0xEDB88320`) — the same
+   function as zlib's `crc32`.
+
+The decoder verifies each CRC, passes the failures as erasures, and reconstructs.
+Because module order is column-major, **each block occupies a contiguous vertical
+stripe**: localized damage destroys a few blocks outright, which an erasure code
+absorbs, rather than lightly corrupting every block, which it cannot.
+
+#### Filler
+
+The bytes between the payload and `k·64`, and the handful of modules past the end
+of the byte stream, carry no information. Their **content is unspecified**: a
+decoder reads exactly `payload.length` bytes after the prefix and MUST ignore the
+rest. They are still covered by the block CRCs and the RS parity, like any other
+byte.
+
+Encoders should not leave them zeroed. The filler sits _outside_ the encryption,
+so a zeroed run paints a flat black band whose width states how much of the
+capacity the secret actually used. The reference encoder fills it from a small
+PRNG seeded with `CRC-32(payload)` — per-image rather than constant, so the same
+pattern does not appear in every part-full symbol and give the boundary away when
+two are compared.
+
+#### Profiles
+
+`n` is a pure function of the profile, and every other parameter is a pure
+function of `n`:
+
+| Profile | `n` | Module px | Parity | Blocks (`k` + `m`) | Usable payload | Rendered size |
+| ------- | --- | --------- | ------ | ------------------ | -------------- | ------------- |
+| Disk    | 168 | 4         | 12 %   | 135 + 19           | **8636** bytes | 704 px        |
+| Cloud   | 128 | 12        | 35 %   | 57 + 31            | **3644** bytes | 1632 px       |
+| Paper   | —   | —         | —      | —                  | unsupported    | —             |
+
+Derivation, for a grid of `n` modules: `dataModules = n² − 4·8² − 8`;
+`storable = ⌊dataModules·3 / 8⌋`; `blocks = ⌊storable / 68⌋`;
+`m = ⌈blocks·parity⌉`; `k = blocks − m`; `capacity = k·64 − 4`.
+
+Note the Disk symbol is _smaller_ than the QR it replaces (704 px against
+1086 px) while carrying 3.08x the payload.
+
+#### Decoding
+
+1. Threshold the luma at the midpoint of its range and scan rows for the
+   `1:1:3:1:1` signature. Confirm each candidate vertically through its centre,
+   requiring the horizontal and vertical module pitches to agree within 25 % —
+   this is what stops caption and brand text from posing as a finder.
+2. Cluster the surviving candidates and take the four extremes of `x ± y` as the
+   corners.
+3. Map grid coordinates to pixels by **bilinear interpolation** between the four
+   finder centres, which sit at module 3 from each edge. Digital images are
+   axis-aligned and at most uniformly rescaled, so this absorbs everything they
+   do without a homography solve — and it stays trivial to mirror in the Python
+   reference decoder.
+4. Sample the central 50 % of each module's area and classify to the nearest
+   observed calibration colour.
+5. Neither `n` nor the orientation is recorded, so try the grid size nearest the
+   measured pitch first, at each of the four quarter-turns, and keep whichever
+   recovers the most intact blocks. Only the sampling repeats; Reed-Solomon runs
+   once, at the end.
 
 ---
 
@@ -79,7 +203,7 @@ describes the whole set — there is no separate manifest image.
 |     13 |    2 | `SHARD_INDEX` | u16, global shard index `0 … k+m-1`     |
 |     15 |    2 | `K`           | u16, number of data shards              |
 |     17 |    2 | `M`           | u16, number of parity shards            |
-|     19 |    1 | `CODEC_ID`    | `0` = qr-grid                           |
+|     19 |    1 | `CODEC_ID`    | `0` qr-grid, `2` color-grid (§2)        |
 |     20 |    1 | `PROFILE`     | `0`=disk, `1`=cloud, `2`=paper          |
 |     21 |    4 | `SHARD_LEN`   | u32, bytes per shard (all shards equal) |
 |     25 |    4 | `BLOB_LEN`    | u32, true length of the vault blob (§6) |
@@ -778,34 +902,35 @@ trade gallery's core guarantee for a mode that already has a stronger home.
 
 ## 11. Constants summary
 
-| Name                  | Value                                                                             |
-| --------------------- | --------------------------------------------------------------------------------- |
-| `FORMAT_VERSION`      | 1                                                                                 |
-| Header magic          | `"SSHD"`                                                                          |
-| Key block magic       | `"SSKY"`                                                                          |
-| Binary magic          | `"SSBN"` (branded); SQLite DB, blob in `cache` table (disguised) (§8)             |
-| Header length         | 33 bytes                                                                          |
-| Codec IDs             | `0` QR-grid; `1` gallery (§9)                                                     |
-| Cipher                | AES-256-GCM, 12-byte IV, 16-byte tag                                              |
-| KDF                   | Argon2id, 32-byte output, salt 16 bytes                                           |
-| KDF defaults          | iterations 4, memory 256 MiB, parallelism 1                                       |
-| GF polynomial         | `0x11D`, generator `0x02`                                                         |
-| Parity                | `m = max(ceil(k·0.3), 2)`                                                         |
-| Data per shard        | `capacity(profile) − 33` (Disk 2767, Cloud 1567, Paper 767)                       |
-| Gallery salt          | `"StegoShard-gllry"` (16 bytes) (§9.1)                                            |
-| Gallery slot          | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)                       |
-| Limits                | file ≤ 1 MiB (images/PDF) or ≤ 1 GiB CLI / 256 MiB browser (binary); images ≤ 150 |
-| Gallery limits        | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)                                |
-| Compression           | gzip (RFC 1952), opportunistic                                                    |
-| Access structure      | `SLOT_COUNT` 4, `SLOT_SIZE` 76, `SLOT_ARRAY` 304; `REGION_COUNT` 2 (§10)          |
-| Vault salt            | 16 bytes, per-vault (§10.2)                                                       |
-| Region key label      | `"stegoshard/vault/region"` ‖ region_index (§10.2)                                |
-| Keyfile factor        | 32 bytes; HKDF label `"stegoshard/v1/keyfile-kek"` (§10.3)                        |
-| Stego factor envelope | `"SSKF"` ‖ version 1 ‖ factor 32 = 37 bytes, whitened (§10.3)                     |
-| Gallery ladder        | 4 KiB · 16 KiB · 64 KiB (§10.5)                                                   |
-| `.db` ladder          | 64 KiB · 256 KiB · 1 MiB · 4 MiB · 16 MiB · 64 MiB (§10.5)                        |
-| Gate label (Mode B)   | `"stegoshard/v1/slot-kek"` (§10.8)                                                |
-| Share (Mode B)        | 38 B: version 1 ‖ index 1 ‖ value 32 ‖ checksum 4; Shamir k-of-n GF(2^8) (§10.8)  |
+| Name                  | Value                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `FORMAT_VERSION`      | 1                                                                                                    |
+| Header magic          | `"SSHD"`                                                                                             |
+| Key block magic       | `"SSKY"`                                                                                             |
+| Binary magic          | `"SSBN"` (branded); SQLite DB, blob in `cache` table (disguised) (§8)                                |
+| Header length         | 33 bytes                                                                                             |
+| Codec IDs             | `0` qr-grid (§2.1); `1` gallery (§9); `2` color-grid (§2.2)                                          |
+| Cipher                | AES-256-GCM, 12-byte IV, 16-byte tag                                                                 |
+| KDF                   | Argon2id, 32-byte output, salt 16 bytes                                                              |
+| KDF defaults          | iterations 4, memory 256 MiB, parallelism 1                                                          |
+| GF polynomial         | `0x11D`, generator `0x02`                                                                            |
+| Parity                | `m = max(ceil(k·0.3), 2)`                                                                            |
+| Data per shard        | `capacity(profile) − 33`; qr-grid Disk 2767, Cloud 1567, Paper 767; color-grid Disk 8603, Cloud 3611 |
+| Color grid (§2.2)     | 8 colours = 3 bits/module; finder 7x7 in an 8x8 box; block 64 B ‖ CRC-32; Disk n=168, Cloud n=128    |
+| Gallery salt          | `"StegoShard-gllry"` (16 bytes) (§9.1)                                                               |
+| Gallery slot          | `SLOT_DATA` 2048, `FRAG_LEN` 2081, `SLOT_BYTES` 2109 (§9.2)                                          |
+| Limits                | file ≤ 1 MiB (images/PDF) or ≤ 1 GiB CLI / 256 MiB browser (binary); images ≤ 150                    |
+| Gallery limits        | blob ≤ 389120 bytes; photos 5–256; decoys ≥ 2 (§9)                                                   |
+| Compression           | gzip (RFC 1952), opportunistic                                                                       |
+| Access structure      | `SLOT_COUNT` 4, `SLOT_SIZE` 76, `SLOT_ARRAY` 304; `REGION_COUNT` 2 (§10)                             |
+| Vault salt            | 16 bytes, per-vault (§10.2)                                                                          |
+| Region key label      | `"stegoshard/vault/region"` ‖ region_index (§10.2)                                                   |
+| Keyfile factor        | 32 bytes; HKDF label `"stegoshard/v1/keyfile-kek"` (§10.3)                                           |
+| Stego factor envelope | `"SSKF"` ‖ version 1 ‖ factor 32 = 37 bytes, whitened (§10.3)                                        |
+| Gallery ladder        | 4 KiB · 16 KiB · 64 KiB (§10.5)                                                                      |
+| `.db` ladder          | 64 KiB · 256 KiB · 1 MiB · 4 MiB · 16 MiB · 64 MiB (§10.5)                                           |
+| Gate label (Mode B)   | `"stegoshard/v1/slot-kek"` (§10.8)                                                                   |
+| Share (Mode B)        | 38 B: version 1 ‖ index 1 ‖ value 32 ‖ checksum 4; Shamir k-of-n GF(2^8) (§10.8)                     |
 
 ---
 
@@ -822,7 +947,9 @@ The TypeScript core in `src/core/` is the reference encoder/decoder:
 | Payload envelope                | `payload.ts`                                                                                                  |
 | Image header                    | `header.ts`                                                                                                   |
 | Vault blob & flow               | `vault.ts`                                                                                                    |
-| QR-grid codec                   | `codec/qr-grid.ts`                                                                                            |
+| qr-grid codec (§2.1)            | `codec/qr-grid.ts`                                                                                            |
+| color-grid codec (§2.2)         | `codec/color-grid.ts`, `crc32.ts`; codec sniffing in `codec/index.ts`                                         |
+| Image branding                  | `brand.ts` (mark + 5x7 ASCII font, shared by the browser and the CLI)                                         |
 | Variable-len stego              | `stego.ts`                                                                                                    |
 | Gallery Mode (§9)               | `gallery.ts`                                                                                                  |
 | Access structures (§10)         | `crypto.ts` (slots + gated KEK), `buckets.ts`, `regions.ts`, `vault.ts` + `segmented.ts` (multi-region blobs) |
@@ -831,7 +958,7 @@ The TypeScript core in `src/core/` is the reference encoder/decoder:
 
 A standalone **Python reference decoder** in `python/stegoshard/` implements this
 same specification independently (GF(2^8) + Reed-Solomon, header, key block,
-Argon2id + AES-GCM, gzip, QR decode, deniable stego + Gallery Mode §9, and the §10
+Argon2id + AES-GCM, gzip, QR and color-grid decode, deniable stego + Gallery Mode §9, and the §10
 access structures — 4-slot / 2-region parse, gated + factor-mixed slot KEKs,
 per-region DEKs, and the duress + non-possession modes). It restores a vault without
 the extension

@@ -22,7 +22,7 @@ import zipfile
 from .binary_container import looks_like_binary_container, unwrap_binary
 from .crypto import WrongPasswordError
 from .pipeline import MissingKeyError, decode_vault, decode_vault_binary
-from .qr import decode_image
+from .codecs import decode_any
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
 
@@ -176,10 +176,10 @@ def main(argv: list[str] | None = None) -> int:
         if not images:
             print("no images found in the inputs", file=sys.stderr)
             return 2
-        payloads = [p for p in (decode_image(img) for img in images) if p is not None]
+        payloads = [p for p in (decode_any(img) for img in images) if p is not None]
         print(f"decoded {len(payloads)} of {len(images)} image(s)", file=sys.stderr)
         if not payloads:
-            print("no readable QR codes found", file=sys.stderr)
+            print("no readable QR codes or color grids found", file=sys.stderr)
             return 1
     else:
         key_block = None

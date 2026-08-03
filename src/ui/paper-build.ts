@@ -9,11 +9,21 @@
  */
 
 import { type PDFDocument, type PDFPage, rgb } from 'pdf-lib';
-import type { ImageDataLike } from '@core';
+import { ACCENT_TOP, STEGO_PATH, type ImageDataLike } from '@core';
 import { wrapText } from './text-wrap';
 
 /** Public project page — printed so the data can be restored without the store. */
 export const PROJECT_URL = 'https://github.com/dlamarre-dev/StegoShard';
+
+/** The brand accent, as a pdf-lib color. */
+const ACCENT = rgb(ACCENT_TOP[0] / 255, ACCENT_TOP[1] / 255, ACCENT_TOP[2] / 255);
+
+/** The mark's rounded tile, in the same 128-unit space as STEGO_PATH (rx 28/128). */
+const TILE_PATH = (() => {
+  const r = 28;
+  const e = 128 - r;
+  return `M ${r} 0 H ${e} A ${r} ${r} 0 0 1 128 ${r} V ${e} A ${r} ${r} 0 0 1 ${e} 128 H ${r} A ${r} ${r} 0 0 1 0 ${e} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
+})();
 
 export const A4 = { w: 595.28, h: 841.89 };
 export const MARGIN = 42;
@@ -294,6 +304,33 @@ export interface BuildPaperInput {
   keyLocation?: string | undefined;
 }
 
+/** Side of the app mark, in points, as drawn on a QR page. */
+const MARK_SIZE = 26;
+/** Larger mark for the instruction sheet's masthead. */
+const MASTHEAD_MARK = 34;
+
+/**
+ * Stamp the app mark as a *vector* path rather than an embedded PNG.
+ *
+ * Vector keeps it crisp at any print DPI, needs no per-environment asset loading
+ * through `BuildPaperInput`, and — the practical reason — adds no image XObject
+ * to the page. A logo PNG would be enumerated by `pdf-restore.ts` on every
+ * restore, pass its `width < 16` filter, and cost a wasted inflate plus decode
+ * attempts per page.
+ *
+ * `drawSvgPath` anchors the path's coordinate space y-down from `y`, so `y` is
+ * the *top* of the 128-unit box. The icon's accent gradient cannot be expressed
+ * as a flat fill, so the tile is a solid accent rectangle with the silhouette
+ * knocked out in white.
+ */
+function drawMark(page: PDFPage, x: number, yTop: number, size: number): void {
+  const opts = { x, y: yTop, scale: size / 128, borderWidth: 0 };
+  // `drawRectangle` has no corner radius, so the tile is a path too — both share
+  // the silhouette's 128-unit space, so one scale positions them together.
+  page.drawSvgPath(TILE_PATH, { ...opts, color: ACCENT });
+  page.drawSvgPath(STEGO_PATH, { ...opts, color: rgb(1, 1, 1) });
+}
+
 async function addInstructionSheet(
   pdf: PDFDocument,
   text: TextEngine,
@@ -301,6 +338,11 @@ async function addInstructionSheet(
 ): Promise<void> {
   const page = pdf.addPage([A4.w, A4.h]);
   let y = A4.h - MARGIN;
+
+  // Masthead: the mark plus the wordmark, above the first heading.
+  drawMark(page, MARGIN, y, MASTHEAD_MARK);
+  await text.block(page, 'StegoShard', MARGIN + MASTHEAD_MARK + 10, y - 6, 18, { bold: true });
+  y -= MASTHEAD_MARK + 14;
 
   for (const copy of instructionLangs(input.locale)) {
     y = (await text.block(page, copy.heading, MARGIN, y, 16, { bold: true })) - 8;
@@ -347,12 +389,20 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
 
     const page = pdf.addPage([A4.w, A4.h]);
     let y = A4.h - MARGIN;
+
+    // The mark sits top-right, in the space the left-anchored title and meta
+    // lines never use, so it costs the QR nothing: `side` below is clamped by
+    // the page width, with well over MARK_SIZE of vertical slack to spare.
+    drawMark(page, A4.w - MARGIN - MARK_SIZE, y, MARK_SIZE);
+
     if (title) {
       title.draw(page, MARGIN, y);
       y -= title.height + 4;
     }
     const meta = [input.date, `${pageWord} ${i + 1} / ${total}`].filter(Boolean).join('    ');
     y = (await text.block(page, meta, MARGIN, y, 10)) - 4;
+    // Never let the header furniture ride up into the mark.
+    y = Math.min(y, A4.h - MARGIN - MARK_SIZE - 6);
 
     const footerTop = MARGIN + footerHeight;
     const side = Math.min(A4.w - MARGIN * 2, y - footerTop - 10);

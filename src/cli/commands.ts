@@ -20,6 +20,7 @@ import { basename, join } from 'node:path';
 import { zipSync } from 'fflate';
 import {
   type BinaryVariant,
+  CODEC_COLOR_GRID,
   CODEC_QR_GRID,
   DEFAULT_ARGON2,
   MissingKeyError,
@@ -29,8 +30,10 @@ import {
   WrongPasswordError,
   binaryKeyName,
   binaryVaultName,
+  codecName,
   createKeyBlock,
   decodeHeader,
+  drawBrandBand,
   estimateImages,
   exportVault,
   exportVaultBinary,
@@ -40,7 +43,9 @@ import {
   getCodec,
   importVault,
   importVaultBinary,
+  isRenderableAscii,
   looksLikeBinaryContainer,
+  recoveryLines,
   serializeKeyBlock,
   toHex,
   unwrapBinary,
@@ -118,6 +123,15 @@ async function makeKey(password: string): Promise<VaultKey> {
 /** §10 access mode for the supported paths (.db, gallery). */
 export type AccessMode = 'plain' | 'duress' | 'nonpossession';
 
+/**
+ * Which image codec to render with (SPEC §2). 'color' packs ~3x the bytes per
+ * image; 'qr' is readable by any phone. Paper output is always 'qr'.
+ */
+export type CodecChoice = 'color' | 'qr';
+
+/** The codecs `--codec` accepts, in the order the help text lists them. */
+export const CODEC_CHOICES: readonly CodecChoice[] = ['color', 'qr'];
+
 export interface SaveOptions {
   inputFile: string;
   outDir: string;
@@ -133,6 +147,8 @@ export interface SaveOptions {
   decoyFile?: string | undefined;
   threshold?: { k: number; n: number } | undefined;
   keyMode: KeyMode;
+  /** Image codec for the disk destination. Paper always uses qr-grid. */
+  codec?: CodecChoice | undefined;
   cover?: string | undefined; // stego cover image path
   title?: string | undefined;
   date?: string | undefined;
@@ -325,13 +341,16 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   }
 
   const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
+  const codecId = codecIdForSave(opts.paper, opts.codec);
 
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(
     basename(opts.inputFile),
     content,
     key,
-    { profile, keyMode: opts.keyMode },
+    { profile, codecId, keyMode: opts.keyMode },
   );
+  // Read it back from the header rather than trusting the request, so the
+  // rendered pixels and the recovery line can never disagree with the payload.
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
   await verifyImageExport(imagePayloads, key.dek, basename(opts.inputFile), content);
   const setHex = toHex(setId);
@@ -368,11 +387,21 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     };
   }
 
-  // Disk: one PNG per image, or a single .zip.
-  const pngs = imagePayloads.map((payload, i) => ({
-    name: `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
-    bytes: imageDataToPng(codec.encode(payload, PROFILE_DISK)),
-  }));
+  // Disk: one PNG per image, or a single .zip. Each carries the same brand strip
+  // the browser stamps (shared renderer in @core), so the two agree pixel for
+  // pixel. --title/--date land here too; the core font is ASCII-only, so a title
+  // it cannot render is dropped rather than mangled.
+  const recovery = recoveryLines(codecName(codecId));
+  const pngs = imagePayloads.map((payload, i) => {
+    const caption = [opts.title, opts.date, `${i + 1} / ${imagePayloads.length}`]
+      .filter((s): s is string => Boolean(s))
+      .filter(isRenderableAscii);
+    const img = drawBrandBand(codec.encode(payload, PROFILE_DISK), { recovery, lines: caption });
+    return {
+      name: `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
+      bytes: imageDataToPng(img),
+    };
+  });
 
   if (opts.zip) {
     const entries: Record<string, Uint8Array> = {};
@@ -634,12 +663,43 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
 export async function runEstimate(
   inputFile: string,
   paper: boolean,
+  codec: CodecChoice = 'color',
 ): Promise<{ images: number; k: number; m: number }> {
   const content = read(inputFile);
   return estimateImages(basename(inputFile), content, {
     profile: paper ? PROFILE_PAPER : PROFILE_DISK,
+    codecId: codecIdForSave(paper, codec),
   });
 }
 
-// Re-export so main.ts can reference the codec id if needed.
-export { CODEC_QR_GRID };
+/**
+ * The codec a save will actually use. Paper always renders qr-grid, whatever was
+ * asked for, so `estimate` and `save` must agree on that or their image counts
+ * drift apart.
+ */
+export function codecIdForSave(paper: boolean, codec: CodecChoice | undefined): number {
+  return !paper && codec !== 'qr' ? CODEC_COLOR_GRID : CODEC_QR_GRID;
+}
+
+/**
+ * Reject a `--codec` / `--paper` combination that cannot mean what it says, and
+ * return the message to print. Null when the arguments are fine.
+ *
+ * `requested` is what the user actually typed, not the resolved default: plain
+ * `--paper` must keep working, and only an *explicit* `--codec color --paper` is
+ * a mistake worth naming.
+ */
+export function codecArgError(
+  requested: string | undefined,
+  paper: boolean,
+): string | null {
+  if (requested !== undefined && !CODEC_CHOICES.includes(requested as CodecChoice)) {
+    return `invalid --codec "${requested}"`;
+  }
+  if (requested === 'color' && paper) {
+    return '--codec color cannot be used with --paper (printed pages use QR)';
+  }
+  return null;
+}
+
+export { CODEC_COLOR_GRID, CODEC_QR_GRID };

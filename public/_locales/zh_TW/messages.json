@@ -63,13 +63,13 @@
     "message": "目的地"
   },
   "destDisk": {
-    "message": "磁碟（PNG 或 .zip）"
+    "message": "圖片"
   },
   "destPaper": {
-    "message": "紙本（可列印的 PDF）"
+    "message": "紙本"
   },
   "destCloud": {
-    "message": "Google 相簿（選用）"
+    "message": "相片"
   },
   "cloudNote": {
     "message": "僅為便利之用 — 切勿當作唯一的備份。"
@@ -121,10 +121,10 @@
     "message": "金鑰儲存方式"
   },
   "keyModeEmbedded": {
-    "message": "簡單 — 只需一組圖片"
+    "message": "內嵌"
   },
   "keyModeKeyfile": {
-    "message": "更安全 — 獨立的金鑰檔案"
+    "message": "金鑰檔"
   },
   "keyModeHelp": {
     "message": "使用獨立的金鑰檔案時，即使圖片外洩，單靠圖片也無法得知任何內容 — 但您必須同時保管 .key 檔案。"
@@ -369,7 +369,7 @@
     "description": "Web restore: camera could not be started."
   },
   "keyModeStego": {
-    "message": "藏在照片中",
+    "message": "藏在相片中",
     "description": "Key mode: hide the key block in a cover photo (stego)."
   },
   "coverTitle": {
@@ -414,7 +414,7 @@
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
   "destBinary": {
-    "message": "檔案（不使用影像）",
+    "message": "檔案",
     "description": "Popup: binary (single file) destination."
   },
   "binaryVariantHeading": {
@@ -556,7 +556,7 @@
     "description": "Gallery Mode error: nothing restorable."
   },
   "destGallery": {
-    "message": "藏在照片中（相簿）",
+    "message": "相簿",
     "description": "Popup: Gallery Mode destination — hide the secret across ordinary photos."
   },
   "restoreModeStandard": {
@@ -732,7 +732,7 @@
     "description": "Wizard: stego key-mode description."
   },
   "destSqlite": {
-    "message": "誘餌資料庫（.db）",
+    "message": "誘餌資料庫",
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
@@ -1003,5 +1003,53 @@
   "errModeExcluded": {
     "message": "此存取模式僅適用於誘餌資料庫（.db）或相簿。",
     "description": "Error: mode on an excluded path."
+  },
+  "codecHeading": {
+    "message": "影像編碼"
+  },
+  "codecColor": {
+    "message": "彩色格點"
+  },
+  "codecColorDesc": {
+    "message": "每格使用八種顏色而非黑白，資料量約為三倍，檔案數量約為三分之一。最適合磁碟與雲端。"
+  },
+  "codecQr": {
+    "message": "QR 碼"
+  },
+  "codecQrDesc": {
+    "message": "任何手機都能讀取的黑白 QR 碼。同樣的秘密需要較多檔案，但若希望影像的壽命超過這個應用程式，這是最保險的選擇。"
+  },
+  "codecHelp": {
+    "message": "兩者的還原方式相同，StegoShard 會自動辨識讀取。彩色每張影像可容納更多資料；QR 則是通用性最高的格式。列印頁面一律使用 QR。"
+  },
+  "codecCount": {
+    "message": "$N$ 個檔案",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "btnSaveFile": {
+    "message": "加密並下載檔案"
+  },
+  "wizRunSaveFile": {
+    "message": "建立檔案"
+  },
+  "statusSavingFile": {
+    "message": "正在加密並寫入檔案…"
+  },
+  "keyModeEmbeddedDescFile": {
+    "message": "金鑰隨檔案一起儲存。最簡單，只需記住一組密碼。"
+  },
+  "keyModeKeyfileDescFile": {
+    "message": "另存一個 .key 檔案，與保險庫檔案分開保管。還原時兩者缺一不可。"
+  },
+  "keyModeHelpFile": {
+    "message": "使用獨立的金鑰檔時，保險庫檔案即使外洩本身也不會透露任何內容，但你必須同時保管 .key。"
+  },
+  "restoreModeHeading": {
+    "message": "要從什麼還原？"
   }
 }

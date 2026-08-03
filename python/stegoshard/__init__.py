@@ -4,7 +4,8 @@ format (see SPEC.md), so a vault can be restored without the browser extension.
 Public API (lazily imported so the pure modules — gf256, reedsolomon, format —
 can be used without the crypto / QR dependencies installed):
     decode_vault(payloads, password, key_block=None) -> RestoredFile
-    decode_image(data) -> bytes | None
+    decode_any(data) -> bytes | None      # any image codec (SPEC §2)
+    decode_image(data) -> bytes | None    # qr-grid only
 """
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ _LAZY = {
     "RestoredFile": "pipeline",
     "MissingKeyError": "pipeline",
     "WrongPasswordError": "crypto",
+    "decode_any": "codecs",
     "decode_image": "qr",
+    "decode_color_grid": "color_grid",
     "extract_key_block": "stego",
     "extract_key_block_jpeg": "stego",
     "extract_key_block_from_image": "stego",

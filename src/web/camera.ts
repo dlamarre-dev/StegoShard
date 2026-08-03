@@ -7,7 +7,7 @@
  * harmless) and handed to the normal import path alongside file uploads.
  */
 
-import { CODEC_QR_GRID, getCodec, toHex } from '@core';
+import { decodeWithAnyCodec, toHex } from '@core';
 import { el, setStatus } from '../ui/domhelpers';
 import { msg } from './i18n';
 
@@ -56,7 +56,6 @@ export function wireCamera(ids: CameraElements, onChange: (count: number) => voi
   const video = el<HTMLVideoElement>(ids.video);
   const count = el(ids.count);
   const errorStatus = el(ids.errorStatus);
-  const codec = getCodec(CODEC_QR_GRID);
 
   let stream: MediaStream | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -76,7 +75,7 @@ export function wireCamera(ids: CameraElements, onChange: (count: number) => voi
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, w, h);
     try {
-      const payload = codec.decode(ctx.getImageData(0, 0, w, h));
+      const payload = decodeWithAnyCodec(ctx.getImageData(0, 0, w, h));
       const key = toHex(payload);
       if (!seen.has(key)) {
         seen.add(key);

@@ -16,6 +16,8 @@ import {
   type KeyMode,
   type OnProgress,
   type VaultKey,
+  CODEC_COLOR_GRID,
+  CODEC_QR_GRID,
   WrongPasswordError,
   parseKeyBlock,
   unlockKeyBlock,
@@ -23,6 +25,45 @@ import {
 import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
 
 export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'cloud' | 'gallery';
+
+/**
+ * Which image codec the digital destinations render with (SPEC §2).
+ *
+ * 'color' packs ~3x the bytes per image, so a vault needs about a third as many
+ * files; 'qr' is the conservative choice, readable by any phone. Paper is always
+ * 'qr' — print, ink and camera white balance make colour a liability there.
+ */
+export type CodecChoice = 'color' | 'qr';
+
+/** Codecs offered to the user, in display order. */
+export const CODEC_CHOICES: readonly CodecChoice[] = ['color', 'qr'];
+
+/**
+ * True when a destination writes one opaque file rather than a set of images.
+ *
+ * The pre-save copy has to follow: telling someone saving a `.ssbn` that we are
+ * about to "download images" is simply wrong. Keys that need both wordings carry
+ * a `File` variant, chosen through `destKey`.
+ */
+export function writesOneFile(dest: SaveDestination): boolean {
+  return dest === 'binary' || dest === 'sqlite';
+}
+
+/** Pick the image- or file-worded variant of a message key for a destination. */
+export function destKey(base: string, dest: SaveDestination): string {
+  return writesOneFile(dest) ? `${base}File` : base;
+}
+
+/** Destinations that render images, and so let the user pick a codec. */
+export function codecApplies(dest: SaveDestination): boolean {
+  return dest === 'disk' || dest === 'cloud';
+}
+
+/** Map a user choice to the CODEC_ID stored in the image header. */
+export function codecIdFor(dest: SaveDestination, codec: CodecChoice | undefined): number {
+  if (!codecApplies(dest)) return CODEC_QR_GRID;
+  return codec === 'color' ? CODEC_COLOR_GRID : CODEC_QR_GRID;
+}
 
 /** §10 access mode for the deniable paths (gallery, .db). Mutually exclusive. */
 export type AccessMode = 'plain' | 'duress' | 'nonpossession';
@@ -47,6 +88,8 @@ export interface SaveRequest {
    */
   key?: VaultKey | undefined;
   keyMode?: KeyMode;
+  /** Image codec for the disk/cloud destinations. Ignored elsewhere. */
+  codec?: CodecChoice | undefined;
   /** Readable title band drawn above disk images. */
   label?: { title?: string; date?: string } | undefined;
   asZip?: boolean | undefined;
@@ -179,6 +222,7 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
     const { saveToPhotos } = await import('./google-photos');
     const { imageCount, albumTitle } = await saveToPhotos(req.file, req.key, {
       keyMode,
+      codecId: codecIdFor('cloud', req.codec),
       title: req.label?.title || undefined,
       date: req.label?.date,
     });
@@ -232,6 +276,7 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
   // disk
   const { imageCount } = await saveFileToDisk(req.file, req.key, {
     keyMode,
+    codecId: codecIdFor('disk', req.codec),
     label: req.label,
     asZip: req.asZip ?? true,
     stego: req.stego,

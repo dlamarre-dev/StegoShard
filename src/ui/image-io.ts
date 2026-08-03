@@ -6,9 +6,11 @@
  */
 
 import {
-  CODEC_QR_GRID,
   JpegUnsupportedError,
   StegoCoverFormatError,
+  codecName,
+  decodeWithAnyCodec,
+  drawBrandBand,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
   embedKeyFactorStego,
@@ -17,8 +19,8 @@ import {
   extractKeyBlockStegoJpeg,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
-  getCodec,
   isJpeg,
+  recoveryLines,
   type GalleryCover,
   type GalleryImage,
   type ImageDataLike,
@@ -51,6 +53,7 @@ export interface LabelBand {
   total: number;
 }
 
+/** Height of the optional user-caption strip, above the brand strip. */
 const BAND_HEIGHT = 70;
 
 /** Render an ImageDataLike to a lossless PNG blob. */
@@ -65,14 +68,33 @@ export async function imageDataToPngBlob(img: ImageDataLike): Promise<Blob> {
 }
 
 /**
- * Render the QR with an optional readable label band on top. The band lives
- * *outside* the QR area (its own white strip), so the QR's quiet zone is
- * untouched and decoding is unaffected. Everything in the band is cleartext.
+ * Render a generated symbol as a PNG, stamped with the StegoShard mark and an
+ * optional readable caption.
+ *
+ * Two strips sit above the symbol, both *outside* its area, so the quiet zone is
+ * untouched and decoding is unaffected:
+ *
+ *  - The brand strip comes from `@core`, so the browser and the CLI stamp the
+ *    same pixels. It carries the mark, the wordmark, and a recovery line naming
+ *    the format version and codec — an image found years from now says what it
+ *    is and where the spec lives.
+ *  - The caption strip, when the user asked for a label, is drawn with canvas
+ *    text so a title in any script renders (the core font is ASCII-only).
+ *
+ * Everything in both strips is cleartext, by design.
+ *
+ * Callers that must stay unbranded for deniability — gallery covers, stego key
+ * covers, disguised binaries — use `imageDataToPngBlob` instead.
  */
-export async function imageWithLabelToPngBlob(img: ImageDataLike, band?: LabelBand): Promise<Blob> {
-  if (!band) return imageDataToPngBlob(img);
+export async function imageWithLabelToPngBlob(
+  img: ImageDataLike,
+  band: LabelBand | undefined,
+  codecId: number,
+): Promise<Blob> {
+  const branded = drawBrandBand(img, { recovery: recoveryLines(codecName(codecId)) });
+  if (!band) return imageDataToPngBlob(branded);
 
-  const canvas = new OffscreenCanvas(img.width, img.height + BAND_HEIGHT);
+  const canvas = new OffscreenCanvas(branded.width, branded.height + BAND_HEIGHT);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('image-io: 2D canvas context unavailable');
 
@@ -82,7 +104,7 @@ export async function imageWithLabelToPngBlob(img: ImageDataLike, band?: LabelBa
   ctx.fillStyle = '#000000';
   ctx.textBaseline = 'top';
   const pad = 12;
-  const maxW = img.width - pad * 2;
+  const maxW = branded.width - pad * 2;
   if (band.title) {
     ctx.font = 'bold 22px sans-serif';
     ctx.fillText(band.title, pad, 10, maxW);
@@ -91,8 +113,8 @@ export async function imageWithLabelToPngBlob(img: ImageDataLike, band?: LabelBa
   ctx.font = '16px sans-serif';
   ctx.fillText(sub, pad, 42, maxW);
 
-  const pixels = new Uint8ClampedArray(img.data);
-  ctx.putImageData(new ImageData(pixels, img.width, img.height), 0, BAND_HEIGHT);
+  const pixels = new Uint8ClampedArray(branded.data);
+  ctx.putImageData(new ImageData(pixels, branded.width, branded.height), 0, BAND_HEIGHT);
   return canvas.convertToBlob({ type: 'image/png' });
 }
 
@@ -125,21 +147,22 @@ export async function fileToImageData(
   }
 }
 
-// Sizes to try when decoding an image. Rendered PNGs decode at the first (their
-// natural size is already below the cap); photos of printed pages need to be
-// downscaled from multiple megapixels before the QR decoder can locate the code.
-const DECODE_MAX_SIDES = [1400, 1000, 1800];
+// Sizes to try when decoding an image. Natural size comes first so our own
+// rendered PNGs are read without any resampling — that matters most for the
+// color grid, whose modules are only a few pixels wide at the disk profile.
+// Photos of printed pages need to be downscaled from multiple megapixels before
+// the QR decoder can locate the code.
+const DECODE_MAX_SIDES = [Infinity, 1400, 1000, 1800];
 
 /**
  * Decode one image's bytes to a codec payload, trying a few downscales. Returns
- * null when no QR is readable (a lost image is tolerated by erasure coding).
+ * null when no symbol is readable (a lost image is tolerated by erasure coding).
  */
 export async function decodeImageBytes(bytes: Uint8Array): Promise<Uint8Array | null> {
-  const codec = getCodec(CODEC_QR_GRID);
   const blob = new Blob([bytes as BufferSource]);
   for (const maxSide of DECODE_MAX_SIDES) {
     try {
-      return codec.decode(await fileToImageData(blob, maxSide));
+      return decodeWithAnyCodec(await fileToImageData(blob, maxSide));
     } catch {
       // Try the next scale.
     }

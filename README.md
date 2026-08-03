@@ -59,10 +59,10 @@ Start from the question that actually matters for your secret:
 These are **not two points on a continuum — they are two incompatible guarantees**,
 and picking one is a deliberate trade-off:
 
-| Model                    | Primary goal                     | Survives recompression | Plausible deniability |
-| ------------------------ | -------------------------------- | :--------------------: | :-------------------: |
-| 🛡 **Resilient Storage** | Reliable backup                  | ✅ Yes                 | ❌ No                 |
-| 🎭 **Deniable Storage**  | Hide that the data even exists   | ❌ No                  | ✅ Yes                |
+| Model                   | Primary goal                   | Survives recompression | Plausible deniability |
+| ----------------------- | ------------------------------ | :--------------------: | :-------------------: |
+| 🛡 **Resilient Storage** | Reliable backup                |         ✅ Yes         |         ❌ No         |
+| 🎭 **Deniable Storage** | Hide that the data even exists |         ❌ No          |        ✅ Yes         |
 
 The more you optimize to survive transformations, the more detectable the carrier
 becomes; the more you optimize for deniability, the more fragile the storage. This
@@ -98,16 +98,46 @@ The security goal is one axis; the **carrier** is another. Each model offers mor
 one output form, so you pick both — what guarantee you want, and what the result looks
 like on disk:
 
-| Output form | Model | What it is |
-| ----------- | :---: | ---------- |
-| **QR-grid images** (disk / paper / cloud) | 🛡 Resilient | Openly artificial images; survive recompression, printing, and cloud storage. |
-| **Opaque binary file** (`.ssbn`) | 🛡 Resilient | One compact file for larger secrets (up to 1 GiB in the CLI, 256 MiB in the browser; no image-count ceiling). Not deniable — clearly a StegoShard vault. |
-| **Decoy database** (`.db`) | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Optional **duress** (a plausible decoy opens under a 2nd password) or **non-possession** (gated on threshold shares you don't hold) access modes (SPEC §10). Survives copying; deniability is shallow against a tool that actually opens it. |
-| **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. Also supports **non-possession** access mode (SPEC §10); duress mode is `.db`-only. |
+| Output form                                    |    Model    | What it is                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | :---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Coded images** (disk / paper / cloud)        | 🛡 Resilient | Openly artificial images; survive recompression, printing, and cloud storage. Digital output defaults to an **8-colour grid** — 3 bits per module instead of QR's ~0.75, so roughly a third as many files — with plain QR one click away, and always used for print. Either is restored automatically.                                                       |
+| **Opaque binary file** (`.ssbn`)               | 🛡 Resilient | One compact file for larger secrets (up to 1 GiB in the CLI, 256 MiB in the browser; no image-count ceiling). Not deniable — clearly a StegoShard vault.                                                                                                                                                                                                     |
+| **Decoy database** (`.db`)                     | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Optional **duress** (a plausible decoy opens under a 2nd password) or **non-possession** (gated on threshold shares you don't hold) access modes (SPEC §10). Survives copying; deniability is shallow against a tool that actually opens it. |
+| **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. Also supports **non-possession** access mode (SPEC §10); duress mode is `.db`-only.                                                                                                                                       |
 
 The binary file and decoy database are peers of the image output, not afterthoughts:
 they are how you store a **larger** secret (up to 1 GiB), resiliently or deniably, when
 the image count would otherwise be impractical.
+
+### What the output looks like
+
+The same 40 KB file, saved three ways. These are real artifacts straight out of the
+pipeline — regenerate them with `npm run samples`.
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/images/sample-color-grid.png" alt="A StegoShard colour-grid image: a dense grid of eight-colour squares under a header bearing the app mark, the wordmark, the format version and the spec URL." width="230">
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/images/sample-qr-grid.png" alt="A StegoShard QR-grid image: a black-and-white QR code under the same header." width="230">
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/images/sample-paper.png" alt="A page of a StegoShard printable PDF: a title, the date and page number, the app mark, a high-error-correction QR code, and restore instructions in the footer." width="230">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><b>Colour grid</b> · disk / cloud<br>7 images · 8636 B each · 704 px</td>
+    <td align="center"><b>QR code</b> · anywhere<br>20 images · 2800 B each · 1086 px</td>
+    <td align="center"><b>Printable PDF</b> · paper<br>one high-ECC QR per page<br>(<a href="docs/images/sample-paper.pdf">sample PDF</a>)</td>
+  </tr>
+</table>
+
+Note the colour image is the _smaller_ picture of the two while holding three times as
+much — which is why the same secret needs 7 files instead of 20. Both are restored the
+same way; StegoShard reads either automatically, so the choice costs you nothing later.
+Every image carries the mark, the format version, the codec name and the spec URL, so one
+found years from now says what it is and where to go to read it.
 
 ## Quickstart
 
@@ -177,7 +207,7 @@ transient memory** for it; it is freed as soon as the key is derived.
 but it takes **real, visible time on the large binary path** (`.ssbn` / `.db`, up to
 **256 MiB** in the browser or **1 GiB** in the CLI). There the file is gzip-compressed,
 encrypted with a chunked authenticated cipher, and then decrypted once more to prove the
-save round-trips *before* you are told it succeeded — on a large file that is a few seconds
+save round-trips _before_ you are told it succeeded — on a large file that is a few seconds
 of work, not instant. So the work is made honest and non-blocking:
 
 - In the **browser**, the binary encrypt/decrypt runs in a **Web Worker** (off the UI
@@ -213,7 +243,7 @@ an external review, not features.
 **Complete and tested:**
 
 - **Crypto core** — Argon2id KEK/DEK, AES-256-GCM, opportunistic gzip, Reed-Solomon
-  erasure coding, the QR-grid image codec, and the self-describing header. The layer is
+  erasure coding, the qr-grid and color-grid image codecs, and the self-describing header. The layer is
   documented for auditors in a [cryptographic review dossier](docs/CRYPTO-REVIEW.md)
   (claims → where enforced → which test proves it), with frozen cross-implementation
   test vectors and exhaustive negative/fuzz testing.
@@ -238,7 +268,7 @@ an external review, not features.
 - **Access structures** _(🎭 Deniable — SPEC §10)_ — on `.db` and Gallery: **duress
   mode**, a plausible decoy payload that opens under a second, independent password
   while the real region stays unreachable from that credential (`.db` only); and
-  **non-possession mode**, gating the real payload on Shamir *k*-of-*n* threshold
+  **non-possession mode**, gating the real payload on Shamir _k_-of-_n_ threshold
   shares the writer never keeps, so "I cannot decrypt this" is literally true below
   threshold. Unlock is constant-work and region-blind — no slot, region, or mode ever
   leaks to the caller, logs, or errors.
@@ -278,17 +308,17 @@ tool.
 
 ## Documentation
 
-| Doc | What's in it |
-| --- | ------------ |
-| [Why StegoShard?](docs/WHY.md) | The problem, and the reasoning behind the two-model design. |
-| [Where it fits](docs/COMPARISON.md) | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
-| [Command-line reference](docs/CLI.md) | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging. |
-| [Threat model](docs/THREAT-MODEL.md) | Adversaries, what each model defends against, and the deliberate non-goals. |
-| [Format specification](SPEC.md) | The frozen on-disk / on-image format (`FORMAT_VERSION = 1`). |
-| [Cryptographic review dossier](docs/CRYPTO-REVIEW.md) | Claims → where enforced → which test proves it, for auditors. |
-| [Roadmap](docs/ROADMAP.md) · [Privacy](docs/PRIVACY.md) · [Terms](docs/TERMS.md) | Direction, privacy policy, terms of use. |
-| [Localization](docs/LOCALIZATION.md) · [Store guide](docs/STORE.md) · [Versioning](docs/VERSIONING.md) | Translation setup, store submission, format-version policy. |
-| [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | How to contribute; how to report vulnerabilities. |
+| Doc                                                                                                    | What's in it                                                                                    |
+| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| [Why StegoShard?](docs/WHY.md)                                                                         | The problem, and the reasoning behind the two-model design.                                     |
+| [Where it fits](docs/COMPARISON.md)                                                                    | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
+| [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                      |
+| [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                     |
+| [Format specification](SPEC.md)                                                                        | The frozen on-disk / on-image format (`FORMAT_VERSION = 1`).                                    |
+| [Cryptographic review dossier](docs/CRYPTO-REVIEW.md)                                                  | Claims → where enforced → which test proves it, for auditors.                                   |
+| [Roadmap](docs/ROADMAP.md) · [Privacy](docs/PRIVACY.md) · [Terms](docs/TERMS.md)                       | Direction, privacy policy, terms of use.                                                        |
+| [Localization](docs/LOCALIZATION.md) · [Store guide](docs/STORE.md) · [Versioning](docs/VERSIONING.md) | Translation setup, store submission, format-version policy.                                     |
+| [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)                                              | How to contribute; how to report vulnerabilities.                                               |
 
 ## Contributing & security
 

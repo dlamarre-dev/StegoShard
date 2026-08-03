@@ -7,6 +7,70 @@ format** is versioned separately — see [docs/VERSIONING.md](docs/VERSIONING.md
 
 ## [Unreleased]
 
+### Added
+
+- **8-colour grid codec (`color-grid`, `CODEC_ID = 2`)** for digital output —
+  three bits per module instead of QR byte mode's ~0.75. A disk vault now fits
+  **8636 bytes per image** against QR's 2800, in a _smaller_ PNG (704 px vs
+  1086 px), which moves the practical ceiling from ~415 KB to ~1.2 MB at the
+  unchanged 150-image limit. Cloud carries 3644 bytes per image and is gated by a
+  JPEG recompression + downscale test. See [SPEC.md](SPEC.md) §2.2.
+  - Intra-image error correction reuses the project's own Reed-Solomon: every
+    64-byte block carries a CRC-32, so a damaged block becomes a known erasure.
+  - Adds **no dependencies** in either TypeScript or Python.
+- **A codec choice in the UI and CLI.** The expert UI, the guided wizard and
+  `--codec color|qr` all offer both; colour is the default for disk and cloud.
+  Restore needs no choice at all — decoders detect the codec from the pixels, so
+  **every image ever written with QR stays readable**. Printed pages are always
+  QR: print, ink and camera white balance make colour a liability.
+- **Per-codec file counts in the estimate**, updating live as you switch codec,
+  so the effect of the choice is visible before you commit to a save.
+- **StegoShard branding on generated images and PDFs.** Saved images carry the
+  mark, the wordmark, and a recovery line naming the format version, the codec
+  and the spec URL — so an image found years from now says what it is and where
+  to read about it. The PDF gets the mark as a vector path on every page plus a
+  masthead on the instruction sheet. Gallery covers, stego key covers and
+  disguised containers stay unbranded, as deniability requires.
+- **Colour-grid support in the Python reference decoder**, with new
+  cross-implementation conformance fixtures. `python/requirements.txt` is
+  unchanged — still common PyPI wheels, still offline-capable.
+- **Sample images in the README**, one per output form, generated from the real
+  pipeline by `npm run samples` (`scripts/gen-samples.ts`).
+- Unused capacity in a colour grid is filled with pseudo-random colour instead of
+  being zeroed. The filler is outside the encryption, so a zeroed run painted a
+  flat black band whose width stated how much of the capacity the secret used.
+  Content is unspecified by the format and decoders ignore it, so this changes
+  nothing for reading images written either way.
+
+### Changed
+
+- **Expert-mode destination and key pickers** are now an icon plus a one-to-three
+  word label, with the longer explanation on hover and keyboard focus. The
+  descriptions were already written for the guided wizard and are reused as-is.
+- **The pre-save copy says "file" rather than "images"** when the destination is
+  a `.ssbn` or a decoy `.db`, which write exactly one file. The estimate line is
+  hidden there too, instead of always reporting `1`.
+- The CLI's `--title` / `--date` now appear on disk images. They were accepted
+  and silently ignored on that path.
+
+### Fixed
+
+- The output estimate ignored the selected key mode, so changing it re-rendered a
+  number that never moved.
+- **Rejecting a non-StegoShard image could take over a minute.** The colour-grid
+  finder search clustered candidates in a way that went quadratic on noisy input,
+  so a 12 MP photo of a printed page — which every restore feeds through the
+  detector, on the main thread — took ~82 s to turn down. Now ~0.3 s.
+- The codec and key mode both move the image count, so either can push a
+  destination past the image limit; the UI only re-checked that when a new file
+  was dropped. Picking a combination that no longer fitted left every control
+  looking fine and failed at the very end of the save instead. Availability is
+  now re-evaluated on every change, and a codec that would blow the limit greys
+  out **the codec** rather than taking the destination down with it.
+- Radio options in the segmented pickers and the wizard cards had **no visible
+  focus indicator** — the radios are visually hidden, and no ring was drawn on the
+  label. The `<fieldset>` groups also had no accessible name.
+
 ## [0.9.0] - 2026-07-23
 
 First tagged pre-1.0 release. Consolidates a round of hardening, reliability, and
@@ -32,7 +96,7 @@ the vault blob are unchanged.
 ### Changed
 
 - **Argon2id defaults raised to 256 MiB / t=4** (from 64 MiB / t=3).
-- **Disguised SQLite container** now stores the vault *inside* a valid database
+- **Disguised SQLite container** now stores the vault _inside_ a valid database
   (rows of a `cache` table under an interior b-tree, no trailing bytes) instead of
   appended after a stub, and spreads it across several rows.
 - Coverage gate raised (branches 80 → 85); dev dependencies updated (Vitest 4,
