@@ -56,6 +56,8 @@ import {
 
 export interface SaveOptions {
   keyMode: KeyMode;
+  /** Image codec (SPEC §2). Defaults to qr-grid when unset. */
+  codecId?: number | undefined;
   /** When set, a readable title band is drawn above each image. */
   label?: { title?: string; date?: string } | undefined;
   /** Bundle all images (+ .key) into a single .zip instead of many files. */
@@ -119,9 +121,11 @@ export async function saveFileToDisk(
   const content = new Uint8Array(await file.arrayBuffer());
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
     profile: PROFILE_DISK,
+    codecId: options.codecId,
     keyMode: options.keyMode,
   });
-  const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
+  const codecId = decodeHeader(imagePayloads[0]!).codecId;
+  const codec = getCodec(codecId);
   const setHex = toHex(setId);
   const total = imagePayloads.length;
 
@@ -134,7 +138,7 @@ export async function saveFileToDisk(
     const index = String(i + 1).padStart(2, '0');
     pngs.push({
       name: `stegoshard-${setHex}-${index}.png`,
-      bytes: await blobBytes(await imageWithLabelToPngBlob(img, band)),
+      bytes: await blobBytes(await imageWithLabelToPngBlob(img, band, codecId)),
     });
   }
   // The key block is external for keyfile/stego modes. In stego mode it is

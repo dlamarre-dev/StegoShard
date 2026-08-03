@@ -141,10 +141,10 @@ export interface VaultKey {
 }
 
 export interface ExportOptions {
-  profile?: number;
-  codecId?: number;
+  profile?: number | undefined;
+  codecId?: number | undefined;
   /** 'embedded' stores the key block in the images; others deliver it externally. */
-  keyMode?: KeyMode;
+  keyMode?: KeyMode | undefined;
 }
 
 export interface ExportResult {

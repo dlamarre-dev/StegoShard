@@ -24,8 +24,12 @@ function pseudoRandom(len: number, seed: number): Uint8Array {
  * real images (bytes → QR pixels → bytes), tolerating missing images. The disk
  * profile is lossless, so rendering and decoding is a faithful identity.
  */
+// Rendering and decoding a whole image set is real work, and it runs alongside
+// the rest of the suite under coverage instrumentation.
+const SLOW = { timeout: 60_000 };
+
 describe('end-to-end pipeline through rendered images', () => {
-  it('restores a file after rendering every payload to a QR image', async () => {
+  it('restores a file after rendering every payload to a QR image', SLOW, async () => {
     const codec = getCodec(CODEC_QR_GRID);
     const key = await makeKey('hunter2');
     const content = pseudoRandom(2500, 123);
@@ -48,7 +52,7 @@ describe('end-to-end pipeline through rendered images', () => {
     expect([...out.content]).toEqual([...content]);
   });
 
-  it('restores from images even when some are missing', async () => {
+  it('restores from images even when some are missing', SLOW, async () => {
     const codec = getCodec(CODEC_QR_GRID);
     const key = await makeKey('pw');
     const content = pseudoRandom(2500, 456);

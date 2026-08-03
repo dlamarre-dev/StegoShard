@@ -17,11 +17,9 @@ export type KeyMode = 'embedded' | 'keyfile' | 'stego';
 /** Robustness profile, matched to the degradation channel of the destination. */
 export type Profile = 'disk' | 'cloud' | 'paper';
 
-/** Image codec family. QR-grid is the starting implementation (plan §1). */
-export type CodecId = 'qr-grid' | 'dc-block';
-
-/** Non-sensitive UI preferences persisted in storage.local. */
-export interface Prefs {
-  destination: Destination;
-  keyMode: KeyMode;
-}
+/**
+ * Image codec family (SPEC §2). The numeric `CODEC_ID` in `header.ts` is what
+ * actually travels in an image; these names are what the spec and the recovery
+ * strip call them.
+ */
+export type CodecId = 'qr-grid' | 'color-grid';

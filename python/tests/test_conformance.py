@@ -12,7 +12,7 @@ import pathlib
 
 import pytest
 
-from stegoshard import WrongPasswordError, decode_image, decode_vault
+from stegoshard import WrongPasswordError, decode_any, decode_vault
 from stegoshard.pipeline import MissingKeyError
 
 FIXTURES = pathlib.Path(__file__).parent / "_fixtures"
@@ -28,7 +28,9 @@ def _load(name: str):
     manifest = json.loads((d / "manifest.json").read_text())
     payloads = []
     for img in sorted(d.glob("page-*.png")):
-        payload = decode_image(img.read_bytes())
+        # decode_any picks the codec from the pixels, exactly as the apps do —
+        # the fixtures carry no out-of-band hint about which one was used.
+        payload = decode_any(img.read_bytes())
         assert payload is not None, f"failed to decode {img.name}"
         payloads.append(payload)
     expected = (d / "expected.bin").read_bytes()
@@ -41,6 +43,33 @@ def test_embedded_round_trip():
     manifest, payloads, expected, _key = _load("embedded")
     restored = decode_vault(payloads, manifest["password"])
     assert restored.filename == manifest["filename"]
+    assert restored.content == expected
+
+
+def test_color_grid_round_trip():
+    """The 8-colour grid (SPEC §2.2), branded exactly as the apps write it."""
+    manifest, payloads, expected, _key = _load("color-grid")
+    assert manifest["codec"] == "color-grid"
+    restored = decode_vault(payloads, manifest["password"])
+    assert restored.filename == manifest["filename"]
+    assert restored.content == expected
+
+
+def test_color_grid_beats_qr_on_density():
+    """A colour set carries far more per image than the QR set would."""
+    color, _, color_expected, _ = _load("color-grid")
+    qr, _, qr_expected, _ = _load("embedded")
+    color_per_image = len(color_expected) / color["images"]
+    qr_per_image = len(qr_expected) / qr["images"]
+    assert color_per_image > qr_per_image * 2
+
+
+def test_color_grid_keyfile_needs_external_key():
+    manifest, payloads, expected, key = _load("color-grid-keyfile")
+    assert manifest["codec"] == "color-grid"
+    with pytest.raises(MissingKeyError):
+        decode_vault(payloads, manifest["password"])
+    restored = decode_vault(payloads, manifest["password"], key)
     assert restored.content == expected
 
 
@@ -73,7 +102,7 @@ def test_stego_key_image_round_trip():
     manifest = json.loads((d / "manifest.json").read_text())
     payloads = []
     for img in sorted(d.glob("page-*.png")):
-        payload = decode_image(img.read_bytes())
+        payload = decode_any(img.read_bytes())
         assert payload is not None
         payloads.append(payload)
     expected = (d / "expected.bin").read_bytes()
@@ -103,7 +132,7 @@ def test_stego_jpeg_key_image_round_trip():
     manifest = json.loads((d / "manifest.json").read_text())
     payloads = []
     for img in sorted(d.glob("page-*.png")):
-        payload = decode_image(img.read_bytes())
+        payload = decode_any(img.read_bytes())
         assert payload is not None
         payloads.append(payload)
     expected = (d / "expected.bin").read_bytes()

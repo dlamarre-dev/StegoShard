@@ -23,6 +23,8 @@ export const HEADER_LEN = 33;
 export const CODEC_QR_GRID = 0;
 /** Gallery Mode carries the header||shard inside a sealed stego slot (SPEC §9). */
 export const CODEC_GALLERY = 1;
+/** Eight-colour grid, ~3x the bytes per image on digital output (SPEC §2.2). */
+export const CODEC_COLOR_GRID = 2;
 export const PROFILE_DISK = 0;
 export const PROFILE_CLOUD = 1;
 export const PROFILE_PAPER = 2;

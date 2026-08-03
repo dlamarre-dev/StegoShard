@@ -63,13 +63,13 @@
     "message": "保存先"
   },
   "destDisk": {
-    "message": "ディスク（PNG または .zip）"
+    "message": "画像"
   },
   "destPaper": {
-    "message": "紙（印刷可能な PDF）"
+    "message": "紙"
   },
   "destCloud": {
-    "message": "Google フォト（任意）"
+    "message": "フォト"
   },
   "cloudNote": {
     "message": "あくまで補助であり、唯一のコピーにはしないでください。"
@@ -121,10 +121,10 @@
     "message": "鍵の保存方法"
   },
   "keyModeEmbedded": {
-    "message": "シンプル — 画像一式のみ"
+    "message": "埋め込み"
   },
   "keyModeKeyfile": {
-    "message": "より安全 — 鍵ファイルを分離"
+    "message": "鍵ファイル"
   },
   "keyModeHelp": {
     "message": "鍵ファイルを分けておくと、画像が流出しても単独では何も分かりません。ただし .key も保管する必要があります。"
@@ -369,7 +369,7 @@
     "description": "Web restore: camera could not be started."
   },
   "keyModeStego": {
-    "message": "写真の中に",
+    "message": "写真に隠す",
     "description": "Key mode: hide the key block in a cover photo (stego)."
   },
   "coverTitle": {
@@ -414,7 +414,7 @@
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
   "destBinary": {
-    "message": "ファイル（画像なし）",
+    "message": "ファイル",
     "description": "Popup: binary (single file) destination."
   },
   "binaryVariantHeading": {
@@ -556,7 +556,7 @@
     "description": "Gallery Mode error: nothing restorable."
   },
   "destGallery": {
-    "message": "写真に隠す（ギャラリー）",
+    "message": "ギャラリー",
     "description": "Popup: Gallery Mode destination — hide the secret across ordinary photos."
   },
   "restoreModeStandard": {
@@ -732,7 +732,7 @@
     "description": "Wizard: stego key-mode description."
   },
   "destSqlite": {
-    "message": "おとりデータベース（.db）",
+    "message": "囮DB",
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
@@ -1003,5 +1003,53 @@
   "errModeExcluded": {
     "message": "このアクセスモードはおとりデータベース（.db）または写真ギャラリー専用です。",
     "description": "Error: mode on an excluded path."
+  },
+  "codecHeading": {
+    "message": "画像コード"
+  },
+  "codecColor": {
+    "message": "カラーグリッド"
+  },
+  "codecColorDesc": {
+    "message": "白黒ではなく 1 マスに 8 色。約 3 倍のデータが入るため、ファイル数はおよそ 3 分の 1 になります。ディスクとクラウドに最適です。"
+  },
+  "codecQr": {
+    "message": "QRコード"
+  },
+  "codecQrDesc": {
+    "message": "どのスマートフォンでも読み取れる白黒の QR コードです。同じ秘密でもファイル数は増えますが、画像をこのアプリより長く残したい場合はこれが最も安全です。"
+  },
+  "codecHelp": {
+    "message": "復元方法はどちらも同じで、StegoShard が自動的に判別して読み取ります。カラーは 1 枚あたりの容量が大きく、QR はより広く読み取れる形式です。印刷ページは常に QR を使います。"
+  },
+  "codecCount": {
+    "message": "$N$ ファイル",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "btnSaveFile": {
+    "message": "暗号化してファイルをダウンロード"
+  },
+  "wizRunSaveFile": {
+    "message": "ファイルを作成"
+  },
+  "statusSavingFile": {
+    "message": "暗号化してファイルを書き出しています…"
+  },
+  "keyModeEmbeddedDescFile": {
+    "message": "鍵はファイルの中に入ります。最も簡単で、覚えておくのはパスワードだけです。"
+  },
+  "keyModeKeyfileDescFile": {
+    "message": "別の .key ファイルを、保管ファイルとは別の場所に保存します。復元には両方が必要です。"
+  },
+  "keyModeHelpFile": {
+    "message": "鍵ファイルを分けておけば、保管ファイルが漏れてもそれだけでは何も分かりません。ただし .key も保管する必要があります。"
+  },
+  "restoreModeHeading": {
+    "message": "何から復元しますか？"
   }
 }

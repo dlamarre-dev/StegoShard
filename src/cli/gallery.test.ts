@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { encode as encodePng } from 'fast-png';
+import { decode as decodePng, encode as encodePng } from 'fast-png';
 import { runGalleryRestore, runGallerySave } from './commands';
 
 // Production Argon2 (64 MiB) runs on save and restore; give CI room.
@@ -57,6 +57,15 @@ describe('CLI gallery round-trip', () => {
     expect(save.files.length).toBe(COVERS);
     expect(save.k + save.m + save.decoys).toBe(COVERS);
     expect(save.decoys).toBeGreaterThanOrEqual(2);
+
+    // Gallery photos must carry no StegoShard branding — the whole point is that
+    // they pass as ordinary pictures. Every output keeps its cover's exact
+    // dimensions, so no band was added.
+    for (const file of save.files) {
+      const out = decodePng(new Uint8Array(readFileSync(file)));
+      expect(out.width, `${file} width`).toBe(256);
+      expect(out.height, `${file} height`).toBe(256);
+    }
 
     const restoreDir = tmp();
     const res = await runGalleryRestore({ inputs: [albumDir], outDir: restoreDir, password: PW });

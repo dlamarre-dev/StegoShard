@@ -6,6 +6,8 @@
 
 export * from './bytes';
 export * from './types';
+export * from './crc32';
+export * from './brand';
 export * from './gf256';
 export * from './reed-solomon';
 export * from './compress';

@@ -18,6 +18,8 @@ import {
   runGallerySave,
   runRestore,
   runSave,
+  codecArgError,
+  type CodecChoice,
   type SaveOptions,
 } from './commands';
 import {
@@ -46,7 +48,7 @@ file, or a decoy database, and restore it.
 Usage:
   stegoshard save <file> [options]
   stegoshard restore <images|folder|zip|pdf ...> [options]
-  stegoshard estimate <file> [--paper]
+  stegoshard estimate <file> [--paper] [--codec color|qr]
   stegoshard gallery-save <file> <cover-photos|folder ...> [options]
   stegoshard gallery-restore <photos|folder ...> [options]
 
@@ -62,6 +64,9 @@ Save options:
   --decoy <file>         --mode duress: the plausible decoy file
   --duress-password-file <path>  --mode duress: the 2nd (duress) password
   --threshold <k-of-n>   --mode nonpossession: e.g. 2-of-3 (writes n share files)
+  --codec <codec>        color | qr   (default: color; images only, not --paper)
+                         color: 8-colour grid, ~3x the bytes per image
+                         qr:    plain QR, readable by any phone
   --key-mode <mode>      embedded | keyfile | stego   (default: embedded)
   --cover <image>        Cover photo for --key-mode stego (key hidden in it)
   --title <text>         Human-readable label / PDF title
@@ -258,6 +263,7 @@ async function main(argv: string[]): Promise<number> {
       'duress-password-file': { type: 'string' },
       share: { type: 'string', multiple: true },
       'key-mode': { type: 'string' },
+      codec: { type: 'string' },
       cover: { type: 'string' },
       title: { type: 'string' },
       date: { type: 'string' },
@@ -285,6 +291,10 @@ async function main(argv: string[]): Promise<number> {
     if (!KEY_MODES.includes(keyMode)) fail(`save: invalid --key-mode "${keyMode}"`);
     if (keyMode === 'stego' && !values.cover)
       fail('save: --key-mode stego requires --cover <image>');
+    const requestedCodec = values.codec as string | undefined;
+    const codecProblem = codecArgError(requestedCodec, Boolean(values.paper));
+    if (codecProblem) fail(`save: ${codecProblem}`);
+    const codec = (requestedCodec ?? 'color') as CodecChoice;
     if (values.binary && values.paper) fail('save: --binary and --paper are mutually exclusive');
     if (values.disguise && !values.binary) fail('save: --disguise requires --binary');
     const binary = values.binary ? (values.disguise ? 'disguised' : 'branded') : undefined;
@@ -317,6 +327,7 @@ async function main(argv: string[]): Promise<number> {
       decoyFile: values.decoy as string | undefined,
       threshold,
       keyMode,
+      codec,
       cover: values.cover as string | undefined,
       title: values.title as string | undefined,
       date: (values.date as string | undefined) ?? new Date().toISOString().slice(0, 10),
@@ -431,7 +442,10 @@ async function main(argv: string[]): Promise<number> {
   if (command === 'estimate') {
     const inputFile = positionals[0];
     if (!inputFile) fail('estimate: missing <file>');
-    const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper));
+    const estProblem = codecArgError(values.codec as string | undefined, Boolean(values.paper));
+    if (estProblem) fail(`estimate: ${estProblem}`);
+    const estCodec = ((values.codec as string | undefined) ?? 'color') as CodecChoice;
+    const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper), estCodec);
     process.stdout.write(`${images} image(s)  (k=${k} data + m=${m} parity)\n`);
     return 0;
   }

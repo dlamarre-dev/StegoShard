@@ -10,15 +10,26 @@
 import { type KeyMode, type VaultKey } from '@core';
 import { friendlyError as friendlyErrorWith, reflectFiles, wireDropzone } from './domhelpers';
 import {
+  CODEC_CHOICES,
+  type CodecChoice,
+  codecApplies,
+  destKey,
   recoveryGuidance,
   runSave,
   type SaveDestination,
   type SaveRequest,
+  writesOneFile,
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
 import type { Msg } from './save-controller';
 import { makeProgressUI } from './progress-ui';
-import { type DestEstimate, type Estimates, computeEstimates, formatSize } from './estimate';
+import {
+  type DestEstimate,
+  type Estimates,
+  computeEstimates,
+  firstCodecThatFits,
+  formatSize,
+} from './estimate';
 import { generatePassphrase, passwordStrength } from './password';
 
 export interface WizardCamera {
@@ -63,12 +74,15 @@ interface State {
   file: File | null;
   dest: SaveDestination;
   keyMode: KeyMode;
+  codec: CodecChoice;
   stegoCover: File | null;
   covers: File[];
   savePassword: string;
-  /** Per-destination availability for `file`, and which file it was computed for. */
+  /** Per-destination availability for `file`, and what it was computed from. */
   estimates: Estimates | null;
   estimatesFor: File | null;
+  /** The other inputs the counts depend on, so a change invalidates the cache. */
+  estimatesKey: string | null;
   // restore
   restoreMode: RestoreMode;
   restoreFiles: File[];
@@ -85,11 +99,13 @@ function initialState(env: WizardEnv): State {
     file: null,
     dest: env.saveDestinations[0] ?? 'disk',
     keyMode: 'embedded',
+    codec: 'color',
     stegoCover: null,
     covers: [],
     savePassword: '',
     estimates: null,
     estimatesFor: null,
+    estimatesKey: null,
     restoreMode: 'standard',
     restoreFiles: [],
     keyFile: null,
@@ -160,6 +176,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     if (state.action === 'save') {
       const s = ['action', 'file', 'dest'];
       if (state.dest === 'gallery') s.push('covers');
+      // Only the image destinations render a symbol worth choosing a codec for.
+      if (codecApplies(state.dest)) s.push('codec');
       // Key handling applies to every destination now (gallery too): embedded,
       // a separate .key, or hidden in a photo.
       s.push('keymode');
@@ -196,14 +214,26 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
 
   // --- per-file destination availability + counts (shared with the expert UI) --
 
-  /** Compute (once per file) which destinations fit and their output counts. */
+  /**
+   * Compute which destinations fit and their output counts, caching by every
+   * input that moves the numbers.
+   *
+   * Keying the cache on the file alone was wrong: the key mode changes the image
+   * count too, and the key-mode step runs *after* the destination step, so the
+   * availability shown at the destination step would never be revisited.
+   */
   async function ensureEstimates(): Promise<void> {
     const file = state.file;
-    if (!file || state.estimatesFor === file) return;
-    const est = await computeEstimates(file, env.saveDestinations, msg);
+    const key = file ? `${state.keyMode}` : null;
+    if (!file || (state.estimatesFor === file && state.estimatesKey === key)) return;
+    const est = await computeEstimates(file, env.saveDestinations, msg, {
+      keyMode: state.keyMode,
+      codec: state.codec,
+    });
     if (state.file !== file) return; // a newer file superseded this computation
     state.estimates = est;
     state.estimatesFor = file;
+    state.estimatesKey = key;
     // If the remembered destination no longer fits, fall back to the first that does.
     if (!est[state.dest]?.available) {
       const firstOk = env.saveDestinations.find((d) => est[d]?.available);
@@ -216,9 +246,17 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     env.saveDestinations.filter((d) => state.estimates?.[d]?.available);
 
   function countNote(dest: SaveDestination, e: DestEstimate): string {
-    if (dest === 'binary' || dest === 'sqlite') return msg('wizOneFile');
+    if (writesOneFile(dest)) return msg('wizOneFile');
     if (dest === 'gallery') return msg('wizGalleryPhotos', String(e.needed ?? e.count));
-    return msg('wizImagesCount', String(e.count));
+    // Follow whichever codec this destination would actually use.
+    const n = e.counts?.[firstCodecThatFits(e, state.codec)] ?? e.count;
+    return msg('wizImagesCount', String(n));
+  }
+
+  /** How many files the chosen destination would need under a given codec. */
+  function codecNote(codec: CodecChoice): string | undefined {
+    const n = state.estimates?.[state.dest]?.counts?.[codec];
+    return n === undefined ? undefined : msg('codecCount', String(n));
   }
 
   // --- option lists (radio-style cards reusing the .segmented look) ----------
@@ -475,6 +513,31 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           ),
         };
       }
+      case 'codec': {
+        // A codec that would blow the image limit is disabled here rather than
+        // taking the destination down with it; snap off it if it was remembered.
+        const here = state.estimates?.[state.dest];
+        state.codec = firstCodecThatFits(here, state.codec);
+        return {
+          title: msg('codecHeading'),
+          body: optionList(
+            'wiz-codec',
+            CODEC_CHOICES.map((c) => ({
+              value: c,
+              label: msg(`codec${c[0]!.toUpperCase()}${c.slice(1)}`),
+              desc: msg(`codec${c[0]!.toUpperCase()}${c.slice(1)}Desc`),
+              // The file count is the whole reason this choice is worth making,
+              // so put it on the card rather than making the user infer it.
+              note: codecNote(c),
+              disabled: here?.codecFits?.[c] === false,
+            })),
+            state.codec,
+            (v) => {
+              state.codec = v as CodecChoice;
+            },
+          ),
+        };
+      }
       case 'keymode':
         return {
           title: msg('wizKeyTitle'),
@@ -618,6 +681,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       if (state.dest === 'gallery')
         lines.push(`${msg('galleryCoversTitle')}: ${state.covers.length}`);
       else lines.push(`${msg('keyModeHeading')}: ${keyModeLabel(state.keyMode)}`);
+      if (codecApplies(state.dest)) {
+        lines.push(`${msg('codecHeading')}: ${codecLabel(state.codec)}`);
+      }
     } else {
       lines.push(
         `${msg('restoreModeStandard')}/${msg('restoreModeGallery')}: ${state.restoreMode}`,
@@ -634,6 +700,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   }
   function keyModeLabel(k: KeyMode): string {
     return msg(`keyMode${k[0]!.toUpperCase()}${k.slice(1)}`);
+  }
+  function codecLabel(c: CodecChoice): string {
+    return msg(`codec${c[0]!.toUpperCase()}${c.slice(1)}`);
   }
 
   // --- run the actual save / restore -----------------------------------------
@@ -662,6 +731,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       // The disguised .db path derives its slot KEK from this per-save password.
       password: state.dest === 'sqlite' ? state.savePassword : undefined,
       keyMode: state.keyMode,
+      codec: state.codec,
       // Guided uses friendly defaults for the advanced knobs the expert UI exposes.
       asZip: state.dest === 'disk' ? true : undefined,
       includeInstructions: state.dest === 'paper',
@@ -698,7 +768,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   async function run(runBtn: HTMLButtonElement, status: HTMLElement): Promise<void> {
     runBtn.disabled = true;
     status.classList.remove('error');
-    status.textContent = msg(state.action === 'save' ? 'statusSaving' : 'statusRestoring');
+    status.textContent = msg(
+      state.action === 'save' ? destKey('statusSaving', state.dest) : 'statusRestoring',
+    );
     const { bar, fill } = ensureProgress(status);
     const prog = makeProgressUI(bar, fill, status, msg);
     try {
@@ -837,7 +909,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       nextBtn = h('button', {
         class: 'btn-primary btn-lg',
         type: 'button',
-        text: msg(state.action === 'save' ? 'wizRunSave' : 'wizRunRestore'),
+        text: msg(state.action === 'save' ? destKey('wizRunSave', state.dest) : 'wizRunRestore'),
       });
       nextBtn.addEventListener('click', () => void run(nextBtn, status));
     } else {

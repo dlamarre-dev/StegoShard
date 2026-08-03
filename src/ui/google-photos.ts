@@ -71,8 +71,7 @@ async function ensurePermissions(): Promise<void> {
 /** Obtain an access token (cached in the session), running the OAuth flow if needed. */
 async function getToken(): Promise<string> {
   const cached = (await browser.storage.session.get(TOKEN_KEY))[TOKEN_KEY] as
-    | CachedToken
-    | undefined;
+    CachedToken | undefined;
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
   const redirectUri = browser.identity.getRedirectURL();
@@ -128,7 +127,8 @@ async function uploadBytes(token: string, bytes: Uint8Array, fileName: string): 
     },
     body: bytes as BufferSource,
   });
-  if (!resp.ok) throw new Error(`upload failed ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  if (!resp.ok)
+    throw new Error(`upload failed ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
   return resp.text(); // the body is the upload token
 }
 
@@ -154,7 +154,12 @@ async function batchCreate(
 export async function saveToPhotos(
   file: File,
   key: VaultKey,
-  options: { keyMode: KeyMode; title?: string | undefined; date?: string | undefined },
+  options: {
+    keyMode: KeyMode;
+    codecId?: number | undefined;
+    title?: string | undefined;
+    date?: string | undefined;
+  },
 ): Promise<{ imageCount: number; albumTitle: string }> {
   await ensurePermissions();
   const token = await getToken();
@@ -162,9 +167,11 @@ export async function saveToPhotos(
   const content = new Uint8Array(await file.arrayBuffer());
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
     profile: PROFILE_CLOUD,
+    codecId: options.codecId,
     keyMode: options.keyMode,
   });
-  const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
+  const codecId = decodeHeader(imagePayloads[0]!).codecId;
+  const codec = getCodec(codecId);
   // Verify the local encode restores before uploading. (The cloud QR uses the
   // recompression-robust PROFILE_CLOUD; server-side JPEG recompression itself
   // isn't verifiable here without re-download — see docs.)
@@ -176,12 +183,11 @@ export async function saveToPhotos(
   const created: { fileName: string; uploadToken: string; description: string }[] = [];
   for (let i = 0; i < imagePayloads.length; i++) {
     const img = codec.encode(imagePayloads[i]!, PROFILE_CLOUD);
-    const blob = await imageWithLabelToPngBlob(img, {
-      title: options.title,
-      date: options.date,
-      index: i + 1,
-      total: imagePayloads.length,
-    });
+    const blob = await imageWithLabelToPngBlob(
+      img,
+      { title: options.title, date: options.date, index: i + 1, total: imagePayloads.length },
+      codecId,
+    );
     const png = new Uint8Array(await blob.arrayBuffer());
     const fileName = `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`;
     const uploadToken = await uploadBytes(token, png, fileName);

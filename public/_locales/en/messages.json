@@ -88,15 +88,15 @@
     "description": "Popup: destination selector heading."
   },
   "destDisk": {
-    "message": "Disk (PNG or .zip)",
+    "message": "Images",
     "description": "Popup: disk destination."
   },
   "destPaper": {
-    "message": "Paper (printable PDF)",
+    "message": "Paper",
     "description": "Popup: paper destination."
   },
   "destCloud": {
-    "message": "Google Photos (optional)",
+    "message": "Photos",
     "description": "Popup: Google Photos destination."
   },
   "cloudNote": {
@@ -161,11 +161,11 @@
     "description": "Key-mode selector heading."
   },
   "keyModeEmbedded": {
-    "message": "Keep it simple — one set of images",
+    "message": "Embedded",
     "description": "Embedded key mode (plain language)."
   },
   "keyModeKeyfile": {
-    "message": "Extra safety — a separate key file",
+    "message": "Key file",
     "description": "Keyfile key mode (plain language)."
   },
   "keyModeHelp": {
@@ -530,11 +530,11 @@
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
   "destBinary": {
-    "message": "File (no images)",
+    "message": "File",
     "description": "Popup: binary (single file) destination."
   },
   "destGallery": {
-    "message": "Hide in photos (Gallery)",
+    "message": "Gallery",
     "description": "Popup: Gallery Mode destination — hide the secret across ordinary photos."
   },
   "restoreModeStandard": {
@@ -848,7 +848,7 @@
     "description": "Wizard: stego key-mode description."
   },
   "destSqlite": {
-    "message": "Decoy database (.db)",
+    "message": "Decoy DB",
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
@@ -1105,5 +1105,67 @@
   "errModeExcluded": {
     "message": "This access mode is only for the decoy database (.db) or photo galleries.",
     "description": "Error: mode on an excluded path."
+  },
+  "codecHeading": {
+    "message": "Image code",
+    "description": "Heading for the image-codec picker (colour grid vs QR)."
+  },
+  "codecColor": {
+    "message": "Colour grid",
+    "description": "Codec option: the 8-colour grid."
+  },
+  "codecColorDesc": {
+    "message": "Eight colours per square instead of black and white — about three times the data, so roughly a third as many files. Best for disk and cloud.",
+    "description": "Codec option description: the 8-colour grid."
+  },
+  "codecQr": {
+    "message": "QR code",
+    "description": "Codec option: a standard QR code."
+  },
+  "codecQrDesc": {
+    "message": "A plain black-and-white QR code any phone can read. More files for the same secret, but the safest choice if the images must outlive this app.",
+    "description": "Codec option description: a standard QR code."
+  },
+  "codecHelp": {
+    "message": "Both are restored the same way — StegoShard reads either automatically. Colour packs more into each image; QR is the more universally readable format. Printed pages always use QR.",
+    "description": "Explanation shown under the codec picker."
+  },
+  "codecCount": {
+    "message": "$N$ files",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "12"
+      }
+    },
+    "description": "File count shown under a codec option, e.g. '12 files'. $N$ is the count."
+  },
+  "btnSaveFile": {
+    "message": "Encrypt & download file",
+    "description": "Save button when the destination writes one file, not images."
+  },
+  "wizRunSaveFile": {
+    "message": "Create the file",
+    "description": "Wizard run button when the destination writes one file."
+  },
+  "statusSavingFile": {
+    "message": "Encrypting and writing the file…",
+    "description": "Progress status when the destination writes one file."
+  },
+  "keyModeEmbeddedDescFile": {
+    "message": "The key travels inside the file. Simplest — one password is all you keep.",
+    "description": "Embedded key mode description when the output is a single file."
+  },
+  "keyModeKeyfileDescFile": {
+    "message": "A separate .key file, stored apart from the vault file. Both are needed to restore.",
+    "description": "Key-file mode description when the output is a single file."
+  },
+  "keyModeHelpFile": {
+    "message": "With a separate key file, a leaked vault file reveals nothing on its own — but you must keep the .key too.",
+    "description": "Key-mode help when the output is a single file."
+  },
+  "restoreModeHeading": {
+    "message": "What are you restoring from?",
+    "description": "Screen-reader name for the restore-mode radio group."
   }
 }

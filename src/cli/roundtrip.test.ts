@@ -10,7 +10,8 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
-import { runEstimate, runRestore, runSave } from './commands';
+import { runEstimate, runRestore, runSave, codecArgError, codecIdForSave } from './commands';
+import { CODEC_COLOR_GRID, CODEC_QR_GRID } from '@core';
 
 // Production Argon2 (64 MiB) runs on every save; give these room under CI.
 const SLOW = { timeout: 60_000 };
@@ -316,19 +317,86 @@ describe('CLI round-trips', () => {
     expect(sizeWarning).toMatch(/binary/);
   });
 
-  it('estimate matches the actual image count', SLOW, async () => {
-    const dir = tmp();
+  it('accepts plain --paper, and only rejects an explicit --codec color with it', () => {
+    // Regression: the codec default is 'color', so validating the *resolved*
+    // value instead of what the user typed broke `save --paper` outright.
+    expect(codecArgError(undefined, true)).toBeNull();
+    expect(codecArgError(undefined, false)).toBeNull();
+    expect(codecArgError('qr', true)).toBeNull();
+    expect(codecArgError('color', false)).toBeNull();
+    expect(codecArgError('color', true)).toMatch(/--paper/);
+    expect(codecArgError('rainbow', false)).toMatch(/invalid --codec/);
+  });
+
+  it('paper always renders QR, whatever the codec argument resolves to', () => {
+    expect(codecIdForSave(true, 'color')).toBe(CODEC_QR_GRID);
+    expect(codecIdForSave(true, undefined)).toBe(CODEC_QR_GRID);
+    expect(codecIdForSave(false, undefined)).toBe(CODEC_COLOR_GRID);
+    expect(codecIdForSave(false, 'qr')).toBe(CODEC_QR_GRID);
+  });
+
+  it('estimate matches the actual image count, for each codec', SLOW, async () => {
     const content = pattern(4000, 21);
+    for (const codec of ['color', 'qr'] as const) {
+      const dir = tmp();
+      const input = writeSecret(dir, content);
+      const est = await runEstimate(input, false, codec);
+      const { imageCount } = await runSave({
+        inputFile: input,
+        outDir: join(dir, 'out'),
+        password: PW,
+        paper: false,
+        zip: false,
+        keyMode: 'embedded',
+        codec,
+      });
+      expect(est.images, `--codec ${codec}`).toBe(imageCount);
+    }
+  });
+
+  it('the color codec needs far fewer images than QR for the same secret', SLOW, async () => {
+    const content = pattern(20_000, 7);
+    const dir = tmp();
     const input = writeSecret(dir, content);
-    const est = await runEstimate(input, false);
-    const { imageCount } = await runSave({
+    const color = await runEstimate(input, false, 'color');
+    const qr = await runEstimate(input, false, 'qr');
+    expect(color.images).toBeLessThan(qr.images / 2);
+  });
+
+  it('round-trips a color-grid save through real PNG files', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(9000, 33); // spans several color-grid images
+    const input = writeSecret(dir, content);
+    const outDir = join(dir, 'out');
+    const { files, imageCount } = await runSave({
       inputFile: input,
-      outDir: join(dir, 'out'),
+      outDir,
       password: PW,
       paper: false,
       zip: false,
       keyMode: 'embedded',
+      codec: 'color',
     });
-    expect(est.images).toBe(imageCount);
+    expect(imageCount).toBeGreaterThan(1);
+
+    const res = await runRestore({ inputs: files, outDir: join(dir, 'back'), password: PW });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(content);
+  });
+
+  it('round-trips a zipped color-grid save with a separate key file', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(5000, 91);
+    const input = writeSecret(dir, content);
+    const { files } = await runSave({
+      inputFile: input,
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: true,
+      keyMode: 'keyfile',
+      codec: 'color',
+    });
+    const res = await runRestore({ inputs: files, outDir: join(dir, 'back'), password: PW });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(content);
   });
 });

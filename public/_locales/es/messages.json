@@ -63,13 +63,13 @@
     "message": "Destino"
   },
   "destDisk": {
-    "message": "Disco (PNG o .zip)"
+    "message": "Imágenes"
   },
   "destPaper": {
-    "message": "Papel (PDF imprimible)"
+    "message": "Papel"
   },
   "destCloud": {
-    "message": "Google Fotos (opcional)"
+    "message": "Fotos"
   },
   "cloudNote": {
     "message": "Una comodidad, nunca tu única copia."
@@ -121,10 +121,10 @@
     "message": "Almacenamiento de la clave"
   },
   "keyModeEmbedded": {
-    "message": "Sencillo: un solo conjunto de imágenes"
+    "message": "Integrada"
   },
   "keyModeKeyfile": {
-    "message": "Mayor seguridad: un archivo de clave aparte"
+    "message": "Archivo clave"
   },
   "keyModeHelp": {
     "message": "Con un archivo de clave aparte, una imagen filtrada no revela nada por sí sola, pero también debes conservar el .key."
@@ -414,7 +414,7 @@
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
   "destBinary": {
-    "message": "Archivo (sin imágenes)",
+    "message": "Archivo",
     "description": "Popup: binary (single file) destination."
   },
   "binaryVariantHeading": {
@@ -556,7 +556,7 @@
     "description": "Gallery Mode error: nothing restorable."
   },
   "destGallery": {
-    "message": "Ocultar en fotos (Galería)",
+    "message": "Galería",
     "description": "Popup: Gallery Mode destination — hide the secret across ordinary photos."
   },
   "restoreModeStandard": {
@@ -732,7 +732,7 @@
     "description": "Wizard: stego key-mode description."
   },
   "destSqlite": {
-    "message": "Base de datos señuelo (.db)",
+    "message": "BD señuelo",
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
@@ -1003,5 +1003,53 @@
   "errModeExcluded": {
     "message": "Este modo de acceso es solo para la base de datos señuelo (.db) o galerías de fotos.",
     "description": "Error: mode on an excluded path."
+  },
+  "codecHeading": {
+    "message": "Código de imagen"
+  },
+  "codecColor": {
+    "message": "Cuadrícula de color"
+  },
+  "codecColorDesc": {
+    "message": "Ocho colores por casilla en lugar de blanco y negro: unas tres veces más datos y, por tanto, un tercio de archivos. Ideal para disco y nube."
+  },
+  "codecQr": {
+    "message": "Código QR"
+  },
+  "codecQrDesc": {
+    "message": "Un código QR en blanco y negro que cualquier teléfono puede leer. Más archivos para el mismo secreto, pero la opción más segura si las imágenes deben sobrevivir a esta aplicación."
+  },
+  "codecHelp": {
+    "message": "Ambos se restauran igual: StegoShard lee cualquiera automáticamente. El color condensa más por imagen; el QR es el formato más universalmente legible. Las páginas impresas siempre usan QR."
+  },
+  "codecCount": {
+    "message": "$N$ archivos",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "btnSaveFile": {
+    "message": "Cifrar y descargar el archivo"
+  },
+  "wizRunSaveFile": {
+    "message": "Crear el archivo"
+  },
+  "statusSavingFile": {
+    "message": "Cifrando y escribiendo el archivo…"
+  },
+  "keyModeEmbeddedDescFile": {
+    "message": "La clave viaja dentro del archivo. Lo más sencillo: solo guardas una contraseña."
+  },
+  "keyModeKeyfileDescFile": {
+    "message": "Un archivo .key aparte, guardado separado del archivo de la caja fuerte. Se necesitan ambos para restaurar."
+  },
+  "keyModeHelpFile": {
+    "message": "Con un archivo de clave aparte, un archivo de caja fuerte filtrado no revela nada por sí solo, pero también debes conservar el .key."
+  },
+  "restoreModeHeading": {
+    "message": "¿Desde qué quieres restaurar?"
   }
 }

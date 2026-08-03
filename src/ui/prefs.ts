@@ -5,6 +5,7 @@
 
 import browser from 'webextension-polyfill';
 import type { KeyMode } from '@core';
+import type { CodecChoice } from './save-controller';
 
 const PREFS_KEY = 'stegoshard.prefs';
 
@@ -19,6 +20,8 @@ export interface Prefs {
   workflow: Workflow;
   destination: Destination;
   keyMode: KeyMode;
+  /** Image codec for the disk/cloud destinations (SPEC §2). */
+  codec: CodecChoice;
   addBand: boolean;
   title: string;
   asZip: boolean;
@@ -31,6 +34,9 @@ const DEFAULT_PREFS: Prefs = {
   workflow: 'guided',
   destination: 'disk',
   keyMode: 'embedded',
+  // Colour is the default on the digital paths: ~3x the bytes per image, so a
+  // vault needs about a third as many files. QR stays one click away.
+  codec: 'color',
   addBand: false,
   title: '',
   asZip: true,
