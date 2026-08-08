@@ -1031,6 +1031,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "Entropia aggiuntiva (facoltativa)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Digita a caso, o inserisci lanci di dadi…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "Il generatore casuale sicuro del browser è sempre usato."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ bit aggiunti",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "Questo è l'unico punto in cui la chiave della cassaforte può essere coperta: viene creata ora, e l'entropia fornita più tardi, al salvataggio, non può più raggiungerla. Quella chiave protegge ogni cassaforte che scriverai su questo dispositivo."
+  },
+  "extraEntropyHelp": {
+    "message": "Ciò che digiti qui viene mescolato (in XOR) in ogni valore casuale prodotto da questo salvataggio, oltre al generatore casuale sicuro del browser, che viene usato comunque. Può solo aggiungere incertezza, mai sostituirla: una stringa debole non può quindi indebolire la tua cassaforte. Copre i sali, i nonce e gli altri valori generati da questo salvataggio; una chiave già presente nel portachiavi è stata creata prima e non viene toccata. Nulla di essa viene conservato: non dovrai reinserirla per ripristinare."
+  },
   "btnSaveFile": {
     "message": "Cifra e scarica il file"
   },

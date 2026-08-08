@@ -10,8 +10,15 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
-import { runEstimate, runRestore, runSave, codecArgError, codecIdForSave } from './commands';
-import { CODEC_COLOR_GRID, CODEC_QR_GRID } from '@core';
+import {
+  runEstimate,
+  runRestore,
+  runSave,
+  codecArgError,
+  codecIdForSave,
+  entropyArgError,
+} from './commands';
+import { CODEC_COLOR_GRID, CODEC_QR_GRID, clearUserEntropy, installUserEntropy } from '@core';
 
 // Production Argon2 (64 MiB) runs on every save; give these room under CI.
 const SLOW = { timeout: 60_000 };
@@ -84,6 +91,32 @@ describe('CLI round-trips', () => {
       keyMode: 'embedded',
     });
     expect(imageCount).toBeGreaterThan(1);
+    const { outPath } = await runRestore({
+      inputs: [join(dir, 'out')],
+      outDir: join(dir, 'restored'),
+      password: PW,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
+  it('extra user entropy: saved with it, restored without it', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(3000, 77);
+    const input = writeSecret(dir, content);
+    await installUserEntropy('4 1 6 2 5 3 3 6 1 dice rolls from a real die');
+    try {
+      await runSave({
+        inputFile: input,
+        outDir: join(dir, 'out'),
+        password: PW,
+        paper: false,
+        zip: false,
+        keyMode: 'embedded',
+      });
+    } finally {
+      clearUserEntropy();
+    }
+    // Nothing about the extra entropy is stored: restore knows nothing of it.
     const { outPath } = await runRestore({
       inputs: [join(dir, 'out')],
       outDir: join(dir, 'restored'),
@@ -326,6 +359,19 @@ describe('CLI round-trips', () => {
     expect(codecArgError('color', false)).toBeNull();
     expect(codecArgError('color', true)).toMatch(/--paper/);
     expect(codecArgError('rainbow', false)).toMatch(/invalid --codec/);
+  });
+
+  it('rejects unusable --entropy* combinations, accepts a single source', () => {
+    expect(entropyArgError({})).toBeNull();
+    expect(entropyArgError({ text: 'dice' })).toBeNull();
+    expect(entropyArgError({ file: 'dice.txt' })).toBeNull();
+    expect(entropyArgError({ prompt: true })).toBeNull();
+    expect(entropyArgError({ text: 'dice', file: 'dice.txt' })).toMatch(/mutually exclusive/);
+    expect(entropyArgError({ file: 'dice.txt', prompt: true })).toMatch(/mutually exclusive/);
+    expect(entropyArgError({ text: '' })).toMatch(/empty/);
+    // The env var is an ambient fallback a typed flag simply outranks, so it is
+    // deliberately not part of the exclusivity check.
+    expect(entropyArgError({ text: 'dice', prompt: false })).toBeNull();
   });
 
   it('paper always renders QR, whatever the codec argument resolves to', () => {

@@ -242,6 +242,16 @@ AES-GCM, §5).
 
 The DEK is protected by the password via the key block (§5.1).
 
+> **Non-normative — optional user entropy.** Every random value in this spec is
+> drawn from the platform CSPRNG (`crypto.getRandomValues`). A writer MAY let the
+> user supply extra entropy, which is XORed into each draw as
+> `getRandomValues() XOR HMAC-SHA256(HKDF(user string, session salt), counter)`.
+> The CSPRNG is still consulted for every byte, so the result is uniform whether
+> or not the user's string carries any entropy. This is a **generation-side**
+> choice only: nothing about it is encoded, no field or length changes, and a
+> reader — including the Python reference decoder — cannot tell whether it was
+> used and never needs it.
+
 ### 5.1 Key block (wrapped DEK)
 
 The DEK is wrapped (encrypted) by a **KEK** derived from the password with

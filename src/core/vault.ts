@@ -502,7 +502,7 @@ export async function exportVault(
   }
 
   const { shards, shardLen } = encodeShards(blob, k, m);
-  const setId = globalThis.crypto.getRandomValues(new Uint8Array(SET_ID_LEN));
+  const setId = randomBytes(SET_ID_LEN);
   const hash = await sha256Short(blob);
 
   const imagePayloads = shards.map((shard, shardIndex) => {

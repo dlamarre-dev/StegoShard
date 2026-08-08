@@ -11,6 +11,8 @@
  * the normal password field.
  */
 
+import { randomBytes } from '@core';
+
 /**
  * Crockford base32 alphabet (no I/L/O/U to avoid visual/keyboard confusion).
  * Exactly 32 symbols ⇒ 5 bits of entropy per character with no modulo bias
@@ -30,7 +32,7 @@ export const GENERATED_PASSPHRASE_BITS = GROUPS * GROUP_LEN * 5; // 100
  */
 export function generatePassphrase(): string {
   const n = GROUPS * GROUP_LEN;
-  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(n));
+  const bytes = randomBytes(n);
   let out = '';
   for (let i = 0; i < n; i++) {
     out += ALPHABET[bytes[i]! & 31];
@@ -65,4 +67,34 @@ export function passwordStrength(pw: string): PasswordStrength {
   const bits = Math.round(rawBits * Math.min(1, 0.3 + 0.7 * uniqueRatio));
   const score = bits < 40 ? 0 : bits < 60 ? 1 : bits < 80 ? 2 : bits < 100 ? 3 : 4;
   return { bits, score: score as PasswordStrength['score'] };
+}
+
+/**
+ * Estimate the bits contributed by typed *extra entropy* (the expert save
+ * option). `passwordStrength` alone is the wrong tool here: its repetition
+ * damping is floored at 0.3, so holding one key down to fill the box — the
+ * obvious degenerate input for a field that says "type randomly" — would be
+ * reported as ~144 bits when it is worth nothing.
+ *
+ * So take the smaller of two estimates: the character-class heuristic above (a
+ * ceiling: you cannot beat length × log2(alphabet)), and length × the Shannon
+ * entropy of the characters actually typed, which is 0 for a single repeated
+ * character and near-maximal for varied input. Order-0 only — it does not catch
+ * `abababab` — but it removes the failure mode the field invites while leaving a
+ * page of dice rolls scored on its real length.
+ *
+ * Still only an estimate, and nothing hangs on it: the CSPRNG is mixed in
+ * regardless, so a low number costs the user nothing.
+ */
+export function extraEntropyBits(text: string): number {
+  const chars = [...text];
+  if (chars.length === 0) return 0;
+  const counts = new Map<string, number>();
+  for (const ch of chars) counts.set(ch, (counts.get(ch) ?? 0) + 1);
+  let perChar = 0;
+  for (const n of counts.values()) {
+    const p = n / chars.length;
+    perChar -= p * Math.log2(p);
+  }
+  return Math.min(passwordStrength(text).bits, Math.round(chars.length * perChar));
 }

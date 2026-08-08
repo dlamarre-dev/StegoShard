@@ -30,6 +30,18 @@ npm run cli -- save secret.txt --codec color      # the default
 npm run cli -- save secret.txt --codec qr
 npm run cli -- estimate secret.txt --codec qr    # compare the file counts
 
+# Extra entropy (optional, expert; `save` and `gallery-save` only — they are the
+# commands that generate key material). Whatever you supply is XORed into every
+# random value the save generates, on top of the OS CSPRNG — which is always
+# used, so a weak string can only fail to help, never weaken the vault. It
+# affects generation only: nothing about it is stored, and restore never asks
+# for it. --entropy is discouraged (shell history, process list), and
+# --entropy-prompt needs a terminal (piped stdin belongs to the password).
+npm run cli -- save secret.txt --entropy-file dice.txt --out ./vault
+npm run cli -- save secret.txt --entropy-prompt --out ./vault
+STEGOSHARD_ENTROPY="$(head -c 64 /dev/urandom | base64)" npm run cli -- save secret.txt
+npm run cli -- restore ./vault --out ./restored   # no entropy argument needed
+
 # Printable PDF with a localized instruction sheet.
 npm run cli -- save notes.txt --paper --instructions --locale fr --out ./print
 

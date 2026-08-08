@@ -1031,6 +1031,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "Entropia adicional (opcional)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Escreva ao acaso, ou introduza lançamentos de dados…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "O gerador aleatório seguro do navegador é sempre utilizado."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ bits adicionados",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "Este é o único momento em que a própria chave do cofre pode ser abrangida: é criada agora, e a entropia fornecida mais tarde, ao gravar, já não lhe chega. Essa chave protege todos os cofres que criar neste dispositivo."
+  },
+  "extraEntropyHelp": {
+    "message": "O que escrever aqui é misturado (por XOR) em cada valor aleatório gerado por esta gravação, além do gerador aleatório seguro do navegador, que é utilizado de qualquer forma. Só pode acrescentar incerteza, nunca substituí-la, por isso um texto fraco não pode enfraquecer o seu cofre. Abrange os sais, os nonces e os restantes valores gerados nesta gravação; uma chave de cofre já guardada no chaveiro foi criada antes e não é afetada. Nada disto é guardado: nunca terá de o reintroduzir para restaurar."
+  },
   "btnSaveFile": {
     "message": "Cifrar e transferir o ficheiro"
   },

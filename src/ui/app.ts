@@ -27,6 +27,7 @@ import {
   type StegoInput,
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
+import { extraEntropyBits as extraEntropyBitsOf } from './password';
 import { makeProgressUI } from './progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from './wizard';
 
@@ -81,6 +82,8 @@ const stegoPw = el<HTMLInputElement>('stego-pw');
 const stegoPwField = el('stego-pw-field');
 const factorDuressHint = el('factor-duress-hint');
 const estimateLine = el('estimate-line');
+const extraEntropy = el<HTMLTextAreaElement>('extra-entropy');
+const extraEntropyBits = el('extra-entropy-bits');
 const keymodeFields = el('keymode-fields');
 const codecFields = el('codec-fields');
 const galleryFields = el('gallery-fields');
@@ -544,6 +547,21 @@ function renderEstimate(): void {
   }
 }
 
+/**
+ * Show an estimate of what the typed extra entropy is worth, without any
+ * pass/fail threshold: there is no minimum here, because the CSPRNG is mixed in
+ * regardless and a weak string can only fail to help, never hurt.
+ */
+function renderEntropyBits(): void {
+  const text = extraEntropy.value.trim();
+  show(extraEntropyBits, text.length > 0);
+  extraEntropyBits.textContent = text
+    ? msg('extraEntropyBits', String(extraEntropyBitsOf(text)))
+    : '';
+}
+
+extraEntropy.addEventListener('input', renderEntropyBits);
+
 /** Label each codec option with the file count it would produce. */
 function renderCodecCounts(): void {
   const e = estimates?.[selectedDest()];
@@ -622,6 +640,13 @@ async function doSave(req: SaveRequest): Promise<void> {
     gallerySavePw.value = '';
     sqliteSavePw.value = '';
     duressPw.value = '';
+    // Also clear the extra entropy: reusing the same string across saves would
+    // quietly turn a one-off contribution into a fixed one. Only on success,
+    // deliberately — after a failed save the user would otherwise have to type a
+    // page of dice rolls again, and keeping it costs nothing: every install
+    // draws a fresh session salt, so the next attempt gets a new keystream.
+    extraEntropy.value = '';
+    renderEntropyBits();
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
@@ -666,6 +691,7 @@ saveBtn.addEventListener('click', async () => {
       stego: gStego,
       accessMode: gMode === 'duress' ? 'plain' : gMode,
       threshold: gThreshold,
+      userEntropy: extraEntropy.value.trim() || undefined,
     });
     return;
   }
@@ -740,6 +766,7 @@ saveBtn.addEventListener('click', async () => {
     passwordHint: pwHint.value.trim() || undefined,
     keyLocation: keyLocation.value.trim() || undefined,
     stego,
+    userEntropy: extraEntropy.value.trim() || undefined,
     locale: browser.i18n.getUILanguage(),
   });
 });

@@ -13,7 +13,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   type Argon2Params,
   type KeyBlock,
@@ -23,9 +23,12 @@ import {
   KEY_BLOCK_LEN,
   SALT_LEN,
   WrongPasswordError,
+  clearUserEntropy,
   createKeyBlock,
   decryptBytes,
   encryptBytes,
+  hasUserEntropy,
+  installUserEntropy,
   parseKeyBlock,
   randomBytes,
   serializeKeyBlock,
@@ -127,6 +130,136 @@ describe('entropy audit', () => {
     const mean = sum / n;
     expect(mean).toBeGreaterThan(120);
     expect(mean).toBeLessThan(135);
+  });
+});
+
+describe('optional user entropy layer', () => {
+  afterEach(() => {
+    clearUserEntropy();
+  });
+
+  it('still draws every byte from the CSPRNG when installed', async () => {
+    await installUserEntropy('dice: 4 1 6 2 5 3');
+    expect(hasUserEntropy()).toBe(true);
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    try {
+      spy.mockClear();
+      const out = randomBytes(64);
+      expect(out.length).toBe(64);
+      // The CSPRNG must be consulted for the full length — the user layer is a
+      // second source, never a substitute.
+      expect(spy.mock.calls.map((c) => (c[0] as Uint8Array).length)).toContain(64);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('contributes: draws differ even when the CSPRNG is stuck at a constant', async () => {
+    await installUserEntropy('mashed keys asdlkfjasdlkfj');
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    try {
+      spy.mockImplementation(((buf: Uint8Array) => {
+        buf.fill(7); // a totally broken "CSPRNG"
+        return buf;
+      }) as typeof globalThis.crypto.getRandomValues);
+      const seen = new Set<string>();
+      for (let i = 0; i < 200; i++) {
+        const hex = toHex(randomBytes(16));
+        expect(hex).not.toBe('07'.repeat(16)); // the user layer did something
+        expect(seen.has(hex)).toBe(false);
+        seen.add(hex);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('the CSPRNG contributes: same string, same session, draws never repeat', async () => {
+    await installUserEntropy('a'); // a deliberately worthless string
+    const seen = new Set<string>();
+    for (let i = 0; i < 500; i++) {
+      const hex = toHex(randomBytes(SALT_LEN));
+      expect(seen.has(hex)).toBe(false);
+      seen.add(hex);
+    }
+  });
+
+  it('re-installing the same string yields a different keystream (session salt)', async () => {
+    const fixedCsprng = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((
+      buf: Uint8Array,
+    ) => {
+      buf.fill(0);
+      return buf;
+    }) as typeof globalThis.crypto.getRandomValues);
+    try {
+      // The session salt itself comes from the (stubbed) CSPRNG here, so force a
+      // difference through the salt draw instead: restore, install, stub again.
+      fixedCsprng.mockRestore();
+      await installUserEntropy('same string');
+      vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((buf: Uint8Array) => {
+        buf.fill(0);
+        return buf;
+      }) as typeof globalThis.crypto.getRandomValues);
+      const first = toHex(randomBytes(32));
+      vi.restoreAllMocks();
+
+      await installUserEntropy('same string');
+      vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((buf: Uint8Array) => {
+        buf.fill(0);
+        return buf;
+      }) as typeof globalThis.crypto.getRandomValues);
+      const second = toHex(randomBytes(32));
+      expect(second).not.toBe(first);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('clearing restores plain CSPRNG passthrough', async () => {
+    await installUserEntropy('temporary');
+    clearUserEntropy();
+    expect(hasUserEntropy()).toBe(false);
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    try {
+      spy.mockImplementation(((buf: Uint8Array) => {
+        buf.fill(9);
+        return buf;
+      }) as typeof globalThis.crypto.getRandomValues);
+      expect(toHex(randomBytes(8))).toBe('09'.repeat(8));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('an empty string installs nothing, and tears down a previous layer', async () => {
+    await installUserEntropy('first');
+    expect(hasUserEntropy()).toBe(true);
+    await installUserEntropy('');
+    expect(hasUserEntropy()).toBe(false);
+  });
+
+  it('mixed output still looks uniform', async () => {
+    await installUserEntropy('dice rolls: 3 6 1 2 4 5 5 2');
+    const n = 65536;
+    const buf = randomBytes(n);
+    const counts = new Array<number>(256).fill(0);
+    let sum = 0;
+    for (const b of buf) {
+      counts[b]!++;
+      sum += b;
+    }
+    expect(counts.every((c) => c > 0)).toBe(true);
+    const mean = sum / n;
+    expect(mean).toBeGreaterThan(120);
+    expect(mean).toBeLessThan(135);
+  });
+
+  it('a vault written with extra entropy needs none to unlock (no format impact)', async () => {
+    await installUserEntropy('paranoid dice');
+    const { block } = await createKeyBlock('pw', FAST);
+    const bytes = serializeKeyBlock(block);
+    clearUserEntropy();
+    expect(await unlockSerialized(bytes, 'pw')).toBeNull();
   });
 });
 

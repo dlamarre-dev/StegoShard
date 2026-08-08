@@ -24,9 +24,28 @@
         <div id="create-fields" hidden>
           <label data-i18n="labelNewPassword" for="new-pw"></label>
           <input id="new-pw" type="password" autocomplete="new-password" />
+          <div class="pw-row">
+            <p id="new-pw-strength" class="muted pw-meter-label" aria-live="polite"></p>
+            <button id="new-pw-gen" type="button" class="btn-link" data-i18n="pwGenerate"></button>
+          </div>
           <label data-i18n="labelConfirmPassword" for="confirm-pw"></label>
           <input id="confirm-pw" type="password" autocomplete="new-password" />
           <p class="muted warn" data-i18n="passwordHint"></p>
+          <details class="advanced">
+            <summary data-i18n="extraEntropyHeading"></summary>
+            <textarea
+              id="key-entropy"
+              rows="2"
+              autocomplete="off"
+              spellcheck="false"
+              data-i18n-placeholder="extraEntropyPlaceholder"
+            ></textarea>
+            <p class="muted">
+              <span data-i18n="extraEntropyAlwaysCsprng"></span>
+              <span id="key-entropy-bits" class="badge" hidden></span>
+            </p>
+            <p class="muted" data-i18n="extraEntropyKeyHelp"></p>
+          </details>
           <button id="create-btn" class="btn-primary" data-i18n="btnCreateKey"></button>
           <p id="create-status" class="status" role="status"></p>
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { VaultKey } from '@core';
+import { hasUserEntropy, type VaultKey } from '@core';
 
 // Mock the disk layer (it calls browser download APIs we don't have in node);
 // we only care that runSave routes to the right function with the right args.
@@ -95,5 +95,41 @@ describe('runSave routing', () => {
 
   it('requires a vault key for non-gallery destinations', async () => {
     await expect(runSave({ dest: 'disk', file }, msg)).rejects.toThrow();
+  });
+});
+
+describe('extra user entropy', () => {
+  it('is installed for the duration of the save and cleared afterwards', async () => {
+    let installedDuringSave = false;
+    saveFileToDisk.mockImplementationOnce(async () => {
+      installedDuringSave = hasUserEntropy();
+      return { imageCount: 7, setId: 'ab', keyMode: 'embedded' };
+    });
+    await runSave({ dest: 'disk', file, key, userEntropy: 'dice 4 1 6 2' }, msg);
+    expect(installedDuringSave).toBe(true);
+    expect(hasUserEntropy()).toBe(false);
+  });
+
+  it('is cleared even when the save fails', async () => {
+    saveFileToDisk.mockImplementationOnce(async () => {
+      throw new Error('boom');
+    });
+    await expect(runSave({ dest: 'disk', file, key, userEntropy: 'dice' }, msg)).rejects.toThrow();
+    expect(hasUserEntropy()).toBe(false);
+  });
+
+  it('reaches the worker path, which has its own module state', async () => {
+    await runSave({ dest: 'binary', file, key, userEntropy: 'dice' }, msg);
+    expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ userEntropy: 'dice' });
+  });
+
+  it('installs nothing when the field was left empty', async () => {
+    let installedDuringSave = true;
+    saveFileToDisk.mockImplementationOnce(async () => {
+      installedDuringSave = hasUserEntropy();
+      return { imageCount: 7, setId: 'ab', keyMode: 'embedded' };
+    });
+    await runSave({ dest: 'disk', file, key }, msg);
+    expect(installedDuringSave).toBe(false);
   });
 });

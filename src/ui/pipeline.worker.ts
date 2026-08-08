@@ -19,9 +19,11 @@ import {
   type BinaryVariant,
   type KeyMode,
   type OnProgress,
+  clearUserEntropy,
   exportVaultBinary,
   exportVaultBinaryDisguised,
   importDek,
+  installUserEntropy,
   importVaultBinary,
   verifyBinaryExport,
   verifyDisguisedExport,
@@ -37,6 +39,9 @@ type RunReq =
       keyBlock: Uint8Array;
       keyMode: KeyMode;
       variant: BinaryVariant;
+      /** Expert extra entropy: this thread has its own module state, so the
+       *  layer installed on the page does not reach here on its own. */
+      userEntropy?: string | undefined;
     }
   | {
       id: number;
@@ -45,6 +50,7 @@ type RunReq =
       content: Uint8Array;
       password: string;
       keyMode: KeyMode;
+      userEntropy?: string | undefined;
     }
   | {
       id: number;
@@ -72,15 +78,22 @@ async function runEncrypt(req: Extract<RunReq, { op: 'encryptBinary' }>): Promis
   const onProgress: OnProgress = (p) => ctx.postMessage({ id: req.id, type: 'progress', p });
   const dek = await importDek(req.rawDek);
   const key = { dek, keyBlock: req.keyBlock };
-  const { container } = await exportVaultBinary(
-    req.filename,
-    req.content,
-    key,
-    { keyMode: req.keyMode, variant: req.variant, maxBytes: MAX_FILE_BYTES_BINARY_UI },
-    onProgress,
-  );
-  await verifyBinaryExport(container, dek, req.filename, req.content, onProgress);
-  return { message: { id: req.id, type: 'result', container }, transfer: [container.buffer] };
+  if (req.userEntropy) await installUserEntropy(req.userEntropy);
+  try {
+    const { container } = await exportVaultBinary(
+      req.filename,
+      req.content,
+      key,
+      { keyMode: req.keyMode, variant: req.variant, maxBytes: MAX_FILE_BYTES_BINARY_UI },
+      onProgress,
+    );
+    await verifyBinaryExport(container, dek, req.filename, req.content, onProgress);
+    return { message: { id: req.id, type: 'result', container }, transfer: [container.buffer] };
+  } finally {
+    // The worker is long-lived and reused across saves: never let one save's
+    // entropy layer linger into the next request.
+    clearUserEntropy();
+  }
 }
 
 async function runEncryptDisguised(
@@ -90,18 +103,23 @@ async function runEncryptDisguised(
   // The disguised .db path derives its slot KEK from the password (each region has
   // its own DEK), so no managed key crosses to the worker here. The generated key
   // factor (keyfile mode) is returned so the page can deliver the .key.
-  const { container, keyBlock, regionIndex, dek } = await exportVaultBinaryDisguised(
-    req.filename,
-    req.content,
-    req.password,
-    { keyMode: req.keyMode, maxBytes: MAX_FILE_BYTES_BINARY_UI },
-    onProgress,
-  );
-  await verifyDisguisedExport(container, dek, regionIndex, req.filename, req.content, onProgress);
-  return {
-    message: { id: req.id, type: 'result', container, keyBlock },
-    transfer: [container.buffer],
-  };
+  if (req.userEntropy) await installUserEntropy(req.userEntropy);
+  try {
+    const { container, keyBlock, regionIndex, dek } = await exportVaultBinaryDisguised(
+      req.filename,
+      req.content,
+      req.password,
+      { keyMode: req.keyMode, maxBytes: MAX_FILE_BYTES_BINARY_UI },
+      onProgress,
+    );
+    await verifyDisguisedExport(container, dek, regionIndex, req.filename, req.content, onProgress);
+    return {
+      message: { id: req.id, type: 'result', container, keyBlock },
+      transfer: [container.buffer],
+    };
+  } finally {
+    clearUserEntropy();
+  }
 }
 
 async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promise<Reply> {

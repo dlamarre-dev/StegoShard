@@ -1031,6 +1031,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "額外亂數來源（選用）"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "隨意敲鍵盤，或輸入骰子點數…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "瀏覽器的安全亂數產生器一律仍會使用。"
+  },
+  "extraEntropyBits": {
+    "message": "約增加 $N$ 位元",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "這是唯一能涵蓋保險庫金鑰本身的地方：金鑰在此刻建立，之後儲存時提供的亂數無法回溯套用。這把金鑰保護您在這台裝置上建立的每一個保險庫。"
+  },
+  "extraEntropyHelp": {
+    "message": "您在此輸入的內容，會在瀏覽器安全亂數產生器（無論如何都會使用）之外，以 XOR 混入這次儲存所產生的每一個亂數。它只能增加不確定性，不會取代原有來源，因此輸入太弱也不會削弱保險庫。涵蓋範圍是這次儲存產生的鹽值、nonce 等數值；金鑰庫中既有的保險庫金鑰是先前建立的，不受影響。內容完全不會儲存：還原時無須再次輸入。"
+  },
   "btnSaveFile": {
     "message": "加密並下載檔案"
   },

@@ -621,6 +621,25 @@
               <input id="key-location" type="text" />
               <p class="muted warn" data-i18n="paperCleartextWarn"></p>
             </div>
+
+            <div id="entropy-fields">
+              <label class="muted" data-i18n="extraEntropyHeading" for="extra-entropy"></label>
+              <textarea
+                id="extra-entropy"
+                rows="2"
+                autocomplete="off"
+                spellcheck="false"
+                data-i18n-placeholder="extraEntropyPlaceholder"
+              ></textarea>
+              <p class="muted">
+                <span data-i18n="extraEntropyAlwaysCsprng"></span>
+                <span id="extra-entropy-bits" class="badge" hidden></span>
+              </p>
+              <details class="why">
+                <summary data-i18n="whyLabel"></summary>
+                <p data-i18n="extraEntropyHelp"></p>
+              </details>
+            </div>
           </div>
 
           <button
@@ -791,6 +810,21 @@
             <label data-i18n="labelConfirmPassword" for="confirm-pw"></label>
             <input id="confirm-pw" type="password" autocomplete="new-password" />
             <p class="muted warn" data-i18n="passwordHint"></p>
+            <details class="advanced">
+              <summary data-i18n="extraEntropyHeading"></summary>
+              <textarea
+                id="key-entropy"
+                rows="2"
+                autocomplete="off"
+                spellcheck="false"
+                data-i18n-placeholder="extraEntropyPlaceholder"
+              ></textarea>
+              <p class="muted">
+                <span data-i18n="extraEntropyAlwaysCsprng"></span>
+                <span id="key-entropy-bits" class="badge" hidden></span>
+              </p>
+              <p class="muted" data-i18n="extraEntropyKeyHelp"></p>
+            </details>
             <button id="create-btn" class="btn-primary" data-i18n="btnCreateKey"></button>
             <p id="create-status" class="status" role="status"></p>
           </div>
