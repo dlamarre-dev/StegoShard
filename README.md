@@ -193,6 +193,23 @@ import images (any source) → decode each (self-describing header → shard)
 The differentiator: **losing a page, a deleted album image, or an unreadable code does
 not stop restoration** as long as at least `k` images survive.
 
+**Bring your own entropy (optional, expert).** Every random value — salts, IVs, DEKs,
+Shamir coefficients, decoy filler — comes from the platform CSPRNG
+(`crypto.getRandomValues`). If you would rather not trust that alone, the expert save
+options (and `--entropy` / `--entropy-file` / `--entropy-prompt` / `STEGOSHARD_ENTROPY` in
+the CLI) let you add a string of your own: mash the keyboard, or type out dice rolls. It is
+XORed into every draw **on top of** the CSPRNG, which is still used for every byte — the
+extra layer can only add uncertainty, never replace it, so even a worthless string leaves
+you exactly as safe as before. It affects generation only: nothing about it is stored, the
+format is unchanged, and **restore never asks for it**.
+
+It covers what the save itself generates. In the CLI and the web app that is everything,
+key included. In the **browser extension** the vault key is minted once when you set up the
+key store, so it predates any save — entropy given at save time covers that save's salts,
+IVs, nonces, key factors, shares and filler, but cannot reach back to the stored key. The
+key-creation form therefore offers the same field, and that is the only moment the managed
+key itself can be covered.
+
 ## Performance
 
 Two costs are worth knowing about; both are deliberate, and neither is hidden from you.

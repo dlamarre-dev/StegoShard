@@ -103,13 +103,23 @@ export async function encryptBinaryInWorker(
   key: VaultKey,
   keyMode: KeyMode,
   variant: BinaryVariant,
+  userEntropy?: string | undefined,
   onProgress?: OnProgress,
 ): Promise<Uint8Array> {
   // Fresh, independent copy of the DEK bytes — safe to transfer. The key block is
   // small and reused by the caller, so it is copied (not transferred).
   const rawDek = await exportDekRaw(key.dek);
   const res = await call<{ container: Uint8Array }>(
-    { op: 'encryptBinary', filename, content, rawDek, keyBlock: key.keyBlock, keyMode, variant },
+    {
+      op: 'encryptBinary',
+      filename,
+      content,
+      rawDek,
+      keyBlock: key.keyBlock,
+      keyMode,
+      variant,
+      userEntropy,
+    },
     [content.buffer, rawDek.buffer],
     onProgress,
   );
@@ -126,10 +136,11 @@ export async function encryptBinaryDisguisedInWorker(
   content: Uint8Array,
   password: string,
   keyMode: KeyMode,
+  userEntropy?: string | undefined,
   onProgress?: OnProgress,
 ): Promise<{ container: Uint8Array; keyBlock: Uint8Array }> {
   const res = await call<{ container: Uint8Array; keyBlock: Uint8Array }>(
-    { op: 'encryptBinaryDisguised', filename, content, password, keyMode },
+    { op: 'encryptBinaryDisguised', filename, content, password, keyMode, userEntropy },
     [content.buffer],
     onProgress,
   );

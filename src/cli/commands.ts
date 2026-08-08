@@ -702,4 +702,42 @@ export function codecArgError(
   return null;
 }
 
+/** The ways the extra entropy layer can be supplied on the command line. */
+export interface EntropySources {
+  /** `--entropy <text>` */
+  text?: string | undefined;
+  /** `--entropy-file <path>` */
+  file?: string | undefined;
+  /** `--entropy-prompt` */
+  prompt?: boolean | undefined;
+}
+// `STEGOSHARD_ENTROPY` is not listed: like STEGOSHARD_PASSWORD it is an ambient
+// fallback that any typed flag simply outranks, so there is no combination of
+// sources to reject.
+
+/**
+ * Reject an unusable `--entropy*` combination and return the message to print.
+ * Null when the arguments are fine.
+ *
+ * Two rules. Combining sources is refused because it would be ambiguous which
+ * one won — and silently ignoring the other is exactly the kind of surprise a
+ * user reaching for this option cannot afford. An explicitly *empty* source is
+ * refused for the same reason `resolvePassword` refuses an empty password: the
+ * flag would have done nothing at all, and the user would never know.
+ */
+export function entropyArgError(src: EntropySources): string | null {
+  const given = [
+    src.text !== undefined && '--entropy',
+    src.file !== undefined && '--entropy-file',
+    src.prompt === true && '--entropy-prompt',
+  ].filter((s): s is string => typeof s === 'string');
+  if (given.length > 1) {
+    return `${given.join(' and ')} are mutually exclusive (pick one entropy source)`;
+  }
+  if (src.text !== undefined && src.text === '') {
+    return '--entropy was empty (omit the flag if you do not want extra entropy)';
+  }
+  return null;
+}
+
 export { CODEC_COLOR_GRID, CODEC_QR_GRID };

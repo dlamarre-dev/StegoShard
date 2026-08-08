@@ -18,7 +18,8 @@ import {
   setupKey,
 } from './keystore';
 import { downloadBlob } from './image-io';
-import { generatePassphrase, passwordStrength } from './password';
+import { extraEntropyBits, generatePassphrase, passwordStrength } from './password';
+import { clearUserEntropy, installUserEntropy } from '@core';
 
 const MIN_PASSWORD = 8;
 const STRENGTH_KEYS = ['pwVeryWeak', 'pwWeak', 'pwFair', 'pwGood', 'pwStrong'];
@@ -67,19 +68,40 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
     refreshStrength();
   });
 
+  // Optional extra entropy (expert), offered here and not only on save: this is
+  // where the DEK is minted, and the DEK protects every vault this device ever
+  // writes. Supplying it at save time cannot reach back and cover a key created
+  // earlier, so a user who wants the key itself covered has to say so now.
+  const keyEntropy = el<HTMLTextAreaElement>('key-entropy');
+  const keyEntropyBits = el('key-entropy-bits');
+  const refreshKeyEntropyBits = (): void => {
+    const text = keyEntropy.value.trim();
+    show(keyEntropyBits, text.length > 0);
+    keyEntropyBits.textContent = text
+      ? msg('extraEntropyBits', String(extraEntropyBits(text)))
+      : '';
+  };
+  keyEntropy.addEventListener('input', refreshKeyEntropyBits);
+
   createBtn.addEventListener('click', async () => {
     const err = validateNewPassword(newPw.value, confirmPw.value);
     if (err) return setStatus(createStatus, err, true);
     createBtn.disabled = true;
+    const entropy = keyEntropy.value.trim();
+    if (entropy) await installUserEntropy(entropy);
     try {
       await setupKey(newPw.value);
       newPw.value = confirmPw.value = '';
+      keyEntropy.value = '';
+      refreshKeyEntropyBits();
       setStatus(createStatus, msg('statusKeyCreated'));
       await refreshState();
       onChange();
     } catch (e) {
       setStatus(createStatus, friendlyError(e), true);
     } finally {
+      // Never let the layer outlive the one operation it was given for.
+      clearUserEntropy();
       createBtn.disabled = false;
     }
   });

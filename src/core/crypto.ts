@@ -15,7 +15,7 @@
  * reference decoder can reproduce them.
  */
 
-import { argon2id } from 'hash-wasm';
+import { argon2id, createHMAC, createSHA256, type IHasher } from 'hash-wasm';
 import { concatBytes, readU16, readU32, writeU16, writeU32 } from './bytes';
 
 const subtle = globalThis.crypto.subtle;
@@ -76,20 +76,123 @@ export const DEFAULT_ARGON2: Argon2Params = {
 };
 
 /**
+ * Optional user-supplied entropy layer (SPEC: generation-side only).
+ *
+ * Some users do not want to trust the platform CSPRNG alone (a suspect hardware
+ * RNG, a cloned VM, a browser they do not control). When they install a string
+ * of their own — mashed keys, dice rolls — every draw becomes
+ *
+ *     output = getRandomValues() XOR HMAC-SHA256(K, counter)
+ *
+ * where K = HKDF(user string, session salt drawn from the CSPRNG). This is
+ * belt-and-braces, never a replacement: WebCrypto is still consulted for every
+ * single byte, so if the user's string is worthless ("aaaa", or nothing at all)
+ * the output is exactly today's CSPRNG output, and if the CSPRNG is worthless
+ * the output is still unpredictable to anyone who does not know the string.
+ * Neither source can weaken the other — XOR with an independent stream can only
+ * preserve or add uncertainty.
+ *
+ * It affects generation only. Nothing about it is stored, so a vault written
+ * with extra entropy is read back with no extra entropy needed: the format and
+ * the Python reference decoder are untouched.
+ */
+const USER_ENTROPY_INFO = new TextEncoder().encode('stegoshard/v1/user-entropy');
+
+interface EntropyPool {
+  /** hash-wasm HMAC instance: the factory is async, init/update/digest are sync
+   *  — required, because `randomBytes` is synchronous by contract. */
+  hmac: IHasher;
+  /** Monotonic block counter; never repeats within a session. */
+  counter: number;
+  /** Leftover keystream bytes from the last block, so a 12-byte IV does not
+   *  burn a whole block. */
+  buf: Uint8Array;
+  off: number;
+}
+
+let pool: EntropyPool | null = null;
+
+/**
+ * Install an extra entropy source for this session (expert option). Idempotent
+ * in effect but not in state: calling it again re-seeds with a fresh session
+ * salt. Passing an empty string clears the layer.
+ */
+export async function installUserEntropy(text: string): Promise<void> {
+  // Tear down any previous layer first, so its leftover keystream bytes are
+  // zeroized rather than orphaned on the heap when `pool` is overwritten below.
+  clearUserEntropy();
+  if (!text) return;
+  // The session salt makes the keystream unique per install, so the same string
+  // reused forever still never replays a keystream.
+  const sessionSalt = randomBytes(32);
+  const ikm = new TextEncoder().encode(text.normalize('NFC'));
+  const key = await hkdf(ikm, USER_ENTROPY_INFO, 32, sessionSalt);
+  const hmac = await createHMAC(createSHA256(), key);
+  ikm.fill(0);
+  key.fill(0);
+  pool = { hmac, counter: 0, buf: new Uint8Array(0), off: 0 };
+}
+
+/** Drop the extra entropy layer; draws return to plain CSPRNG output. */
+export function clearUserEntropy(): void {
+  pool?.buf.fill(0);
+  pool = null;
+}
+
+/** True when an extra entropy layer is installed for this session. */
+export function hasUserEntropy(): boolean {
+  return pool !== null;
+}
+
+/** Next keystream block: HMAC(K, u64be(counter++)). */
+function keystreamBlock(p: EntropyPool): Uint8Array {
+  const ctr = new Uint8Array(8);
+  // counter is a JS number: safe up to 2^53 blocks — unreachable in a session.
+  writeU32(ctr, 0, Math.floor(p.counter / 0x1_0000_0000));
+  writeU32(ctr, 4, p.counter >>> 0);
+  p.counter++;
+  p.hmac.init();
+  p.hmac.update(ctr);
+  return p.hmac.digest('binary') as Uint8Array;
+}
+
+/** XOR the user keystream into freshly drawn CSPRNG bytes, in place. */
+function mixUserEntropy(out: Uint8Array): void {
+  const p = pool;
+  if (!p) return;
+  for (let i = 0; i < out.length; i++) {
+    if (p.off >= p.buf.length) {
+      p.buf.fill(0);
+      p.buf = keystreamBlock(p);
+      p.off = 0;
+    }
+    out[i]! ^= p.buf[p.off++]!;
+  }
+  if (p.off >= p.buf.length) {
+    p.buf.fill(0);
+    p.buf = new Uint8Array(0);
+    p.off = 0;
+  }
+}
+
+/**
  * Cryptographically secure random bytes. `getRandomValues` caps at 65536 bytes
  * per call, so larger requests (e.g. filling a dead region up to the .db bucket
- * ceiling, §10.4) are filled in windows.
+ * ceiling, §10.4) are filled in windows. When the user has installed extra
+ * entropy (see above), it is XORed in afterwards — the CSPRNG is consulted
+ * either way, so this can never produce *less* randomness than before.
  */
 export function randomBytes(len: number): Uint8Array {
   const out = new Uint8Array(len);
   const MAX = 65536;
   if (len <= MAX) {
     globalThis.crypto.getRandomValues(out);
-    return out;
+  } else {
+    for (let off = 0; off < len; off += MAX) {
+      globalThis.crypto.getRandomValues(out.subarray(off, Math.min(off + MAX, len)));
+    }
   }
-  for (let off = 0; off < len; off += MAX) {
-    globalThis.crypto.getRandomValues(out.subarray(off, Math.min(off + MAX, len)));
-  }
+  mixUserEntropy(out);
   return out;
 }
 
@@ -128,9 +231,21 @@ export async function deriveKEK(
   return key;
 }
 
-/** Generate a fresh, extractable DEK (needed so it can be wrapped). */
+/**
+ * Generate a fresh, extractable DEK (needed so it can be wrapped). Built from
+ * `randomBytes` rather than `subtle.generateKey` so that it goes through the
+ * same single entropy tap as every other secret — including the optional
+ * user-entropy layer, which `subtle.generateKey` would bypass. The §10 paths
+ * already mint their DEKs this way (access.ts, vault.ts).
+ */
 export async function generateDEK(): Promise<CryptoKey> {
-  return subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const raw = randomBytes(DEK_LEN);
+  const key = await subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, true, [
+    'encrypt',
+    'decrypt',
+  ]);
+  raw.fill(0); // zeroize the transient raw DEK
+  return key;
 }
 
 /** Export a DEK to raw bytes (for holding it in volatile session storage).

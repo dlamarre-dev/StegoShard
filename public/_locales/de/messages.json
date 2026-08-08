@@ -1031,6 +1031,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "Zusätzliche Entropie (optional)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Zufällig tippen oder Würfelwürfe eingeben…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "Der sichere Zufallsgenerator des Browsers wird immer verwendet."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ Bit hinzugefügt",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "Nur hier lässt sich der Tresorschlüssel selbst abdecken: Er wird jetzt erzeugt, und später beim Speichern angegebene Entropie kann ihn nicht mehr erreichen. Dieser Schlüssel schützt jeden Tresor, den Sie auf diesem Gerät anlegen."
+  },
+  "extraEntropyHelp": {
+    "message": "Was Sie hier eingeben, wird zusätzlich zum sicheren Zufallsgenerator des Browsers – der ohnehin genutzt wird – in jeden Zufallswert dieser Speicherung eingemischt (per XOR). Es kann Unsicherheit nur hinzufügen, nie ersetzen; eine schwache Eingabe kann Ihren Tresor also nicht schwächen. Es umfasst die Salts, Nonces und übrigen Werte dieser Speicherung; ein bereits im Schlüsselspeicher liegender Tresorschlüssel wurde früher erzeugt und bleibt unberührt. Nichts davon wird gespeichert: Zum Wiederherstellen geben Sie es nie erneut ein."
+  },
   "btnSaveFile": {
     "message": "Verschlüsseln & Datei herunterladen"
   },

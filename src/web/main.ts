@@ -7,7 +7,14 @@
  * locally in the browser; nothing is uploaded.
  */
 
-import { createKeyBlock, serializeKeyBlock, type KeyMode, type VaultKey } from '@core';
+import {
+  clearUserEntropy,
+  createKeyBlock,
+  installUserEntropy,
+  serializeKeyBlock,
+  type KeyMode,
+  type VaultKey,
+} from '@core';
 import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import {
   type Estimates,
@@ -28,6 +35,7 @@ import {
   type StegoInput,
 } from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
+import { extraEntropyBits as extraEntropyBitsOf } from '../ui/password';
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
@@ -57,6 +65,8 @@ const dzFile = el('dz-file');
 const savePw = el<HTMLInputElement>('save-pw');
 const estimate = el('estimate');
 const estimateLine = el('estimate-line');
+const extraEntropy = el<HTMLTextAreaElement>('extra-entropy');
+const extraEntropyBits = el('extra-entropy-bits');
 const saveSize = el('save-size');
 const noFormat = el('no-format');
 const keymodeFields = el('keymode-fields');
@@ -403,6 +413,20 @@ wireCamera(
   reflectCaptured,
 );
 
+/**
+ * Show an estimate of what the typed extra entropy is worth, with no pass/fail
+ * threshold: there is no minimum, because the CSPRNG is mixed in either way.
+ */
+function renderEntropyBits(): void {
+  const text = extraEntropy.value.trim();
+  show(extraEntropyBits, text.length > 0);
+  extraEntropyBits.textContent = text
+    ? msg('extraEntropyBits', String(extraEntropyBitsOf(text)))
+    : '';
+}
+
+extraEntropy.addEventListener('input', renderEntropyBits);
+
 async function makeKey(password: string): Promise<VaultKey> {
   const { dek, block } = await createKeyBlock(password);
   return { dek, keyBlock: serializeKeyBlock(block) };
@@ -414,8 +438,15 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
   show(saveResult, false);
   const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
   setStatus(saveStatus, msg(destKey('statusSaving', selectedDest())));
+  // On the web the vault key is minted here, inside `build()` — ahead of
+  // `runSave` — so the extra entropy has to be installed before that, or the key
+  // block's own salt and DEK would miss the layer. `runSave` re-seeds it for the
+  // rest of the save; the request still carries the string for the worker thread.
+  const entropy = extraEntropy.value.trim();
+  if (entropy) await installUserEntropy(entropy);
   try {
     const req = await build();
+    req.userEntropy = entropy || undefined;
     req.onProgress = prog.onProgress;
     const { note } = await runSave(req, msg);
     setStatus(saveStatus, '');
@@ -423,9 +454,16 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     show(saveResult, true);
     savePw.value = ''; // don't leave the secret in the field after use
     duressPw.value = '';
+    // Clearing the entropy too: a string kept across saves stops being a
+    // one-off contribution and becomes a fixed one. Success only, deliberately —
+    // a failed save should not cost the user a page of re-typed dice rolls, and
+    // keeping it is harmless since each install draws a fresh session salt.
+    extraEntropy.value = '';
+    renderEntropyBits();
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
+    clearUserEntropy();
     prog.done();
     saveBtn.disabled = false;
   }

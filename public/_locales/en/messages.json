@@ -1140,6 +1140,36 @@
     },
     "description": "File count shown under a codec option, e.g. '12 files'. $N$ is the count."
   },
+  "extraEntropyHeading": {
+    "message": "Extra entropy (optional)",
+    "description": "Label of the optional extra-entropy field in the expert save options."
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Type randomly, or enter dice rolls…",
+    "description": "Placeholder of the extra-entropy textarea."
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "Your browser's secure random generator is always used.",
+    "description": "Reassurance shown next to the extra-entropy field: the CSPRNG is never replaced."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ bits added",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    },
+    "description": "Estimated bits contributed by the typed extra entropy. $N$ is the count."
+  },
+  "extraEntropyKeyHelp": {
+    "message": "This is the one place the vault key itself can be covered: it is created now, and entropy supplied later at save time cannot reach back to it. The key protects every vault you write on this device.",
+    "description": "Explanation under the extra-entropy field on the key-creation form: only here can the vault key itself be covered."
+  },
+  "extraEntropyHelp": {
+    "message": "Whatever you type here is mixed (XORed) into every random value this save generates, on top of the browser's secure random generator — which is used regardless. It can only add uncertainty, never replace it, so a weak string cannot weaken your vault. It covers this save's salts, nonces and other generated values; a vault key already held in the key store was created earlier and is not affected. Nothing about it is stored: you never re-enter it to restore.",
+    "description": "Explanation shown under the extra-entropy field."
+  },
   "btnSaveFile": {
     "message": "Encrypt & download file",
     "description": "Save button when the destination writes one file, not images."

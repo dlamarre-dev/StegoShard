@@ -19,12 +19,14 @@ import {
   runRestore,
   runSave,
   codecArgError,
+  entropyArgError,
   type CodecChoice,
   type SaveOptions,
 } from './commands';
 import {
   CredentialsNotIndependentError,
   GalleryRestoreError,
+  installUserEntropy,
   type KeyMode,
   type OnProgress,
   type Progress,
@@ -92,6 +94,16 @@ Password (any command that needs one), in order of precedence:
   STEGOSHARD_PASSWORD    Environment variable
   interactive prompt     Asked (hidden) when none of the above is set
 
+Extra entropy for save / gallery-save (optional, expert; affects generation
+only — nothing to re-enter on restore, and the OS CSPRNG is always used
+regardless), in order of precedence:
+  --entropy <text>       Discouraged: visible in shell history / process list
+  --entropy-file <path>  Read it from a file (whole contents, e.g. dice rolls)
+  --entropy-prompt       Ask for it (hidden) at the terminal (needs a TTY)
+  STEGOSHARD_ENTROPY     Environment variable
+  Your text is XORed in as a second source: it can only add uncertainty, never
+  replace the CSPRNG, so a weak string cannot weaken the vault.
+
 Gallery Mode (a secret hidden, fragmented, across many ordinary photos):
   --out <dir>            Output directory for the modified photos
   --key-mode <mode>      embedded (default) | keyfile | stego   (gallery-save)
@@ -109,6 +121,7 @@ Examples:
   stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
   stegoshard save notes.txt --paper --instructions --locale fr --out ./print
   stegoshard save archive.zip --binary --disguise --out ./vault
+  stegoshard save secret.txt --entropy-file dice.txt --out ./vault
   stegoshard restore ./vault --out ./restored
   stegoshard gallery-save note.txt ./photos --out ./album
   stegoshard gallery-restore ./album --out ./restored
@@ -239,6 +252,67 @@ async function resolveDuressPassword(values: Record<string, unknown>): Promise<s
   return pw;
 }
 
+/**
+ * True when an entropy *flag* was typed. The environment variable is deliberately
+ * excluded: it is ambient (a user may export it in their shell profile), so it
+ * must never turn a restore into an error — while a typed flag on a command that
+ * generates nothing is a mistake worth naming.
+ */
+function entropyFlagGiven(values: Record<string, unknown>): boolean {
+  return (
+    typeof values.entropy === 'string' ||
+    typeof values['entropy-file'] === 'string' ||
+    values['entropy-prompt'] === true
+  );
+}
+
+/**
+ * Optional extra entropy for this run (expert). Called only by the commands that
+ * actually generate key material, and only *after* the password has been read —
+ * two prompts cannot share a piped stdin, and the password must win it.
+ */
+async function installEntropy(values: Record<string, unknown>): Promise<void> {
+  const problem = entropyArgError({
+    text: values.entropy as string | undefined,
+    file: values['entropy-file'] as string | undefined,
+    prompt: values['entropy-prompt'] as boolean | undefined,
+  });
+  if (problem) fail(problem);
+
+  let text: string;
+  if (typeof values.entropy === 'string') {
+    process.stderr.write(
+      'Warning: --entropy is visible in your shell history and the process list; ' +
+        'prefer STEGOSHARD_ENTROPY, --entropy-file, or --entropy-prompt.\n',
+    );
+    text = values.entropy;
+  } else if (typeof values['entropy-file'] === 'string') {
+    // Whole file, not just the first line: a page of dice rolls is the point.
+    const path = values['entropy-file'];
+    try {
+      text = readFileSync(path, 'utf8');
+    } catch {
+      // A missing or unreadable file must name itself, not surface as a raw
+      // ENOENT stack — this runs after the password prompt, deep into the run.
+      fail(`--entropy-file: cannot read "${path}"`);
+    }
+  } else if (values['entropy-prompt']) {
+    // Without a terminal, a "hidden prompt" would swallow whatever is piped in —
+    // including a password meant for the password prompt. Refuse instead.
+    if (!process.stdin.isTTY) {
+      fail('--entropy-prompt needs a terminal; use --entropy-file or STEGOSHARD_ENTROPY');
+    }
+    text = await promptHidden('Extra entropy (type randomly, or paste dice rolls): ');
+    if (!text) fail('--entropy-prompt: nothing entered');
+  } else if (process.env.STEGOSHARD_ENTROPY) {
+    text = process.env.STEGOSHARD_ENTROPY;
+  } else {
+    return; // no extra layer: plain CSPRNG, exactly as before
+  }
+  if (!text.trim()) fail('extra entropy was empty (omit it if you do not want the extra layer)');
+  await installUserEntropy(text);
+}
+
 const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
 
 async function main(argv: string[]): Promise<number> {
@@ -275,10 +349,19 @@ async function main(argv: string[]): Promise<number> {
       key: { type: 'string' },
       password: { type: 'string' },
       'password-file': { type: 'string' },
+      entropy: { type: 'string' },
+      'entropy-file': { type: 'string' },
+      'entropy-prompt': { type: 'boolean' },
       force: { type: 'boolean' },
       quiet: { type: 'boolean' },
     },
   });
+
+  // Only `save` and `gallery-save` generate key material. Say so rather than
+  // accepting the flags and quietly doing nothing with them.
+  if (command !== 'save' && command !== 'gallery-save' && entropyFlagGiven(values)) {
+    fail(`${command}: the --entropy options apply to save and gallery-save only`);
+  }
 
   const force = Boolean(values.force);
 
@@ -315,6 +398,9 @@ async function main(argv: string[]): Promise<number> {
 
     const password = await resolvePassword(values);
     if (mode === 'duress') duressPassword = await resolveDuressPassword(values);
+    // After the passwords (they get first claim on stdin), before anything is
+    // generated.
+    await installEntropy(values);
     const opts: SaveOptions = {
       inputFile,
       outDir,
@@ -400,6 +486,7 @@ async function main(argv: string[]): Promise<number> {
       gThreshold = parseThreshold(values.threshold as string);
     }
     const password = await resolvePassword(values);
+    await installEntropy(values);
     const res = await runGallerySave({
       secretFile,
       covers,

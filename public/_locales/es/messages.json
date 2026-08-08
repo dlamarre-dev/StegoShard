@@ -1031,6 +1031,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "Entropía adicional (opcional)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Escriba al azar o introduzca tiradas de dados…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "El generador aleatorio seguro del navegador se usa siempre."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ bits añadidos",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "Este es el único momento en que la propia clave de la caja fuerte puede quedar cubierta: se crea ahora, y la entropía que aporte después, al guardar, ya no puede alcanzarla. Esa clave protege todas las cajas fuertes que escriba en este dispositivo."
+  },
+  "extraEntropyHelp": {
+    "message": "Lo que escriba aquí se mezcla (mediante XOR) en cada valor aleatorio que genera este guardado, además del generador aleatorio seguro del navegador, que se usa igualmente. Solo puede añadir incertidumbre, nunca sustituirla, así que una cadena débil no puede debilitar su caja fuerte. Cubre las sales, los nonces y los demás valores generados en este guardado; una clave de caja fuerte ya presente en el almacén de claves se creó antes y no se ve afectada. No se guarda nada de ella: nunca hay que volver a escribirla para restaurar."
+  },
   "btnSaveFile": {
     "message": "Cifrar y descargar el archivo"
   },

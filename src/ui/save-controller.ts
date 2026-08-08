@@ -19,6 +19,8 @@ import {
   CODEC_COLOR_GRID,
   CODEC_QR_GRID,
   WrongPasswordError,
+  clearUserEntropy,
+  installUserEntropy,
   parseKeyBlock,
   unlockKeyBlock,
 } from '@core';
@@ -117,6 +119,14 @@ export interface SaveRequest {
   decoy?: File | undefined;
   /** Mode B: the k-of-n threshold. */
   threshold?: { k: number; n: number } | undefined;
+  /**
+   * Expert option: extra entropy typed by the user (mashed keys, dice rolls),
+   * XORed into every random draw of this save on top of the platform CSPRNG,
+   * which is always used regardless. Generation-side only — nothing is stored,
+   * so restoring needs no trace of it. Never persisted: a remembered entropy
+   * string is a reused one.
+   */
+  userEntropy?: string | undefined;
   /** Progress callback for the binary path (the slow, large-file destination). */
   onProgress?: OnProgress;
 }
@@ -193,8 +203,24 @@ export function recoveryGuidance(dest: SaveDestination, keyMode: KeyMode): Recov
   return { items, lossless };
 }
 
-/** Run a save and return a localized result note. Throws on any failure. */
+/**
+ * Run a save and return a localized result note. Throws on any failure.
+ *
+ * The optional user-entropy layer is installed for the duration of the save and
+ * torn down afterwards, so it can never leak into a later operation the user did
+ * not ask it for. The pipeline worker runs on its own thread with its own module
+ * state, so requests routed through it carry the string along (see disk.ts).
+ */
 export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
+  if (req.userEntropy) await installUserEntropy(req.userEntropy);
+  try {
+    return await performSave(req, msg);
+  } finally {
+    clearUserEntropy();
+  }
+}
+
+async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
   if (req.dest === 'gallery') {
     const covers = req.covers ?? [];
     if (!req.galleryPassword) throw new Error('gallery mode requires a password');
@@ -268,6 +294,7 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
       duressPassword: req.duressPassword,
       decoy: req.decoy,
       threshold: req.threshold,
+      userEntropy: req.userEntropy,
       onProgress: req.onProgress,
     });
     return { note: binaryNote(msg, keyMode, saved) };

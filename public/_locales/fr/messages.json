@@ -1127,6 +1127,30 @@
       }
     }
   },
+  "extraEntropyHeading": {
+    "message": "Entropie supplémentaire (facultatif)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "Tapez au hasard, ou entrez des jets de dés…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "Le générateur aléatoire sécurisé du navigateur est toujours utilisé."
+  },
+  "extraEntropyBits": {
+    "message": "≈$N$ bits ajoutés",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "C'est le seul endroit où la clé du coffre elle-même peut être couverte : elle est créée maintenant, et une entropie fournie plus tard, au moment d'une sauvegarde, ne peut pas revenir en arrière. Cette clé protège tous les coffres que vous écrirez sur cet appareil."
+  },
+  "extraEntropyHelp": {
+    "message": "Ce que vous tapez ici est mélangé (par XOR) à chaque valeur aléatoire produite par cette sauvegarde, en plus du générateur aléatoire sécurisé du navigateur, qui est utilisé de toute façon. Cela ne peut qu'ajouter de l'incertitude, jamais la remplacer : une chaîne faible ne peut donc pas affaiblir votre coffre. Cela couvre les sels, les nonces et les autres valeurs produites par cette sauvegarde ; une clé de coffre déjà présente dans le trousseau a été créée auparavant et n'est pas touchée. Rien n'en est conservé : vous n'avez jamais à la ressaisir pour restaurer."
+  },
   "btnSaveFile": {
     "message": "Chiffrer et télécharger le fichier"
   },

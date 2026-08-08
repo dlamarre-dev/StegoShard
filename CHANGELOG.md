@@ -9,6 +9,18 @@ format** is versioned separately — see [docs/VERSIONING.md](docs/VERSIONING.md
 
 ### Added
 
+- **Optional user-supplied entropy (expert).** Users who would rather not trust
+  the platform CSPRNG alone can now type their own — mashed keys, dice rolls —
+  in the expert save options or via `--entropy` / `--entropy-file` /
+  `STEGOSHARD_ENTROPY` / `--entropy-prompt`. It is XORed into every random draw
+  of that save _on top of_ `crypto.getRandomValues`, which is still consulted for
+  every byte: the extra layer can only add uncertainty, never replace it, so a
+  weak string cannot weaken a vault. Generation-side only — nothing is stored,
+  the format is unchanged, and restore never asks for it.
+  - The same field appears on the extension's **key-creation** form, which is the
+    only moment the managed vault key itself can be covered: it is minted once,
+    before any save, so entropy given later cannot reach back to it.
+
 - **8-colour grid codec (`color-grid`, `CODEC_ID = 2`)** for digital output —
   three bits per module instead of QR byte mode's ~0.75. A disk vault now fits
   **8636 bytes per image** against QR's 2800, in a _smaller_ PNG (704 px vs

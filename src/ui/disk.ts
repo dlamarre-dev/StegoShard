@@ -310,6 +310,9 @@ export async function saveFileToBinary(
     duressPassword?: string | undefined;
     decoy?: File | undefined;
     threshold?: { k: number; n: number } | undefined;
+    /** Expert extra entropy. Forwarded to the worker, which has its own module
+     *  state and so cannot see the layer installed on this thread. */
+    userEntropy?: string | undefined;
     onProgress?: OnProgress | undefined;
   },
 ): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
@@ -336,7 +339,7 @@ export async function saveFileToBinary(
         threshold: options.threshold,
         onProgress: options.onProgress,
       });
-      const modeId = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+      const modeId = toHex(randomBytes(4));
       await deliver(downloads, `stegoshard-${modeId}`);
       return { keyMode, variant: 'disguised' };
     }
@@ -345,6 +348,7 @@ export async function saveFileToBinary(
       content,
       options.password,
       keyMode,
+      options.userEntropy,
       options.onProgress,
     );
     const downloads: { name: string; blob: Blob }[] = [
@@ -377,7 +381,7 @@ export async function saveFileToBinary(
         blob: octet(wrapBinary(keyFactor, 'disguised')),
       });
     }
-    const disguisedId = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+    const disguisedId = toHex(randomBytes(4));
     await deliver(downloads, `stegoshard-${disguisedId}`);
     return { keyMode, variant: 'disguised' };
   }
@@ -391,6 +395,7 @@ export async function saveFileToBinary(
     key,
     keyMode,
     options.variant,
+    options.userEntropy,
     options.onProgress,
   );
   const downloads: { name: string; blob: Blob }[] = [
@@ -422,7 +427,7 @@ export async function saveFileToBinary(
     );
   }
   // No setId on the binary path — group the vault + key under a random-id folder.
-  const id = toHex(globalThis.crypto.getRandomValues(new Uint8Array(4)));
+  const id = toHex(randomBytes(4));
   await deliver(downloads, `stegoshard-${id}`);
   return { keyMode, variant: options.variant };
 }
