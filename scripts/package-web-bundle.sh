@@ -20,13 +20,25 @@
 set -euo pipefail
 
 version="${1:-}"
-if [ -z "$version" ]; then
-  if [ -n "${GITHUB_REF_NAME:-}" ]; then
-    version="${GITHUB_REF_NAME#v}"
-  else
-    version="$(node -p 'require("./package.json").version')"
-  fi
+
+# Only trust GITHUB_REF_NAME when it is genuinely a tag. Actions sets it on
+# every event, so on a pull request it holds something like "73/merge" — which
+# silently produced "stegoshard-web-73/merge.zip" and a zip I/O error.
+if [ -z "$version" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+  version="${GITHUB_REF_NAME#v}"
 fi
+if [ -z "$version" ]; then
+  version="$(node -p 'require("./package.json").version')"
+fi
+
+# Fail loudly on anything that is not a plain version token, rather than letting
+# it become a strange path further down.
+case "$version" in
+  '' | *[!0-9A-Za-z.+-]*)
+    echo "::error::refusing to package version '$version' — expected a plain version such as 1.2.3"
+    exit 1
+    ;;
+esac
 
 for dir in web-dist web-dist-offline; do
   if [ ! -d "$dir" ]; then
