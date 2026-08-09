@@ -56,7 +56,7 @@ jobs:
           sha256sum "$archive" > SHA256SUMS-web.txt
           echo "WEB_ARCHIVE=$archive" >> "$GITHUB_ENV"
       - name: Attest offline web bundle
-        uses: actions/attest-build-provenance@8beda2b7ed98355c0e97c0a63bec38ae472e66c4 # v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ env.WEB_ARCHIVE }}
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
@@ -66,7 +66,7 @@ jobs:
       - id: deploy
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
       - name: Attach web bundle to GitHub release
-        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: |
             ${{ env.WEB_ARCHIVE }}

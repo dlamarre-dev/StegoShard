@@ -48,7 +48,7 @@ jobs:
         run: npm run build:cli
 
       - name: Set up Deno
-        uses: denoland/setup-deno@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.9.5
 
