@@ -11,7 +11,7 @@ const PREFS_KEY = 'stegoshard.prefs';
 
 // 'binary' = branded .ssbn, 'sqlite' = disguised .db (SPEC §8) — two destinations
 // over the one binary container.
-export type Destination = 'disk' | 'paper' | 'cloud' | 'binary' | 'sqlite' | 'gallery';
+export type Destination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
 /** Which UI to show at launch — the step-by-step wizard or the dense one-screen UI. */
 export type Workflow = 'guided' | 'expert';
@@ -20,7 +20,7 @@ export interface Prefs {
   workflow: Workflow;
   destination: Destination;
   keyMode: KeyMode;
-  /** Image codec for the disk/cloud destinations (SPEC §2). */
+  /** Image codec for the disk destination (SPEC §2). */
   codec: CodecChoice;
   addBand: boolean;
   title: string;
@@ -46,8 +46,14 @@ const DEFAULT_PREFS: Prefs = {
 
 export async function getPrefs(): Promise<Prefs> {
   const record = await browser.storage.local.get(PREFS_KEY);
-  const stored = record[PREFS_KEY] as Partial<Prefs> | undefined;
-  return { ...DEFAULT_PREFS, ...stored };
+  const raw = record[PREFS_KEY] as
+    (Omit<Partial<Prefs>, 'destination'> & { destination?: string }) | undefined;
+  const destinations: readonly Destination[] = ['disk', 'paper', 'binary', 'sqlite', 'gallery'];
+  // Invalid or deferred pre-1.0 destinations migrate to the offline default.
+  const destination = destinations.includes(raw?.destination as Destination)
+    ? (raw!.destination as Destination)
+    : 'disk';
+  return { ...DEFAULT_PREFS, ...raw, destination };
 }
 
 export async function savePrefs(patch: Partial<Prefs>): Promise<void> {

@@ -399,19 +399,19 @@ describe('Argon2id parameter boundaries', () => {
 
   const accepted: Partial<Argon2Params>[] = [
     { iterations: 1 },
-    { iterations: 16 },
+    { iterations: 4 },
     { memoryKiB: 8 },
-    { memoryKiB: 1024 * 1024 },
+    { memoryKiB: 256 * 1024 },
     { parallelism: 1 },
     { parallelism: 4 },
   ];
   const rejected: Partial<Argon2Params>[] = [
     { iterations: 0 },
-    { iterations: 17 },
+    { iterations: 5 },
     { iterations: 1.5 },
     { iterations: -1 },
     { memoryKiB: 7 },
-    { memoryKiB: 1024 * 1024 + 1 },
+    { memoryKiB: 256 * 1024 + 1 },
     { memoryKiB: 0xffffffff },
     { parallelism: 0 },
     { parallelism: 5 },

@@ -33,7 +33,7 @@ OVERFLOW_CHUNK = U - 4
 def _put_varint(n: int) -> bytes:
     if n < 0:
         raise ValueError("sqlite: bad varint")
-    groups = []
+    groups: list[int] = []
     v = n
     while True:
         groups.insert(0, v & 0x7F)
@@ -57,20 +57,21 @@ def _read_varint(buf: bytes, off: int) -> tuple[int, int]:
     return result, 9
 
 
-def _encode_record(cols: list[tuple[str, object]]) -> bytes:
+def _encode_record(cols: list[tuple[str, bytes | int]]) -> bytes:
     """cols: list of ("text"|"blob", bytes) or ("int", int)."""
     serials = bytearray()
     bodies = bytearray()
     for kind, val in cols:
-        if kind == "text":
-            serials += _put_varint(2 * len(val) + 13)  # type: ignore[arg-type]
-            bodies += val  # type: ignore[operator]
-        elif kind == "blob":
-            serials += _put_varint(2 * len(val) + 12)  # type: ignore[arg-type]
-            bodies += val  # type: ignore[operator]
+        if kind in {"text", "blob"}:
+            if not isinstance(val, bytes):
+                raise TypeError(f"sqlite: {kind} record value must be bytes")
+            serials += _put_varint(2 * len(val) + (13 if kind == "text" else 12))
+            bodies += val
         else:  # small non-negative int → serial type 1 (1-byte)
+            if not isinstance(val, int):
+                raise TypeError("sqlite: integer record value must be int")
             serials += _put_varint(1)
-            bodies += bytes([val & 0xFF])  # type: ignore[operator]
+            bodies += bytes([val & 0xFF])
     header_len_size = 1
     while True:
         header_len = header_len_size + len(serials)

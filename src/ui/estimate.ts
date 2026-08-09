@@ -14,13 +14,13 @@ import {
   MAX_FILE_BYTES,
   MAX_FILE_BYTES_BINARY_UI,
   MAX_IMAGES,
-  PROFILE_CLOUD,
   PROFILE_DISK,
   PROFILE_PAPER,
   buildPayload,
   galleryCoversForEnvelopeLen,
   imagesForEnvelopeLen,
 } from '@core';
+import { boundedBlobBytes } from './input-limits';
 import type { KeyMode } from '@core';
 import {
   CODEC_CHOICES,
@@ -42,7 +42,7 @@ export interface DestEstimate {
    * because they toggled a codec is not.
    */
   available: boolean;
-  /** Images (disk/paper/cloud), 1 (binary/sqlite), or needed photos (gallery). */
+  /** Images (disk/paper), 1 (binary/sqlite), or needed photos (gallery). */
   count: number;
   /**
    * Image count per codec, for the destinations that offer the choice. Lets the
@@ -93,10 +93,9 @@ export function estimateFor(
       ? { available: true, count: needed, needed }
       : { available: false, count: 0, reason: msg('wizTooLarge') };
   }
-  // disk / paper / cloud
+  // disk / paper
   if (size > MAX_FILE_BYTES) return { available: false, count: 0, reason: msg('wizTooLarge') };
-  const profile =
-    dest === 'paper' ? PROFILE_PAPER : dest === 'cloud' ? PROFILE_CLOUD : PROFILE_DISK;
+  const profile = dest === 'paper' ? PROFILE_PAPER : PROFILE_DISK;
   const keyMode = ctx.keyMode ?? 'embedded';
 
   const imagesWith = (codec: CodecChoice | undefined): number =>
@@ -153,8 +152,21 @@ export function firstCodecThatFits(
  * codec or key mode.
  */
 export async function envelopeLenFor(file: File): Promise<number> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = await boundedBlobBytes(file, MAX_FILE_BYTES_BINARY_UI);
   return (await buildPayload(file.name, bytes)).length;
+}
+
+/**
+ * Envelope length for estimation, or 0 for a file past the binary ceiling.
+ *
+ * `envelopeLenFor` throws `FileTooLargeError` there, which would rob the UI of
+ * the chance to say *why* every destination is unavailable. Every branch of
+ * `estimateFor` rejects on `size` alone at that point and never reads the
+ * envelope length, so the placeholder is never consulted.
+ */
+export async function envelopeLenForEstimate(file: File): Promise<number> {
+  if (file.size > MAX_FILE_BYTES_BINARY_UI) return 0;
+  return envelopeLenFor(file);
 }
 
 /** Availability for every destination, from an already-measured envelope. */
@@ -177,5 +189,5 @@ export async function computeEstimates(
   msg: Msg,
   ctx: EstimateContext = {},
 ): Promise<Estimates> {
-  return estimatesFrom(file.size, await envelopeLenFor(file), dests, msg, ctx);
+  return estimatesFrom(file.size, await envelopeLenForEstimate(file), dests, msg, ctx);
 }

@@ -9,14 +9,7 @@
  *   dist-release/<target>/            (identical contents, source maps excluded)
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { zipSync } from 'fflate';
 import { buildManifest, type Target } from '../src/manifest.config';
@@ -47,6 +40,10 @@ function pack(target: Target): void {
   const dir = resolve(ROOT, 'dist', target);
   if (!existsSync(dir)) throw new Error(`missing build: ${dir} (run the build first)`);
   const entries = collect(dir);
+  entries['LICENSE'] = new Uint8Array(readFileSync(resolve(ROOT, 'LICENSE')));
+  entries['THIRD_PARTY_NOTICES.txt'] = new Uint8Array(
+    readFileSync(resolve(ROOT, 'THIRD_PARTY_NOTICES.txt')),
+  );
 
   // 1) Zip for store upload.
   const zipped = zipSync(entries, { level: 9 });

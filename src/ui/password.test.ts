@@ -3,6 +3,7 @@ import {
   GENERATED_PASSPHRASE_BITS,
   extraEntropyBits,
   generatePassphrase,
+  isStrongNewPassword,
   passwordStrength,
 } from './password';
 
@@ -21,6 +22,14 @@ describe('generatePassphrase', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 500; i++) seen.add(generatePassphrase());
     expect(seen.size).toBe(500);
+  });
+});
+
+describe('new-password policy', () => {
+  it('accepts generated credentials and rejects short or repetitive ones', () => {
+    expect(isStrongNewPassword(generatePassphrase())).toBe(true);
+    expect(isStrongNewPassword('password')).toBe(false);
+    expect(isStrongNewPassword('a'.repeat(40))).toBe(false);
   });
 });
 

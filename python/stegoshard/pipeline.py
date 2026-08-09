@@ -98,7 +98,14 @@ def decode_vault(
 
     if multiregion:
         return decode_multiregion_vault_blob(
-            blob, password, key_factor, MAX_CONTENT_BYTES, iterations, memory_kib, parallelism, secret
+            blob,
+            password,
+            key_factor,
+            MAX_CONTENT_BYTES,
+            iterations,
+            memory_kib,
+            parallelism,
+            secret,
         )
     return _decode_vault_blob(blob, password, key_block, MAX_CONTENT_BYTES)
 

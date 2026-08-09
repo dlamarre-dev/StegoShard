@@ -24,15 +24,28 @@ jobs:
     name: Parser fuzzing
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Fuzz parsers
-        run: npm run fuzz -- --iters=${{ github.event.inputs.iters || '200000' }} --seed=${{ github.run_id }}
+        # The dispatch input reaches the shell through the environment, not
+        # through `${{ }}` inside `run:`. An expression pasted into a run block
+        # is substituted before the shell parses the line, so a crafted input
+        # would execute as shell; "$ITERS" is inert, and the guard below keeps
+        # it to a plain integer besides.
+        env:
+          ITERS: ${{ inputs.iters }}
+          SEED: ${{ github.run_id }}
+        run: |
+          case "$ITERS" in
+            '') ITERS=200000 ;;
+            *[!0-9]*) echo "iters must be a positive integer, got: $ITERS" >&2; exit 1 ;;
+          esac
+          npm run fuzz -- --iters="$ITERS" --seed="$SEED"

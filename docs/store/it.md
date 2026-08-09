@@ -1,4 +1,4 @@
-<!-- lang: it · review: translated + light copy-edit · optional native check before 1.0 · target ≤2500 chars · store long description -->
+<!-- lang: it · review: draft after 2026-08-09 claims edit · native review required · target ≤2500 chars · store long description -->
 
 **Blocca con una password un piccolo file prezioso — poi conservalo dove durerà davvero nel tempo, o dove nessuno lo troverà.**
 
@@ -7,6 +7,7 @@ StegoShard trasforma un file sensibile — l'esportazione del gestore di passwor
 Tutto avviene sul tuo dispositivo. Niente viene caricato online, nessun account, e funziona offline.
 
 **Cosa puoi farci**
+
 - Fare il backup dell'esportazione del gestore di password e conservarla per anni senza affidarti a un cloud — e stamparla così che i dati non vadano persi se il portatile si guasta.
 - Proteggere la frase di recupero di un wallet crypto — minuscola, insostituibile e senza alcun meccanismo di recupero tipo «password dimenticata».
 - Stampare un backup cifrato come PDF di codici QR e ripristinarlo poi scansionando le pagine con la fotocamera del telefono — anche se una pagina si perde o si macchia.
@@ -15,6 +16,7 @@ Tutto avviene sul tuo dispositivo. Niente viene caricato online, nessun account,
 - Conservare codici di recupero e riavere il file originale byte per byte, anche se alcune copie sono danneggiate.
 
 **Funzioni**
+
 - Cifratura con password; la tua chiave non lascia mai il dispositivo (Argon2id + AES-256-GCM)
 - Nascondere segreti dentro foto ordinarie — un JPEG resta un JPEG, un PNG resta un PNG
 - Correzione degli errori su più immagini: perdi una pagina o una foto e recuperi lo stesso
@@ -26,7 +28,7 @@ Tutto avviene sul tuo dispositivo. Niente viene caricato online, nessun account,
 - Funziona in Chrome, Edge e Firefox, più una web app equivalente senza installazione
 
 **Progettato per la privacy**
-Gratuito e open source (MIT). Nessun account, nessun tracciamento, niente lascia il tuo dispositivo. I tuoi dati sopravvivono all'app: una web app gratuita e un decodificatore indipendente possono sempre ripristinare la tua cassaforte, e il formato del file è congelato e versionato.
+Gratuito e open source (MIT). Nessun account o tracciamento; i file scelti vengono elaborati localmente. La web app e il decoder indipendente offrono percorsi di recupero separati. Il formato è versionato, ma resta un candidato beta prima della versione 1.0.
 
 **Da tenere presente**
 StegoShard è pensato per piccoli segreti, non per backup di interi dischi. Non c'è recupero se perdi la password — conservala al sicuro. Nascondere un segreto lo rende discreto a uno sguardo casuale; non è una garanzia contro un'analisi forense digitale professionale. È software in beta.

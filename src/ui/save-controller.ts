@@ -4,11 +4,10 @@
  * so the branching over destination / key mode lives in exactly one place
  * instead of being copied into each surface's click handler.
  *
- * It wraps the destination flows in `disk.ts` / `paper.ts` / `google-photos.ts`
+ * It wraps the destination flows in `disk.ts` / `paper.ts`
  * and returns a localized result note (via the caller's `msg`, since the
- * extension and web build use different i18n backends). Paper and cloud are
- * imported lazily so surfaces that never use them don't pull them into the
- * bundle.
+ * extension and web build use different i18n backends). Paper is imported
+ * lazily so surfaces that never use it don't pull it into the bundle.
  */
 
 import {
@@ -26,7 +25,7 @@ import {
 } from '@core';
 import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
 
-export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'cloud' | 'gallery';
+export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
 /**
  * Which image codec the digital destinations render with (SPEC §2).
@@ -58,7 +57,7 @@ export function destKey(base: string, dest: SaveDestination): string {
 
 /** Destinations that render images, and so let the user pick a codec. */
 export function codecApplies(dest: SaveDestination): boolean {
-  return dest === 'disk' || dest === 'cloud';
+  return dest === 'disk';
 }
 
 /** Map a user choice to the CODEC_ID stored in the image header. */
@@ -90,7 +89,7 @@ export interface SaveRequest {
    */
   key?: VaultKey | undefined;
   keyMode?: KeyMode;
-  /** Image codec for the disk/cloud destinations. Ignored elsewhere. */
+  /** Image codec for the disk destination. Ignored elsewhere. */
   codec?: CodecChoice | undefined;
   /** Readable title band drawn above disk images. */
   label?: { title?: string; date?: string } | undefined;
@@ -194,7 +193,7 @@ export function recoveryGuidance(dest: SaveDestination, keyMode: KeyMode): Recov
   const items = ['recoveryPassword'];
   if (dest === 'gallery') items.push('recoveryPhotos');
   else if (dest === 'binary' || dest === 'sqlite') items.push('recoveryFile');
-  else items.push('recoveryImages'); // disk / paper / cloud
+  else items.push('recoveryImages'); // disk / paper
   if (keyMode === 'keyfile') items.push('recoveryKeyfile');
   else if (keyMode === 'stego') items.push('recoveryCover');
   // LSB carriers (a stego key cover, or Gallery Mode's photos) are destroyed by
@@ -243,17 +242,6 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
 
   if (!req.key) throw new Error('a vault key is required');
   const keyMode = req.keyMode ?? 'embedded';
-
-  if (req.dest === 'cloud') {
-    const { saveToPhotos } = await import('./google-photos');
-    const { imageCount, albumTitle } = await saveToPhotos(req.file, req.key, {
-      keyMode,
-      codecId: codecIdFor('cloud', req.codec),
-      title: req.label?.title || undefined,
-      date: req.label?.date,
-    });
-    return { note: msg('statusSavedCloud', [String(imageCount), albumTitle]) };
-  }
 
   if (req.dest === 'paper') {
     const { saveFileToPaper } = await import('./paper');

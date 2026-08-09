@@ -27,14 +27,18 @@ The `main` branch is protected: **no direct pushes**. All changes land via pull 
 ### Required checks (must pass before merge)
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+npm run ci:node
+npm run package
+npm run build:web
+npm run build:cli
+npm run test:e2e
 ```
 
 These run automatically in CI (GitHub Actions) on every push and PR. CodeQL and
 Dependabot also run on the repository.
+
+`ci:node` includes `format:check`, so unformatted code fails the build. Run
+`npm run format` to fix it.
 
 > **Repository administrators:** enable branch protection on `main` in the GitHub
 > settings — require pull requests, at least one approving review, "up to date before
@@ -51,9 +55,17 @@ Dependabot also run on the repository.
 
 ## Format stability
 
-Once `SPEC.md` is frozen (Phase 1), the on-image format is a **public, versioned
-interface**. Breaking changes require a version bump in the header and a spec update, and
-must keep the Python reference decoder in sync (it doubles as a conformance test in CI).
+The current format is a versioned pre-1.0 candidate, not a frozen compatibility promise.
+Breaking changes still require a version bump in the header and a spec update, and must
+keep the Python reference decoder in sync (it doubles as a conformance test in CI).
+
+## Contribution licensing
+
+Contributions are currently accepted under the repository's MIT License. Before doing
+non-trivial work, read [docs/LICENSING.md](docs/LICENSING.md): the maintainer is evaluating
+the post-beta licensing model, and changes in copyright ownership can constrain future
+relicensing or dual licensing. Do not add third-party code without its license text and a
+compatibility review.
 
 ## Building & releasing
 
@@ -62,7 +74,7 @@ Local builds (see `package.json` scripts):
 - `npm run build` (Chrome/Edge), `build:firefox`, `build:web` — extension / web app.
 - `npm run build:cli` then `npm run package:cli` — the standalone CLI (`deno compile`).
 - `npm run package` — all store builds + packaging (see [docs/STORE.md](docs/STORE.md)).
-- `npm run vectors` / `npm run fixtures` — regenerate frozen crypto vectors /
+- `npm run vectors` / `npm run fixtures` — regenerate committed crypto vectors /
   cross-implementation conformance fixtures (only when the format deliberately changes).
 
 Release flow:

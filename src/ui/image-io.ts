@@ -25,6 +25,7 @@ import {
   type GalleryImage,
   type ImageDataLike,
 } from '@core';
+import { MAX_BROWSER_MEDIA_BYTES, assertBlobSize, boundedBlobBytes } from './input-limits';
 
 /** A produced stego key image: raw bytes plus how to name/serve it. */
 export interface StegoKeyImage {
@@ -126,13 +127,26 @@ export async function imageWithLabelToPngBlob(
  * full-resolution phone photos (~9 MP) but succeeds once the image is reduced
  * to ~1000–1400 px. Rendered PNGs are already small, so the cap is a no-op for
  * them (it never upscales).
+ *
+ * On the two guards: `assertBlobSize` is what bounds the *decode*, because it
+ * runs before `createImageBitmap` — a compressed image above the cap is never
+ * handed to the decoder. The megapixel check below runs after the decode has
+ * already happened, so it bounds only what comes next: the canvas allocation
+ * and the `getImageData` copy, both several bytes per pixel. Reading the source
+ * dimensions ahead of the decode would take a PNG/JPEG header parser, which is
+ * not worth it while the compressed cap stands at 25 MiB.
  */
 export async function fileToImageData(
   file: Blob,
   maxSide: number = Infinity,
 ): Promise<ImageDataLike> {
+  assertBlobSize(file, MAX_BROWSER_MEDIA_BYTES);
   const bitmap = await createImageBitmap(file);
   try {
+    // Bounds the canvas + getImageData allocations below, not the decode above.
+    if (bitmap.width * bitmap.height > 40_000_000) {
+      throw new Error('image dimensions are too large (40 megapixel limit)');
+    }
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
@@ -182,7 +196,7 @@ export async function embedKeyImage(
   keyBlock: Uint8Array,
   password: string,
 ): Promise<StegoKeyImage> {
-  const bytes = new Uint8Array(await cover.arrayBuffer());
+  const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) {
     try {
       const out = await embedKeyBlockStegoJpeg(bytes, keyBlock, password);
@@ -207,7 +221,7 @@ export async function embedKeyImage(
  * or when the format is unsupported.
  */
 export async function extractKeyImage(file: Blob, password: string): Promise<Uint8Array | null> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) return extractKeyBlockStegoJpeg(bytes, password);
   if (isPngBytes(bytes)) {
     const img = await fileToImageData(file); // full resolution (no cap)
@@ -227,7 +241,7 @@ export async function embedKeyFactorImage(
   factor: Uint8Array,
   password: string,
 ): Promise<StegoKeyImage> {
-  const bytes = new Uint8Array(await cover.arrayBuffer());
+  const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) {
     try {
       const out = await embedKeyFactorStegoJpeg(bytes, factor, password);
@@ -255,7 +269,7 @@ export async function extractKeyFactorImage(
   file: Blob,
   password: string,
 ): Promise<Uint8Array | null> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) return extractKeyFactorStegoJpeg(bytes, password);
   if (isPngBytes(bytes)) {
     const img = await fileToImageData(file); // full resolution (no cap)
@@ -273,7 +287,7 @@ export async function extractKeyFactorImage(
  * embedding is position-sensitive).
  */
 export async function fileToGalleryCover(file: File): Promise<GalleryCover> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) return { kind: 'jpeg', name: file.name, jpeg: bytes };
   const img = await fileToImageData(file);
   return { kind: 'rgba', name: file.name, rgba: img.data, width: img.width, height: img.height };

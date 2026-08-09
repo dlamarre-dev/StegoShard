@@ -19,15 +19,9 @@ describe('buildManifest', () => {
     expect(csp.extension_pages).toContain("'wasm-unsafe-eval'");
   });
 
-  it('keeps Google Photos permissions optional (Chromium)', () => {
+  it('contains no identity or host permissions', () => {
     const m = buildManifest('chrome');
     expect(m.permissions).not.toContain('identity');
-    expect(m.optional_permissions).toContain('identity');
-    expect(m.optional_host_permissions).toContain('https://photoslibrary.googleapis.com/*');
-  });
-
-  it('omits Google Photos permissions when the destination is disabled', () => {
-    const m = buildManifest('chrome', { googlePhotos: false });
     expect(m).not.toHaveProperty('optional_permissions');
     expect(m).not.toHaveProperty('optional_host_permissions');
   });
@@ -36,7 +30,6 @@ describe('buildManifest', () => {
     const m = buildManifest('firefox');
     expect((m.background as { scripts: string[] }).scripts).toEqual(['background.js']);
     expect(m).toHaveProperty('browser_specific_settings');
-    // Firefox rejects `identity` in optional_permissions; Photos is Phase 4.
     expect(m).not.toHaveProperty('optional_permissions');
     expect(m).not.toHaveProperty('optional_host_permissions');
   });

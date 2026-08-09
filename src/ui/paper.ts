@@ -15,12 +15,14 @@ import {
   exportVault,
   PROFILE_PAPER,
   decodeHeader,
+  MAX_FILE_BYTES,
   toHex,
   verifyImageExport,
   type KeyMode,
   type VaultKey,
 } from '@core';
 import { downloadBlob, embedKeyImage, imageDataToPngBlob, stegoKeyName } from './image-io';
+import { assertBlobSize, assertBrowserInputs } from './input-limits';
 import { wrapText } from './text-wrap';
 import {
   A4,
@@ -137,6 +139,8 @@ export async function saveFileToPaper(
   key: VaultKey,
   options: PaperOptions,
 ): Promise<{ imageCount: number; setId: string; keyMode: KeyMode }> {
+  assertBlobSize(file, MAX_FILE_BYTES);
+  if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
     profile: PROFILE_PAPER,

@@ -15,7 +15,17 @@ Requires Python ≥ 3.10.
 
 ```bash
 cd python
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
+```
+
+The checked-in locks are resolved universally at the CI floor (Python 3.12).
+Regenerate them from the repository root after changing an input file:
+
+```bash
+uv pip compile --universal --python-version 3.12 --generate-hashes \
+  --output-file python/requirements.lock python/requirements.in
+uv pip compile --universal --python-version 3.12 --generate-hashes \
+  --output-file python/requirements-dev.lock python/requirements-dev.in
 ```
 
 All dependencies are common PyPI packages with prebuilt wheels (no system

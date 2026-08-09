@@ -38,18 +38,22 @@ export function makeProgressUI(
     if (p.total > 0) {
       const pct = Math.min(100, Math.max(0, Math.floor((p.done / p.total) * 100)));
       fill.classList.remove('progress-bar--indeterminate');
-      fill.style.width = `${pct}%`;
+      for (const cls of [...fill.classList]) {
+        if (cls.startsWith('progress-pct-')) fill.classList.remove(cls);
+      }
+      fill.classList.add(`progress-pct-${Math.ceil(pct / 5)}`);
       bar.setAttribute('aria-valuenow', String(pct));
     } else {
       fill.classList.add('progress-bar--indeterminate');
-      fill.style.width = '100%';
       bar.removeAttribute('aria-valuenow');
     }
     setStatus(status, msg(PHASE_KEY[p.phase] ?? 'statusSaving'));
   };
   const done = () => {
     show(bar, false);
-    fill.style.width = '0%';
+    for (const cls of [...fill.classList]) {
+      if (cls.startsWith('progress-pct-')) fill.classList.remove(cls);
+    }
     fill.classList.remove('progress-bar--indeterminate');
     bar.removeAttribute('aria-valuenow');
   };

@@ -5,7 +5,6 @@ from __future__ import annotations
 import struct
 
 import pytest
-
 from stegoshard.format import KEY_MAGIC, MAGIC, parse_header, parse_key_block
 
 

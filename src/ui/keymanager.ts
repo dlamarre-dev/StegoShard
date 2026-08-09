@@ -18,10 +18,15 @@ import {
   setupKey,
 } from './keystore';
 import { downloadBlob } from './image-io';
-import { extraEntropyBits, generatePassphrase, passwordStrength } from './password';
+import {
+  extraEntropyBits,
+  generatePassphrase,
+  isStrongNewPassword,
+  passwordStrength,
+} from './password';
 import { clearUserEntropy, installUserEntropy } from '@core';
+import { MAX_BROWSER_MEDIA_BYTES, boundedBlobBytes } from './input-limits';
 
-const MIN_PASSWORD = 8;
 const STRENGTH_KEYS = ['pwVeryWeak', 'pwWeak', 'pwFair', 'pwGood', 'pwStrong'];
 
 export function wireKeyManager(onChange: () => void = () => {}): void {
@@ -40,9 +45,13 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
 
   /** Validate a new password + confirmation; returns an error message or null. */
   function validateNewPassword(pw: string, confirm: string): string | null {
-    if (pw.length < MIN_PASSWORD) return msg('errPasswordTooShort');
+    if (!pw) return msg('errNoPassword');
     if (pw !== confirm) return msg('errPasswordMismatch');
     return null;
+  }
+
+  function acceptPassword(pw: string): boolean {
+    return isStrongNewPassword(pw) || confirm(msg('confirmWeakPassword'));
   }
 
   // --- Create key ------------------------------------------------------------
@@ -86,6 +95,7 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
   createBtn.addEventListener('click', async () => {
     const err = validateNewPassword(newPw.value, confirmPw.value);
     if (err) return setStatus(createStatus, err, true);
+    if (!acceptPassword(newPw.value)) return;
     createBtn.disabled = true;
     const entropy = keyEntropy.value.trim();
     if (entropy) await installUserEntropy(entropy);
@@ -116,6 +126,7 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
   changeBtn.addEventListener('click', async () => {
     const err = validateNewPassword(changeNewPw.value, changeConfirmPw.value);
     if (err) return setStatus(changeStatus, err, true);
+    if (!acceptPassword(changeNewPw.value)) return;
     changeBtn.disabled = true;
     try {
       await changePassword(oldPw.value, changeNewPw.value);
@@ -155,7 +166,7 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
     if (!importPw.value) return setStatus(importStatus, msg('errNoPassword'), true);
     importBtn.disabled = true;
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
+      const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
       await importKeyBlock(bytes, importPw.value);
       importPw.value = '';
       setStatus(importStatus, msg('statusKeyImported'));

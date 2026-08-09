@@ -1,0 +1,5 @@
+# Runtime dependencies for the independent decoder.
+zxing-cpp>=2.2.0
+Pillow>=10.0.0
+argon2-cffi>=23.1.0
+cryptography>=42.0.0

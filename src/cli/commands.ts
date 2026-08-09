@@ -689,10 +689,7 @@ export function codecIdForSave(paper: boolean, codec: CodecChoice | undefined): 
  * `--paper` must keep working, and only an *explicit* `--codec color --paper` is
  * a mistake worth naming.
  */
-export function codecArgError(
-  requested: string | undefined,
-  paper: boolean,
-): string | null {
+export function codecArgError(requested: string | undefined, paper: boolean): string | null {
   if (requested !== undefined && !CODEC_CHOICES.includes(requested as CodecChoice)) {
     return `invalid --codec "${requested}"`;
   }

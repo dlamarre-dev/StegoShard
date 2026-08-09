@@ -46,7 +46,7 @@ const MAX_VAULT_ROWS = 256;
 
 // Table-leaf payload thresholds (SQLite fileformat.html, reserved = 0).
 const MAX_LOCAL = U - 35;
-const MIN_LOCAL = Math.floor((U - 12) * 32 / 255) - 23;
+const MIN_LOCAL = Math.floor(((U - 12) * 32) / 255) - 23;
 const OVERFLOW_CHUNK = U - 4;
 
 // --- varint (SQLite big-endian, 7 bits/byte, high bit = continue) -------------
@@ -164,7 +164,10 @@ function writeHeader(page: Uint8Array, pageCount: number): void {
 }
 
 /** Interior table b-tree page: child pointers to leaf pages, keyed by rowid. */
-function buildInteriorPage(children: { page: number; key: number }[], rightMost: number): Uint8Array {
+function buildInteriorPage(
+  children: { page: number; key: number }[],
+  rightMost: number,
+): Uint8Array {
   const page = new Uint8Array(PAGE_SIZE);
   const cells = children.map(({ page: child, key }) => {
     const kv = putVarint(key);
@@ -346,7 +349,9 @@ export function unpackSqlite(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < pageCount * PAGE_SIZE) return null;
 
   const pageAt = (n: number): Uint8Array =>
-    n >= 1 && n <= pageCount ? bytes.subarray((n - 1) * PAGE_SIZE, n * PAGE_SIZE) : new Uint8Array(0);
+    n >= 1 && n <= pageCount
+      ? bytes.subarray((n - 1) * PAGE_SIZE, n * PAGE_SIZE)
+      : new Uint8Array(0);
 
   // Reassemble a table-leaf cell's full payload, following overflow if needed.
   const reassemble = (page: Uint8Array, cellOff: number): Uint8Array | null => {

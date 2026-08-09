@@ -109,7 +109,9 @@ def decode_gallery(
         fragments.append(frag)
 
     if not fragments:
-        raise GalleryRestoreError("no restorable gallery found (wrong password or no gallery photos)")
+        raise GalleryRestoreError(
+            "no restorable gallery found (wrong password or no gallery photos)"
+        )
 
     # Each fragment is header || shard || zero-pad; the vault decoder's own
     # split_payload reads exactly shard_len bytes and ignores the padding. Group by

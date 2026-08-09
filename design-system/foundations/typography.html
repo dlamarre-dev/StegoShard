@@ -1,36 +1,125 @@
 <!-- @dsCard group="Foundations" name="Typography" subtitle="System font stack, 400 / 600 / 700" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Typography</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
-.row{border-bottom:1px solid var(--border);padding:12px 0}
-.row:last-child{border-bottom:none}
-.tag{font-size:.72rem;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-h1{font-size:1.4rem;margin:.15em 0 0}
-h2{font-size:1.05rem;margin:.15em 0 0}
-.brand-name{font-weight:700;font-size:1.05rem}
-.label{font-weight:600;font-size:.9rem}
-.body-txt{font-size:15px}
-.muted{color:var(--muted);font-size:.85rem}
-.pill-txt{font-size:.75rem;font-weight:600}
-.wiz-step{font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-</style>
-</head>
-<body>
-<div class="row"><div class="tag">h1 · 1.4rem</div><h1>Store a file safely</h1></div>
-<div class="row"><div class="tag">h2 · 1.05rem</div><h2>Restore from an image</h2></div>
-<div class="row"><div class="tag">.brand-name · 1.05rem / 700</div><div class="brand-name">StegoShard</div></div>
-<div class="row"><div class="tag">label · 0.9rem / 600</div><div class="label">Passphrase</div></div>
-<div class="row"><div class="tag">body · 15px / 400</div><div class="body-txt">Encrypt any file into a resilient, error-corrected image.</div></div>
-<div class="row"><div class="tag">.muted · 0.85rem</div><div class="muted">Kept only on your device — never uploaded.</div></div>
-<div class="row"><div class="tag">.wiz-step · 0.85rem / uppercase</div><div class="wiz-step">Step 1 of 3</div></div>
-<div class="row"><div class="tag">.pill · 0.75rem / 600</div><div class="pill-txt">ENCRYPTED</div></div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Typography</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+      }
+      .row {
+        border-bottom: 1px solid var(--border);
+        padding: 12px 0;
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .tag {
+        font-size: 0.72rem;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0.15em 0 0;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin: 0.15em 0 0;
+      }
+      .brand-name {
+        font-weight: 700;
+        font-size: 1.05rem;
+      }
+      .label {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .body-txt {
+        font-size: 15px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .pill-txt {
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .wiz-step {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="tag">h1 · 1.4rem</div>
+      <h1>Store a file safely</h1>
+    </div>
+    <div class="row">
+      <div class="tag">h2 · 1.05rem</div>
+      <h2>Restore from an image</h2>
+    </div>
+    <div class="row">
+      <div class="tag">.brand-name · 1.05rem / 700</div>
+      <div class="brand-name">StegoShard</div>
+    </div>
+    <div class="row">
+      <div class="tag">label · 0.9rem / 600</div>
+      <div class="label">Passphrase</div>
+    </div>
+    <div class="row">
+      <div class="tag">body · 15px / 400</div>
+      <div class="body-txt">Encrypt any file into a resilient, error-corrected image.</div>
+    </div>
+    <div class="row">
+      <div class="tag">.muted · 0.85rem</div>
+      <div class="muted">Kept only on your device — never uploaded.</div>
+    </div>
+    <div class="row">
+      <div class="tag">.wiz-step · 0.85rem / uppercase</div>
+      <div class="wiz-step">Step 1 of 3</div>
+    </div>
+    <div class="row">
+      <div class="tag">.pill · 0.75rem / 600</div>
+      <div class="pill-txt">ENCRYPTED</div>
+    </div>
+  </body>
 </html>

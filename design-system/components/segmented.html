@@ -1,27 +1,91 @@
 <!-- @dsCard group="Components" name="Segmented control" subtitle="Radio-backed destination picker" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Segmented control</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius-sm:9px;--shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px;max-width:420px}
-.segmented{display:flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2)}
-.segmented label{flex:1;margin:0;text-align:center;padding:8px 6px;border-radius:7px;font-weight:600;font-size:.9rem;color:var(--muted);cursor:pointer}
-.segmented input{position:absolute;opacity:0;pointer-events:none}
-.segmented label:has(input:checked){background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
-.segmented label:has(input:disabled){opacity:.4;cursor:not-allowed}
-</style>
-</head>
-<body>
-<div class="segmented">
-  <label><input type="radio" name="dest" checked> Disk</label>
-  <label><input type="radio" name="dest"> Cloud</label>
-  <label><input type="radio" name="dest" disabled> Paper</label>
-</div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Segmented control</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --radius-sm: 9px;
+        --shadow: 0 1px 2px rgba(20, 30, 50, 0.06), 0 8px 24px rgba(20, 30, 50, 0.05);
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+        max-width: 420px;
+      }
+      .segmented {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+      }
+      .segmented label {
+        flex: 1;
+        margin: 0;
+        text-align: center;
+        padding: 8px 6px;
+        border-radius: 7px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .segmented input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .segmented label:has(input:checked) {
+        background: var(--surface);
+        color: var(--accent);
+        box-shadow: var(--shadow);
+      }
+      .segmented label:has(input:disabled) {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="segmented">
+      <label><input type="radio" name="dest" checked /> Disk</label>
+      <label><input type="radio" name="dest" /> Cloud</label>
+      <label><input type="radio" name="dest" disabled /> Paper</label>
+    </div>
+  </body>
 </html>

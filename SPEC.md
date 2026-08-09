@@ -1,13 +1,14 @@
 # StegoShard format specification — v1
 
-This document is the **stable, versioned interface** for the StegoShard on-image
+This document is the **pre-1.0 versioned candidate** for the StegoShard on-image
 format. It describes everything needed to decode a vault **without the extension**,
 so the data survives even if the extension disappears. Any conforming
 implementation (including the Python reference decoder, Phase 3) must interoperate
 with images produced by format version 1.
 
-> **Status:** frozen for format version 1 (`FORMAT_VERSION = 1`). Breaking changes
-> require a new version number in the image header.
+> **Status:** beta candidate for format version 1 (`FORMAT_VERSION = 1`). Audit-driven
+> breaking changes may still be folded into this candidate. The compatibility freeze
+> begins with the public 1.0 release.
 
 All multi-byte integers are **big-endian**. All lengths are in bytes.
 
@@ -582,7 +583,7 @@ decoded blindly by trial-authentication ("winnowing").
 - `posKey` ← `info = "stegoshard/gallery/pos"` — drives carrier selection.
 - `aeadKey` ← `info = "stegoshard/gallery/aead"` — seals fragments (AES-256-GCM).
 
-The gallery Argon2 cost is the frozen `DEFAULT_ARGON2` and is **not stored**
+The gallery Argon2 cost is the format-defined v2-candidate `DEFAULT_ARGON2` and is **not stored**
 anywhere (like the §5.3 stego salt). Because `aeadKey` is password-only,
 extraction is image-independent — a decoder can trial-open every photo blindly.
 
@@ -705,7 +706,7 @@ CEK_r     := HKDF-SHA256(ikm = dek_r, salt = region_contentSalt_r,
 
 `vault_salt` is a fresh 16-byte per-vault CSPRNG value, shared across all slots (its job
 is to defeat cross-vault precomputation; distinct passwords yield distinct KEKs
-regardless). Unlike the §5.1 key block, the slot KEK's **Argon2 parameters are the frozen
+regardless). Unlike the §5.1 key block, the slot KEK's **Argon2 parameters are the format-defined
 `DEFAULT_ARGON2` and are NOT stored** in the container — the geometry carries no cost
 field (as with the gallery/stego keys, §5.3, §9.1).
 
@@ -756,7 +757,7 @@ single Argon2id output, plus their gated variants when a secret is supplied). Th
 no-factor decoy slot openable even when the factor is presented, while the real slot still
 requires it. Credential independence (§10.9) guarantees the real and decoy KEKs never both match,
 so the exactly-one-match rule (§10.4) holds. Every derivation with a null factor is byte-identical
-to the password-only KEK, so `embedded` output — and every frozen vector — is unchanged.
+to the password-only KEK, so `embedded` output — and every committed vector — is unchanged.
 
 ### 10.4 Constant-work unlock
 
@@ -790,7 +791,7 @@ independently.
 
 The ladders are capped to real capacity: gallery to 64 KiB/region (the doubled blob must
 fit `GALLERY_MAX_BLOB`); `.db` to 64 MiB/region (the SQLite writer allocates the database
-in one buffer). Both are frozen.
+in one buffer). Both are fixed for this format version candidate.
 
 ### 10.6 Multi-region vault blob (gallery, single-shot GCM)
 
@@ -980,6 +981,6 @@ See `python/README.md`.
 > 2-region parse (`format.py` `split_multiregion_vault_blob` / `parse_region_plaintext`,
 > `crypto.py` `try_open_slot` / `open_slot_array` / `slot_kek_candidates`, `pipeline.py`
 > `decode_multiregion_vault_blob`, `segmented.py` `decode_multiregion_segmented_blob`),
-> with frozen cross-implementation vectors and gallery/`.db` conformance fixtures (incl.
+> with committed cross-implementation vectors and gallery/`.db` conformance fixtures (incl.
 > the duress and non-possession modes and the keyfile/stego key factor). §10 is therefore
 > a normative cross-implementation contract, verified in CI like the rest of the format.

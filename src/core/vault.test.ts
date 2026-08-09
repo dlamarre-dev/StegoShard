@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type Argon2Params,
-  WrongPasswordError,
-  createKeyBlock,
-  serializeKeyBlock,
-} from './crypto';
+import { type Argon2Params, WrongPasswordError, createKeyBlock, serializeKeyBlock } from './crypto';
 import {
   FileTooLargeError,
   MAX_FILE_BYTES,

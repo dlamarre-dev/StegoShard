@@ -42,7 +42,6 @@ export async function parsePayload(
   if (bytes.length < nameEnd) throw new Error('payload: truncated filename');
   const filename = new TextDecoder().decode(bytes.slice(3, nameEnd));
   const stored = bytes.slice(nameEnd);
-  const content =
-    flags & FLAG_COMPRESSED ? await gzipDecompress(stored, maxContentBytes) : stored;
+  const content = flags & FLAG_COMPRESSED ? await gzipDecompress(stored, maxContentBytes) : stored;
   return { filename, content };
 }

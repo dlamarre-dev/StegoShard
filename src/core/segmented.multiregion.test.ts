@@ -42,14 +42,26 @@ describe('multi-region segmented blob (SPEC §10.4, .db path)', () => {
   });
 
   it('rejects a wrong password uniformly', async () => {
-    const { blob } = await buildPlainSegmentedBlobMulti('x', enc('s'), 'right', DB_LADDER, TEST_PARAMS);
+    const { blob } = await buildPlainSegmentedBlobMulti(
+      'x',
+      enc('s'),
+      'right',
+      DB_LADDER,
+      TEST_PARAMS,
+    );
     await expect(
       decodeMultiRegionSegmentedBlob(blob, 'wrong', { params: TEST_PARAMS, maxContentBytes: CAP }),
     ).rejects.toBeInstanceOf(WrongPasswordError);
   });
 
   it('the two region streams are equal length (dead region invisible)', async () => {
-    const { blob } = await buildPlainSegmentedBlobMulti('x', enc('hi'), 'pw', DB_LADDER, TEST_PARAMS);
+    const { blob } = await buildPlainSegmentedBlobMulti(
+      'x',
+      enc('hi'),
+      'pw',
+      DB_LADDER,
+      TEST_PARAMS,
+    );
     // head = 334 bytes; the remainder is two equal region streams.
     const regionArea = blob.length - 334;
     expect(regionArea % 2).toBe(0);
@@ -68,7 +80,13 @@ describe('multi-region segmented blob (SPEC §10.4, .db path)', () => {
   });
 
   it('rejects a truncated container (length cross-check)', async () => {
-    const { blob } = await buildPlainSegmentedBlobMulti('x', enc('s'), 'pw', DB_LADDER, TEST_PARAMS);
+    const { blob } = await buildPlainSegmentedBlobMulti(
+      'x',
+      enc('s'),
+      'pw',
+      DB_LADDER,
+      TEST_PARAMS,
+    );
     await expect(
       decodeMultiRegionSegmentedBlob(blob.subarray(0, blob.length - 1), 'pw', {
         params: TEST_PARAMS,

@@ -8,7 +8,7 @@
     "description": "Store listing description (max 132 chars)."
   },
   "popupTagline": {
-    "message": "Chiffrez un fichier en images résilientes — disque, papier ou cloud.",
+    "message": "Chiffrez un fichier en images résilientes — disque ou papier.",
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
@@ -28,7 +28,7 @@
     "description": "Header status pill when the vault is unlocked."
   },
   "webIntro": {
-    "message": "Une version web libre et open source — sans installation, sans compte, et rien ne quitte votre appareil. Sauvegardez un fichier en images ou restaurez-le. (Google Photos nécessite l'extension.)",
+    "message": "Une version web libre et open source — sans installation, sans compte, et rien ne quitte votre appareil. Sauvegardez un fichier en images ou restaurez-le.",
     "description": "Intro banner on the web app."
   },
   "unlockHeading": {
@@ -94,42 +94,6 @@
   "destPaper": {
     "message": "Papier",
     "description": "Popup: paper destination."
-  },
-  "destCloud": {
-    "message": "Photos",
-    "description": "Popup: Google Photos destination."
-  },
-  "cloudNote": {
-    "message": "Une commodité — jamais votre unique copie.",
-    "description": "Popup: note under the Google Photos option."
-  },
-  "statusSavedCloud": {
-    "message": "$COUNT$ image(s) téléversée(s) dans l'album « $ALBUM$ ». Conservez votre mot de passe.",
-    "description": "Popup: status after uploading to Google Photos.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "album": {
-        "content": "$2"
-      }
-    }
-  },
-  "btnRestorePhotos": {
-    "message": "Restaurer depuis Google Photos",
-    "description": "Popup: button to restore via the Photos picker."
-  },
-  "photosHeading": {
-    "message": "Restaurer depuis Google Photos",
-    "description": "Photos restore page: heading."
-  },
-  "photosIntro": {
-    "message": "Ceci s'exécute dans son propre onglet pour rester ouvert pendant que vous choisissez vos images. Saisissez votre mot de passe, lancez, sélectionnez les images du coffre dans le sélecteur, puis revenez ici.",
-    "description": "Photos restore page: intro."
-  },
-  "statusPickerOpen": {
-    "message": "Sélectionnez vos images StegoShard dans la fenêtre ouverte, puis revenez ici…",
-    "description": "Popup: status while the picker is open."
   },
   "labelInstructions": {
     "message": "Inclure une feuille d'instructions",
@@ -327,6 +291,18 @@
       }
     }
   },
+  "errTooManyFiles": {
+    "message": "Trop de fichiers : $COUNT$ (max $LIMIT$). Sélectionnez moins de fichiers.",
+    "description": "Shown when more input files are selected than a surface accepts.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
   "optKeyHeading": {
     "message": "Clé de coffre",
     "description": "Options: key section heading."
@@ -361,10 +337,6 @@
   },
   "errPasswordMismatch": {
     "message": "Les mots de passe ne correspondent pas.",
-    "description": "Validation error."
-  },
-  "errPasswordTooShort": {
-    "message": "Utilisez au moins 8 caractères.",
     "description": "Validation error."
   },
   "statusKeyCreated": {
@@ -491,10 +463,6 @@
   "errCoverTooSmall": {
     "message": "Cette photo est trop petite pour contenir la clé. Choisissez-en une plus grande.",
     "description": "Stego: cover photo too small to hold the key block."
-  },
-  "errStegoCloud": {
-    "message": "Cacher la clé dans une photo n'est pas disponible avec la destination infonuagique.",
-    "description": "Stego: not available with the cloud destination."
   },
   "statusSavedStego": {
     "message": "$COUNT$ image(s) enregistrée(s). Votre clé est cachée dans la photo de couverture — conservez ce PNG et votre mot de passe pour restaurer.",
@@ -796,7 +764,7 @@
     "description": "Wizard: run the restore."
   },
   "destDiskDesc": {
-    "message": "Images PNG regroupées dans un .zip, à conserver sur disque ou dans le cloud.",
+    "message": "Images PNG regroupées dans un .zip pour un stockage local.",
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
@@ -806,10 +774,6 @@
   "destBinaryDesc": {
     "message": "Un seul fichier opaque au lieu d'images — idéal pour les secrets plus volumineux.",
     "description": "Wizard: binary destination description."
-  },
-  "destCloudDesc": {
-    "message": "Envoie les images directement dans un album Google Photos.",
-    "description": "Wizard: cloud destination description."
   },
   "destGalleryDesc": {
     "message": "Réparti dans plusieurs de vos photos ordinaires, avec des leurres.",
@@ -965,6 +929,9 @@
   "pwStrong": {
     "message": "Fort"
   },
+  "confirmWeakPassword": {
+    "message": "Ce mot de passe semble faible et pourrait être deviné hors ligne. Continuer malgré tout ?"
+  },
   "pwBits": {
     "message": "bits"
   },
@@ -1107,7 +1074,7 @@
     "message": "Grille couleur"
   },
   "codecColorDesc": {
-    "message": "Huit couleurs par case au lieu du noir et blanc — environ trois fois plus de données, donc environ trois fois moins de fichiers. Idéal pour le disque et le cloud."
+    "message": "Huit couleurs par case au lieu du noir et blanc — environ trois fois plus de données, donc environ trois fois moins de fichiers. Idéal pour un stockage local."
   },
   "codecQr": {
     "message": "Code QR"

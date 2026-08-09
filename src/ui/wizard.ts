@@ -30,7 +30,7 @@ import {
   firstCodecThatFits,
   formatSize,
 } from './estimate';
-import { generatePassphrase, passwordStrength } from './password';
+import { generatePassphrase, isStrongNewPassword, passwordStrength } from './password';
 
 export interface WizardCamera {
   open: () => void;
@@ -138,7 +138,7 @@ const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
 
 /**
  * Destinations whose goal is deniability — the artifact blends in as ordinary
- * files (photos, or a real SQLite database). The others (disk/paper/cloud QR,
+ * files (photos, or a real SQLite database). The others (disk/paper QR,
  * branded binary) are overt: openly StegoShard by design.
  */
 const DENIABLE_DESTS = new Set<SaveDestination>(['gallery', 'sqlite']);
@@ -226,10 +226,23 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const file = state.file;
     const key = file ? `${state.keyMode}` : null;
     if (!file || (state.estimatesFor === file && state.estimatesKey === key)) return;
-    const est = await computeEstimates(file, env.saveDestinations, msg, {
-      keyMode: state.keyMode,
-      codec: state.codec,
-    });
+    let est: Estimates;
+    try {
+      est = await computeEstimates(file, env.saveDestinations, msg, {
+        keyMode: state.keyMode,
+        codec: state.codec,
+      });
+    } catch {
+      // The file could not be read at all. Callers fire this without awaiting,
+      // so it has to resolve — record "nothing fits" and let the file step say
+      // so rather than leave the wizard spinning on "computing…".
+      if (state.file !== file) return;
+      state.estimates = {};
+      state.estimatesFor = file;
+      state.estimatesKey = key;
+      render();
+      return;
+    }
     if (state.file !== file) return; // a newer file superseded this computation
     state.estimates = est;
     state.estimatesFor = file;
@@ -318,7 +331,11 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     onPick: (files: File[]) => void,
   ): HTMLElement {
     const chip = h('span', { class: 'dz-file' });
-    const input = h('input', { type: 'file', ...(multiple ? { multiple: '' } : {}) });
+    const input = h('input', {
+      type: 'file',
+      class: 'dropzone-input',
+      ...(multiple ? { multiple: '' } : {}),
+    });
     if (accept) input.setAttribute('accept', accept);
     const zone = h(
       'div',
@@ -371,8 +388,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const label = h('p', { class: 'muted pw-meter-label' });
     const refresh = (): void => {
       const s = passwordStrength(input.value);
-      bar.className = `pw-meter-bar pw-score-${s.score}`;
-      bar.style.width = `${input.value ? Math.max(8, s.score * 25) : 0}%`;
+      // No score class while the field is empty: the bar collapses to width 0.
+      bar.className = input.value ? `pw-meter-bar pw-score-${s.score}` : 'pw-meter-bar';
       label.textContent = input.value
         ? `${msg(STRENGTH_KEYS[s.score]!)} · ~${s.bits} ${msg('pwBits')}`
         : '';
@@ -458,7 +475,6 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           paper: [msg('destPaper'), msg('destPaperDesc')],
           binary: [msg('destBinary'), msg('destBinaryDesc')],
           sqlite: [msg('destSqlite'), msg('destSqliteDesc')],
-          cloud: [msg('destCloud'), msg('destCloudDesc')],
           gallery: [msg('destGallery'), msg('destGalleryDesc')],
         };
         if (state.file) void ensureEstimates();
@@ -775,10 +791,19 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const prog = makeProgressUI(bar, fill, status, msg);
     try {
       if (state.action === 'save') {
-        // Stego hides the key in a cover photo, which the cloud flow can't carry
-        // (it only uploads the QR images) — mirror the expert UI's guard.
-        if (state.dest === 'cloud' && state.keyMode === 'stego') {
-          throw new Error(msg('errStegoCloud'));
+        const createsPassword =
+          env.needsSavePassword || state.dest === 'gallery' || state.dest === 'sqlite';
+        if (
+          createsPassword &&
+          !isStrongNewPassword(state.savePassword) &&
+          !confirm(msg('confirmWeakPassword'))
+        ) {
+          runBtn.disabled = false;
+          prog.done();
+          // The "saving…" line above was set before this check — leaving it up
+          // would read as a run that silently stalled.
+          status.textContent = '';
+          return;
         }
         // Extension stego: confirm the password unlocks the managed key first.
         if (

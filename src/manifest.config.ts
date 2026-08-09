@@ -22,14 +22,7 @@ const ICONS = {
   '128': 'icons/icon-128.png',
 };
 
-export interface ManifestOptions {
-  /** Include the optional Google Photos permissions. Off for public store
-   *  builds where the destination is not configured. */
-  googlePhotos?: boolean;
-}
-
-export function buildManifest(target: Target, options: ManifestOptions = {}): Record<string, unknown> {
-  const googlePhotos = options.googlePhotos ?? true;
+export function buildManifest(target: Target): Record<string, unknown> {
   const base: Record<string, unknown> = {
     manifest_version: 3,
     // Localized via _locales; keep the browser locale as default.
@@ -56,7 +49,7 @@ export function buildManifest(target: Target, options: ManifestOptions = {}): Re
 
     // MV3 requires 'wasm-unsafe-eval' to run the Argon2id WASM (hash-wasm).
     content_security_policy: {
-      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'",
     },
   };
 
@@ -78,23 +71,8 @@ export function buildManifest(target: Target, options: ManifestOptions = {}): Re
     };
   }
 
-  // Chrome / Edge (Chromium).
-  // Google Photos is an optional destination (Phase 4), so its OAuth/identity
-  // and host permissions are declared optional and requested at runtime. These
-  // live in the Chromium branch only: Firefox rejects `identity` in
-  // optional_permissions and its OAuth flow differs — revisited in Phase 4.
   return {
     ...base,
-    ...(googlePhotos
-      ? {
-          optional_permissions: ['identity'],
-          optional_host_permissions: [
-            'https://photoslibrary.googleapis.com/*',
-            'https://photospicker.googleapis.com/*',
-            'https://*.googleusercontent.com/*',
-          ],
-        }
-      : {}),
     background: {
       service_worker: 'background.js',
       type: 'module',

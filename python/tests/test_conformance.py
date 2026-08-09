@@ -11,7 +11,6 @@ import json
 import pathlib
 
 import pytest
-
 from stegoshard import WrongPasswordError, decode_any, decode_vault
 from stegoshard.pipeline import MissingKeyError
 

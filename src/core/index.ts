@@ -1,7 +1,7 @@
 /**
  * Public surface of the browser-agnostic core: crypto, codec, erasure coding,
  * and shared helpers. The extension and the Python reference decoder both
- * target the format described here (frozen in SPEC.md at Phase 1).
+ * target the pre-1.0 format candidate described in SPEC.md.
  */
 
 export * from './bytes';

@@ -1,8 +1,7 @@
 /**
- * Cloud-profile recompression: cloud hosts like Google Photos re-encode uploads
- * as JPEG (luminance-preserving, 4:2:0 chroma). This test confirms the
- * Cloud-profile QR survives a JPEG round-trip (jpeg-js) at typical qualities, so
- * the Google Photos destination round-trips in practice.
+ * Conservative-profile recompression: image hosts and messaging tools may
+ * re-encode uploads as JPEG (luminance-preserving, 4:2:0 chroma). This confirms
+ * that profile survives a representative jpeg-js round-trip at typical qualities.
  *
  * It also confirms that a classic LSB does NOT survive JPEG — the reason the
  * (future) "invisible" stego mode is disk-only.
@@ -14,7 +13,7 @@ import { colorGridCodec, qrGridCodec } from '@core';
 import { PROFILE_CLOUD } from '@core';
 import type { ImageDataLike } from '@core';
 
-/** JPEG round-trip approximating a Google Photos re-encode at a given quality. */
+/** JPEG round-trip approximating a lossy image-host re-encode at a given quality. */
 function recompress(img: ImageDataLike, quality: number): ImageDataLike {
   const encoded = jpeg.encode(
     {

@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; worker-src 'self'; connect-src 'none'; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'"
+    />
     <meta name="google-site-verification" content="6Ds3RKHLz46hfpQwb__ZTQ0Tuk_0d2ZMGwfy6S0WJ9s" />
     <title>StegoShard — encrypt files into resilient images</title>
     <meta
@@ -84,8 +89,13 @@
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="dz-file" class="dz-file"></span>
-            <input id="save-file" type="file" />
           </div>
+          <input
+            id="save-file"
+            class="dropzone-input"
+            type="file"
+            data-i18n-aria-label="dropTitle"
+          />
           <p id="size-line" class="muted estimate-line">
             <span data-i18n="labelFileSize"></span> <span id="save-size" class="badge">—</span>
           </p>
@@ -363,8 +373,15 @@
                   <span class="muted" data-i18n="dropPrompt"></span>
                 </span>
                 <span id="gallery-covers-name" class="dz-file"></span>
-                <input id="gallery-covers" type="file" accept="image/png,image/jpeg" multiple />
               </div>
+              <input
+                id="gallery-covers"
+                class="dropzone-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                data-i18n-aria-label="galleryCoversTitle"
+                multiple
+              />
               <p class="muted" data-i18n="galleryPasswordHint"></p>
 
               <label class="muted" data-i18n="keyModeHeading"></label>
@@ -446,8 +463,14 @@
                     <span class="muted" data-i18n="dropPrompt"></span>
                   </span>
                   <span id="gallery-cover-name" class="dz-file"></span>
-                  <input id="gallery-cover" type="file" accept="image/png,image/jpeg" />
                 </div>
+                <input
+                  id="gallery-cover"
+                  class="dropzone-input"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  data-i18n-aria-label="coverTitle"
+                />
                 <p class="muted warn" data-i18n="stegoWarning"></p>
               </div>
             </div>
@@ -481,8 +504,13 @@
                     <span class="muted" data-i18n="dropPrompt"></span>
                   </span>
                   <span id="decoy-name" class="dz-file"></span>
-                  <input id="decoy-file" type="file" />
                 </div>
+                <input
+                  id="decoy-file"
+                  class="dropzone-input"
+                  type="file"
+                  data-i18n-aria-label="decoyTitle"
+                />
                 <p class="muted warn" data-i18n="duressWarning"></p>
                 <a
                   class="warn-link"
@@ -525,8 +553,14 @@
                   <span class="muted" data-i18n="dropPrompt"></span>
                 </span>
                 <span id="cover-dz-file" class="dz-file"></span>
-                <input id="cover-file" type="file" accept="image/png,image/jpeg" />
               </div>
+              <input
+                id="cover-file"
+                class="dropzone-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                data-i18n-aria-label="coverTitle"
+              />
               <p class="muted warn" data-i18n="stegoWarning"></p>
             </div>
 
@@ -634,13 +668,15 @@
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="restore-dz-file" class="dz-file"></span>
-            <input
-              id="restore-files"
-              type="file"
-              accept="image/*,.zip,.pdf,application/pdf"
-              multiple
-            />
           </div>
+          <input
+            id="restore-files"
+            class="dropzone-input"
+            type="file"
+            accept="image/*,.zip,.pdf,application/pdf"
+            data-i18n-aria-label="labelImagesOrZip"
+            multiple
+          />
 
           <button id="camera-btn" class="btn-ghost camera-btn" hidden>
             <svg
@@ -690,8 +726,14 @@
                 <span class="muted" data-i18n="dropPrompt"></span>
               </span>
               <span id="key-dz-file" class="dz-file"></span>
-              <input id="restore-key" type="file" accept=".key,image/png,image/jpeg" />
             </div>
+            <input
+              id="restore-key"
+              class="dropzone-input"
+              type="file"
+              accept=".key,image/png,image/jpeg"
+              data-i18n-aria-label="labelKeyFileOrImage"
+            />
             <p class="muted" data-i18n="keyFileHint"></p>
             <div id="shares-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
               <span class="dz-prompt">
@@ -699,8 +741,15 @@
                 <span class="muted" data-i18n="dropPrompt"></span>
               </span>
               <span id="shares-dz-file" class="dz-file"></span>
-              <input id="restore-shares" type="file" accept=".txt,text/plain" multiple />
             </div>
+            <input
+              id="restore-shares"
+              class="dropzone-input"
+              type="file"
+              accept=".txt,text/plain"
+              data-i18n-aria-label="labelShareFiles"
+              multiple
+            />
             <p class="muted" data-i18n="shareFilesHint"></p>
           </div>
 
@@ -729,6 +778,7 @@
         <a href="https://github.com/dlamarre-dev/StegoShard" data-i18n="footerSource"
           >Source (MIT)</a
         >
+        · <span id="build-version"></span>
       </footer>
     </main>
 

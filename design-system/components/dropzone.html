@@ -1,32 +1,118 @@
 <!-- @dsCard group="Components" name="Dropzone" subtitle="Drag-and-drop file zone + compact variant" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Dropzone</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius:14px;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px;max-width:420px}
-.dropzone{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:26px 20px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 5%,var(--surface));color:var(--muted);cursor:pointer}
-.dropzone.dragging{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
-.dz-icon{width:34px;height:34px;opacity:.9;color:var(--accent)}
-.dz-title{color:var(--text);font-weight:600}
-.dropzone-sm{padding:14px 16px;gap:4px;margin-top:16px}
-.dropzone-sm .dz-icon{width:24px;height:24px}
-</style>
-</head>
-<body>
-<div class="dropzone dragging">
-  <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-  <div class="dz-title">Drop a file to encrypt</div>
-  <div>or click to browse</div>
-</div>
-<div class="dropzone dropzone-sm">
-  <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-  <div>Optional .key file</div>
-</div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Dropzone</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --radius: 14px;
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+        max-width: 420px;
+      }
+      .dropzone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        text-align: center;
+        padding: 26px 20px;
+        border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+        border-radius: var(--radius);
+        background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .dropzone.dragging {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+      }
+      .dz-icon {
+        width: 34px;
+        height: 34px;
+        opacity: 0.9;
+        color: var(--accent);
+      }
+      .dz-title {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .dropzone-sm {
+        padding: 14px 16px;
+        gap: 4px;
+        margin-top: 16px;
+      }
+      .dropzone-sm .dz-icon {
+        width: 24px;
+        height: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dropzone dragging">
+      <svg
+        class="dz-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 16V4M12 4l-4 4M12 4l4 4" />
+        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+      </svg>
+      <div class="dz-title">Drop a file to encrypt</div>
+      <div>or click to browse</div>
+    </div>
+    <div class="dropzone dropzone-sm">
+      <svg
+        class="dz-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 16V4M12 4l-4 4M12 4l4 4" />
+        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+      </svg>
+      <div>Optional .key file</div>
+    </div>
+  </body>
 </html>

@@ -27,7 +27,7 @@ store the archive resiliently and hide only the recovery key in an everyday phot
 ```
 StegoShard offers two complementary storage models — plus a bridge between them.
 
-🛡  Resilient Storage   error-corrected images, or one opaque file · survives cloud, print, copy
+🛡  Resilient Storage   error-corrected images, or one opaque file · survives print and copy
 🎭  Deniable Storage    inside ordinary photos, or a decoy database · hides that data exists
 🔗  Hybrid              store the archive resiliently, hide only the recovery key in a photo
 ```
@@ -45,7 +45,7 @@ Start from the question that actually matters for your secret:
           │                                         │
   It must survive                           Nobody must know
   everything                                it even exists
-  (loss · print · cloud)                    (plausible deniability)
+  (loss · print · copy)                     (plausible deniability)
           │                                         │
           ▼                                         ▼
   🛡 Resilient Storage                       🎭 Deniable Storage
@@ -78,7 +78,7 @@ Archive (≤ 1 GiB)
         ▼
 StegoShard — Resilient Storage
         │
-        ├── resilient images (visibly artificial, survive the cloud)
+        ├── resilient images (visibly artificial, tolerate recompression)
         │
         └── recovery key
                  │
@@ -100,7 +100,7 @@ like on disk:
 
 | Output form                                    |    Model    | What it is                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------------------------- | :---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Coded images** (disk / paper / cloud)        | 🛡 Resilient | Openly artificial images; survive recompression, printing, and cloud storage. Digital output defaults to an **8-colour grid** — 3 bits per module instead of QR's ~0.75, so roughly a third as many files — with plain QR one click away, and always used for print. Either is restored automatically.                                                       |
+| **Coded images** (disk / paper)                | 🛡 Resilient | Openly artificial images designed to tolerate recompression and printing. Digital output defaults to an **8-colour grid** — 3 bits per module instead of QR's ~0.75, so roughly a third as many files — with plain QR one click away, and always used for print. Either is restored automatically.                                                           |
 | **Opaque binary file** (`.ssbn`)               | 🛡 Resilient | One compact file for larger secrets (up to 1 GiB in the CLI, 256 MiB in the browser; no image-count ceiling). Not deniable — clearly a StegoShard vault.                                                                                                                                                                                                     |
 | **Decoy database** (`.db`)                     | 🎭 Deniable | The same binary bytes wrapped with a valid SQLite header, so file-type triage reads it as an ordinary database. Optional **duress** (a plausible decoy opens under a 2nd password) or **non-possession** (gated on threshold shares you don't hold) access modes (SPEC §10). Survives copying; deniability is shallow against a tool that actually opens it. |
 | **Ordinary photos** (stego key / Gallery Mode) | 🎭 Deniable | The secret (or just the key) hidden inside real-looking photos. Blends in completely, but **fragile** — recompression destroys it. Also supports **non-possession** access mode (SPEC §10); duress mode is `.db`-only.                                                                                                                                       |
@@ -127,7 +127,7 @@ pipeline — regenerate them with `npm run samples`.
     </td>
   </tr>
   <tr>
-    <td align="center"><b>Colour grid</b> · disk / cloud<br>7 images · 8636 B each · 704 px</td>
+    <td align="center"><b>Colour grid</b> · disk<br>7 images · 8636 B each · 704 px</td>
     <td align="center"><b>QR code</b> · anywhere<br>20 images · 2800 B each · 1086 px</td>
     <td align="center"><b>Printable PDF</b> · paper<br>one high-ECC QR per page<br>(<a href="docs/images/sample-paper.pdf">sample PDF</a>)</td>
   </tr>
@@ -179,7 +179,7 @@ See the [command-line reference](docs/CLI.md) for key modes, paper, binary, and 
 file → unlock (password → KEK → DEK) → compress → encrypt (AES-GCM)
      → erasure code (k data + m parity shards, Reed-Solomon)
      → render each shard as a resilient image (profile per destination)
-     → disk (PNG/ZIP) | paper (printable PDF) | cloud album (optional)
+     → disk (PNG/ZIP) | paper (printable PDF)
 ```
 
 **Restore (import)**
@@ -215,10 +215,9 @@ key itself can be covered.
 Two costs are worth knowing about; both are deliberate, and neither is hidden from you.
 
 **Key derivation** is the cost that protects you. Every unlock runs Argon2id at
-**256 MiB, t=4** (frozen in [SPEC.md](SPEC.md)), tuned for a **~1–2 s** unlock on typical
-desktop hardware while staying viable in a browser tab and on a phone. That slowness is the
-point — it makes an offline password search expensive. Budget roughly **256 MiB of
-transient memory** for it; it is freed as soon as the key is derived.
+**256 MiB, t=4** in the current pre-1.0 candidate. That slowness is deliberate: it makes
+an offline password search more expensive. Budget roughly **256 MiB of transient memory**
+for it. Actual latency and mobile viability vary by device and remain release-QA gates.
 
 **Processing the secret** is effectively instant on the image/PDF path (capped at ≤ 1 MiB),
 but it takes **real, visible time on the large binary path** (`.ssbn` / `.db`, up to
@@ -233,7 +232,8 @@ of work, not instant. So the work is made honest and non-blocking:
   `--quiet`).
 
 It all runs **locally** — WebAssembly in the browser, the bundled runtime in the CLI —
-with no network round-trips (the optional cloud destination aside).
+with no application network round-trips. The hosted web build still depends on the web
+host to deliver the reviewed files; the downloadable extension and CLI avoid that delivery trust.
 
 ## Design principles
 
@@ -246,29 +246,27 @@ with no network round-trips (the optional cloud destination aside).
   binary path takes up to 1 GiB (CLI) / 256 MiB (browser). Multi-gigabyte files are out of scope.
 - **No single support is trusted.** Resilience (multiple destinations + erasure coding)
   is the value proposition.
-- **The offline core (file → images → disk/paper) depends on no third-party service or
-  network.** Google Photos is an optional destination only.
+- **The offline core (file → images/files → disk/paper) depends on no third-party
+  service or network.** Public builds request no network or host permissions.
 - **Auditable.** Open source (MIT), PR-gated, with a versioned format spec and a
   standalone Python reference decoder so your data survives even if the extension does not.
 
 ## Status
 
-🧪 **Beta — feature-complete, hardening for a public 1.0.** Every piece of the product
-is built, tested, and cross-validated; what remains before 1.0 is release logistics and
-an external review, not features.
+🧪 **Beta — under security and physical-recovery validation.** The major workflows are
+built and cross-validated, but the compatibility and high-value-use promises remain
+provisional until the external audit and release QA gates close.
 
 **Complete and tested:**
 
 - **Crypto core** — Argon2id KEK/DEK, AES-256-GCM, opportunistic gzip, Reed-Solomon
   erasure coding, the qr-grid and color-grid image codecs, and the self-describing header. The layer is
   documented for auditors in a [cryptographic review dossier](docs/CRYPTO-REVIEW.md)
-  (claims → where enforced → which test proves it), with frozen cross-implementation
+  (claims → where enforced → which test proves it), with committed cross-implementation
   test vectors and exhaustive negative/fuzz testing.
 - **Destinations** _(🛡 Resilient Storage)_ — **Disk** (a set of PNG images, or a single
-  `.zip`), **Paper** (a printable PDF, one high-ECC QR per page, readable header +
-  optional instruction sheet, restores from scans or photos), and an **optional Google
-  Photos** album (upload + restore via the Picker API); the cloud is a convenience,
-  never the only copy.
+  `.zip`) and **Paper** (a printable PDF, one high-ECC QR per page, readable header +
+  optional instruction sheet, restores from scans or photos).
 - **Key modes** — **embedded** (key block travels in the images), **keyfile** (a separate
   `.key` file), and **deniable stego** _(🎭/🔗 — the Deniable & Hybrid building block)_:
   the key hidden in an ordinary photo — a baseline JPEG cover stays a same-size JPEG via
@@ -287,23 +285,26 @@ an external review, not features.
   while the real region stays unreachable from that credential (`.db` only); and
   **non-possession mode**, gating the real payload on Shamir _k_-of-_n_ threshold
   shares the writer never keeps, so "I cannot decrypt this" is literally true below
-  threshold. Unlock is constant-work and region-blind — no slot, region, or mode ever
-  leaks to the caller, logs, or errors.
+  threshold. Unlock follows a fixed candidate schedule and returns region-blind errors;
+  this is an equal-control-flow design, not a formal side-channel proof.
 - **Independent recovery** — a standalone **[Python reference decoder](python/README.md)**
   restores a vault without the extension and runs in CI as a cross-implementation
   conformance test, and a headless **CLI** (below) creates and restores the same format.
 - **Localization** — the UI, privacy policy, and terms are localized into 8 languages
   (en, fr, it, de, es, pt, ja, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)),
-  all natively proofread.
+  with native review still required for the locales listed in
+  [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 
-The on-image format is **frozen** in [SPEC.md](SPEC.md) (`FORMAT_VERSION = 1`). The
+The current beta format candidate is documented in [SPEC.md](SPEC.md)
+(`FORMAT_VERSION = 1`), but pre-1.0 compatibility is not promised until the external
+audit and physical QA gates close. The
 extension is packaged for the Chrome Web Store, Edge Add-ons, and Firefox
 (`npm run package`); see [docs/STORE.md](docs/STORE.md) and the
 [privacy policy](docs/PRIVACY.md).
 
-**Remaining before a public 1.0:** localized store screenshots, Google's OAuth
-verification (only for the public Google Photos destination), and an optional external
-crypto review.
+**Required before a public 1.0:** close the independent security audit, complete the
+documented browser/physical QA matrix, obtain the outstanding native reviews, and
+freeze the resulting format and release artifacts.
 
 ## Development
 
@@ -331,7 +332,7 @@ tool.
 | [Where it fits](docs/COMPARISON.md)                                                                    | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
 | [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                      |
 | [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                     |
-| [Format specification](SPEC.md)                                                                        | The frozen on-disk / on-image format (`FORMAT_VERSION = 1`).                                    |
+| [Format specification](SPEC.md)                                                                        | The beta on-disk / on-image format candidate (`FORMAT_VERSION = 1`).                            |
 | [Cryptographic review dossier](docs/CRYPTO-REVIEW.md)                                                  | Claims → where enforced → which test proves it, for auditors.                                   |
 | [Roadmap](docs/ROADMAP.md) · [Privacy](docs/PRIVACY.md) · [Terms](docs/TERMS.md)                       | Direction, privacy policy, terms of use.                                                        |
 | [Localization](docs/LOCALIZATION.md) · [Store guide](docs/STORE.md) · [Versioning](docs/VERSIONING.md) | Translation setup, store submission, format-version policy.                                     |
@@ -346,4 +347,5 @@ public issue.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE) for the current beta. The pre-1.0 licensing decision record is in
+[docs/LICENSING.md](docs/LICENSING.md).
