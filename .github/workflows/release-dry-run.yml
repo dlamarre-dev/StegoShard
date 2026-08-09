@@ -109,24 +109,16 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: npm run build:web:offline
 
-      # Mirrors the bundling step in pages.yml, with the version standing in for
-      # the tag. If you change one, change the other.
+      # The same script pages.yml runs. With no tag present it falls back to the
+      # version in package.json, so this is the real bundling step, not a copy.
       - name: Create offline bundle, SBOM, and checksums
-        run: |
-          version="$(node -p 'require("./package.json").version')"
-          npm sbom --omit=dev --sbom-format=cyclonedx > stegoshard-npm.cdx.json
-          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist/
-          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist-offline/
-          archive="stegoshard-web-$version.zip"
-          (cd web-dist-offline && zip -X -r "../$archive" .)
-          sha256sum "$archive" > SHA256SUMS-web.txt
-          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+        run: bash scripts/package-web-bundle.sh
 
       - name: Archive is complete and its checksum matches
         run: |
           sha256sum -c SHA256SUMS-web.txt
           rm -rf verify && mkdir -p verify/nested/dir
-          unzip -q "$ARCHIVE" -d verify/nested/dir
+          unzip -q "$WEB_ARCHIVE" -d verify/nested/dir
           for f in index.html privacy.html terms.html LICENSE \
                    THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json; do
             test -f "verify/nested/dir/$f" \
@@ -203,27 +195,14 @@ jobs:
         run: |
           deno compile --allow-read --allow-write --allow-env --no-prompt \
             --target "$TARGET" --output "$BIN" dist-cli/stegoshard.js
-      # Mirrors the packaging in release-cli.yml. If you change one, change the
-      # other.
-      - name: Package for download (tar.gz)
-        if: runner.os != 'Windows'
-        env:
-          BIN: ${{ matrix.name }}
-          ARCHIVE: ${{ matrix.archive }}
-        run: tar -czf "$ARCHIVE" "$BIN"
-      - name: Package for download (zip)
-        if: runner.os == 'Windows'
+      # The same script release-cli.yml runs; it picks the format from the
+      # archive extension and reports both sizes.
+      - name: Package for download
         env:
           BIN: ${{ matrix.name }}
           ARCHIVE: ${{ matrix.archive }}
         shell: bash
-        run: 7z a -tzip -mx=9 "$ARCHIVE" "$BIN" > /dev/null
-      - name: Report raw and packaged sizes
-        env:
-          BIN: ${{ matrix.name }}
-          ARCHIVE: ${{ matrix.archive }}
-        shell: bash
-        run: ls -lh "$BIN" "$ARCHIVE" | awk 'NF>=9 {print $9, $5}'
+        run: bash scripts/package-cli-binary.sh "$BIN" "$ARCHIVE"
 
       # Smoke the binary *extracted from the archive*, not the loose one left
       # over from the compile: the archive is what a user downloads, so it is

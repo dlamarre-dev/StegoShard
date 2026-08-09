@@ -65,30 +65,18 @@ jobs:
       # because V8 re-protects pages for JIT and UPX's unpacker leaves them in a
       # state it rejects. The Windows case is the dangerous one: the release
       # would have published, checksummed, and attested an executable that
-      # crashes on first run. Compress the download, never the executable.
-      # Compress the *download*, not the executable: the archive is unpacked
-      # before anything runs it, so it cannot reproduce the UPX failure above.
-      # `deno compile` output is 215-254 MB raw, which is too large to serve as
-      # a bare release asset.
-      - name: Package for download (tar.gz)
-        if: runner.os != 'Windows'
-        env:
-          BIN: ${{ matrix.name }}
-          ARCHIVE: ${{ matrix.archive }}
-        run: tar -czf "$ARCHIVE" "$BIN"
-      - name: Package for download (zip)
-        if: runner.os == 'Windows'
+      # crashes on first run. Compress the download, never the executable —
+      # `deno compile` output is 215-254 MB raw, too large to serve bare, and
+      # the archive is unpacked before anything runs it.
+      #
+      # Shared with the release dry run, which extracts the archive and runs the
+      # binary from inside it. See scripts/package-cli-binary.sh.
+      - name: Package for download
         env:
           BIN: ${{ matrix.name }}
           ARCHIVE: ${{ matrix.archive }}
         shell: bash
-        run: 7z a -tzip -mx=9 "$ARCHIVE" "$BIN" > /dev/null
-      - name: Report raw and packaged sizes
-        env:
-          BIN: ${{ matrix.name }}
-          ARCHIVE: ${{ matrix.archive }}
-        shell: bash
-        run: ls -lh "$BIN" "$ARCHIVE" | awk 'NF>=9 {print $9, $5}'
+        run: bash scripts/package-cli-binary.sh "$BIN" "$ARCHIVE"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.archive }}
