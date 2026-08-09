@@ -103,9 +103,12 @@ Two ways to install, depending on whether you already have Node:
   Node ≥ 20. `npm run build:cli` produces that self-contained, shebang-included bundle.
 - **Standalone binary (larger, zero-dependency).** From the same bundle, `deno compile`
   produces per-OS executables (see the `Release CLI binaries` workflow). These embed the
-  Deno/V8 runtime, so they are tens of MB even though the app code is tiny; the Linux and
-  Windows binaries are UPX-compressed (~25-35 MB), the macOS one is shipped uncompressed
-  (UPX breaks its Gatekeeper signature). They resolve nothing at run time and have baked-in
+  Deno/V8 runtime, so they are tens of MB even though the app code is tiny, and they are
+  shipped uncompressed. UPX is not usable on `deno compile` output: it breaks the macOS
+  Gatekeeper signature, refuses the Linux binary outright, and — worst — packs the Windows
+  binary successfully but leaves it aborting inside V8 on startup, because V8 re-protects
+  pages for JIT and the unpacker leaves them in a state it rejects. They resolve nothing at
+  run time and have baked-in
   `--allow-read --allow-write` permissions with **no network access**, so "nothing leaves
   your device" is enforced by the runtime.
 

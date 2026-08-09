@@ -30,15 +30,12 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: stegoshard-linux-x64
-            upx: true
           - os: macos-latest
             target: aarch64-apple-darwin
             name: stegoshard-macos-arm64
-            upx: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: stegoshard-windows-x64.exe
-            upx: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -58,13 +55,19 @@ jobs:
           --target ${{ matrix.target }}
           --output ${{ matrix.name }}
           dist-cli/stegoshard.js
-      - name: Compress with UPX
-        if: matrix.upx
-        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4
-        with:
-          install: true
-          files: ${{ matrix.name }}
-          args: --best --lzma
+      # No UPX. It is incompatible with `deno compile` output, in two different
+      # ways: on Linux it refuses outright ("CantPackException: bad e_phoff"),
+      # and on Windows it packs successfully but produces a binary that aborts
+      # on startup inside V8 ("Check failed: old_protection == PAGE_READWRITE"),
+      # because V8 re-protects pages for JIT and UPX's unpacker leaves them in a
+      # state it rejects. The Windows case is the dangerous one: the release
+      # would have published, checksummed, and attested an executable that
+      # crashes on first run. Compress the download, never the executable.
+      - name: Report the shipped binary size
+        env:
+          BIN: ${{ matrix.name }}
+        shell: bash
+        run: ls -lh "$BIN" | awk '{print $9, $5}'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.name }}

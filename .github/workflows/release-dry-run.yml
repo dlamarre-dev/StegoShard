@@ -173,15 +173,12 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: stegoshard-linux-x64
-            upx: true
           - os: macos-latest
             target: aarch64-apple-darwin
             name: stegoshard-macos-arm64
-            upx: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: stegoshard-windows-x64.exe
-            upx: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -203,18 +200,17 @@ jobs:
         run: |
           deno compile --allow-read --allow-write --allow-env --no-prompt \
             --target "$TARGET" --output "$BIN" dist-cli/stegoshard.js
-      - name: Compress with UPX
-        if: matrix.upx
-        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4
-        with:
-          install: true
-          files: ${{ matrix.name }}
-          args: --best --lzma
+      - name: Report the shipped binary size
+        env:
+          BIN: ${{ matrix.name }}
+        shell: bash
+        run: ls -lh "$BIN" | awk '{print $9, $5}'
 
       # CI only ever runs the CLI through `deno run`. The artifact the release
-      # actually ships is this compiled, UPX-compressed binary, which until now
-      # was never executed before being published. Each matrix target is native
-      # to its runner, so all three can be smoke-tested here.
+      # actually ships is this compiled binary, which until now was never
+      # executed before being published — and on the first dry run the Windows
+      # one, then still UPX-packed, aborted inside V8 on startup. Each matrix
+      # target is native to its runner, so all three are smoke-tested here.
       - name: Round-trip a file with the shipped binary
         env:
           BIN: ${{ matrix.name }}
