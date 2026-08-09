@@ -18,7 +18,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Require tag and package versions to match
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+        run: bash scripts/check-release-version.sh
       - run: npm run audit
       - run: npm run ci:node
 
@@ -30,15 +30,15 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: stegoshard-linux-x64
-            upx: true
+            archive: stegoshard-linux-x64.tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
             name: stegoshard-macos-arm64
-            upx: false
+            archive: stegoshard-macos-arm64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: stegoshard-windows-x64.exe
-            upx: true
+            archive: stegoshard-windows-x64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -58,17 +58,41 @@ jobs:
           --target ${{ matrix.target }}
           --output ${{ matrix.name }}
           dist-cli/stegoshard.js
-      - name: Compress with UPX
-        if: matrix.upx
-        uses: crazy-max/ghaction-upx@c83f378efc804f828e988debb88ed6116feb2368 # v4
-        with:
-          install: true
-          files: ${{ matrix.name }}
-          args: --best --lzma
+      # No UPX. It is incompatible with `deno compile` output, in two different
+      # ways: on Linux it refuses outright ("CantPackException: bad e_phoff"),
+      # and on Windows it packs successfully but produces a binary that aborts
+      # on startup inside V8 ("Check failed: old_protection == PAGE_READWRITE"),
+      # because V8 re-protects pages for JIT and UPX's unpacker leaves them in a
+      # state it rejects. The Windows case is the dangerous one: the release
+      # would have published, checksummed, and attested an executable that
+      # crashes on first run. Compress the download, never the executable.
+      # Compress the *download*, not the executable: the archive is unpacked
+      # before anything runs it, so it cannot reproduce the UPX failure above.
+      # `deno compile` output is 215-254 MB raw, which is too large to serve as
+      # a bare release asset.
+      - name: Package for download (tar.gz)
+        if: runner.os != 'Windows'
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: tar -czf "$ARCHIVE" "$BIN"
+      - name: Package for download (zip)
+        if: runner.os == 'Windows'
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        shell: bash
+        run: 7z a -tzip -mx=9 "$ARCHIVE" "$BIN" > /dev/null
+      - name: Report raw and packaged sizes
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        shell: bash
+        run: ls -lh "$BIN" "$ARCHIVE" | awk 'NF>=9 {print $9, $5}'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.name }}
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
           if-no-files-found: error
 
   publish:
@@ -91,12 +115,15 @@ jobs:
           pattern: stegoshard-*
           path: release
           merge-multiple: true
+      # Checksums and attestation cover the archives — that is what a user
+      # actually downloads, so that is what they can verify.
       - name: Add licenses, SBOM, and checksums
         run: |
           cp LICENSE THIRD_PARTY_NOTICES.txt release/
           npm sbom --omit=dev --sbom-format=cyclonedx > release/stegoshard-npm.cdx.json
           (cd release && sha256sum stegoshard-* LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS.txt)
-      - name: Attest released binaries
+          cat release/SHA256SUMS.txt
+      - name: Attest released archives
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: release/stegoshard-*

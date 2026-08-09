@@ -1,0 +1,252 @@
+name: Release dry run
+
+# The release path only runs on a tag, so its first real execution was the
+# release itself. Three separate defects shipped in that blind spot:
+#
+#   - the tag/version guard was a shell syntax error, so it failed every time;
+#   - three action pins resolved to nothing upstream, killing jobs at setup;
+#   - the offline web bundle used Pages-absolute asset URLs, so it 404'd
+#     everywhere it was actually extracted.
+#
+# Each would have been caught by running the release once without publishing.
+# That is what this workflow does: everything the release does, up to but not
+# including the steps that publish. It deliberately holds no write, id-token,
+# or attestation permission, so it *cannot* publish even if a step is added
+# carelessly.
+#
+# Not covered here, because they cannot run without a real tag: the attestation
+# and GitHub-release upload steps themselves. The `pinned-actions` job checks
+# that those actions at least resolve.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1' # Mondays 05:17 UTC
+  pull_request:
+    branches: [main]
+    # Deliberately excludes package-lock.json: Dependabot touches it constantly
+    # and ci.yml already builds the CLI and web app on every PR.
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'vite.web.config.ts'
+      - 'vite.cli.config.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-dry-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned-actions:
+    name: Pinned actions resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Every pinned SHA must exist upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -rhoE 'uses: [^ ]+@[0-9a-f]{40}' .github/workflows/ \
+            | sed 's/uses: //' | sort -u > pins.txt
+          test -s pins.txt || { echo "::error::found no pinned actions to check"; exit 1; }
+          fail=0
+          while IFS='@' read -r action sha; do
+            repo=$(echo "$action" | cut -d/ -f1-2)
+            if gh api "repos/$repo/commits/$sha" --jq .sha >/dev/null 2>&1; then
+              echo "ok    $action@${sha:0:8}"
+            else
+              echo "::error::$action is pinned to $sha, which does not exist in $repo"
+              fail=1
+            fi
+          done < pins.txt
+          exit $fail
+
+  version-guard:
+    name: Tag/version guard behaves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+      # Runs the same script the release workflows run, both ways round. A guard
+      # that always fails and a guard that always passes are equally useless, so
+      # assert both directions.
+      - name: Accepts the matching tag, rejects a mismatched one
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if ! bash scripts/check-release-version.sh "v$version"; then
+            echo "::error::guard rejected the matching tag v$version"
+            exit 1
+          fi
+          if bash scripts/check-release-version.sh v0.0.0-mismatch >/dev/null 2>&1; then
+            echo "::error::guard accepted a mismatched tag"
+            exit 1
+          fi
+          echo "version guard OK (package version $version)"
+
+  web-bundle:
+    name: Web release bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+
+      - name: Build identified web app
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run build:web
+      - name: Build portable offline web app
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run build:web:offline
+
+      # Mirrors the bundling step in pages.yml, with the version standing in for
+      # the tag. If you change one, change the other.
+      - name: Create offline bundle, SBOM, and checksums
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          npm sbom --omit=dev --sbom-format=cyclonedx > stegoshard-npm.cdx.json
+          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist/
+          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist-offline/
+          archive="stegoshard-web-$version.zip"
+          (cd web-dist-offline && zip -X -r "../$archive" .)
+          sha256sum "$archive" > SHA256SUMS-web.txt
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Archive is complete and its checksum matches
+        run: |
+          sha256sum -c SHA256SUMS-web.txt
+          rm -rf verify && mkdir -p verify/nested/dir
+          unzip -q "$ARCHIVE" -d verify/nested/dir
+          for f in index.html privacy.html terms.html LICENSE \
+                   THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json; do
+            test -f "verify/nested/dir/$f" \
+              || { echo "::error::$f is missing from the offline archive"; exit 1; }
+          done
+
+      # The bug this exists to catch: the Pages build hard-codes /StegoShard/,
+      # so every asset 404s once the archive is extracted somewhere else. Served
+      # from a deliberately nested path, since serving from the server root
+      # would let a root-absolute URL pass by accident.
+      - name: Every referenced asset resolves from a nested path
+        run: |
+          (cd verify && python3 -m http.server 8099 --bind 127.0.0.1 &) >/dev/null 2>&1
+          for _ in $(seq 1 20); do
+            curl -sf -o /dev/null http://127.0.0.1:8099/nested/dir/index.html && break
+            sleep 0.5
+          done
+          fail=0
+          for page in index.html privacy.html terms.html; do
+            grep -oE '(src|href)="[^"]+"' "verify/nested/dir/$page" \
+              | sed -E 's/^(src|href)="//; s/"$//' \
+              | grep -vE '^(https?:|mailto:|data:|#)' \
+              | sort -u > refs.txt
+            while read -r ref; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' \
+                "http://127.0.0.1:8099/nested/dir/$ref")
+              if [ "$code" = 200 ]; then
+                echo "ok    $page -> $ref"
+              else
+                echo "::error::$page references $ref, which returns HTTP $code"
+                fail=1
+              fi
+            done < refs.txt
+          done
+          exit $fail
+
+  cli-binaries:
+    name: CLI binary (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      # Kept in step with the build matrix in release-cli.yml.
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: stegoshard-linux-x64
+            archive: stegoshard-linux-x64.tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: stegoshard-macos-arm64
+            archive: stegoshard-macos-arm64.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: stegoshard-windows-x64.exe
+            archive: stegoshard-windows-x64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+      - name: Build bundled CLI
+        run: npm run build:cli
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.5
+      - name: Compile standalone network-disabled binary
+        env:
+          TARGET: ${{ matrix.target }}
+          BIN: ${{ matrix.name }}
+        shell: bash
+        run: |
+          deno compile --allow-read --allow-write --allow-env --no-prompt \
+            --target "$TARGET" --output "$BIN" dist-cli/stegoshard.js
+      # Mirrors the packaging in release-cli.yml. If you change one, change the
+      # other.
+      - name: Package for download (tar.gz)
+        if: runner.os != 'Windows'
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: tar -czf "$ARCHIVE" "$BIN"
+      - name: Package for download (zip)
+        if: runner.os == 'Windows'
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        shell: bash
+        run: 7z a -tzip -mx=9 "$ARCHIVE" "$BIN" > /dev/null
+      - name: Report raw and packaged sizes
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        shell: bash
+        run: ls -lh "$BIN" "$ARCHIVE" | awk 'NF>=9 {print $9, $5}'
+
+      # Smoke the binary *extracted from the archive*, not the loose one left
+      # over from the compile: the archive is what a user downloads, so it is
+      # what has to work. CI only ever runs the CLI through `deno run`, and on
+      # the first dry run this step caught the Windows binary — then still
+      # UPX-packed — aborting inside V8 on startup. Each matrix target is native
+      # to its runner, so all three are exercised.
+      - name: Round-trip a file with the binary from the archive
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+          STEGOSHARD_PASSWORD: Correct-Horse-Battery-Staple-42!
+        shell: bash
+        run: |
+          mkdir -p unpacked
+          case "$ARCHIVE" in
+            *.tar.gz) tar -xzf "$ARCHIVE" -C unpacked ;;
+            *.zip)    7z x -ounpacked "$ARCHIVE" > /dev/null ;;
+          esac
+          test -f "unpacked/$BIN" || { echo "::error::$BIN missing from $ARCHIVE"; exit 1; }
+          chmod +x "unpacked/$BIN" || true
+          echo "release dry run: packaged binary round-trip" > secret.txt
+          "./unpacked/$BIN" save secret.txt --out out
+          "./unpacked/$BIN" restore out --out restored
+          diff secret.txt restored/secret.txt
+          echo "packaged binary round-trip OK"
