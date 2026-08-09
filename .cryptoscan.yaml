@@ -27,11 +27,11 @@ ignore:
     # are no X.509 certificates, TLS configs, or PKI in this project.
     - Certificate
   files:
-    - "node_modules/*"
-    - "dist/*"
-    - "dist-cli/*"
-    - "coverage/*"
-    - ".git/*"
+    - 'node_modules/*'
+    - 'dist/*'
+    - 'dist-cli/*'
+    - 'coverage/*'
+    - '.git/*'
 
 # Fail CI on any HIGH or CRITICAL finding that survives the suppressions above —
 # i.e. a newly introduced quantum-vulnerable or classically-broken algorithm.

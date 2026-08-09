@@ -1,30 +1,110 @@
 <!-- @dsCard group="Foundations" name="Radii & Elevation" subtitle="--radius, --radius-sm, pills, --shadow" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Radii & Elevation</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius:14px;--radius-sm:9px;--shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
-.grid{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end}
-.item{text-align:center}
-.box{width:96px;height:72px;background:var(--surface);border:1px solid var(--border);display:flex}
-.tag{font-size:.75rem;color:var(--muted);margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.r{border-radius:var(--radius)}.rs{border-radius:var(--radius-sm)}.rp{border-radius:999px;width:120px}
-.elev{box-shadow:var(--shadow);border-radius:var(--radius)}
-</style>
-</head>
-<body>
-<div class="grid">
-  <div class="item"><div class="box rs"></div><div class="tag">--radius-sm · 9px</div></div>
-  <div class="item"><div class="box r"></div><div class="tag">--radius · 14px</div></div>
-  <div class="item"><div class="box rs" style="border-radius:16px"></div><div class="tag">modal · 16px</div></div>
-  <div class="item"><div class="box rp"></div><div class="tag">pill · 999px</div></div>
-  <div class="item"><div class="box elev" style="border-color:transparent"></div><div class="tag">--shadow</div></div>
-</div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Radii & Elevation</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --radius: 14px;
+        --radius-sm: 9px;
+        --shadow: 0 1px 2px rgba(20, 30, 50, 0.06), 0 8px 24px rgba(20, 30, 50, 0.05);
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+      }
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: flex-end;
+      }
+      .item {
+        text-align: center;
+      }
+      .box {
+        width: 96px;
+        height: 72px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        display: flex;
+      }
+      .tag {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .r {
+        border-radius: var(--radius);
+      }
+      .rs {
+        border-radius: var(--radius-sm);
+      }
+      .rp {
+        border-radius: 999px;
+        width: 120px;
+      }
+      .elev {
+        box-shadow: var(--shadow);
+        border-radius: var(--radius);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="item">
+        <div class="box rs"></div>
+        <div class="tag">--radius-sm · 9px</div>
+      </div>
+      <div class="item">
+        <div class="box r"></div>
+        <div class="tag">--radius · 14px</div>
+      </div>
+      <div class="item">
+        <div class="box rs" style="border-radius: 16px"></div>
+        <div class="tag">modal · 16px</div>
+      </div>
+      <div class="item">
+        <div class="box rp"></div>
+        <div class="tag">pill · 999px</div>
+      </div>
+      <div class="item">
+        <div class="box elev" style="border-color: transparent"></div>
+        <div class="tag">--shadow</div>
+      </div>
+    </div>
+  </body>
 </html>

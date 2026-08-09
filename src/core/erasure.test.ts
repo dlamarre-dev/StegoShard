@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MIN_PARITY,
-  decodeBlob,
-  encodeShards,
-  parityCount,
-  splitIntoShards,
-} from './erasure';
+import { MIN_PARITY, decodeBlob, encodeShards, parityCount, splitIntoShards } from './erasure';
 
 describe('parityCount', () => {
   it('applies +30% above the floor', () => {

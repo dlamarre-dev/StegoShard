@@ -1,37 +1,136 @@
 <!-- @dsCard group="Components" name="Form fields" subtitle="text / password inputs, field-row, fieldset, radio, checkbox" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Form fields</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--radius-sm:9px;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px;max-width:420px}
-label{display:block;font-weight:600;font-size:.9rem;margin:14px 0 5px}
-input[type='text'],input[type='password']{width:100%;padding:9px 11px;font:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);outline:none}
-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
-.field-row{display:flex;gap:10px}
-.field-row input{flex:1}
-.btn-ghost{padding:7px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap}
-fieldset{border:1px solid var(--border);border-radius:var(--radius-sm);margin:14px 0;padding:10px 14px 14px}
-legend{font-weight:600;font-size:.85rem;padding:0 6px;color:var(--muted)}
-label.radio,label.checkbox{display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0;cursor:pointer}
-label.radio input,label.checkbox input{width:auto;accent-color:var(--accent)}
-</style>
-</head>
-<body>
-<label for="a">File name</label>
-<input id="a" type="text" value="taxes-2025.pdf">
-<label for="b">Passphrase (focused)</label>
-<div class="field-row"><input id="b" type="password" value="correct-horse" style="border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)"><button class="btn-ghost">Show</button></div>
-<fieldset>
-  <legend>Error correction</legend>
-  <label class="radio"><input type="radio" name="ec" checked> Standard</label>
-  <label class="radio"><input type="radio" name="ec"> Maximum (paper-safe)</label>
-  <label class="checkbox"><input type="checkbox" checked> Add a decoy layer</label>
-</fieldset>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Form fields</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --radius-sm: 9px;
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+        max-width: 420px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin: 14px 0 5px;
+      }
+      input[type='text'],
+      input[type='password'] {
+        width: 100%;
+        padding: 9px 11px;
+        font: inherit;
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+      }
+      .field-row {
+        display: flex;
+        gap: 10px;
+      }
+      .field-row input {
+        flex: 1;
+      }
+      .btn-ghost {
+        padding: 7px 12px;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      fieldset {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        margin: 14px 0;
+        padding: 10px 14px 14px;
+      }
+      legend {
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 0 6px;
+        color: var(--muted);
+      }
+      label.radio,
+      label.checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 400;
+        margin: 8px 0;
+        cursor: pointer;
+      }
+      label.radio input,
+      label.checkbox input {
+        width: auto;
+        accent-color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <label for="a">File name</label>
+    <input id="a" type="text" value="taxes-2025.pdf" />
+    <label for="b">Passphrase (focused)</label>
+    <div class="field-row">
+      <input
+        id="b"
+        type="password"
+        value="correct-horse"
+        style="
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+        "
+      /><button class="btn-ghost">Show</button>
+    </div>
+    <fieldset>
+      <legend>Error correction</legend>
+      <label class="radio"><input type="radio" name="ec" checked /> Standard</label>
+      <label class="radio"><input type="radio" name="ec" /> Maximum (paper-safe)</label>
+      <label class="checkbox"><input type="checkbox" checked /> Add a decoy layer</label>
+    </fieldset>
+  </body>
 </html>

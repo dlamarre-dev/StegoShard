@@ -1,11 +1,6 @@
 /** Guard branches for reed-solomon.ts. */
 import { describe, it, expect } from 'vitest';
-import {
-  buildCauchyMatrix,
-  invertMatrix,
-  rsEncode,
-  rsReconstructData,
-} from './reed-solomon';
+import { buildCauchyMatrix, invertMatrix, rsEncode, rsReconstructData } from './reed-solomon';
 
 describe('reed-solomon guards', () => {
   it('buildCauchyMatrix rejects bad k/m', () => {

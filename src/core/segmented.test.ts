@@ -98,10 +98,17 @@ describe('segmented key modes', () => {
 
   it('rejects a wrong password', async () => {
     const key = await makeKey('correct horse');
-    const blob = await buildSegmentedBlob('x', randomContent(50), key, 'embedded', undefined, CHUNK);
-    await expect(decodeSegmentedBlob(blob, 'wrong', { maxContentBytes: MAX })).rejects.toBeInstanceOf(
-      WrongPasswordError,
+    const blob = await buildSegmentedBlob(
+      'x',
+      randomContent(50),
+      key,
+      'embedded',
+      undefined,
+      CHUNK,
     );
+    await expect(
+      decodeSegmentedBlob(blob, 'wrong', { maxContentBytes: MAX }),
+    ).rejects.toBeInstanceOf(WrongPasswordError);
   });
 });
 
@@ -112,7 +119,14 @@ describe('segmented tamper / truncation / reorder rejection', () => {
 
   async function freshBlob(len = 10000): Promise<{ key: VaultKey; blob: Uint8Array }> {
     const key = await makeKey('pw');
-    const blob = await buildSegmentedBlob('x', randomContent(len), key, 'keyfile', undefined, CHUNK);
+    const blob = await buildSegmentedBlob(
+      'x',
+      randomContent(len),
+      key,
+      'keyfile',
+      undefined,
+      CHUNK,
+    );
     return { key, blob };
   }
 

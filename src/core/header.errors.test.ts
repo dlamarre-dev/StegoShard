@@ -50,7 +50,9 @@ describe('decodeHeader guards', () => {
     expect(() => decodeHeader(bytes)).toThrow(/bad magic/);
   });
   it('rejects an unsupported version', () => {
-    expect(() => decodeHeader(encodeHeader(mkHeader({ version: 2 })))).toThrow(/unsupported version/);
+    expect(() => decodeHeader(encodeHeader(mkHeader({ version: 2 })))).toThrow(
+      /unsupported version/,
+    );
   });
   it('rejects invalid k/m', () => {
     expect(() => decodeHeader(encodeHeader(mkHeader({ k: 0 })))).toThrow(/invalid k\/m/);
@@ -67,7 +69,9 @@ describe('decodeHeader guards', () => {
     );
   });
   it('rejects an invalid blob length', () => {
-    expect(() => decodeHeader(encodeHeader(mkHeader({ blobLen: 0 })))).toThrow(/invalid blob length/);
+    expect(() => decodeHeader(encodeHeader(mkHeader({ blobLen: 0 })))).toThrow(
+      /invalid blob length/,
+    );
     expect(() => decodeHeader(encodeHeader(mkHeader({ blobLen: 999 })))).toThrow(
       /invalid blob length/,
     );

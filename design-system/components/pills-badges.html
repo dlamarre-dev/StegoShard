@@ -1,34 +1,111 @@
 <!-- @dsCard group="Components" name="Pills & Badges" subtitle="pill, pill-ok, badge, mode-badge (deniable / overt)" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Pills & Badges</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--ok:#2b8a3e;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--ok:#51cf66}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
-.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
-.pill{font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
-.pill-ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--border));background:color-mix(in srgb,var(--ok) 12%,transparent)}
-.badge{display:inline-block;min-width:22px;text-align:center;padding:1px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;font-size:.85rem}
-.mode-badge{display:inline-block;padding:0 6px;border-radius:8px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-.mode-badge--deniable{background:#1e8449;color:#fff}
-.mode-badge--overt{background:var(--border);color:inherit;opacity:.85}
-</style>
-</head>
-<body>
-<div class="row">
-  <span class="pill">Idle</span>
-  <span class="pill pill-ok">Local only</span>
-  <span class="badge">3</span>
-  <span class="badge">12</span>
-</div>
-<div class="row">
-  <span class="mode-badge mode-badge--deniable">Deniable</span>
-  <span class="mode-badge mode-badge--overt">Overt</span>
-</div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Pills & Badges</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --ok: #2b8a3e;
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+          --ok: #51cf66;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .pill {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: var(--surface-2);
+        color: var(--muted);
+        border: 1px solid var(--border);
+      }
+      .pill-ok {
+        color: var(--ok);
+        border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+        background: color-mix(in srgb, var(--ok) 12%, transparent);
+      }
+      .badge {
+        display: inline-block;
+        min-width: 22px;
+        text-align: center;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 0.85rem;
+      }
+      .mode-badge {
+        display: inline-block;
+        padding: 0 6px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .mode-badge--deniable {
+        background: #1e8449;
+        color: #fff;
+      }
+      .mode-badge--overt {
+        background: var(--border);
+        color: inherit;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <span class="pill">Idle</span>
+      <span class="pill pill-ok">Local only</span>
+      <span class="badge">3</span>
+      <span class="badge">12</span>
+    </div>
+    <div class="row">
+      <span class="mode-badge mode-badge--deniable">Deniable</span>
+      <span class="mode-badge mode-badge--overt">Overt</span>
+    </div>
+  </body>
 </html>

@@ -128,7 +128,11 @@ export function invertMatrix(matrix: Uint8Array[]): Uint8Array[] {
  * `shards[i]` is the shard at global index i (0..k+m-1) or null if missing.
  * Throws if fewer than k shards survive.
  */
-export function rsReconstructData(shards: (Uint8Array | null)[], k: number, m: number): Uint8Array[] {
+export function rsReconstructData(
+  shards: (Uint8Array | null)[],
+  k: number,
+  m: number,
+): Uint8Array[] {
   if (shards.length !== k + m) {
     throw new RangeError(`reed-solomon: expected ${k + m} shard slots, got ${shards.length}`);
   }
@@ -143,9 +147,7 @@ export function rsReconstructData(shards: (Uint8Array | null)[], k: number, m: n
     }
   }
   if (presentIndices.length < k) {
-    throw new Error(
-      `reed-solomon: only ${presentIndices.length} of ${k} required shards present`,
-    );
+    throw new Error(`reed-solomon: only ${presentIndices.length} of ${k} required shards present`);
   }
 
   // Use the first k surviving shards.

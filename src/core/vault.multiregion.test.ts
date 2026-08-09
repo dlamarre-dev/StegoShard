@@ -43,18 +43,32 @@ describe('multi-region vault blob (SPEC §10.4)', () => {
   });
 
   it('rejects a wrong password uniformly', async () => {
-    const { blob } = await buildPlainVaultBlobMulti('x', enc('s'), 'right', GALLERY_LADDER, TEST_PARAMS);
+    const { blob } = await buildPlainVaultBlobMulti(
+      'x',
+      enc('s'),
+      'right',
+      GALLERY_LADDER,
+      TEST_PARAMS,
+    );
     await expect(
       decodeMultiRegionVaultBlob(blob, 'wrong', { params: TEST_PARAMS, maxContentBytes: 1 << 20 }),
     ).rejects.toBeInstanceOf(WrongPasswordError);
   });
 
   it('the two regions are equal length: which is real is invisible', async () => {
-    const { blob } = await buildPlainVaultBlobMulti('x', enc('hi'), 'pw', GALLERY_LADDER, TEST_PARAMS);
+    const { blob } = await buildPlainVaultBlobMulti(
+      'x',
+      enc('hi'),
+      'pw',
+      GALLERY_LADDER,
+      TEST_PARAMS,
+    );
     // Region area (after vault_salt 16 + slot_array 304) splits into two equal halves.
     const regionArea = blob.length - 16 - 304;
     expect(regionArea % 2).toBe(0);
-    expect(blob.length).toBe(multiRegionBlobLen((await buildPayload('x', enc('hi'))).length, 0, GALLERY_LADDER));
+    expect(blob.length).toBe(
+      multiRegionBlobLen((await buildPayload('x', enc('hi'))).length, 0, GALLERY_LADDER),
+    );
   });
 
   it('two different payloads in the same bucket yield identical blob length', async () => {

@@ -20,7 +20,10 @@ import { unwrapBinary } from '../src/core/binary-container';
 import { decode as decodeJpeg } from '../src/core/jpeg-coeff';
 
 function arg(name: string): string | undefined {
-  return process.argv.slice(2).find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
+  return process.argv
+    .slice(2)
+    .find((a) => a.startsWith(`--${name}=`))
+    ?.split('=')[1];
 }
 
 const ITERS = Number(arg('iters') ?? 5000);
@@ -100,10 +103,7 @@ async function main(): Promise<void> {
   }
   for (let i = 0; i < ITERS; i++) {
     await fuzzOne(targets[0]!, mutate(validKeyBlock)); // parseKeyBlock
-    await fuzzOne(
-      { name: 'unpackSqlite', run: (b) => unpackSqlite(b) },
-      mutate(validSqlite),
-    );
+    await fuzzOne({ name: 'unpackSqlite', run: (b) => unpackSqlite(b) }, mutate(validSqlite));
   }
 
   console.log(`fuzz: OK — ${targets.length} targets survived random + mutation inputs`);

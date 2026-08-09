@@ -132,7 +132,8 @@ describe('key-slot array (SPEC §10.3)', () => {
     for (let n = 0; n < 40; n++) {
       const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
       for (let i = 0; i < SLOT_COUNT; i++) {
-        if (await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE))) positions.add(i);
+        if (await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE)))
+          positions.add(i);
       }
     }
     // Over 40 shuffles all four positions should appear (biased shuffle would not).
@@ -162,7 +163,9 @@ describe('deriveKekBytes + secureShuffle helpers', () => {
     const viaBytes = await importAesGcmKey(raw);
     const direct = await deriveKEK('pw', salt, TEST_PARAMS);
     const { iv, ciphertext } = await encryptBytes(direct, enc('same key?'));
-    expect(new TextDecoder().decode(await decryptBytes(viaBytes, iv, ciphertext))).toBe('same key?');
+    expect(new TextDecoder().decode(await decryptBytes(viaBytes, iv, ciphertext))).toBe(
+      'same key?',
+    );
   });
 
   it('secureShuffle keeps the multiset and covers all positions', () => {

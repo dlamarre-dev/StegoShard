@@ -1,42 +1,139 @@
 <!-- @dsCard group="Components" name="Buttons" subtitle="primary / secondary / ghost / lg / link / danger / disabled" -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StegoShard — Buttons</title>
-<style>
-:root{color-scheme:light dark;--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--text:#1a1d21;--muted:#626c78;--border:#e3e7ec;--accent:#3b5bdb;--accent-hover:#2f49b8;--accent-contrast:#fff;--danger:#c0392b;--radius-sm:9px;--font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#171b22;--surface-2:#1f2530;--text:#e6eaef;--muted:#98a2b0;--border:#2a313c;--accent:#5c7cfa;--accent-hover:#748ffc;--accent-contrast:#0e1116}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;padding:24px}
-button{font:inherit;cursor:pointer;border-radius:var(--radius-sm);border:1px solid transparent}
-.stack{display:flex;flex-direction:column;gap:12px;max-width:360px}
-.inline{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.btn-primary,.btn-secondary{display:block;width:100%;padding:10px 16px;font-weight:600}
-.btn-primary{background:var(--accent);color:var(--accent-contrast)}
-.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
-.btn-secondary{background:var(--surface-2);color:var(--text);border-color:var(--border)}
-.btn-secondary:hover:not(:disabled){border-color:var(--accent)}
-.btn-ghost{padding:7px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);font-size:.85rem;font-weight:600}
-.btn-ghost:hover{color:var(--text);border-color:var(--accent)}
-.btn-lg{padding:12px 16px;font-size:1rem}
-.danger{color:#fff;background:var(--danger);border-color:color-mix(in srgb,var(--danger) 70%,black)}
-.linklike{padding:0;border:none;background:none;color:var(--accent);font-size:.85rem;text-decoration:underline}
-button:disabled{opacity:.55;cursor:default}
-</style>
-</head>
-<body>
-<div class="stack">
-  <button class="btn-primary btn-lg">Encrypt &amp; save</button>
-  <button class="btn-primary">Primary</button>
-  <button class="btn-secondary">Secondary</button>
-  <button class="btn-primary" disabled>Primary · disabled</button>
-</div>
-<div class="inline" style="margin-top:16px">
-  <button class="btn-ghost">Ghost</button>
-  <button class="danger" style="padding:7px 12px">Delete key</button>
-  <button class="linklike">Why is this safe?</button>
-</div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StegoShard — Buttons</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --surface: #fff;
+        --surface-2: #f0f2f5;
+        --text: #1a1d21;
+        --muted: #626c78;
+        --border: #e3e7ec;
+        --accent: #3b5bdb;
+        --accent-hover: #2f49b8;
+        --accent-contrast: #fff;
+        --danger: #c0392b;
+        --radius-sm: 9px;
+        --font:
+          system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+          sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --surface: #171b22;
+          --surface-2: #1f2530;
+          --text: #e6eaef;
+          --muted: #98a2b0;
+          --border: #2a313c;
+          --accent: #5c7cfa;
+          --accent-hover: #748ffc;
+          --accent-contrast: #0e1116;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        padding: 24px;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 360px;
+      }
+      .inline {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .btn-primary,
+      .btn-secondary {
+        display: block;
+        width: 100%;
+        padding: 10px 16px;
+        font-weight: 600;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-contrast);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      .btn-secondary {
+        background: var(--surface-2);
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .btn-secondary:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+      .btn-ghost {
+        padding: 7px 12px;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .btn-ghost:hover {
+        color: var(--text);
+        border-color: var(--accent);
+      }
+      .btn-lg {
+        padding: 12px 16px;
+        font-size: 1rem;
+      }
+      .danger {
+        color: #fff;
+        background: var(--danger);
+        border-color: color-mix(in srgb, var(--danger) 70%, black);
+      }
+      .linklike {
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--accent);
+        font-size: 0.85rem;
+        text-decoration: underline;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <button class="btn-primary btn-lg">Encrypt &amp; save</button>
+      <button class="btn-primary">Primary</button>
+      <button class="btn-secondary">Secondary</button>
+      <button class="btn-primary" disabled>Primary · disabled</button>
+    </div>
+    <div class="inline" style="margin-top: 16px">
+      <button class="btn-ghost">Ghost</button>
+      <button class="danger" style="padding: 7px 12px">Delete key</button>
+      <button class="linklike">Why is this safe?</button>
+    </div>
+  </body>
 </html>
