@@ -104,13 +104,10 @@ jobs:
           path: release
           merge-multiple: true
       # Checksums and attestation cover the archives — that is what a user
-      # actually downloads, so that is what they can verify.
+      # actually downloads, so that is what they can verify. Shared with the
+      # dry run; see scripts/assemble-cli-release.sh.
       - name: Add licenses, SBOM, and checksums
-        run: |
-          cp LICENSE THIRD_PARTY_NOTICES.txt release/
-          npm sbom --omit=dev --sbom-format=cyclonedx > release/stegoshard-npm.cdx.json
-          (cd release && sha256sum stegoshard-* LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS.txt)
-          cat release/SHA256SUMS.txt
+        run: bash scripts/assemble-cli-release.sh release
       - name: Attest released archives
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

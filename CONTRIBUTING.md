@@ -53,6 +53,17 @@ It is intentionally **not** a required status check: it is path-filtered, and a
 required check that does not run on most PRs blocks them. Run it by hand
 (`gh workflow run "Release dry run"`) before tagging a release.
 
+The only release step it cannot cover is publishing itself — the attestation and
+the GitHub release upload, which need a real tag and write permissions the dry
+run deliberately does not hold.
+
+### Shell scripts
+
+`scripts/*.sh` carry the release logic shared between the release workflows and
+the dry run. Prettier cannot parse shell, so they are linted with `shellcheck`
+in CI (`npm run lint:shell`). To run it locally, install shellcheck first —
+`brew install shellcheck` or `apt install shellcheck`.
+
 > **Repository administrators:** enable branch protection on `main` in the GitHub
 > settings — require pull requests, at least one approving review, "up to date before
 > merge", and the CI, typecheck, lint, test, and build checks as required status checks.
