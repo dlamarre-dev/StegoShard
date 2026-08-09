@@ -173,12 +173,15 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: stegoshard-linux-x64
+            archive: stegoshard-linux-x64.tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
             name: stegoshard-macos-arm64
+            archive: stegoshard-macos-arm64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: stegoshard-windows-x64.exe
+            archive: stegoshard-windows-x64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -200,25 +203,50 @@ jobs:
         run: |
           deno compile --allow-read --allow-write --allow-env --no-prompt \
             --target "$TARGET" --output "$BIN" dist-cli/stegoshard.js
-      - name: Report the shipped binary size
+      # Mirrors the packaging in release-cli.yml. If you change one, change the
+      # other.
+      - name: Package for download (tar.gz)
+        if: runner.os != 'Windows'
         env:
           BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: tar -czf "$ARCHIVE" "$BIN"
+      - name: Package for download (zip)
+        if: runner.os == 'Windows'
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
         shell: bash
-        run: ls -lh "$BIN" | awk '{print $9, $5}'
-
-      # CI only ever runs the CLI through `deno run`. The artifact the release
-      # actually ships is this compiled binary, which until now was never
-      # executed before being published — and on the first dry run the Windows
-      # one, then still UPX-packed, aborted inside V8 on startup. Each matrix
-      # target is native to its runner, so all three are smoke-tested here.
-      - name: Round-trip a file with the shipped binary
+        run: 7z a -tzip -mx=9 "$ARCHIVE" "$BIN" > /dev/null
+      - name: Report raw and packaged sizes
         env:
           BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
+        shell: bash
+        run: ls -lh "$BIN" "$ARCHIVE" | awk 'NF>=9 {print $9, $5}'
+
+      # Smoke the binary *extracted from the archive*, not the loose one left
+      # over from the compile: the archive is what a user downloads, so it is
+      # what has to work. CI only ever runs the CLI through `deno run`, and on
+      # the first dry run this step caught the Windows binary — then still
+      # UPX-packed — aborting inside V8 on startup. Each matrix target is native
+      # to its runner, so all three are exercised.
+      - name: Round-trip a file with the binary from the archive
+        env:
+          BIN: ${{ matrix.name }}
+          ARCHIVE: ${{ matrix.archive }}
           STEGOSHARD_PASSWORD: Correct-Horse-Battery-Staple-42!
         shell: bash
         run: |
-          echo "release dry run: compiled binary round-trip" > secret.txt
-          "./$BIN" save secret.txt --out out
-          "./$BIN" restore out --out restored
+          mkdir -p unpacked
+          case "$ARCHIVE" in
+            *.tar.gz) tar -xzf "$ARCHIVE" -C unpacked ;;
+            *.zip)    7z x -ounpacked "$ARCHIVE" > /dev/null ;;
+          esac
+          test -f "unpacked/$BIN" || { echo "::error::$BIN missing from $ARCHIVE"; exit 1; }
+          chmod +x "unpacked/$BIN" || true
+          echo "release dry run: packaged binary round-trip" > secret.txt
+          "./unpacked/$BIN" save secret.txt --out out
+          "./unpacked/$BIN" restore out --out restored
           diff secret.txt restored/secret.txt
-          echo "compiled binary round-trip OK"
+          echo "packaged binary round-trip OK"

@@ -103,8 +103,13 @@ Two ways to install, depending on whether you already have Node:
   Node ≥ 20. `npm run build:cli` produces that self-contained, shebang-included bundle.
 - **Standalone binary (larger, zero-dependency).** From the same bundle, `deno compile`
   produces per-OS executables (see the `Release CLI binaries` workflow). These embed the
-  Deno/V8 runtime, so they are tens of MB even though the app code is tiny, and they are
-  shipped uncompressed. UPX is not usable on `deno compile` output: it breaks the macOS
+  Deno/V8 runtime, so they are **large** even though the app code is tiny — 215 MB (macOS
+  arm64), 231 MB (Windows x64), 254 MB (Linux x64). They are therefore published as
+  compressed archives: `stegoshard-<platform>.tar.gz` for Linux and macOS,
+  `stegoshard-windows-x64.zip` for Windows. Unpack, then run the binary inside.
+  `SHA256SUMS.txt` and the build-provenance attestation both cover the **archive**, since
+  that is what you download. Note that the executable itself is never compressed in place:
+  UPX is not usable on `deno compile` output — it breaks the macOS
   Gatekeeper signature, refuses the Linux binary outright, and — worst — packs the Windows
   binary successfully but leaves it aborting inside V8 on startup, because V8 re-protects
   pages for JIT and the unpacker leaves them in a state it rejects. They resolve nothing at
