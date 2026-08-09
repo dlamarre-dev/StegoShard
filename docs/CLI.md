@@ -103,8 +103,10 @@ Two ways to install, depending on whether you already have Node:
   Node ≥ 20. `npm run build:cli` produces that self-contained, shebang-included bundle.
 - **Standalone binary (larger, zero-dependency).** From the same bundle, `deno compile`
   produces per-OS executables (see the `Release CLI binaries` workflow). These embed the
-  Deno/V8 runtime, so they are **large** even though the app code is tiny — 215 MB (macOS
-  arm64), 231 MB (Windows x64), 254 MB (Linux x64). They are therefore published as
+  Deno/V8 runtime, so they are **large** even though the app code is tiny — roughly
+  215-285 MB depending on platform, compressing to roughly 65-85 MB. (Exact figures move
+  with the Deno and dependency versions; the `Release dry run` workflow prints the current
+  ones for every target, which is the number to trust.) They are therefore published as
   compressed archives: `stegoshard-<platform>.tar.gz` for Linux and macOS,
   `stegoshard-windows-x64.zip` for Windows. Unpack, then run the binary inside.
   `SHA256SUMS.txt` and the build-provenance attestation both cover the **archive**, since
