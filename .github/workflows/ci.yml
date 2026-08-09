@@ -34,6 +34,13 @@ jobs:
       - name: Notices, formatting, lint, typecheck, and tests
         run: npm run ci:node
 
+      # Prettier cannot parse shell, so scripts/*.sh are invisible to
+      # format:check. They carry real release logic — two of the defects found
+      # during the release-path audit were shell bugs — so lint them properly.
+      # shellcheck ships on the runner image.
+      - name: Shell script lint (shellcheck)
+        run: npm run lint:shell
+
       # Quick fixed-seed parser fuzz smoke; the deep nightly run is fuzz.yml.
       - name: Fuzz smoke (parsers)
         run: npm run fuzz -- --iters=2000 --seed=1

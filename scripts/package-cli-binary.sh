@@ -41,4 +41,8 @@ esac
 
 # Keep the size trade-off visible in the log: these binaries embed the Deno/V8
 # runtime and are 215-254 MB raw.
+#
+# shellcheck disable=SC2012  # both names are workflow-defined constants with no
+# special characters, and `ls -lh` is the one size listing that behaves the same
+# on the ubuntu, macos, and windows-bash runners.
 ls -lh "$bin" "$archive" | awk 'NF>=9 {print $9, $5}'
