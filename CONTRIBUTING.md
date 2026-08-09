@@ -40,6 +40,19 @@ Dependabot also run on the repository.
 `ci:node` includes `format:check`, so unformatted code fails the build. Run
 `npm run format` to fix it.
 
+### Release dry run
+
+The release workflows only fire on a `v*` tag, so their first real execution
+used to be the release itself. `release-dry-run.yml` runs everything they do
+except the publishing steps — the version guard, the offline web bundle, the
+compiled CLI binaries — plus a check that every pinned action SHA still
+resolves upstream. It runs weekly, on demand, and on PRs that touch workflows,
+scripts, or the build configs.
+
+It is intentionally **not** a required status check: it is path-filtered, and a
+required check that does not run on most PRs blocks them. Run it by hand
+(`gh workflow run "Release dry run"`) before tagging a release.
+
 > **Repository administrators:** enable branch protection on `main` in the GitHub
 > settings — require pull requests, at least one approving review, "up to date before
 > merge", and the CI, typecheck, lint, test, and build checks as required status checks.
