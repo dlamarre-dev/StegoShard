@@ -46,15 +46,10 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: npm run build:web:offline
+      # Shared with the release dry run, which is the only thing that exercises
+      # this before a tag exists. See scripts/package-web-bundle.sh.
       - name: Create offline bundle, SBOM, and checksums
-        run: |
-          npm sbom --omit=dev --sbom-format=cyclonedx > stegoshard-npm.cdx.json
-          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist/
-          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist-offline/
-          archive="stegoshard-web-${GITHUB_REF_NAME#v}.zip"
-          (cd web-dist-offline && zip -X -r "../$archive" .)
-          sha256sum "$archive" > SHA256SUMS-web.txt
-          echo "WEB_ARCHIVE=$archive" >> "$GITHUB_ENV"
+        run: bash scripts/package-web-bundle.sh
       - name: Attest offline web bundle
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
