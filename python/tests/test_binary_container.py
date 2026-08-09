@@ -7,7 +7,6 @@ import sqlite3
 import tempfile
 
 import pytest
-
 from stegoshard.binary_container import (
     BINARY_MAGIC,
     unwrap_binary,

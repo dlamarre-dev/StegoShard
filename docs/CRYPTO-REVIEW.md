@@ -2,7 +2,8 @@
 
 This document is written for external reviewers. It states exactly what the
 encryption layer claims, where each claim is enforced in code, and which test
-proves it. The format itself is frozen in [SPEC.md](../SPEC.md) (§5–§6).
+proves it. The pre-1.0 format candidate is documented in [SPEC.md](../SPEC.md)
+(§5–§6); compatibility freezes only after this review closes.
 
 Scope: `src/core/crypto.ts` (primitives + key block), `src/core/vault.ts`
 (blob assembly), and the independent Python reference decoder
@@ -347,7 +348,7 @@ Three design points carry the security:
    HKDF-SHA256-split (domain-separated `info` labels) into a position-selection
    key and the AEAD key, so the two jobs never share key bytes. `GALLERY_SALT`
    ("StegoShard-gllry") is distinct from the §6a stego salt, so gallery carriers
-   never collide with the key-block stego. The gallery Argon2 cost is the frozen
+   never collide with the key-block stego. The gallery Argon2 cost is the format-defined
    default and is not stored (like §6a); the WebCrypto/TS and Python
    implementations agree bit-for-bit — proven by the `gallery-png` / `gallery-jpeg`
    conformance fixtures (TS encodes, Python `decode_gallery` restores).
@@ -403,7 +404,7 @@ has them.
 npm test                                  # TS suites incl. vectors/hardening/isolation
 npm run vectors                           # regenerate the frozen vectors (deliberate act)
 npm run fixtures -- python/tests/_fixtures
-pip install -r python/requirements.txt
+pip install --require-hashes -r python/requirements-dev.lock
 pytest python -q                          # Python conformance + cross-impl vectors
 ```
 
@@ -416,9 +417,8 @@ The scheme is **entirely symmetric**: `Argon2id` (KDF) → `AES-256-GCM` (AEAD) 
 `HKDF-SHA256` (subkey separation), with `AES-256-CTR` as a keystream PRF in the stego
 layer (§6a). There is **no asymmetric cryptography anywhere** — no RSA, no
 Diffie-Hellman, no elliptic curves (ECDH/ECDSA/Ed25519) — so **Shor's algorithm has
-nothing to break**. The only asymmetric operations in the product's runtime are inside
-TLS when the optional Google Photos integration talks to Google, which is the OS/browser's
-transport, not part of the vault format.
+nothing to break**. Public builds contain no network integration or asymmetric
+cryptographic protocol; release provenance signatures are outside the vault format.
 
 Against **Grover's algorithm**, the symmetric primitives keep an adequate margin:
 AES-256 retains ~128-bit effective key strength and SHA-256 ~128-bit collision

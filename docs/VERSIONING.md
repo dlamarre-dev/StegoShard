@@ -11,9 +11,10 @@ bumps may include behavioural changes; there is no stability promise until 1.0.
 
 ## 2. On-disk format version (the real compatibility contract)
 
-The bytes StegoShard writes are a **stable, versioned public interface** so a
-vault can be recovered without this software (see [SPEC.md](../SPEC.md), frozen at
-format v1). The format carries several independent version tags:
+The bytes StegoShard writes are a **versioned pre-1.0 interface** so independent
+decoders can recover a vault. The current v1 candidate is documented in
+[SPEC.md](../SPEC.md); its compatibility promise begins at the public 1.0 release.
+The format carries several independent version tags:
 
 | Constant            | Where                          | Meaning                                    |
 | ------------------- | ------------------------------ | ------------------------------------------ |
@@ -33,13 +34,14 @@ structure (a 4-slot key array over 2 payload regions). This geometry is a functi
 the excluded paths (single image, PDF, QR, branded `.ssbn`) never do. That is deliberate —
 a version bit that appeared only when a hidden alternative existed would itself be the
 distinguisher (SPEC §10). Because StegoShard is pre-1.0 with no shipped vaults, this was
-folded into v1 in place rather than introduced as a parallel v2; the frozen test vectors
+folded into v1 in place rather than introduced as a parallel v2; the fixed test vectors
 and fixtures are regenerated accordingly.
 
 ### Rules for a format change
 
-A change is **breaking** if an existing artifact would no longer decode, or a new
-artifact would not decode on an older reader. Breaking changes MUST:
+A post-1.0 change is **breaking** if an existing artifact would no longer decode, or a
+new artifact would not decode on an older reader. Before 1.0, audit-driven changes may
+replace the candidate in place but must still:
 
 1. Bump the relevant version constant (and add a new branch to the decoders,
    keeping the old one until support is formally dropped).

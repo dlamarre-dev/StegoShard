@@ -9,6 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { createInterface } from 'node:readline/promises';
 import {
   type AccessMode,
   MissingKeyError,
@@ -31,6 +32,7 @@ import {
   type OnProgress,
   type Progress,
 } from '@core';
+import { isStrongNewPassword, passwordStrength } from '../ui/password';
 
 const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
 
@@ -78,6 +80,7 @@ Save options:
   --password-hint <t>    Password hint printed on the instruction sheet
   --key-location <t>     Where the key is kept, printed on the sheet
   --font <path>          A .ttf/.otf for CJK instruction text (paper)
+  --allow-weak-password  Acknowledge and allow a weak password for a new vault
 
 Restore options:
   --out <dir>            Output directory (default: current directory)
@@ -252,6 +255,32 @@ async function resolveDuressPassword(values: Record<string, unknown>): Promise<s
   return pw;
 }
 
+async function requireStrongOrAcknowledged(
+  password: string,
+  values: Record<string, unknown>,
+  label = 'password',
+): Promise<void> {
+  if (isStrongNewPassword(password)) return;
+  const estimate = passwordStrength(password);
+  const warning =
+    `Warning: the ${label} is weak (estimated ${estimate.bits} bits). ` +
+    'Offline vaults can be guessed without contacting you.';
+  if (values['allow-weak-password'] === true) {
+    process.stderr.write(`${warning}\n`);
+    return;
+  }
+  if (!process.stdin.isTTY || !process.stderr.isTTY) {
+    fail(`${warning} Re-run with --allow-weak-password to acknowledge this risk.`);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await rl.question(`${warning}\nType ALLOW to continue: `);
+    if (answer !== 'ALLOW') fail('cancelled: weak password was not acknowledged');
+  } finally {
+    rl.close();
+  }
+}
+
 /**
  * True when an entropy *flag* was typed. The environment variable is deliberately
  * excluded: it is ambient (a user may export it in their shell profile), so it
@@ -354,6 +383,7 @@ async function main(argv: string[]): Promise<number> {
       'entropy-prompt': { type: 'boolean' },
       force: { type: 'boolean' },
       quiet: { type: 'boolean' },
+      'allow-weak-password': { type: 'boolean' },
     },
   });
 
@@ -397,7 +427,11 @@ async function main(argv: string[]): Promise<number> {
     }
 
     const password = await resolvePassword(values);
-    if (mode === 'duress') duressPassword = await resolveDuressPassword(values);
+    await requireStrongOrAcknowledged(password, values);
+    if (mode === 'duress') {
+      duressPassword = await resolveDuressPassword(values);
+      await requireStrongOrAcknowledged(duressPassword, values, 'duress password');
+    }
     // After the passwords (they get first claim on stdin), before anything is
     // generated.
     await installEntropy(values);
@@ -486,6 +520,7 @@ async function main(argv: string[]): Promise<number> {
       gThreshold = parseThreshold(values.threshold as string);
     }
     const password = await resolvePassword(values);
+    await requireStrongOrAcknowledged(password, values);
     await installEntropy(values);
     const res = await runGallerySave({
       secretFile,

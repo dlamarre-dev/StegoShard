@@ -82,7 +82,6 @@ describe('option pickers', () => {
       'destPaper',
       'destBinary',
       'destSqlite',
-      'destCloud',
       'destGallery',
       'keyModeEmbedded',
       'keyModeKeyfile',
@@ -113,13 +112,8 @@ describe('option pickers', () => {
     }
   });
 
-  it('puts the cloud option behind a hidden .seg-item, which destRadios() reads', () => {
-    // app.ts filters on `.closest('.seg-item')` — if `hidden` moved back onto the
-    // <label>, Google Photos would show up in builds that cannot use it.
-    const item = segItems(PAGES.extension).find((s) => s.includes('value="cloud"'));
-    expect(item).toBeTruthy();
-    expect(item).toMatch(/<div class="seg-item" id="dest-cloud-label" hidden>/);
-    // The web build has no Google Photos at all.
+  it('contains no deferred cloud destination in either public UI', () => {
+    expect(PAGES.extension).not.toContain('value="cloud"');
     expect(PAGES.web).not.toContain('value="cloud"');
   });
 

@@ -18,34 +18,28 @@ jobs:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Audit JavaScript dependencies
+        run: npm run audit
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test (with coverage)
-        run: npm run test:coverage
+      - name: Notices, formatting, lint, typecheck, and tests
+        run: npm run ci:node
 
       # Quick fixed-seed parser fuzz smoke; the deep nightly run is fuzz.yml.
       - name: Fuzz smoke (parsers)
         run: npm run fuzz -- --iters=2000 --seed=1
 
-      - name: Build (Chrome/Edge)
-        run: npm run build
-
-      - name: Build (Firefox)
-        run: npm run build:firefox
+      - name: Build and validate exact extension packages
+        run: npm run package
 
       - name: Build (web app)
         run: npm run build:web
@@ -54,29 +48,67 @@ jobs:
         run: npm run build:cli
 
       - name: Set up Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v2
         with:
-          deno-version: v2.1.4
+          deno-version: v2.9.5
 
       - name: CLI smoke test (Deno)
         run: |
           echo "deno smoke: save + restore a vault with the bundled CLI" > /tmp/ss-secret.txt
-          STEGOSHARD_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
+          STEGOSHARD_PASSWORD='Correct-Horse-Battery-Staple-42!' deno run --allow-read --allow-write --allow-env \
             dist-cli/stegoshard.js save /tmp/ss-secret.txt --out /tmp/ss-out
-          STEGOSHARD_PASSWORD=ci-pass deno run --allow-read --allow-write --allow-env \
+          STEGOSHARD_PASSWORD='Correct-Horse-Battery-Staple-42!' deno run --allow-read --allow-write --allow-env \
             dist-cli/stegoshard.js restore /tmp/ss-out --out /tmp/ss-restored
           diff /tmp/ss-secret.txt /tmp/ss-restored/ss-secret.txt
           echo "Deno round-trip OK"
+
+      - name: Upload validated browser builds
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: validated-browser-builds
+          path: dist-release
+          if-no-files-found: error
+
+  browser-e2e:
+    name: Browser, accessibility, CSP, and extension smoke
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: validated-browser-builds
+          path: dist-release
+      - name: Build production web app
+        run: npm run build:web
+      - name: Install pinned browsers
+        run: npx playwright install --with-deps chromium firefox
+      - name: Run browser E2E suite
+        run: npm run test:e2e
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
 
   crypto-scan:
     name: Post-quantum crypto scan (QRAMM)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: stable
+          go-version: '1.25.0'
 
       - name: Install QRAMM scanners
         run: |
@@ -101,7 +133,7 @@ jobs:
         run: cryptodeps analyze . --fail-on none
 
       - name: Upload CBOM
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: crypto-bom
           path: crypto-bom.json
@@ -110,16 +142,18 @@ jobs:
     name: Python decoder conformance
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements-dev.lock
 
       - name: Install dependencies
         run: npm ci
@@ -128,7 +162,28 @@ jobs:
         run: npm run fixtures -- python/tests/_fixtures
 
       - name: Install Python dependencies
-        run: pip install -r python/requirements.txt
+        run: pip install --require-hashes -r python/requirements-dev.lock
+
+      - name: Python lint and typecheck
+        run: |
+          ruff check python
+          mypy python/stegoshard
+
+      - name: Audit Python runtime dependencies
+        run: pip-audit -r python/requirements.lock --require-hashes
+
+      - name: Generate reproducible Python runtime SBOM
+        run: >-
+          cyclonedx-py requirements python/requirements.lock
+          --output-reproducible
+          --output-file python-runtime.cdx.json
+
+      - name: Upload Python runtime SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: python-runtime-sbom
+          path: python-runtime.cdx.json
+          if-no-files-found: error
 
       - name: Conformance test (Python decodes)
         run: pytest python -q

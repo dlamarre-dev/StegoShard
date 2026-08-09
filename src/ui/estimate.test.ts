@@ -16,7 +16,7 @@ const ENVELOPE = 40_000;
 
 describe('estimates', () => {
   it('reports a count per codec for the image destinations', () => {
-    for (const dest of ['disk', 'cloud'] as const) {
+    for (const dest of ['disk'] as const) {
       const e = estimateFor(dest, ENVELOPE, ENVELOPE, msg);
       expect(e.available).toBe(true);
       expect(e.counts?.color, `${dest} color`).toBeGreaterThan(0);

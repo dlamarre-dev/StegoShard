@@ -9,6 +9,7 @@ export default [
     ignores: [
       'dist/**',
       'web-dist/**',
+      'web-dist-offline/**',
       'dist-cli/**',
       'dist-release/**',
       'coverage/**',

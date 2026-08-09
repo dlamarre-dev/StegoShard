@@ -1,47 +1,44 @@
 # StegoShard privacy policy
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-08-09_
 
-StegoShard is a zero-knowledge, offline-first tool. **It does not collect,
-transmit, or sell any personal data.**
+StegoShard is a local-only tool with no application backend. It does not collect,
+transmit, sell, or profile personal data, and contains no analytics, telemetry, or
+tracking.
 
-## What data StegoShard handles
+## Data processed on your device
 
-- **Your files and password** are processed **entirely on your device**. Files
-  are encrypted locally (Argon2id + AES-256-GCM) before being turned into
-  images. Your password is never stored and never leaves your device.
-- **At rest**, only a *password-wrapped* key and non-sensitive preferences are
-  stored locally in the browser (`storage.local`). The wrapped key is useless
-  without your password. Nothing is synced to any server.
-- StegoShard contains **no analytics, no telemetry, and no tracking** of any
-  kind, and makes **no network requests** for its core features (Disk and Paper).
+- Files, passwords, keys, filenames, and recovery shares are processed locally in
+  your browser or CLI. Passwords are not intentionally persisted or transmitted.
+- The extension stores a password-wrapped vault key and save preferences in
+  `storage.local`. Preferences include workflow, destination, codec, and an optional
+  user-entered title; a title may contain personal data if you put it there.
+- While the extension is unlocked, the raw vault key is represented in
+  `storage.session`. This volatile browser-managed value is cleared when you lock the
+  vault or close the browser, but it cannot be reliably zeroized like native memory.
+- The hosted web app has no managed key. It stores only non-secret UI preferences in
+  site-local `localStorage`; selected files and passwords are not intentionally stored.
 
-## Google Photos (optional)
+StegoShard's core features make no network requests. Public extension builds request
+only the browser `storage` permission and no host access.
 
-The Google Photos destination is **opt-in** and off unless you enable it:
+## Hosted web-app trust
 
-- It requests Google authorization only when you first use it, via Google's
-  standard OAuth consent screen.
-- Encrypted images are uploaded to **your own Google account**, into an album
-  the extension creates. Restoring downloads images **you select** with Google's
-  Picker. All of this happens directly between your browser and Google.
-- **StegoShard operates no servers and receives none of this data.** Your use of
-  Google Photos is governed by Google's own privacy policy.
-- The extension only ever handles opaque, already-encrypted images — it cannot
-  read your other photos.
-
-## Permissions
-
-- `storage` — save the wrapped key and preferences locally.
-- `identity` and the Google host permissions — **optional**, requested only if
-  you use Google Photos.
+The web app downloads executable JavaScript from its host. Although cryptographic
+processing remains local, a compromised or replaced deployment could change that
+code. Each release shows its version and commit; high-value use should prefer a
+reviewed extension, CLI binary, or checksum/provenance-verified offline web bundle.
 
 ## Your control
 
-- Export, re-password, or **erase** your key at any time from the settings.
-- Uninstalling the extension removes all local data.
+- Export, re-password, lock, or erase the extension key from settings.
+- Uninstalling the extension removes its extension storage under normal browser
+  behavior.
+- Web-app preferences remain in browser site data until you clear that site's data.
+- Downloaded vaults, keys, shares, and restored files remain wherever you saved them
+  and are not removed automatically.
 
 ## Contact
 
-Questions or concerns: open an issue or a private report on the project page —
-<https://github.com/dlamarre-dev/StegoShard>.
+Questions or concerns: open an issue for general privacy questions or use a private
+security report for sensitive matters — <https://github.com/dlamarre-dev/StegoShard>.

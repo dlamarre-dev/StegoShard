@@ -7,6 +7,7 @@
 
 import {
   type BinaryVariant,
+  FileTooLargeError,
   binaryKeyName,
   binaryVaultName,
   buildDuressDbContainer,
@@ -19,9 +20,12 @@ import {
   galleryDecode,
   galleryEncode,
   importVault,
+  MAX_FILE_BYTES,
+  MAX_FILE_BYTES_BINARY_UI,
   MAX_IMAGES,
   PROFILE_DISK,
   shamirRecover,
+  TooManyFilesError,
   VerificationError,
   decodeHeader,
   toHex,
@@ -53,6 +57,15 @@ import {
   stegoKeyName,
   type LabelBand,
 } from './image-io';
+import {
+  MAX_BROWSER_CONTAINER_BYTES,
+  MAX_BROWSER_INPUT_FILES,
+  MAX_BROWSER_MEDIA_BYTES,
+  MAX_BROWSER_TOTAL_INPUT_BYTES,
+  assertBlobSize,
+  assertBrowserInputs,
+  boundedBlobBytes,
+} from './input-limits';
 
 export interface SaveOptions {
   keyMode: KeyMode;
@@ -118,6 +131,8 @@ export async function saveFileToDisk(
   key: VaultKey,
   options: SaveOptions,
 ): Promise<{ imageCount: number; setId: string; keyMode: KeyMode }> {
+  assertBlobSize(file, MAX_FILE_BYTES);
+  if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
     profile: PROFILE_DISK,
@@ -258,7 +273,11 @@ async function buildDisguisedMode(
     if (!options.duressPassword || !options.decoy) {
       throw new Error('duress mode requires a duress password and a decoy file');
     }
-    const decoyContent = new Uint8Array(await options.decoy.arrayBuffer());
+    assertBrowserInputs([file, options.decoy], {
+      perFile: MAX_FILE_BYTES_BINARY_UI,
+      total: MAX_BROWSER_TOTAL_INPUT_BYTES,
+    });
+    const decoyContent = await boundedBlobBytes(options.decoy, MAX_FILE_BYTES_BINARY_UI);
     // Core builds + self-verifies both regions and wraps the container.
     const { container } = await buildDuressDbContainer(
       file.name,
@@ -316,6 +335,14 @@ export async function saveFileToBinary(
     onProgress?: OnProgress | undefined;
   },
 ): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
+  assertBrowserInputs(
+    [
+      file,
+      ...(options.decoy ? [options.decoy] : []),
+      ...(options.stego ? [options.stego.cover] : []),
+    ],
+    { perFile: MAX_FILE_BYTES_BINARY_UI, total: MAX_BROWSER_TOTAL_INPUT_BYTES },
+  );
   const content = new Uint8Array(await file.arrayBuffer());
   const keyMode = options.keyMode;
   const mode = options.mode ?? 'plain';
@@ -458,6 +485,8 @@ export async function saveGalleryToDisk(
     threshold?: { k: number; n: number } | undefined;
   } = {},
 ): Promise<GallerySaveResult> {
+  assertBlobSize(secret, MAX_FILE_BYTES);
+  assertBrowserInputs([...covers, ...(options.stego ? [options.stego.cover] : [])]);
   const keyMode = options.keyMode ?? 'embedded';
   const mode = options.mode ?? 'plain';
   const content = new Uint8Array(await secret.arrayBuffer());
@@ -541,6 +570,7 @@ export async function restoreGalleryFromDisk(
   keyFile?: File,
   secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
+  assertBrowserInputs([...files, ...(keyFile ? [keyFile] : [])]);
   const covers = await Promise.all(files.map(fileToGalleryCover));
   // Optional external key (keyfile/stego galleries): a .key, a binary key
   // container, or a stego cover de-embedded with the restore password.
@@ -568,9 +598,12 @@ const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
 // Bounds for restoring from an untrusted .zip (zip-bomb / resource guard).
 // Generous enough for real photo sets, tight enough to reject an archive that
 // claims gigabytes.
-const MAX_ZIP_ENTRIES = MAX_IMAGES + 4; // images + a stray .key or two
-const MAX_ENTRY_BYTES = 25 * 1024 * 1024; // 25 MB per image (a large photo)
-const MAX_TOTAL_BYTES = 300 * 1024 * 1024; // cumulative uncompressed
+// A disk backup never holds more than MAX_IMAGES images (plus a .key and a
+// little slack), so bound the archive by *that*, not by the much larger gallery
+// input budget. Mirrors `MAX_ZIP_ENTRIES` in src/cli/inputs.ts.
+export const MAX_ZIP_ENTRIES = MAX_IMAGES + 4;
+const MAX_ENTRY_BYTES = MAX_BROWSER_MEDIA_BYTES;
+const MAX_TOTAL_BYTES = MAX_BROWSER_TOTAL_INPUT_BYTES;
 
 /**
  * Extract only image/.key entries from a zip, within the size/count budgets.
@@ -640,13 +673,33 @@ export async function restoreFileFromDisk(
   onProgress?: OnProgress,
   secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
+  assertBrowserInputs(files, {
+    perFile: MAX_BROWSER_CONTAINER_BYTES,
+    total: MAX_BROWSER_TOTAL_INPUT_BYTES,
+  });
+  for (const file of files) {
+    if (!isZip(file.name) && !/\.(?:ssbn|db)$/i.test(file.name)) {
+      assertBlobSize(file, MAX_BROWSER_MEDIA_BYTES);
+    }
+  }
+  if (keyFile) assertBlobSize(keyFile, MAX_BROWSER_MEDIA_BYTES);
+  if (extraPayloads.length > MAX_BROWSER_INPUT_FILES) {
+    throw new TooManyFilesError(extraPayloads.length, MAX_BROWSER_INPUT_FILES);
+  }
+  let decodedTotal = 0;
+  for (const payload of extraPayloads) {
+    decodedTotal += payload.byteLength;
+    if (decodedTotal > MAX_BROWSER_TOTAL_INPUT_BYTES) {
+      throw new FileTooLargeError(decodedTotal, MAX_BROWSER_TOTAL_INPUT_BYTES);
+    }
+  }
   const images: Uint8Array[] = [];
   const payloads: Uint8Array[] = [...extraPayloads];
   // A key input can be a raw .key, a binary key container (branded/disguised),
   // or a stego cover image (de-embedded with the restore password).
   let keyBlock: Uint8Array | undefined;
   if (keyFile) {
-    const bytes = await blobBytes(keyFile);
+    const bytes = await boundedBlobBytes(keyFile, MAX_BROWSER_MEDIA_BYTES);
     const unwrapped = unwrapBinary(bytes);
     keyBlock = unwrapped
       ? unwrapped.payload
@@ -665,7 +718,7 @@ export async function restoreFileFromDisk(
   // captures arrive as extraPayloads and are always images, so skip the probe.)
   if (extraPayloads.length === 0) {
     for (const file of files) {
-      const bytes = await blobBytes(file);
+      const bytes = await boundedBlobBytes(file, MAX_BROWSER_CONTAINER_BYTES);
       if (unwrapBinary(bytes)) {
         const { filename, content } = await decryptBinaryInWorker(
           bytes,
@@ -682,17 +735,19 @@ export async function restoreFileFromDisk(
 
   for (const file of files) {
     if (isZip(file.name)) {
-      const extracted = extractZip(await blobBytes(file));
+      const extracted = extractZip(await boundedBlobBytes(file, MAX_BROWSER_CONTAINER_BYTES));
       images.push(...extracted.images);
       if (extracted.keyBlock) keyBlock = extracted.keyBlock;
     } else if (isKey(file.name)) {
-      keyBlock = await blobBytes(file);
+      keyBlock = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
     } else if (isPdf(file.name)) {
       // Lazy: keeps pdf-lib out of the initial bundle (only paper users pay).
       const { extractPdfPayloads } = await import('./pdf-restore');
-      payloads.push(...(await extractPdfPayloads(await blobBytes(file))));
+      payloads.push(
+        ...(await extractPdfPayloads(await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES))),
+      );
     } else {
-      images.push(await blobBytes(file));
+      images.push(await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES));
     }
   }
 

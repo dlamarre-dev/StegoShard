@@ -20,7 +20,6 @@ import unicodedata
 import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
 from stegoshard.crypto import (
     WrongPasswordError,
     decrypt_content,
@@ -46,7 +45,9 @@ def _hx(s: str) -> bytes:
 
 @pytest.mark.parametrize("v", VECTORS["argon2id"], ids=lambda v: v["name"])
 def test_argon2id_kek_matches_typescript(v):
-    kek = derive_kek(v["password"], _hx(v["saltHex"]), v["iterations"], v["memoryKiB"], v["parallelism"])
+    kek = derive_kek(
+        v["password"], _hx(v["saltHex"]), v["iterations"], v["memoryKiB"], v["parallelism"]
+    )
     assert kek == _hx(v["kekHex"])
 
 
@@ -56,11 +57,17 @@ def test_nfc_and_nfd_passwords_derive_same_kek():
     nfd = next(v for v in VECTORS["argon2id"] if v["name"] == "unicode-nfd")
     # Different raw bytes, same normalized text -> identical KEK.
     assert nfc["password"] != nfd["password"]
-    assert unicodedata.normalize("NFC", nfc["password"]) == unicodedata.normalize("NFC", nfd["password"])
+    assert unicodedata.normalize("NFC", nfc["password"]) == unicodedata.normalize(
+        "NFC", nfd["password"]
+    )
     assert nfc["kekHex"] == nfd["kekHex"]
     # And derive_kek reproduces that shared KEK from either spelling.
     kek_from_nfd = derive_kek(
-        nfd["password"], _hx(nfd["saltHex"]), nfd["iterations"], nfd["memoryKiB"], nfd["parallelism"]
+        nfd["password"],
+        _hx(nfd["saltHex"]),
+        nfd["iterations"],
+        nfd["memoryKiB"],
+        nfd["parallelism"],
     )
     assert kek_from_nfd == _hx(nfc["kekHex"])
 
@@ -162,7 +169,13 @@ def test_multiregion_vault_blob_decodes_like_typescript(v):
     TypeScript encoder produced — proving both stacks agree on the slot array, the
     slot KEK (incl. the keyfile factor), the per-region key, and the region framing."""
     restored = decode_multiregion_vault_blob(
-        _hx(v["blobHex"]), v["password"], _factor(v), MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+        _hx(v["blobHex"]),
+        v["password"],
+        _factor(v),
+        MAX,
+        v["iterations"],
+        v["memoryKiB"],
+        v["parallelism"],
     )
     assert restored.filename == v["filename"]
     assert restored.content == _hx(v["contentHex"])
@@ -174,11 +187,23 @@ def test_multiregion_vault_blob_rejects_wrong_credential(v):
         if v["keyFactorHex"]:
             # keyfile vector: the correct password without the factor must not open.
             decode_multiregion_vault_blob(
-                _hx(v["blobHex"]), v["password"], None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+                _hx(v["blobHex"]),
+                v["password"],
+                None,
+                MAX,
+                v["iterations"],
+                v["memoryKiB"],
+                v["parallelism"],
             )
         else:
             decode_multiregion_vault_blob(
-                _hx(v["blobHex"]), v["password"] + "x", None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+                _hx(v["blobHex"]),
+                v["password"] + "x",
+                None,
+                MAX,
+                v["iterations"],
+                v["memoryKiB"],
+                v["parallelism"],
             )
 
 
@@ -186,7 +211,13 @@ def test_multiregion_vault_blob_rejects_wrong_credential(v):
 def test_multiregion_segmented_blob_decodes_like_typescript(v):
     """The .db-geometry multi-region segmented blob (§10.7) decodes identically."""
     filename, content = decode_multiregion_segmented_blob(
-        _hx(v["blobHex"]), v["password"], _factor(v), MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+        _hx(v["blobHex"]),
+        v["password"],
+        _factor(v),
+        MAX,
+        v["iterations"],
+        v["memoryKiB"],
+        v["parallelism"],
     )
     assert filename == v["filename"]
     assert content == _hx(v["contentHex"])
@@ -212,7 +243,13 @@ def test_gated_slot_decodes_only_with_the_threshold_secret(v):
 
     with pytest.raises(WrongPasswordError):
         decode_multiregion_vault_blob(
-            _hx(v["blobHex"]), v["password"], None, MAX, v["iterations"], v["memoryKiB"], v["parallelism"]
+            _hx(v["blobHex"]),
+            v["password"],
+            None,
+            MAX,
+            v["iterations"],
+            v["memoryKiB"],
+            v["parallelism"],
         )
 
 

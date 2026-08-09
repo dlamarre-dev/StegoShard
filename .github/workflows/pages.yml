@@ -1,37 +1,74 @@
-name: Deploy web app to Pages
+name: Release and deploy web app
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+  attestations: write
+  artifact-metadata: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  release:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
       - run: npm ci
-      - name: Build web app
+      - name: Require tag and package versions to match
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: Audit, test, and validate notices
+        run: |
+          npm run audit
+          npm run ci:node
+      - name: Build identified web app
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         run: npm run build:web
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      # Built separately from the Pages copy above: that one is pinned to the
+      # /StegoShard/ project path, which 404s everywhere else. The downloadable
+      # bundle uses a relative base so it works from any directory it is served
+      # from. Different outDir, so neither build clobbers the other.
+      - name: Build portable offline web app
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run build:web:offline
+      - name: Create offline bundle, SBOM, and checksums
+        run: |
+          npm sbom --omit=dev --sbom-format=cyclonedx > stegoshard-npm.cdx.json
+          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist/
+          cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist-offline/
+          archive="stegoshard-web-${GITHUB_REF_NAME#v}.zip"
+          (cd web-dist-offline && zip -X -r "../$archive" .)
+          sha256sum "$archive" > SHA256SUMS-web.txt
+          echo "WEB_ARCHIVE=$archive" >> "$GITHUB_ENV"
+      - name: Attest offline web bundle
+        uses: actions/attest-build-provenance@8beda2b7ed98355c0e97c0a63bec38ae472e66c4 # v4
+        with:
+          subject-path: ${{ env.WEB_ARCHIVE }}
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: web-dist
       - id: deploy
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+      - name: Attach web bundle to GitHub release
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
+        with:
+          files: |
+            ${{ env.WEB_ARCHIVE }}
+            SHA256SUMS-web.txt
+            web-dist/stegoshard-npm.cdx.json

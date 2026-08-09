@@ -7,56 +7,46 @@
     "intro": [
       {
         "p": [
-          "O StegoShard é uma ferramenta de conhecimento zero que funciona prioritariamente offline. ",
+          "O StegoShard é uma ferramenta local sem backend de aplicação. ",
           {
-            "b": "Não recolhe, transmite nem vende quaisquer dados pessoais."
+            "b": "Não recolhe, transmite, vende nem cria perfis de dados pessoais."
           }
         ]
       }
     ],
     "sections": [
       {
-        "h": "O que o StegoShard trata",
+        "h": "Dados tratados no seu dispositivo",
         "blocks": [
           {
             "ul": [
               [
                 {
-                  "b": "Os seus ficheiros e a sua palavra-passe"
-                },
-                " são processados inteiramente no seu dispositivo. Os ficheiros são cifrados localmente (Argon2id + AES-256-GCM) antes de serem transformados em imagens. A sua palavra-passe nunca é armazenada e nunca sai do seu dispositivo."
+                  "b": "Ficheiros, palavras-passe, chaves, nomes e partes de recuperação são tratados localmente. As palavras-passe não são intencionalmente guardadas nem transmitidas."
+                }
               ],
               [
                 {
-                  "b": "Em repouso"
-                },
-                ", apenas uma chave protegida pela palavra-passe e preferências não sensíveis são armazenadas localmente no navegador. A chave protegida é inútil sem a sua palavra-passe. Nada é sincronizado com qualquer servidor."
+                  "b": "A extensão guarda uma chave protegida e preferências em storage.local, incluindo um título opcional que pode conter dados pessoais. Quando desbloqueada, a chave em bruto é representada no storage.session volátil. A aplicação web guarda apenas preferências não secretas em localStorage."
+                }
               ],
               [
                 "O StegoShard não contém ",
                 {
-                  "b": "análises, telemetria nem rastreamento"
+                  "b": "análises, telemetria nem rastreio"
                 },
-                " e não efetua pedidos de rede para as suas funcionalidades principais (Disk e Paper)."
+                " e as funções principais não fazem pedidos de rede."
               ]
             ]
           }
         ]
       },
       {
-        "h": "Google Photos (opcional)",
+        "h": "Confiança na aplicação web alojada",
         "blocks": [
           {
             "p": [
-              "O destino Google Photos é de adesão voluntária e está desativado a menos que o ative. Quando ativado, as imagens cifradas são carregadas para ",
-              {
-                "b": "a sua própria conta Google"
-              },
-              " (para um álbum que a extensão cria), e o restauro descarrega as imagens que selecionar com o Picker da Google. Isto ocorre diretamente entre o seu navegador e a Google; ",
-              {
-                "b": "o StegoShard não opera quaisquer servidores e não recebe nenhum destes dados."
-              },
-              " A sua utilização do Google Photos rege-se pela própria política de privacidade da Google. A extensão trata unicamente de imagens já cifradas e não consegue ler as suas outras fotografias."
+              "A aplicação alojada descarrega JavaScript executável. O processamento continua local, mas uma implementação comprometida poderia alterar o código. Para segredos importantes, prefira uma extensão ou CLI revistos, ou o pacote offline verificado por soma e proveniência."
             ]
           }
         ]
@@ -70,14 +60,9 @@
                 {
                   "code": "storage"
                 },
-                " — guardar localmente a chave protegida e as preferências."
+                " — guarda localmente a chave protegida e as preferências."
               ],
-              [
-                {
-                  "code": "identity"
-                },
-                " e as permissões de host da Google — opcionais, solicitadas apenas se utilizar o Google Photos."
-              ]
+              ["As versões públicas da extensão não pedem permissões de identidade ou anfitrião."]
             ]
           }
         ]
@@ -87,7 +72,7 @@
         "blocks": [
           {
             "p": [
-              "Exporte, redefina a palavra-passe ou elimine a sua chave a qualquer momento nas definições. A desinstalação da extensão remove todos os dados locais."
+              "Pode exportar, alterar a palavra-passe, bloquear ou apagar a chave. A desinstalação remove normalmente o armazenamento da extensão; as preferências web ficam até limpar os dados do site. Os ficheiros descarregados nunca são apagados automaticamente."
             ]
           }
         ]
@@ -132,7 +117,7 @@
         "blocks": [
           {
             "p": [
-              "O StegoShard cifra um ficheiro no seu dispositivo e codifica-o em imagens que pode guardar em disco, imprimir ou, opcionalmente, carregar para a sua própria conta Google Photos. Funciona inteiramente no seu navegador; não existe conta nem servidor operado por nós (consulte a ",
+              "O StegoShard cifra um ficheiro no dispositivo e codifica-o como imagens ou contentor binário para guardar ou imprimir. Funciona no navegador; não operamos qualquer conta ou backend da aplicação (consulte a ",
               {
                 "a": "Política de Privacidade",
                 "href": "./privacy.html"
@@ -165,7 +150,7 @@
                 " — ninguém os poderá restaurar por si."
               ],
               [
-                "Mantenha várias cópias das suas imagens em locais independentes. Não dependa de um único meio e nunca considere o Google Photos como a sua única cópia."
+                "Mantenha várias cópias dos artefactos de recuperação em locais independentes. Não dependa de um único meio."
               ],
               [
                 "Utilize o StegoShard apenas para fins lícitos e apenas com dados que tenha o direito de armazenar."
@@ -175,11 +160,11 @@
         ]
       },
       {
-        "h": "Google Photos",
+        "h": "Aplicação alojada",
         "blocks": [
           {
             "p": [
-              "O destino opcional Google Photos interage diretamente com a sua própria conta Google e rege-se adicionalmente pelos termos e políticas da Google."
+              "A aplicação alojada também depende da segurança e disponibilidade da sua plataforma; para segredos importantes use uma versão offline verificada."
             ]
           }
         ]

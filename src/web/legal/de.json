@@ -7,56 +7,46 @@
     "intro": [
       {
         "p": [
-          "StegoShard ist ein Zero-Knowledge-Tool, das offline-first arbeitet. ",
+          "StegoShard ist ein lokales Werkzeug ohne Anwendungs-Backend. ",
           {
-            "b": "Es erhebt, übermittelt oder verkauft keine personenbezogenen Daten."
+            "b": "Es erfasst, übermittelt, verkauft oder profiliert keine personenbezogenen Daten."
           }
         ]
       }
     ],
     "sections": [
       {
-        "h": "Was StegoShard verarbeitet",
+        "h": "Auf Ihrem Gerät verarbeitete Daten",
         "blocks": [
           {
             "ul": [
               [
                 {
-                  "b": "Ihre Dateien und Ihr Passwort"
-                },
-                " werden vollständig auf Ihrem Gerät verarbeitet. Dateien werden lokal (Argon2id + AES-256-GCM) verschlüsselt, bevor sie in Bilder umgewandelt werden. Ihr Passwort wird niemals gespeichert und verlässt niemals Ihr Gerät."
+                  "b": "Dateien, Passwörter, Schlüssel, Dateinamen und Wiederherstellungsanteile werden lokal verarbeitet. Passwörter werden nicht absichtlich gespeichert oder übertragen."
+                }
               ],
               [
                 {
-                  "b": "Im Ruhezustand"
-                },
-                " werden lediglich ein mit dem Passwort umschlüsselter Schlüssel und nicht sensible Einstellungen lokal im Browser gespeichert. Der umschlüsselte Schlüssel ist ohne Ihr Passwort nutzlos. Es werden keine Daten mit irgendeinem Server synchronisiert."
+                  "b": "Die Erweiterung speichert einen passwortgeschützten Schlüssel und Einstellungen in storage.local, darunter einen optionalen Titel, der personenbezogene Daten enthalten kann. Im entsperrten Zustand liegt der Rohschlüssel im flüchtigen storage.session. Die Web-App speichert nur nicht geheime UI-Einstellungen in localStorage."
+                }
               ],
               [
                 "StegoShard enthält ",
                 {
-                  "b": "keine Analysen, keine Telemetrie und kein Tracking"
+                  "b": "keine Analyse, Telemetrie oder Verfolgung"
                 },
-                " und stellt für seine Kernfunktionen (Disk und Paper) keine Netzwerkanfragen."
+                " und seine Kernfunktionen stellen keine Netzwerkanfragen."
               ]
             ]
           }
         ]
       },
       {
-        "h": "Google Photos (optional)",
+        "h": "Vertrauen in die gehostete Web-App",
         "blocks": [
           {
             "p": [
-              "Das Ziel Google Photos ist optional und deaktiviert, sofern Sie es nicht aktivieren. Wenn es aktiviert ist, werden verschlüsselte Bilder in ",
-              {
-                "b": "Ihr eigenes Google-Konto"
-              },
-              " hochgeladen (in ein von der Erweiterung erstelltes Album), und beim Wiederherstellen werden die von Ihnen mit dem Picker von Google ausgewählten Bilder heruntergeladen. Dies geschieht direkt zwischen Ihrem Browser und Google; ",
-              {
-                "b": "StegoShard betreibt keine Server und erhält keine dieser Daten."
-              },
-              " Ihre Nutzung von Google Photos unterliegt der Datenschutzerklärung von Google. Die Erweiterung verarbeitet ausschließlich bereits verschlüsselte Bilder und kann Ihre anderen Fotos nicht lesen."
+              "Die gehostete App lädt ausführbares JavaScript. Die Verarbeitung bleibt lokal, aber eine kompromittierte Bereitstellung könnte den Code ändern. Für wichtige Geheimnisse sollten Sie eine geprüfte Erweiterung, CLI-Datei oder ein per Prüfsumme und Herkunftsnachweis verifiziertes Offline-Paket verwenden."
             ]
           }
         ]
@@ -70,14 +60,9 @@
                 {
                   "code": "storage"
                 },
-                " — Speichern des umschlüsselten Schlüssels und der Einstellungen lokal."
+                " — speichert den geschützten Schlüssel und Einstellungen lokal."
               ],
-              [
-                {
-                  "code": "identity"
-                },
-                " und die Google-Host-Berechtigungen — optional, nur angefordert, wenn Sie Google Photos verwenden."
-              ]
+              ["Öffentliche Erweiterungen fordern keine Identitäts- oder Hostberechtigungen an."]
             ]
           }
         ]
@@ -87,7 +72,7 @@
         "blocks": [
           {
             "p": [
-              "Exportieren Sie Ihren Schlüssel, vergeben Sie ein neues Passwort oder löschen Sie ihn jederzeit in den Einstellungen. Beim Deinstallieren der Erweiterung werden alle lokalen Daten entfernt."
+              "Sie können den Erweiterungsschlüssel exportieren, neu schützen, sperren oder löschen. Die Deinstallation entfernt normalerweise den Erweiterungsspeicher; Web-Einstellungen bleiben bis zum Löschen der Websitedaten. Heruntergeladene Dateien werden nie automatisch gelöscht."
             ]
           }
         ]
@@ -132,7 +117,7 @@
         "blocks": [
           {
             "p": [
-              "StegoShard verschlüsselt eine Datei auf Ihrem Gerät und kodiert sie in Bilder, die Sie auf einem Datenträger speichern, ausdrucken oder optional in Ihr eigenes Google Photos hochladen können. Es läuft vollständig in Ihrem Browser; es gibt kein Konto und keinen von uns betriebenen Server (siehe die ",
+              "StegoShard verschlüsselt eine Datei auf Ihrem Gerät und kodiert sie als Bilder oder binären Container zum Speichern oder Drucken. Es läuft im Browser; wir betreiben weder Anwendungskonto noch Backend (siehe ",
               {
                 "a": "Datenschutzerklärung",
                 "href": "./privacy.html"
@@ -165,7 +150,7 @@
                 " — niemand kann sie für Sie wiederherstellen."
               ],
               [
-                "Bewahren Sie mehrere Kopien Ihrer Bilder an voneinander unabhängigen Orten auf. Verlassen Sie sich nicht auf ein einzelnes Medium und betrachten Sie Google Photos niemals als Ihre einzige Kopie."
+                "Bewahren Sie mehrere Kopien Ihrer Wiederherstellungsartefakte an unabhängigen Orten auf. Verlassen Sie sich nicht auf ein einzelnes Medium."
               ],
               [
                 "Verwenden Sie StegoShard nur für rechtmäßige Zwecke und nur mit Daten, die Sie speichern dürfen."
@@ -175,11 +160,11 @@
         ]
       },
       {
-        "h": "Google Photos",
+        "h": "Gehostete Anwendung",
         "blocks": [
           {
             "p": [
-              "Das optionale Ziel Google Photos interagiert direkt mit Ihrem eigenen Google-Konto und unterliegt zusätzlich den Bedingungen und Richtlinien von Google."
+              "Die gehostete Anwendung hängt auch von Sicherheit und Verfügbarkeit ihrer Plattform ab; verwenden Sie für wichtige Geheimnisse eine verifizierte Offline-Version."
             ]
           }
         ]

@@ -5,7 +5,8 @@
  * `friendlyError` (which uses `instanceof`) still localizes them.
  *
  * A single lazily-created module worker is reused across calls (keeping the
- * ~256 MiB Argon2 heap warm); requests are multiplexed by a numeric id.
+ * ~256 MiB Argon2 heap warm). Requests are serialized: the optional entropy
+ * mixer is module-global inside the worker and must never overlap operations.
  */
 
 import {
@@ -27,9 +28,41 @@ interface Pending {
   onProgress?: OnProgress | undefined;
 }
 
+interface Queued extends Pending {
+  id: number;
+  message: Record<string, unknown>;
+  transfer: Transferable[];
+}
+
 let worker: Worker | undefined;
 const pending = new Map<number, Pending>();
+const queue: Queued[] = [];
+let activeId: number | undefined;
 let nextId = 1;
+
+function pump(): void {
+  while (activeId === undefined && queue.length > 0) {
+    const next = queue.shift()!;
+    activeId = next.id;
+    pending.set(next.id, next);
+    try {
+      getWorker().postMessage({ id: next.id, ...next.message }, next.transfer);
+      return;
+    } catch (err) {
+      // Dispatch can fail synchronously — workers blocked by policy, or a
+      // transfer list the structured clone cannot handle. The slot was already
+      // marked busy above, and no reply will ever arrive to free it, so unwind
+      // it here: without this the queue stays pinned to a dead id and every
+      // later request hangs forever. `worker` is deliberately left alone: if
+      // `new Worker` threw it was never assigned (so the next call retries the
+      // construction), and if `postMessage` threw the worker itself is still
+      // healthy and worth keeping warm.
+      pending.delete(next.id);
+      activeId = undefined;
+      next.reject(err);
+    }
+  }
+}
 
 function getWorker(): Worker {
   if (worker) return worker;
@@ -43,18 +76,23 @@ function getWorker(): Worker {
       return;
     }
     pending.delete(data.id);
+    activeId = undefined;
     if (data.type === 'error') {
       p.reject(reconstructError(data));
     } else {
       p.resolve(data);
     }
+    pump();
   };
   w.onerror = () => {
     // A worker-level failure (e.g. a load error) rejects everything in flight so
     // callers surface an error instead of hanging forever.
     const err = new Error('pipeline worker crashed');
     for (const [, p] of pending) p.reject(err);
+    for (const p of queue) p.reject(err);
     pending.clear();
+    queue.length = 0;
+    activeId = undefined;
     worker = undefined;
   };
   worker = w;
@@ -88,11 +126,17 @@ function call<T>(
   transfer: Transferable[],
   onProgress?: OnProgress,
 ): Promise<T> {
-  const w = getWorker();
   const id = nextId++;
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (v: unknown) => void, reject, onProgress });
-    w.postMessage({ id, ...message }, transfer);
+    queue.push({
+      id,
+      message,
+      transfer,
+      resolve: resolve as (v: unknown) => void,
+      reject,
+      onProgress,
+    });
+    pump();
   });
 }
 

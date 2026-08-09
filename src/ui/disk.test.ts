@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { zipSync } from 'fflate';
-import { extractZip } from './disk';
+import { MAX_ZIP_ENTRIES, extractZip } from './disk';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
@@ -23,9 +23,20 @@ describe('extractZip', () => {
     expect(keyBlock).toBeUndefined();
   });
 
-  it('rejects a zip with too many entries (bomb guard)', () => {
+  // Straddle the real boundary rather than testing well past it: an off-by-one
+  // or a silently widened budget would slip through a loop that only ever
+  // builds an archive far larger than the cap.
+  const zipOf = (count: number): Uint8Array => {
     const entries: Record<string, Uint8Array> = {};
-    for (let i = 0; i < 160; i++) entries[`p-${i}.png`] = enc('x');
-    expect(() => extractZip(zipSync(entries))).toThrow(/too many/);
+    for (let i = 0; i < count; i++) entries[`p-${i}.png`] = enc('x');
+    return zipSync(entries);
+  };
+
+  it('accepts a zip at exactly the entry limit', () => {
+    expect(extractZip(zipOf(MAX_ZIP_ENTRIES)).images.length).toBe(MAX_ZIP_ENTRIES);
+  });
+
+  it('rejects a zip one entry past the limit (bomb guard)', () => {
+    expect(() => extractZip(zipOf(MAX_ZIP_ENTRIES + 1))).toThrow(/too many/);
   });
 });

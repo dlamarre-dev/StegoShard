@@ -18,7 +18,7 @@ import {
 import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/domhelpers';
 import {
   type Estimates,
-  envelopeLenFor,
+  envelopeLenForEstimate,
   estimatesFrom,
   firstCodecThatFits,
   formatSize,
@@ -35,13 +35,20 @@ import {
   type StegoInput,
 } from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
-import { extraEntropyBits as extraEntropyBitsOf } from '../ui/password';
+import { extraEntropyBits as extraEntropyBitsOf, isStrongNewPassword } from '../ui/password';
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
+if (window.top !== window.self) {
+  document.body.textContent = 'StegoShard refuses to run while embedded in another page.';
+  throw new Error('refusing to run in a frame');
+}
+
 localizeDom();
+el('build-version').textContent =
+  `v${__STEGOSHARD_VERSION__} · ${__STEGOSHARD_COMMIT__.slice(0, 12)}`;
 wireLanguageSelect(el<HTMLSelectElement>('lang-select'), () => {
   // localizeDom only retranslates static [data-i18n] nodes. Status lines and
   // result panels were filled at action time with the then-current language;
@@ -110,6 +117,9 @@ const saveProgress = el('save-progress');
 const saveProgressBar = el('save-progress-bar');
 const saveResult = el('save-result');
 const saveResultNote = el('save-result-note');
+
+const acceptNewPassword = (password: string): boolean =>
+  isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
 const restoreDrop = el('restore-drop');
@@ -226,7 +236,7 @@ async function refreshEstimates(): Promise<void> {
   }
   let len: number;
   try {
-    len = await envelopeLenFor(file);
+    len = await envelopeLenForEstimate(file);
   } catch {
     return; // couldn't read the file — leave destinations enabled, no estimate
   }
@@ -474,6 +484,7 @@ saveBtn.addEventListener('click', async () => {
   const file = saveFile.files?.[0];
   if (!file) return setStatus(saveStatus, msg('errNoFile'), true);
   if (!savePw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
+  if (!acceptNewPassword(savePw.value)) return;
 
   if (dest === 'gallery') {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
@@ -515,6 +526,7 @@ saveBtn.addEventListener('click', async () => {
   if (accessMode === 'duress') {
     const d = decoyFile.files?.[0];
     if (!duressPw.value || !d) return setStatus(saveStatus, msg('errDuressInputs'), true);
+    if (!acceptNewPassword(duressPw.value)) return;
     duressPassword = duressPw.value;
     decoy = d;
   } else if (accessMode === 'nonpossession') {

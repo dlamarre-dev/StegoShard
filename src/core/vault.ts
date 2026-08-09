@@ -115,6 +115,17 @@ export class TooManyImagesError extends Error {
   }
 }
 
+/** Thrown when more input files are handed in than a surface will accept. */
+export class TooManyFilesError extends Error {
+  constructor(
+    readonly count: number,
+    readonly limit: number,
+  ) {
+    super(`too many input files: ${count} (limit ${limit})`);
+    this.name = 'TooManyFilesError';
+  }
+}
+
 /** Bytes of shard data that fit one image for a codec/profile (header aside). */
 function dataPerShard(codecId: number, profile: number): number {
   return getCodec(codecId).capacity(profile) - HEADER_LEN;

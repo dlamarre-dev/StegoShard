@@ -45,8 +45,11 @@ export interface Argon2Params {
  * memory-exhaustion DoS. Reject anything outside a generous-but-safe range.
  */
 const ARGON2_LIMITS = {
-  iterations: { min: 1, max: 16 },
-  memoryKiB: { min: 8, max: 1024 * 1024 }, // ≤ 1 GiB
+  // These fields are attacker-controlled and consumed before authentication.
+  // Parallelism up to four remains accepted for compatibility with committed
+  // v1 vectors; memory and time stay capped at the production candidate values.
+  iterations: { min: 1, max: 4 },
+  memoryKiB: { min: 8, max: 256 * 1024 }, // ≤ 256 MiB
   parallelism: { min: 1, max: 4 },
 } as const;
 
@@ -62,12 +65,11 @@ export function validateArgon2Params(p: Argon2Params): void {
 }
 
 /**
- * Production defaults. Calibrated toward a ~1–2 s unlock on typical desktop
- * hardware while staying viable in a browser tab and on mobile. 256 MiB × t=4
- * raises the cost of an offline password search several-fold over the old
- * 64 MiB × t=3 baseline. Frozen in SPEC.md. Tests override these with cheaper
- * values, and the Python reference decoder mirrors them for the stego/gallery
- * layer (whose cost is not stored — see python/stegoshard/stego.py).
+ * Production-candidate defaults. 256 MiB × t=4 raises the cost of an offline
+ * password search over the old 64 MiB × t=3 baseline, but latency and mobile
+ * viability remain release-QA gates. Tests override these with cheaper values,
+ * and the Python reference decoder mirrors them for the stego/gallery layer
+ * (whose cost is not stored — see python/stegoshard/stego.py).
  */
 export const DEFAULT_ARGON2: Argon2Params = {
   iterations: 4,
@@ -338,7 +340,7 @@ export async function decryptBytes(
  * (e.g. an Argon2id output) into several independent, domain-separated subkeys
  * via distinct `info` labels — safer than reusing the same bytes for two jobs.
  * `salt` defaults to empty (the IKM is already high-entropy). Reproduced by the
- * Python reference decoder, so it is part of the frozen format.
+ * Python reference decoder, so it is part of the versioned pre-1.0 format candidate.
  */
 export async function hkdf(
   ikm: Uint8Array,
@@ -365,7 +367,7 @@ const CONTENT_INFO = new TextEncoder().encode('stegoshard/vault/content');
  * make the AES-GCM random-IV collision bound accumulate across every export
  * under that key. A fresh random `salt` per export gives each export its own CEK,
  * so the (key, IV) space is per-export and the bound resets — one export is one
- * message. The raw DEK never leaves this function. Frozen format (SPEC §6);
+ * message. The raw DEK never leaves this function. Versioned format candidate (SPEC §6);
  * mirrored by the Python reference decoder.
  */
 export async function deriveContentKey(dek: CryptoKey, salt: Uint8Array): Promise<CryptoKey> {
@@ -644,7 +646,7 @@ export async function deriveKekBytes(
  * Derive the slot-array KEK from a password (Argon2id, run exactly once) plus an
  * OPTIONAL external key factor (a random keyfile / stego secret) mixed in via HKDF
  * for domain separation. With no factor this is the password-only ("embedded")
- * KEK. The slot KEK's Argon2 parameters are the frozen DEFAULT_ARGON2 and are NOT
+ * KEK. The slot KEK's Argon2 parameters are the format-defined DEFAULT_ARGON2 and are NOT
  * stored in the container (like the gallery/stego keys) — the geometry carries no
  * cost field, so the decoder uses the same frozen cost.
  */
@@ -739,7 +741,8 @@ export async function slotKekCandidates(
  * Derive a per-region content key from that region's INDEPENDENT DEK. A distinct
  * `info` label per region gives domain separation even in the (single-real-region)
  * case where a DEK is not shared; `salt` is the region's own content salt. The
- * raw DEK never leaves this function. Frozen format; mirrored by the Python decoder.
+ * raw DEK never leaves this function. Mirrored by the Python decoder as part of the
+ * versioned pre-1.0 format candidate.
  */
 export async function deriveRegionKey(
   dek: Uint8Array,

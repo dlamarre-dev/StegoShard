@@ -40,9 +40,13 @@ async function writeStoredBlock(keyBlock: Uint8Array): Promise<void> {
 
 async function writeSession(dek: CryptoKey, keyBlock: Uint8Array): Promise<void> {
   const dekRaw = await exportDekRaw(dek);
-  await browser.storage.session.set({
-    [SESSION_KEY]: { dek: toBase64(dekRaw), keyBlock: toBase64(keyBlock) },
-  });
+  try {
+    await browser.storage.session.set({
+      [SESSION_KEY]: { dek: toBase64(dekRaw), keyBlock: toBase64(keyBlock) },
+    });
+  } finally {
+    dekRaw.fill(0);
+  }
 }
 
 /** Whether a vault key has been set up on this device. */
@@ -55,7 +59,13 @@ export async function getSession(): Promise<VaultKey | null> {
   const record = await browser.storage.session.get(SESSION_KEY);
   const value = record[SESSION_KEY] as { dek: string; keyBlock: string } | undefined;
   if (!value) return null;
-  const dek = await importDek(fromBase64(value.dek));
+  const raw = fromBase64(value.dek);
+  let dek: CryptoKey;
+  try {
+    dek = await importDek(raw);
+  } finally {
+    raw.fill(0);
+  }
   return { dek, keyBlock: fromBase64(value.keyBlock) };
 }
 

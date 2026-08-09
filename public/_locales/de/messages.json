@@ -6,7 +6,7 @@
     "message": "Geheimnisse in Bildern speichern: resilientes, fehlerkorrigiertes Backup, glaubhaft abstreitbare Steganografie – oder beides."
   },
   "popupTagline": {
-    "message": "Verschlüssle eine Datei in widerstandsfähige Bilder — Festplatte, Papier oder Cloud."
+    "message": "Verschlüssle eine Datei in widerstandsfähige Bilder — Festplatte oder Papier."
   },
   "optionsTitle": {
     "message": "StegoShard-Einstellungen"
@@ -67,35 +67,6 @@
   },
   "destPaper": {
     "message": "Papier"
-  },
-  "destCloud": {
-    "message": "Fotos"
-  },
-  "cloudNote": {
-    "message": "Eine Bequemlichkeit — niemals Ihre einzige Kopie."
-  },
-  "statusSavedCloud": {
-    "message": "$COUNT$ Bild(er) ins Album „$ALBUM$“ hochgeladen. Bewahre dein Passwort sicher auf.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "album": {
-        "content": "$2"
-      }
-    }
-  },
-  "btnRestorePhotos": {
-    "message": "Aus Google Fotos wiederherstellen"
-  },
-  "photosHeading": {
-    "message": "Aus Google Fotos wiederherstellen"
-  },
-  "photosIntro": {
-    "message": "Dies läuft in einem eigenen Tab, damit es offen bleibt, während du deine Bilder auswählst. Gib dein Passwort ein, starte, wähle die Tresor-Bilder im Picker und komm dann hierher zurück."
-  },
-  "statusPickerOpen": {
-    "message": "Wähle deine StegoShard-Bilder im geöffneten Fenster und komm dann zurück…"
   },
   "labelInstructions": {
     "message": "Ein Anleitungsblatt beilegen"
@@ -237,6 +208,17 @@
       }
     }
   },
+  "errTooManyFiles": {
+    "message": "Zu viele Dateien: $COUNT$ (max. $LIMIT$). Wähle weniger Dateien aus.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
   "optKeyHeading": {
     "message": "Tresorschlüssel"
   },
@@ -263,9 +245,6 @@
   },
   "errPasswordMismatch": {
     "message": "Die Passwörter stimmen nicht überein."
-  },
-  "errPasswordTooShort": {
-    "message": "Verwende mindestens 8 Zeichen."
   },
   "statusKeyCreated": {
     "message": "Tresorschlüssel erstellt."
@@ -395,10 +374,6 @@
   "errCoverTooSmall": {
     "message": "Dieses Foto ist zu klein für den Schlüssel. Wählen Sie ein größeres.",
     "description": "Stego: cover photo too small to hold the key block."
-  },
-  "errStegoCloud": {
-    "message": "Den Schlüssel in einem Foto zu verstecken ist beim Cloud-Ziel nicht verfügbar.",
-    "description": "Stego: not available with the cloud destination."
   },
   "statusSavedStego": {
     "message": "$COUNT$ Bild(er) gespeichert. Ihr Schlüssel ist im Titelfoto versteckt — bewahren Sie dieses PNG und Ihr Passwort zum Wiederherstellen auf.",
@@ -700,7 +675,7 @@
     "description": "Wizard: run the restore."
   },
   "destDiskDesc": {
-    "message": "PNG-Bilder in einer .zip gebündelt, für Festplatte oder Cloud.",
+    "message": "PNG-Bilder in einer .zip gebündelt, zur lokalen Speicherung.",
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
@@ -710,10 +685,6 @@
   "destBinaryDesc": {
     "message": "Eine einzelne undurchsichtige Datei statt Bildern — ideal für größere Geheimnisse.",
     "description": "Wizard: binary destination description."
-  },
-  "destCloudDesc": {
-    "message": "Lädt die Bilder direkt in ein Google-Fotos-Album hoch.",
-    "description": "Wizard: cloud destination description."
   },
   "destGalleryDesc": {
     "message": "Verteilt über eine Reihe eigener gewöhnlicher Fotos, plus Köder.",
@@ -869,6 +840,9 @@
   "pwStrong": {
     "message": "Stark"
   },
+  "confirmWeakPassword": {
+    "message": "Dieses Passwort wirkt schwach und könnte offline erraten werden. Trotzdem fortfahren?"
+  },
   "pwBits": {
     "message": "Bit"
   },
@@ -1011,7 +985,7 @@
     "message": "Farbraster"
   },
   "codecColorDesc": {
-    "message": "Acht Farben pro Feld statt Schwarzweiß — rund dreimal so viele Daten und damit etwa ein Drittel der Dateien. Ideal für Datenträger und Cloud."
+    "message": "Acht Farben pro Feld statt Schwarzweiß — rund dreimal so viele Daten und damit etwa ein Drittel der Dateien. Ideal für lokale Datenträger."
   },
   "codecQr": {
     "message": "QR-Code"

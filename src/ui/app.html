@@ -122,8 +122,13 @@
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="dz-file" class="dz-file"></span>
-            <input id="save-file" type="file" />
           </div>
+          <input
+            id="save-file"
+            class="dropzone-input"
+            type="file"
+            data-i18n-aria-label="dropTitle"
+          />
           <p id="size-line" class="muted estimate-line">
             <span data-i18n="labelFileSize"></span> <span id="save-size" class="badge">—</span>
           </p>
@@ -218,27 +223,6 @@
                 </label>
                 <span class="seg-hint" role="tooltip" data-i18n="destSqliteDesc"></span>
               </div>
-              <div class="seg-item" id="dest-cloud-label" hidden>
-                <label>
-                  <input type="radio" name="dest" value="cloud" />
-                  <svg
-                    class="seg-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.3 10.3 3.5 3.5 0 0 0 7 19Z"
-                    />
-                  </svg>
-                  <span class="seg-label" data-i18n="destCloud"></span>
-                </label>
-                <span class="seg-hint" role="tooltip" data-i18n="destCloudDesc"></span>
-              </div>
               <div class="seg-item">
                 <label>
                   <input type="radio" name="dest" value="gallery" />
@@ -267,7 +251,6 @@
               <span data-i18n="estimateFiles"></span> <span id="estimate" class="badge">—</span>
             </p>
             <p id="no-format" class="status error" hidden></p>
-            <p id="cloud-note" class="muted" data-i18n="cloudNote" hidden></p>
             <p id="size-warn" class="muted warn" hidden></p>
 
             <div id="codec-fields">
@@ -418,8 +401,15 @@
                   <span class="muted" data-i18n="dropPrompt"></span>
                 </span>
                 <span id="gallery-covers-name" class="dz-file"></span>
-                <input id="gallery-covers" type="file" accept="image/png,image/jpeg" multiple />
               </div>
+              <input
+                id="gallery-covers"
+                class="dropzone-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                data-i18n-aria-label="galleryCoversTitle"
+                multiple
+              />
               <label class="stack-gap" data-i18n="labelStegoPassword" for="gallery-save-pw"></label>
               <input id="gallery-save-pw" type="password" autocomplete="new-password" />
 
@@ -502,8 +492,14 @@
                     <span class="muted" data-i18n="dropPrompt"></span>
                   </span>
                   <span id="gallery-cover-name" class="dz-file"></span>
-                  <input id="gallery-cover" type="file" accept="image/png,image/jpeg" />
                 </div>
+                <input
+                  id="gallery-cover"
+                  class="dropzone-input"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  data-i18n-aria-label="coverTitle"
+                />
                 <p class="muted warn" data-i18n="stegoWarning"></p>
               </div>
             </div>
@@ -545,8 +541,13 @@
                     <span class="muted" data-i18n="dropPrompt"></span>
                   </span>
                   <span id="decoy-name" class="dz-file"></span>
-                  <input id="decoy-file" type="file" />
                 </div>
+                <input
+                  id="decoy-file"
+                  class="dropzone-input"
+                  type="file"
+                  data-i18n-aria-label="decoyTitle"
+                />
                 <p class="muted warn" data-i18n="duressWarning"></p>
                 <a
                   class="warn-link"
@@ -589,8 +590,14 @@
                   <span class="muted" data-i18n="dropPrompt"></span>
                 </span>
                 <span id="cover-dz-file" class="dz-file"></span>
-                <input id="cover-file" type="file" accept="image/png,image/jpeg" />
               </div>
+              <input
+                id="cover-file"
+                class="dropzone-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                data-i18n-aria-label="coverTitle"
+              />
               <div id="stego-pw-field">
                 <label data-i18n="labelStegoPassword" for="stego-pw"></label>
                 <input id="stego-pw" type="password" autocomplete="current-password" />
@@ -704,13 +711,15 @@
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="restore-dz-file" class="dz-file"></span>
-            <input
-              id="restore-files"
-              type="file"
-              accept="image/*,.zip,.pdf,application/pdf"
-              multiple
-            />
           </div>
+          <input
+            id="restore-files"
+            class="dropzone-input"
+            type="file"
+            accept="image/*,.zip,.pdf,application/pdf"
+            data-i18n-aria-label="labelImagesOrZip"
+            multiple
+          />
 
           <input
             id="restore-pw"
@@ -740,8 +749,14 @@
                 <span class="muted" data-i18n="dropPrompt"></span>
               </span>
               <span id="key-dz-file" class="dz-file"></span>
-              <input id="restore-key" type="file" accept=".key,image/png,image/jpeg" />
             </div>
+            <input
+              id="restore-key"
+              class="dropzone-input"
+              type="file"
+              accept=".key,image/png,image/jpeg"
+              data-i18n-aria-label="labelKeyFileOrImage"
+            />
             <p class="muted" data-i18n="keyFileHint"></p>
             <div id="shares-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
               <span class="dz-prompt">
@@ -749,18 +764,19 @@
                 <span class="muted" data-i18n="dropPrompt"></span>
               </span>
               <span id="shares-dz-file" class="dz-file"></span>
-              <input id="restore-shares" type="file" accept=".txt,text/plain" multiple />
             </div>
+            <input
+              id="restore-shares"
+              class="dropzone-input"
+              type="file"
+              accept=".txt,text/plain"
+              data-i18n-aria-label="labelShareFiles"
+              multiple
+            />
             <p class="muted" data-i18n="shareFilesHint"></p>
           </div>
 
           <button id="restore-btn" class="btn-primary btn-lg" data-i18n="btnRestore"></button>
-          <button
-            id="restore-photos-btn"
-            class="btn-secondary"
-            data-i18n="btnRestorePhotos"
-            hidden
-          ></button>
           <p id="restore-status" class="status" role="status"></p>
           <div
             id="restore-progress"

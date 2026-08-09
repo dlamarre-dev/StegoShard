@@ -49,6 +49,9 @@ export interface PasswordStrength {
   score: 0 | 1 | 2 | 3 | 4;
 }
 
+export const MIN_NEW_PASSWORD_LENGTH = 16;
+export const MIN_NEW_PASSWORD_SCORE = 3;
+
 /**
  * Estimate password strength from character-class diversity and length, damped
  * by the ratio of distinct characters so that runs like `aaaaaaaa` don't score
@@ -67,6 +70,13 @@ export function passwordStrength(pw: string): PasswordStrength {
   const bits = Math.round(rawBits * Math.min(1, 0.3 + 0.7 * uniqueRatio));
   const score = bits < 40 ? 0 : bits < 60 ? 1 : bits < 80 ? 2 : bits < 100 ? 3 : 4;
   return { bits, score: score as PasswordStrength['score'] };
+}
+
+/** Policy for newly-created credentials. Restore/unlock deliberately do not use it. */
+export function isStrongNewPassword(pw: string): boolean {
+  return (
+    pw.length >= MIN_NEW_PASSWORD_LENGTH && passwordStrength(pw).score >= MIN_NEW_PASSWORD_SCORE
+  );
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   MissingKeyError,
   StegoCapacityError,
   StegoCoverFormatError,
+  TooManyFilesError,
   TooManyImagesError,
   WrongPasswordError,
 } from '@core';
@@ -33,6 +34,9 @@ export function friendlyError(
   }
   if (err instanceof TooManyImagesError) {
     return translate('errTooManyImages', [String(err.count), String(err.limit)]);
+  }
+  if (err instanceof TooManyFilesError) {
+    return translate('errTooManyFiles', [String(err.count), String(err.limit)]);
   }
   if (err instanceof GalleryTooFewImagesError)
     return translate('errGalleryTooFew', String(err.needed));
@@ -89,6 +93,12 @@ export function wireDropzone(
 ): void {
   zone.addEventListener('click', (e) => {
     if (e.target !== input) input.click();
+  });
+  zone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      input.click();
+    }
   });
   zone.addEventListener('dragover', (e) => {
     e.preventDefault();

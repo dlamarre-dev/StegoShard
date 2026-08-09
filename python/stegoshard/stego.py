@@ -36,6 +36,7 @@ def _min_capacity_rgba(payload_len: int) -> int:
 def _min_capacity_jpeg(payload_len: int) -> int:
     return payload_len * 8 * 2
 
+
 # Fixed application salt: ASCII "StegoShard-stego" (exactly 16 bytes) (SPEC §5.3).
 STEGO_SALT = b"StegoShard-stego"
 # Fixed application salt for Gallery Mode: ASCII "StegoShard-gllry" (SPEC §9.1).

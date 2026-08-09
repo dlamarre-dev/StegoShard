@@ -6,7 +6,7 @@
     "message": "把機密存於圖像：具錯誤更正、具韌性的備份、可否認的隱寫術，或兩者兼具。"
   },
   "popupTagline": {
-    "message": "把檔案加密成具韌性的圖像 — 磁碟、紙本或雲端。"
+    "message": "把檔案加密成具韌性的圖像 — 磁碟或紙本。"
   },
   "optionsTitle": {
     "message": "StegoShard 設定"
@@ -67,35 +67,6 @@
   },
   "destPaper": {
     "message": "紙本"
-  },
-  "destCloud": {
-    "message": "相片"
-  },
-  "cloudNote": {
-    "message": "僅為便利之用 — 切勿當作唯一的備份。"
-  },
-  "statusSavedCloud": {
-    "message": "已將 $COUNT$ 張圖像上傳到相簿「$ALBUM$」。請妥善保管密碼。",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "album": {
-        "content": "$2"
-      }
-    }
-  },
-  "btnRestorePhotos": {
-    "message": "從 Google 相簿還原"
-  },
-  "photosHeading": {
-    "message": "從 Google 相簿還原"
-  },
-  "photosIntro": {
-    "message": "此頁在自己的分頁中執行，讓您挑選圖像時保持開啟。輸入密碼並開始，在選取器中選擇保險庫的圖像，然後回到這裡。"
-  },
-  "statusPickerOpen": {
-    "message": "在開啟的視窗中選擇您的 StegoShard 圖像，然後回到這裡…"
   },
   "labelInstructions": {
     "message": "附上說明頁"
@@ -237,6 +208,17 @@
       }
     }
   },
+  "errTooManyFiles": {
+    "message": "檔案過多：$COUNT$ 個（上限 $LIMIT$）。請減少選取的檔案。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
   "optKeyHeading": {
     "message": "保險庫金鑰"
   },
@@ -263,9 +245,6 @@
   },
   "errPasswordMismatch": {
     "message": "兩次密碼不一致。"
-  },
-  "errPasswordTooShort": {
-    "message": "請至少使用 8 個字元。"
   },
   "statusKeyCreated": {
     "message": "已建立保險庫金鑰。"
@@ -395,10 +374,6 @@
   "errCoverTooSmall": {
     "message": "該照片太小,無法容納金鑰。請選擇較大的照片。",
     "description": "Stego: cover photo too small to hold the key block."
-  },
-  "errStegoCloud": {
-    "message": "雲端目的地不支援將金鑰隱藏在照片中。",
-    "description": "Stego: not available with the cloud destination."
   },
   "statusSavedStego": {
     "message": "已儲存 $COUNT$ 張圖像。您的金鑰已隱藏在封面照片中——請保留該 PNG 與密碼以便還原。",
@@ -700,7 +675,7 @@
     "description": "Wizard: run the restore."
   },
   "destDiskDesc": {
-    "message": "打包成 .zip 的 PNG 圖片，可存放在磁碟或雲端。",
+    "message": "打包成 .zip 的 PNG 圖片，可儲存在本機。",
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
@@ -710,10 +685,6 @@
   "destBinaryDesc": {
     "message": "以單一不透明檔案取代圖片 — 適合較大的秘密。",
     "description": "Wizard: binary destination description."
-  },
-  "destCloudDesc": {
-    "message": "將圖片直接上傳到 Google 相簿。",
-    "description": "Wizard: cloud destination description."
   },
   "destGalleryDesc": {
     "message": "分散藏在您自己的一組普通照片中，並加入誘餌。",
@@ -869,6 +840,9 @@
   "pwStrong": {
     "message": "強"
   },
+  "confirmWeakPassword": {
+    "message": "此密碼似乎較弱，可能遭到離線猜測。仍要繼續嗎？"
+  },
   "pwBits": {
     "message": "位元"
   },
@@ -1011,7 +985,7 @@
     "message": "彩色格點"
   },
   "codecColorDesc": {
-    "message": "每格使用八種顏色而非黑白，資料量約為三倍，檔案數量約為三分之一。最適合磁碟與雲端。"
+    "message": "每格使用八種顏色而非黑白，資料量約為三倍，檔案數量約為三分之一。適合儲存在本機。"
   },
   "codecQr": {
     "message": "QR 碼"

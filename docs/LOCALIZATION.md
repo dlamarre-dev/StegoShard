@@ -16,12 +16,12 @@ are present in every locale.
 
 ## Review status
 
-| Locale | Status |
-| ------ | ------ |
-| en | Source of truth. |
-| fr | Author-reviewed (project language). |
-| it, de, es, pt | Translated; recommend a light native proofread before 1.0. |
-| ja, zh_TW | Translated; **native review required** before store submission (plan §7). |
+| Locale         | Status                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| en             | Source of truth.                                                          |
+| fr             | Author-reviewed (project language).                                       |
+| it, de, es, pt | Translated; recommend a light native proofread before 1.0.                |
+| ja, zh_TW      | Translated; **native review required** before store submission (plan §7). |
 
 The store `name` (`extName`, ≤ 75 chars) and `description` (`extDesc`, ≤ 132
 chars) are keyword-oriented rather than literal translations. Before publishing,
@@ -37,6 +37,10 @@ for all eight locales lives as structured JSON in `src/web/legal/<code>.json`;
 browser, with any `zh-*` mapped to `zh_TW`), builds the page as real DOM nodes,
 and shows a visible language selector. `docs/PRIVACY.md` and `docs/TERMS.md`
 remain the **English source of truth**; the `en.json` catalog mirrors them.
+
+The 2026-08-09 privacy and hosted-delivery revision was synchronized across all
+catalogs as draft copy. Every non-English legal catalog requires native review before
+public 1.0.
 
 `src/web/legal/legal.test.ts` guards the catalogs: every locale must match the
 English structure exactly and preserve each `href` and `code` literal verbatim

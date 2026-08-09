@@ -2,7 +2,7 @@ import browser from 'webextension-polyfill';
 import { WARN_FILE_BYTES, type KeyMode } from '@core';
 import {
   type Estimates,
-  envelopeLenFor,
+  envelopeLenForEstimate,
   estimatesFrom,
   firstCodecThatFits,
   formatSize,
@@ -11,7 +11,6 @@ import { localizeDom } from './i18n';
 import { el, friendlyError, msg, pick, reflectFiles, setStatus, show, wireDropzone } from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
 import { type Destination, getPrefs, savePrefs, type Workflow } from './prefs';
-import { HAS_GOOGLE_PHOTOS } from './config';
 import { wireKeyManager } from './keymanager';
 import {
   type AccessMode,
@@ -27,7 +26,7 @@ import {
   type StegoInput,
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
-import { extraEntropyBits as extraEntropyBitsOf } from './password';
+import { extraEntropyBits as extraEntropyBitsOf, isStrongNewPassword } from './password';
 import { makeProgressUI } from './progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from './wizard';
 
@@ -119,10 +118,12 @@ const sharesDrop = el('shares-drop');
 const sharesDzFile = el('shares-dz-file');
 const restorePw = el<HTMLInputElement>('restore-pw');
 const restoreBtn = el<HTMLButtonElement>('restore-btn');
-const restorePhotosBtn = el<HTMLButtonElement>('restore-photos-btn');
 const restoreStatus = el('restore-status');
 const restoreProgress = el('restore-progress');
 const restoreProgressBar = el('restore-progress-bar');
+
+const acceptNewPassword = (password: string): boolean =>
+  isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
 const restoreResult = el('restore-result');
 const restoreResultNote = el('restore-result-note');
 const restoreAdvanced = el('restore-advanced');
@@ -191,7 +192,7 @@ function reflectDestination(): void {
   show(paperFields, dest === 'paper');
   // A label band is only drawn onto images.
   show(addBandLabel, dest === 'disk');
-  show(bandFields, dest === 'paper' || dest === 'cloud' || (dest === 'disk' && addBand.checked));
+  show(bandFields, dest === 'paper' || (dest === 'disk' && addBand.checked));
   reflectKeyMode();
   reflectGalleryKeyMode();
   reflectAccessMode();
@@ -247,19 +248,11 @@ function reflectRestoreMode(): void {
   show(restoreAdvanced, true);
 }
 
-if (HAS_GOOGLE_PHOTOS) {
-  show(el('dest-cloud-label'), true);
-  show(el('cloud-note'), true);
-  show(restorePhotosBtn, true);
-}
-
 async function loadPrefs(): Promise<void> {
   const prefs = await getPrefs();
   onboardingSeen = prefs.seenOnboarding;
   void refreshState();
-  const destination =
-    prefs.destination === 'cloud' && !HAS_GOOGLE_PHOTOS ? 'disk' : prefs.destination;
-  setRadio('dest', destination);
+  setRadio('dest', prefs.destination);
   setRadio('keymode', prefs.keyMode);
   setRadio('codec', prefs.codec);
   addBand.checked = prefs.addBand;
@@ -286,9 +279,7 @@ let wizard: Wizard | null = null;
 const wizardEnv: WizardEnv = {
   msg,
   locale: () => browser.i18n.getUILanguage(),
-  saveDestinations: HAS_GOOGLE_PHOTOS
-    ? ['disk', 'paper', 'binary', 'sqlite', 'cloud', 'gallery']
-    : ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
+  saveDestinations: ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
   getSaveKey: async () => {
     const s = await getSession();
     if (!s) throw new Error(msg('errLocked'));
@@ -430,7 +421,7 @@ for (const radio of document.querySelectorAll('input[name="accessmode"]')) {
 let estimates: Estimates | null = null;
 let envelope: { file: File; len: number } | null = null;
 
-/** Destination radios that are actually visible (cloud is hidden without Google Photos). */
+/** Destination radios that are actually visible. */
 function destRadios(): HTMLInputElement[] {
   return Array.from(document.querySelectorAll<HTMLInputElement>('input[name="dest"]')).filter(
     (r) => !r.closest('.seg-item')?.hasAttribute('hidden'),
@@ -489,7 +480,7 @@ async function refreshEstimates(): Promise<void> {
   }
   let len: number;
   try {
-    len = await envelopeLenFor(file);
+    len = await envelopeLenForEstimate(file);
   } catch {
     return; // couldn't read the file — leave destinations enabled, no estimate
   }
@@ -535,7 +526,7 @@ function renderEstimate(): void {
   const e = estimates?.[dest];
   estimate.textContent = e?.available ? String(e.count) : '—';
   // Large secrets sprawl into many images; nudge toward the binary option.
-  const imageDest = dest === 'disk' || dest === 'paper' || dest === 'cloud';
+  const imageDest = dest === 'disk' || dest === 'paper';
   if (imageDest && e?.available && file.size > WARN_FILE_BYTES) {
     sizeWarn.textContent = msg('sizeWarnImages', [
       String(Math.round(file.size / 1024)),
@@ -666,6 +657,7 @@ saveBtn.addEventListener('click', async () => {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
     if (covers.length === 0) return setStatus(saveStatus, msg('errNoCovers'), true);
     if (!gallerySavePw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
+    if (!acceptNewPassword(gallerySavePw.value)) return;
     const gKeyMode = selectedGalleryKeyMode();
     let gStego: StegoInput | undefined;
     if (gKeyMode === 'stego') {
@@ -703,6 +695,7 @@ saveBtn.addEventListener('click', async () => {
   if (dest === 'sqlite' && !sqliteSavePw.value) {
     return setStatus(saveStatus, msg('errNoPassword'), true);
   }
+  if (dest === 'sqlite' && !acceptNewPassword(sqliteSavePw.value)) return;
   // §10 access mode + its inputs (the .db path only; other dests stay plain).
   const accessMode = dest === 'sqlite' ? selectedAccessMode() : 'plain';
   // key-file / stego delivery composes with every .db access mode (§10.3).
@@ -713,6 +706,7 @@ saveBtn.addEventListener('click', async () => {
   if (accessMode === 'duress') {
     const d = decoyFile.files?.[0];
     if (!duressPw.value || !d) return setStatus(saveStatus, msg('errDuressInputs'), true);
+    if (!acceptNewPassword(duressPw.value)) return;
     duressPassword = duressPw.value;
     decoy = d;
   } else if (accessMode === 'nonpossession') {
@@ -731,7 +725,6 @@ saveBtn.addEventListener('click', async () => {
   // it is the 32-byte key factor, keyed by the same per-save .db password.
   let stego: StegoInput | undefined;
   if (keyMode === 'stego') {
-    if (dest === 'cloud') return setStatus(saveStatus, msg('errStegoCloud'), true);
     const cover = coverFile.files?.[0];
     if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
     if (dest === 'sqlite') {
@@ -802,12 +795,6 @@ restoreBtn.addEventListener('click', async () => {
     prog.done();
     restoreBtn.disabled = false;
   }
-});
-
-// The Photos picker opens in a new tab, which would dismiss a popup and kill the
-// flow — run the whole Photos restore in its own persistent tab.
-restorePhotosBtn.addEventListener('click', () => {
-  void browser.tabs.create({ url: browser.runtime.getURL('ui/photos.html') });
 });
 
 void loadPrefs();

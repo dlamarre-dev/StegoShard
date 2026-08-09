@@ -77,6 +77,7 @@ interface Reply {
 async function runEncrypt(req: Extract<RunReq, { op: 'encryptBinary' }>): Promise<Reply> {
   const onProgress: OnProgress = (p) => ctx.postMessage({ id: req.id, type: 'progress', p });
   const dek = await importDek(req.rawDek);
+  req.rawDek.fill(0);
   const key = { dek, keyBlock: req.keyBlock };
   if (req.userEntropy) await installUserEntropy(req.userEntropy);
   try {
@@ -93,6 +94,7 @@ async function runEncrypt(req: Extract<RunReq, { op: 'encryptBinary' }>): Promis
     // The worker is long-lived and reused across saves: never let one save's
     // entropy layer linger into the next request.
     clearUserEntropy();
+    req.content.fill(0);
   }
 }
 
@@ -119,6 +121,7 @@ async function runEncryptDisguised(
     };
   } finally {
     clearUserEntropy();
+    req.content.fill(0);
   }
 }
 
@@ -127,7 +130,7 @@ async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promis
   const { filename, content } = await importVaultBinary(
     req.container,
     req.password,
-    { keyBlock: req.keyBlock, secret: req.secret ?? null },
+    { keyBlock: req.keyBlock, secret: req.secret ?? null, maxBytes: MAX_FILE_BYTES_BINARY_UI },
     onProgress,
   );
   return { message: { id: req.id, type: 'result', filename, content }, transfer: [content.buffer] };

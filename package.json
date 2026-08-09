@@ -2,7 +2,7 @@
   "name": "stegoshard",
   "version": "0.9.0",
   "private": true,
-  "description": "Store secrets in images, an opaque file, or a decoy database: resilient error-corrected storage that survives disk, paper, and the cloud, plausible-deniability steganography, or both.",
+  "description": "Store secrets in images, an opaque file, or a decoy database with resilient error correction and optional plausible-deniability steganography.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -14,6 +14,7 @@
   "engines": {
     "node": ">=20.19"
   },
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "vite",
     "cli": "tsx src/cli/main.ts",
@@ -27,7 +28,9 @@
     "build:store:edge": "cross-env STEGOSHARD_TARGET=edge vite build --mode store",
     "build:store:firefox": "cross-env STEGOSHARD_TARGET=firefox vite build --mode store",
     "build:web": "tsc --noEmit && vite build --config vite.web.config.ts",
+    "build:web:offline": "cross-env STEGOSHARD_WEB_BASE=./ STEGOSHARD_WEB_OUTDIR=web-dist-offline vite build --config vite.web.config.ts",
     "dev:web": "vite --config vite.web.config.ts",
+    "preview:web": "vite preview --config vite.web.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -36,12 +39,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:web": "playwright test --project=web",
+    "test:e2e:extension": "playwright test --project=extension",
     "fixtures": "tsx scripts/gen-fixtures.ts",
     "samples": "tsx scripts/gen-samples.ts",
     "vectors": "tsx scripts/gen-vectors.ts",
     "fuzz": "tsx scripts/fuzz.ts",
     "icons": "tsx scripts/gen-icons.ts",
-    "package": "npm run build:store && npm run build:store:edge && npm run build:store:firefox && tsx scripts/package.ts"
+    "notices": "tsx scripts/generate-notices.ts",
+    "notices:check": "tsx scripts/generate-notices.ts --check",
+    "audit": "npm audit --audit-level=moderate && npm audit --omit=dev --audit-level=moderate",
+    "ci:node": "npm run notices:check && npm run format:check && npm run lint && npm run typecheck && npm run test:coverage",
+    "package": "npm run notices:check && npm run build:store && npm run build:store:edge && npm run build:store:firefox && tsx scripts/package.ts && tsx scripts/check-packages.ts",
+    "package:check": "tsx scripts/check-packages.ts"
   },
   "dependencies": {
     "fflate": "^0.8.3",
@@ -52,8 +63,10 @@
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "@pdf-lib/fontkit": "^1.1.1",
+    "@playwright/test": "^1.62.1",
     "@types/chrome": "^0.2.2",
     "@types/node": "^26.1.2",
     "@types/pngjs": "^6.0.5",

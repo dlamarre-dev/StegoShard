@@ -6,7 +6,7 @@
     "message": "Conserva i segreti nelle immagini: backup resiliente con correzione d'errore, steganografia negabile, o entrambi."
   },
   "popupTagline": {
-    "message": "Cifra un file in immagini resilienti — disco, carta o cloud."
+    "message": "Cifra un file in immagini resilienti — disco o carta."
   },
   "optionsTitle": {
     "message": "Impostazioni di StegoShard"
@@ -67,35 +67,6 @@
   },
   "destPaper": {
     "message": "Carta"
-  },
-  "destCloud": {
-    "message": "Foto"
-  },
-  "cloudNote": {
-    "message": "Una comodità, mai la tua unica copia."
-  },
-  "statusSavedCloud": {
-    "message": "Caricate $COUNT$ immagine/i nell'album «$ALBUM$». Conserva la password.",
-    "placeholders": {
-      "count": {
-        "content": "$1"
-      },
-      "album": {
-        "content": "$2"
-      }
-    }
-  },
-  "btnRestorePhotos": {
-    "message": "Ripristina da Google Photos"
-  },
-  "photosHeading": {
-    "message": "Ripristina da Google Photos"
-  },
-  "photosIntro": {
-    "message": "Questo viene eseguito in una scheda dedicata per restare aperto mentre scegli le immagini. Inserisci la password, avvia, seleziona le immagini della cassaforte nel selettore, poi torna qui."
-  },
-  "statusPickerOpen": {
-    "message": "Scegli le immagini di StegoShard nella finestra aperta, poi torna qui…"
   },
   "labelInstructions": {
     "message": "Includi un foglio di istruzioni"
@@ -237,6 +208,17 @@
       }
     }
   },
+  "errTooManyFiles": {
+    "message": "Troppi file: $COUNT$ (max $LIMIT$). Seleziona meno file.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
   "optKeyHeading": {
     "message": "Chiave della cassaforte"
   },
@@ -263,9 +245,6 @@
   },
   "errPasswordMismatch": {
     "message": "Le password non corrispondono."
-  },
-  "errPasswordTooShort": {
-    "message": "Usa almeno 8 caratteri."
   },
   "statusKeyCreated": {
     "message": "Chiave della cassaforte creata."
@@ -395,10 +374,6 @@
   "errCoverTooSmall": {
     "message": "Quella foto è troppo piccola per contenere la chiave. Scegline una più grande.",
     "description": "Stego: cover photo too small to hold the key block."
-  },
-  "errStegoCloud": {
-    "message": "Nascondere la chiave in una foto non è disponibile con la destinazione cloud.",
-    "description": "Stego: not available with the cloud destination."
   },
   "statusSavedStego": {
     "message": "Salvate $COUNT$ immagine/i. La tua chiave è nascosta nella foto di copertina — conserva quel PNG e la password per ripristinare.",
@@ -700,7 +675,7 @@
     "description": "Wizard: run the restore."
   },
   "destDiskDesc": {
-    "message": "Immagini PNG raccolte in uno .zip, da tenere su disco o nel cloud.",
+    "message": "Immagini PNG raccolte in uno .zip per l'archiviazione locale.",
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
@@ -710,10 +685,6 @@
   "destBinaryDesc": {
     "message": "Un unico file opaco invece delle immagini — ideale per segreti più grandi.",
     "description": "Wizard: binary destination description."
-  },
-  "destCloudDesc": {
-    "message": "Carica le immagini direttamente in un album di Google Foto.",
-    "description": "Wizard: cloud destination description."
   },
   "destGalleryDesc": {
     "message": "Distribuito su un insieme di tue foto ordinarie, più esche.",
@@ -869,6 +840,9 @@
   "pwStrong": {
     "message": "Forte"
   },
+  "confirmWeakPassword": {
+    "message": "Questa password sembra debole e potrebbe essere indovinata offline. Continuare comunque?"
+  },
   "pwBits": {
     "message": "bit"
   },
@@ -1011,7 +985,7 @@
     "message": "Griglia a colori"
   },
   "codecColorDesc": {
-    "message": "Otto colori per casella invece del bianco e nero: circa tre volte i dati e quindi circa un terzo dei file. Ideale per disco e cloud."
+    "message": "Otto colori per casella invece del bianco e nero: circa tre volte i dati e quindi circa un terzo dei file. Ideale per l'archiviazione locale."
   },
   "codecQr": {
     "message": "Codice QR"

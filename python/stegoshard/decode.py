@@ -20,9 +20,9 @@ import sys
 import zipfile
 
 from .binary_container import looks_like_binary_container, unwrap_binary
+from .codecs import decode_any
 from .crypto import WrongPasswordError
 from .pipeline import MissingKeyError, decode_vault, decode_vault_binary
-from .codecs import decode_any
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
 

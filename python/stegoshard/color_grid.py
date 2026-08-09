@@ -174,10 +174,7 @@ def _locate_finders(
             if x not in columns:
                 col = [luma[i * width + x] < threshold for i in range(height)]
                 columns[x] = _pattern_hits(col)
-            if not any(
-                abs(cy - y) <= 2 and abs(cu - unit) <= unit * 0.25
-                for cy, cu in columns[x]
-            ):
+            if not any(abs(cy - y) <= 2 and abs(cu - unit) <= unit * 0.25 for cy, cu in columns[x]):
                 continue
 
             units.append(unit)
@@ -209,9 +206,7 @@ def _locate_finders(
 # --- decoding --------------------------------------------------------------
 
 
-def _sample_point(
-    corners: list[tuple[float, float]], u: float, v: float
-) -> tuple[float, float]:
+def _sample_point(corners: list[tuple[float, float]], u: float, v: float) -> tuple[float, float]:
     """Bilinear map from grid coordinates to pixels, anchored on the finders.
 
     Digital images are axis-aligned and at most uniformly rescaled, so this
@@ -255,9 +250,7 @@ class _Sampler:
         self.offsets = list(range(-int(half), int(half) + 1))
 
     def read(self, mx: int, my: int) -> tuple[float, float, float]:
-        cx, cy = _sample_point(
-            self.corners, (mx - 3) / self.span, (my - 3) / self.span
-        )
+        cx, cy = _sample_point(self.corners, (mx - 3) / self.span, (my - 3) / self.span)
         r = g = b = 0
         count = 0
         raw = self.raw
@@ -289,9 +282,7 @@ def _nearest(rgb: tuple[float, float, float], refs: list[tuple[float, float, flo
     return best
 
 
-def _read_blocks(
-    sampler: _Sampler, lay: Layout, turns: int
-) -> tuple[list[bytes | None], int]:
+def _read_blocks(sampler: _Sampler, lay: Layout, turns: int) -> tuple[list[bytes | None], int]:
     """Read every stored block at one candidate rotation; CRC failures become None."""
     n = lay.n
 
@@ -339,10 +330,7 @@ def decode_pixels(img: Image.Image) -> bytes | None:
     # RGB, three bytes per pixel. `getdata()` is deprecated, and anything newer
     # would narrow the Pillow versions this decoder runs on.
     raw = img.tobytes()
-    luma = [
-        (raw[i] * 77 + raw[i + 1] * 150 + raw[i + 2] * 29) >> 8
-        for i in range(0, len(raw), 3)
-    ]
+    luma = [(raw[i] * 77 + raw[i + 1] * 150 + raw[i + 2] * 29) >> 8 for i in range(0, len(raw), 3)]
 
     try:
         corners, unit = _locate_finders(luma, width, height)

@@ -5,6 +5,7 @@ local/
 node_modules/
 dist/
 web-dist/
+web-dist-offline/
 dist-cli/
 dist-release/
 # deno compile output
@@ -13,6 +14,9 @@ dist-release/
 build/
 coverage/
 packages/
+playwright-report/
+test-results/
+blob-report/
 *.log
 
 # Python (reference decoder)

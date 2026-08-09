@@ -11,13 +11,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from .format import (
     IV_LEN,
-    KeyBlock,
     REGION_COUNT,
     REGION_INDEX_OFF,
     SLOT_ARRAY_LEN,
     SLOT_COUNT,
     SLOT_PLAINTEXT_LEN,
     SLOT_SIZE,
+    KeyBlock,
 )
 
 DEK_LEN = 32
@@ -36,7 +36,9 @@ def normalize_password(password: str) -> str:
     return unicodedata.normalize("NFC", password)
 
 
-def derive_kek(password: str, salt: bytes, iterations: int, memory_kib: int, parallelism: int) -> bytes:
+def derive_kek(
+    password: str, salt: bytes, iterations: int, memory_kib: int, parallelism: int
+) -> bytes:
     """Argon2id → 32-byte KEK. Version 0x13 matches the extension (hash-wasm)."""
     return hash_secret_raw(
         secret=normalize_password(password).encode("utf-8"),
@@ -101,9 +103,9 @@ def derive_slot_kek(
 def gate_kek(base_kek: bytes, secret: bytes, vault_salt: bytes) -> bytes:
     """Gate a base KEK on threshold material (SPEC §10.6.2): HKDF-SHA256(base_kek ||
     secret, salt=vault_salt, info='stegoshard/v1/slot-kek'). HKDF, not XOR."""
-    return HKDF(algorithm=hashes.SHA256(), length=DEK_LEN, salt=vault_salt, info=SLOT_KEK_INFO).derive(
-        base_kek + secret
-    )
+    return HKDF(
+        algorithm=hashes.SHA256(), length=DEK_LEN, salt=vault_salt, info=SLOT_KEK_INFO
+    ).derive(base_kek + secret)
 
 
 def slot_kek_candidates(

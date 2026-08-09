@@ -26,8 +26,9 @@ MAX_CONTENT_BYTES = 1024 * 1024  # image/PDF export cap; bounds gzip on that pat
 # artifact the tools can produce, i.e. the CLI cap (the browser UI caps lower).
 MAX_CONTENT_BYTES_BINARY = 1024 * 1024 * 1024  # 1 GiB
 ARGON2_LIMITS = {
-    "iterations": (1, 16),
-    "memory_kib": (8, 1024 * 1024),  # <= 1 GiB
+    "iterations": (1, 4),
+    "memory_kib": (8, 256 * 1024),  # <= 256 MiB
+    # Preserve v1 compatibility; committed vectors legitimately use 2 and 4.
     "parallelism": (1, 4),
 }
 
@@ -185,7 +186,9 @@ def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
     return key_block, content_salt, iv, ciphertext
 
 
-def parse_envelope(envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES) -> tuple[str, bytes]:
+def parse_envelope(
+    envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES
+) -> tuple[str, bytes]:
     if len(envelope) < 3:
         raise ValueError("payload: too short")
     flags = envelope[0]

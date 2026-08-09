@@ -4,7 +4,7 @@ import { MissingKeyError, SegmentedFormatError, WrongPasswordError } from '@core
 /**
  * A fake dedicated Worker: records posted messages and lets the test drive
  * replies back through the handler run-in-worker installs. This exercises the
- * request multiplexing, progress fan-out, and typed-error reconstruction without
+ * request serialization, progress fan-out, and typed-error reconstruction without
  * a real module worker (unavailable under jsdom/node).
  */
 class FakeWorker {
@@ -15,7 +15,14 @@ class FakeWorker {
   constructor(_url: unknown, _opts?: unknown) {
     FakeWorker.last = this;
   }
+  /** Set to make the next postMessage throw synchronously, as a failed transfer would. */
+  failNextPost: Error | undefined;
   postMessage(msg: Record<string, unknown>, _transfer?: unknown): void {
+    if (this.failNextPost) {
+      const err = this.failNextPost;
+      this.failNextPost = undefined;
+      throw err;
+    }
     this.posted.push(msg);
   }
   terminate(): void {}
@@ -80,5 +87,60 @@ describe('run-in-worker transport', () => {
     const w = FakeWorker.last!;
     w.reply({ id: w.lastId(), type: 'error', name: 'WeirdError', message: 'nope' });
     await expect(promise).rejects.toThrow('nope');
+  });
+
+  it('posts only one cryptographic request at a time', async () => {
+    const first = decryptBinaryInWorker(new Uint8Array([1]), 'one', undefined);
+    const w = FakeWorker.last!;
+    const before = w.posted.length;
+    const second = decryptBinaryInWorker(new Uint8Array([2]), 'two', undefined);
+    expect(w.posted).toHaveLength(before);
+
+    const firstId = w.lastId();
+    w.reply({ id: firstId, type: 'result', filename: 'one', content: new Uint8Array() });
+    await first;
+    expect(w.posted).toHaveLength(before + 1);
+    const secondId = w.lastId();
+    expect(secondId).not.toBe(firstId);
+    w.reply({ id: secondId, type: 'result', filename: 'two', content: new Uint8Array() });
+    await second;
+  });
+
+  it('keeps serving requests after a dispatch fails synchronously', async () => {
+    const w = FakeWorker.last!;
+    w.failNextPost = new DOMException('could not be cloned', 'DataCloneError');
+
+    // The failing request rejects rather than hanging...
+    await expect(decryptBinaryInWorker(new Uint8Array([1]), 'bad', undefined)).rejects.toThrow(
+      /could not be cloned/,
+    );
+
+    // ...and, crucially, the queue is not left pinned to the dead id: the next
+    // request is dispatched and completes normally.
+    const before = w.posted.length;
+    const next = decryptBinaryInWorker(new Uint8Array([2]), 'good', undefined);
+    expect(w.posted).toHaveLength(before + 1);
+    w.reply({ id: w.lastId(), type: 'result', filename: 'after', content: new Uint8Array() });
+    expect((await next).filename).toBe('after');
+  });
+
+  it('rejects every queued request when dispatch keeps failing', async () => {
+    const w = FakeWorker.last!;
+    // Queue a request that occupies the single in-flight slot.
+    const held = decryptBinaryInWorker(new Uint8Array([1]), 'held', undefined);
+    const heldId = w.lastId();
+    const queued = decryptBinaryInWorker(new Uint8Array([2]), 'queued', undefined);
+
+    // Releasing the slot pumps the queued request, whose dispatch fails.
+    w.failNextPost = new DOMException('could not be cloned', 'DataCloneError');
+    w.reply({ id: heldId, type: 'result', filename: 'held', content: new Uint8Array() });
+    await held;
+    await expect(queued).rejects.toThrow(/could not be cloned/);
+
+    const before = w.posted.length;
+    const after = decryptBinaryInWorker(new Uint8Array([3]), 'after', undefined);
+    expect(w.posted).toHaveLength(before + 1);
+    w.reply({ id: w.lastId(), type: 'result', filename: 'ok', content: new Uint8Array() });
+    expect((await after).filename).toBe('ok');
   });
 });

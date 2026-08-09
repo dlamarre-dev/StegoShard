@@ -107,6 +107,10 @@ export function localizeDom(root: ParentNode = document): void {
     const key = el.dataset.i18nPlaceholder;
     if (key) el.placeholder = msg(key);
   }
+  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-aria-label]')) {
+    const key = el.dataset.i18nAriaLabel;
+    if (key) el.setAttribute('aria-label', msg(key));
+  }
 }
 
 /**
