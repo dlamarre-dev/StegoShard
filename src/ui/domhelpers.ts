@@ -170,3 +170,67 @@ export function renderManifest(
   box.append(heading, list);
   return box;
 }
+
+/**
+ * Keep an auto-growing textarea in step with its own content.
+ *
+ * The `.grow-wrap` parent sizes itself from a replicated copy of the text (see
+ * ui.css); this only has to keep that copy current. Writing a data attribute
+ * rather than `style.height` keeps the field working under a `style-src 'self'`
+ * CSP, which forbids the inline styles the usual scrollHeight trick needs.
+ */
+export function wireAutoGrow(textarea: HTMLTextAreaElement): void {
+  const wrap = textarea.closest<HTMLElement>('.grow-wrap');
+  if (!wrap) return;
+  const sync = (): void => {
+    wrap.dataset.replicatedValue = textarea.value;
+  };
+  textarea.addEventListener('input', sync);
+  sync();
+}
+
+/** Bounds of the threshold picker. */
+export const THRESHOLD_MIN = 2;
+export const THRESHOLD_MAX = 10;
+
+/**
+ * Wire the k-of-n threshold selects so an invalid pair is unreachable.
+ *
+ * The old pair of number boxes let k exceed n and reported it only at save time
+ * as a bare "missing threshold" — the user had no way to see what was wrong. A
+ * picker that cannot express the invalid state needs no error message at all.
+ *
+ * n is chosen first and bounds k. Both start at 2: k=1 means a single holder
+ * opens the vault, and n=1 means you hold it yourself, so neither is a threshold
+ * in any useful sense.
+ */
+export function wireThreshold(
+  n: HTMLSelectElement,
+  k: HTMLSelectElement,
+  onSummary?: (k: number, n: number) => void,
+): void {
+  const option = (value: number): HTMLOptionElement => {
+    const o = document.createElement('option');
+    o.value = String(value);
+    o.textContent = String(value);
+    return o;
+  };
+
+  for (let v = THRESHOLD_MIN; v <= THRESHOLD_MAX; v++) n.append(option(v));
+  n.value = '3';
+
+  const refreshK = (): void => {
+    const total = Number(n.value);
+    const wanted = Number(k.value) || THRESHOLD_MIN;
+    k.replaceChildren();
+    for (let v = THRESHOLD_MIN; v <= total; v++) k.append(option(v));
+    // Keep the user's choice when it still fits; otherwise pull it down to n
+    // rather than silently resetting to the minimum.
+    k.value = String(Math.min(wanted, total));
+    onSummary?.(Number(k.value), total);
+  };
+
+  n.addEventListener('change', refreshK);
+  k.addEventListener('change', () => onSummary?.(Number(k.value), Number(n.value)));
+  refreshK();
+}

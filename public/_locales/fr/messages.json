@@ -1084,6 +1084,30 @@
     "message": "Vous ne conservez rien qui l'ouvre seul — il faut k des n fichiers de parts.",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "Ajouter de l'entropie supplémentaire (optionnel, expert)",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "Parts à créer (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "Parts requises (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "Il faudra réunir $K$ des $N$ parts.",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "Entrez un seuil k-parmi-n valide (1 ≤ k ≤ n).",
     "description": "Error: invalid threshold."

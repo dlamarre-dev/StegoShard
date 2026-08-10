@@ -523,11 +523,17 @@
               </div>
               <div id="threshold-fields" hidden>
                 <label class="stack-gap" data-i18n="labelThreshold"></label>
-                <div class="field-row">
-                  <input id="threshold-k" type="number" min="1" max="255" value="2" />
-                  <span aria-hidden="true">/</span>
-                  <input id="threshold-n" type="number" min="1" max="255" value="3" />
+                <div class="threshold-row">
+                  <span class="threshold-field">
+                    <label class="muted" data-i18n="labelThresholdN" for="threshold-n"></label>
+                    <select id="threshold-n" class="field"></select>
+                  </span>
+                  <span class="threshold-field">
+                    <label class="muted" data-i18n="labelThresholdK" for="threshold-k"></label>
+                    <select id="threshold-k" class="field"></select>
+                  </span>
                 </div>
+                <p id="threshold-summary" class="muted"></p>
                 <p class="muted" data-i18n="thresholdHint"></p>
               </div>
             </div>
@@ -588,15 +594,21 @@
               <p class="muted warn" data-i18n="paperCleartextWarn"></p>
             </div>
 
-            <div id="entropy-fields">
+            <label id="entropy-toggle-label" class="checkbox"
+              ><input id="entropy-toggle" type="checkbox" />
+              <span data-i18n="labelExtraEntropy"></span
+            ></label>
+            <div id="entropy-fields" hidden>
               <label class="muted" data-i18n="extraEntropyHeading" for="extra-entropy"></label>
-              <textarea
-                id="extra-entropy"
-                rows="2"
-                autocomplete="off"
-                spellcheck="false"
-                data-i18n-placeholder="extraEntropyPlaceholder"
-              ></textarea>
+              <div class="grow-wrap">
+                <textarea
+                  id="extra-entropy"
+                  rows="1"
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-i18n-placeholder="extraEntropyPlaceholder"
+                ></textarea>
+              </div>
               <p class="muted">
                 <span data-i18n="extraEntropyAlwaysCsprng"></span>
                 <span id="extra-entropy-bits" class="badge" hidden></span>

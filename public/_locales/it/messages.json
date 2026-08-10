@@ -994,6 +994,30 @@
     "message": "Non conservi nulla che lo apra da solo: bastano k qualsiasi degli n file di quote.",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "Aggiungi entropia extra (facoltativo, esperto)",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "Quote da creare (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "Quote richieste (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "Dovrai riunire $K$ delle $N$ quote.",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "Inserisci una soglia k-di-n valida (1 ≤ k ≤ n).",
     "description": "Error: invalid threshold."

@@ -1090,6 +1090,30 @@
     "message": "You keep nothing that opens this alone — any k of the n share files do.",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "Add extra entropy (optional, expert)",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "Shares to create (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "Shares required (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "You will need to gather $K$ of the $N$ shares.",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "Enter a valid k-of-n threshold (1 ≤ k ≤ n).",
     "description": "Error: invalid threshold."
