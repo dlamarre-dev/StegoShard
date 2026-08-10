@@ -5,7 +5,7 @@
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { decode as decodePng, encode as encodePng } from 'fast-png';
 import { runGalleryRestore, runGallerySave } from './commands';
@@ -173,7 +173,9 @@ describe('CLI gallery round-trip', () => {
       mode: 'nonpossession',
       threshold: { k: 2, n: 3 },
     });
-    const shares = save.files.filter((f) => f.endsWith('.txt') && f.includes('share'));
+    const shares = save.files.filter(
+      (f) => f.endsWith('.txt') && basename(f).startsWith('recovery-'),
+    );
     expect(shares.length).toBe(3);
     const photos = save.files.filter((f) => f.endsWith('.png'));
 
@@ -214,7 +216,9 @@ describe('CLI gallery round-trip', () => {
     });
     expect(save.keyMode).toBe('keyfile');
     const keyPath = save.files.find((f) => f.endsWith('.key'))!;
-    const shares = save.files.filter((f) => f.endsWith('.txt') && f.includes('share'));
+    const shares = save.files.filter(
+      (f) => f.endsWith('.txt') && basename(f).startsWith('recovery-'),
+    );
     const photos = save.files.filter((f) => f.endsWith('.png'));
     expect(keyPath).toBeTruthy();
     expect(shares.length).toBe(3);

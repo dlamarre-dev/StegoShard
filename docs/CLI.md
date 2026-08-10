@@ -73,16 +73,18 @@ npm run cli -- restore ./vault/cache.db --password-file duress-pw.txt --out ./re
 # Non-possession mode (SPEC §10.8, .db and Gallery): gate the real payload on
 # Shamir k-of-n threshold shares that the writer never keeps — "I cannot
 # decrypt this" is literally true below threshold. --threshold k-of-n writes n
-# share files; collect any k of them to restore.
+# share files (recovery-1.txt …); collect any k of them to restore. Both the
+# filenames and the text inside them stay neutral: these are deniable
+# destinations, so nothing they write names the project.
 npm run cli -- save wallet.dat --binary --disguise --mode nonpossession --threshold 2-of-3 --out ./vault
 npm run cli -- restore ./vault/cache.db \
-  --share ./vault/stegoshard-share-1.txt --share ./vault/stegoshard-share-2.txt --out ./restored
+  --share ./vault/recovery-1.txt --share ./vault/recovery-2.txt --out ./restored
 
 # Non-possession also works on Gallery Mode (duress does not — a gallery's
 # password-derived winnowing key can't host two independent credentials).
 npm run cli -- gallery-save note.txt ./photos --mode nonpossession --threshold 2-of-3 --out ./album
 npm run cli -- gallery-restore ./album \
-  --share ./album/stegoshard-share-1.txt --share ./album/stegoshard-share-2.txt --out ./restored
+  --share ./album/recovery-1.txt --share ./album/recovery-2.txt --out ./restored
 ```
 
 Images and PDF are capped at 1 MiB (a warning shows the resulting image count

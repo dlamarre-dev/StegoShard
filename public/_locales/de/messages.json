@@ -882,6 +882,30 @@
   "recoveryLossless": {
     "message": "Genau so aufbewahren — Verkleinern, Neukomprimieren oder das Senden über einen Dienst, der Bilder neu kodiert, zerstört sie."
   },
+  "filesCreatedHeading": {
+    "message": "Erstellte Dateien:"
+  },
+  "filePurposeVault": {
+    "message": "Der Tresor — enthält Ihre Datei"
+  },
+  "filePurposeArchive": {
+    "message": "Alle Bilder gebündelt in einer .zip"
+  },
+  "filePurposeDocument": {
+    "message": "Druckbares Blatt"
+  },
+  "filePurposePhotos": {
+    "message": "Fragment-Fotos — den ganzen Satz aufbewahren"
+  },
+  "filePurposeKeyfile": {
+    "message": "Separater Schlüssel — zusammen mit dem Passwort nötig"
+  },
+  "filePurposeStegoCover": {
+    "message": "Foto mit dem versteckten Schlüssel"
+  },
+  "filePurposeShare": {
+    "message": "Wiederherstellungsanteil — für eine Person"
+  },
   "onboardingTitle": {
     "message": "Willkommen bei StegoShard"
   },

@@ -27,8 +27,11 @@ import {
 import {
   CredentialsNotIndependentError,
   GalleryRestoreError,
+  collapseManifest,
   installUserEntropy,
+  type FilePurpose,
   type KeyMode,
+  type ManifestEntry,
   type OnProgress,
   type Progress,
 } from '@core';
@@ -44,6 +47,38 @@ function parseThreshold(spec: string): { k: number; n: number } {
   const n = Number(m[2]);
   if (k < 1 || n < k || n > 255) fail(`--threshold out of range: ${spec} (need 1 ≤ k ≤ n ≤ 255)`);
   return { k, n };
+}
+
+/** Plain-English purpose for each produced file (the app localizes the same set). */
+const PURPOSE_TEXT: Record<FilePurpose, string> = {
+  vault: 'the vault — holds your file',
+  archive: 'all images bundled in one .zip',
+  document: 'printable sheet',
+  photos: 'fragment photos — keep the whole set',
+  keyfile: 'separate key — needed with your password',
+  stegoCover: 'photo holding the hidden key',
+  share: 'recovery share — for one holder',
+};
+
+/**
+ * "Files created" block for the end of a save.
+ *
+ * Every destination gets one, not just the deniable ones: `cache.db` and
+ * `recovery-1.txt` are anonymous by design, and `stegoshard-a1b2-07.png` still
+ * does not say which file holds the key. Numbered runs collapse to first … last
+ * so a 40-image save stays readable.
+ */
+function manifestLines(manifest: readonly ManifestEntry[]): string {
+  if (manifest.length === 0) return '';
+  const groups = collapseManifest(manifest);
+  const rendered = groups.map((g) => ({
+    name: g.count > 1 ? `${g.first} … ${g.last}` : g.first,
+    text: g.count > 1 ? `${PURPOSE_TEXT[g.purpose]} (${g.count})` : PURPOSE_TEXT[g.purpose],
+  }));
+  const width = Math.max(...rendered.map((r) => r.name.length));
+  return `Files created:\n${rendered
+    .map((r) => `  ${r.name.padEnd(width)}  ${r.text}`)
+    .join('\n')}\n`;
 }
 
 const USAGE = `StegoShard — encrypt a file into resilient images, an opaque binary
@@ -469,7 +504,7 @@ async function main(argv: string[]): Promise<number> {
     const what = res.binary
       ? `binary vault (${res.binary}) [${res.keyMode}]`
       : `${res.imageCount} image(s) [${res.keyMode}]`;
-    process.stdout.write(`Saved ${what} to:\n${res.files.map((f) => `  ${f}`).join('\n')}\n`);
+    process.stdout.write(`Saved ${what}.\n${manifestLines(res.manifest)}`);
     if (res.keyMode !== 'embedded') {
       process.stdout.write('Keep the separate key artifact AND your password to restore.\n');
     }
@@ -535,8 +570,8 @@ async function main(argv: string[]): Promise<number> {
     });
     process.stdout.write(
       `Saved gallery across ${res.files.length} file(s) ` +
-        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy) [${res.keyMode}]:\n` +
-        `${res.files.map((f) => `  ${f}`).join('\n')}\n`,
+        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy) [${res.keyMode}].\n` +
+        manifestLines(res.manifest),
     );
     process.stdout.write(`Keep your password; any ${res.k} of the fragment photos restore it.\n`);
     if (res.keyMode !== 'embedded') {

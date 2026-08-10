@@ -43,7 +43,10 @@ const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
  */
 export function stegoKeyName(coverName: string | undefined, ext: string, setHex: string): string {
   const trimmed = coverName?.trim();
-  return trimmed ? trimmed : `stegoshard-${setHex}-key.${ext}`;
+  // The cover's own filename is the deniable choice — it is an ordinary photo
+  // the user already had. The fallback only runs when the picked file has no
+  // usable name, so it must not announce the project either.
+  return trimmed ? trimmed : `image-${setHex}.${ext}`;
 }
 
 /** Optional human-readable label band drawn above the QR (cleartext — plan §1). */

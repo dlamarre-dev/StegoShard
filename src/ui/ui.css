@@ -1186,3 +1186,32 @@ details.advanced[open] > summary::before {
   align-items: baseline;
   gap: 8px;
 }
+
+/* "Files created" list in the save result. The name is monospaced so a run of
+   numbered files lines up and the collapsed first … last range stays readable. */
+.result-files {
+  margin: 0 0 10px;
+}
+.manifest-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.manifest-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.manifest-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.manifest-purpose {
+  color: var(--muted);
+  font-size: 0.82rem;
+}

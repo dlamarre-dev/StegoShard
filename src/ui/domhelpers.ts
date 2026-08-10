@@ -4,6 +4,9 @@
  */
 
 import {
+  type FilePurpose,
+  type ManifestEntry,
+  collapseManifest,
   FileTooLargeError,
   GalleryCoverCapacityError,
   GalleryFileTooLargeError,
@@ -114,4 +117,56 @@ export function wireDropzone(
     }
   });
   input.addEventListener('change', onChange);
+}
+
+/** i18n key naming each file purpose, shared by both surfaces. */
+const PURPOSE_KEY: Record<FilePurpose, string> = {
+  vault: 'filePurposeVault',
+  archive: 'filePurposeArchive',
+  document: 'filePurposeDocument',
+  photos: 'filePurposePhotos',
+  keyfile: 'filePurposeKeyfile',
+  stegoCover: 'filePurposeStegoCover',
+  share: 'filePurposeShare',
+};
+
+/**
+ * "Files created" list for the save-result panel.
+ *
+ * Built here rather than in each surface because the wizard and the expert view
+ * must describe the same save identically — and because deniable destinations
+ * make this the only place the user learns what `cache.db` and `recovery-1.txt`
+ * actually are.
+ *
+ * Numbered runs collapse to first … last so a 40-image save does not push the
+ * rest of the panel off screen.
+ */
+export function renderManifest(
+  manifest: readonly ManifestEntry[],
+  translate: (key: string, subs?: string | string[]) => string,
+): HTMLElement | null {
+  if (manifest.length === 0) return null;
+  const box = document.createElement('div');
+  box.className = 'result-files';
+
+  const heading = document.createElement('p');
+  heading.className = 'result-recovery-heading';
+  heading.textContent = translate('filesCreatedHeading');
+
+  const list = document.createElement('ul');
+  list.className = 'manifest-list';
+  for (const group of collapseManifest(manifest)) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'manifest-name';
+    name.textContent = group.count > 1 ? `${group.first} … ${group.last}` : group.first;
+    const purpose = document.createElement('span');
+    purpose.className = 'manifest-purpose';
+    const label = translate(PURPOSE_KEY[group.purpose]);
+    purpose.textContent = group.count > 1 ? `${label} (${group.count})` : label;
+    li.append(name, purpose);
+    list.append(li);
+  }
+  box.append(heading, list);
+  return box;
 }

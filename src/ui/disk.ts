@@ -7,6 +7,8 @@
 
 import {
   type BinaryVariant,
+  type FilePurpose,
+  type ManifestEntry,
   FileTooLargeError,
   binaryKeyName,
   binaryVaultName,
@@ -91,6 +93,22 @@ async function blobBytes(blob: Blob): Promise<Uint8Array> {
  * `subdir` under the browser's download folder (so a save never scatters loose
  * files), with a small gap between downloads to avoid batch-blocking.
  */
+/** A file this save will hand to the user, tagged with what it is for. */
+type Download = { name: string; blob: Blob; purpose: FilePurpose };
+
+/** The user-facing record of what was written (SPEC-agnostic; see core/manifest.ts). */
+const manifestOf = (downloads: readonly Download[]): ManifestEntry[] =>
+  downloads.map(({ name, purpose }) => ({ name, purpose }));
+
+/**
+ * Folder the browser drops a multi-file save into.
+ *
+ * Deniable destinations must not be filed under the project name: a `cache.db`
+ * inside `stegoshard-a1b2c3d4/` is not deniable, whatever the file is called.
+ */
+const saveFolder = (id: string, deniable: boolean): string =>
+  deniable ? `app-data-${id}` : `stegoshard-${id}`;
+
 async function deliver(downloads: { name: string; blob: Blob }[], subdir: string): Promise<void> {
   const multi = downloads.length > 1;
   for (let i = 0; i < downloads.length; i++) {
@@ -130,7 +148,7 @@ export async function saveFileToDisk(
   file: File,
   key: VaultKey,
   options: SaveOptions,
-): Promise<{ imageCount: number; setId: string; keyMode: KeyMode }> {
+): Promise<{ imageCount: number; setId: string; keyMode: KeyMode; manifest: ManifestEntry[] }> {
   assertBlobSize(file, MAX_FILE_BYTES);
   if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
@@ -181,17 +199,24 @@ export async function saveFileToDisk(
   // Collect everything this save produces, then deliver. A separate key (a .key
   // or a stego cover) is always delivered on its own — never inside the .zip —
   // so the two factors stay physically separate.
-  const downloads: { name: string; blob: Blob }[] = [];
+  const downloads: Download[] = [];
   if (options.asZip) {
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
     const zipped = zipSync(entries, { level: 0 }); // PNGs are already compressed
-    downloads.push({ name: `stegoshard-${setHex}.zip`, blob: octet(zipped) });
+    downloads.push({ name: `stegoshard-${setHex}.zip`, blob: octet(zipped), purpose: 'archive' });
   } else {
-    for (const p of pngs) downloads.push({ name: p.name, blob: octet(p.bytes, 'image/png') });
+    for (const p of pngs) {
+      downloads.push({ name: p.name, blob: octet(p.bytes, 'image/png'), purpose: 'vault' });
+    }
   }
-  if (externalKey)
-    downloads.push({ name: externalKey.name, blob: octet(externalKey.bytes, externalKey.mime) });
+  if (externalKey) {
+    downloads.push({
+      name: externalKey.name,
+      blob: octet(externalKey.bytes, externalKey.mime),
+      purpose: keyMode === 'stego' ? 'stegoCover' : 'keyfile',
+    });
+  }
 
   // Prove the set (and, for stego, the key cover) restores before handing it over.
   await verifyImageExport(imagePayloads, key.dek, file.name, content);
@@ -204,19 +229,18 @@ export async function saveFileToDisk(
     );
   }
 
-  await deliver(downloads, `stegoshard-${setHex}`);
-  return { imageCount: total, setId: setHex, keyMode };
+  await deliver(downloads, saveFolder(setHex, false));
+  return { imageCount: total, setId: setHex, keyMode, manifest: manifestOf(downloads) };
 }
 
 /** The text file handed to one threshold holder (§10.6 / §10.8 item 4). */
-function shareDownloads(
-  shares: Uint8Array[],
-  k: number,
-  n: number,
-): { name: string; blob: Blob }[] {
+function shareDownloads(shares: Uint8Array[], k: number, n: number): Download[] {
+  // Threshold shares only exist on the deniable destinations (disguised .db and
+  // gallery), so both the filename and the file's own heading stay neutral.
   return shares.map((share, i) => ({
-    name: `stegoshard-share-${i + 1}.txt`,
-    blob: new Blob([shareFileText(share, i + 1, n, k, 'and load them at restore.')], {
+    name: `recovery-${i + 1}.txt`,
+    purpose: 'share' as const,
+    blob: new Blob([shareFileText(share, i + 1, n, k, 'and load them at restore.', 'neutral')], {
       type: 'text/plain',
     }),
   }));
@@ -239,25 +263,32 @@ async function buildDisguisedMode(
     decoy?: File | undefined;
     threshold?: { k: number; n: number } | undefined;
     onProgress?: OnProgress | undefined;
+    /** Random id for this save, so a nameless cover still yields a stable filename. */
+    id: string;
   },
-): Promise<{ name: string; blob: Blob }[]> {
+): Promise<Download[]> {
   const vaultName = binaryVaultName('disguised');
   // keyfile/stego mint a 32-byte external key factor (§10.3) that composes with the
   // access mode as an extra layer (needed on top of the password / duress / shares).
   const keyFactor = options.keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
 
-  async function deliverFactor(): Promise<{ name: string; blob: Blob }[]> {
+  async function deliverFactor(): Promise<Download[]> {
     if (!keyFactor) return [];
     if (options.keyMode === 'keyfile') {
       return [
-        { name: binaryKeyName('disguised'), blob: octet(wrapBinary(keyFactor, 'disguised')) },
+        {
+          name: binaryKeyName('disguised'),
+          blob: octet(wrapBinary(keyFactor, 'disguised')),
+          purpose: 'keyfile',
+        },
       ];
     }
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const k = await embedKeyFactorImage(options.stego.cover, keyFactor, options.stego.password);
-    const dl = {
-      name: stegoKeyName(options.stego.cover.name, k.ext, ''),
+    const dl: Download = {
+      name: stegoKeyName(options.stego.cover.name, k.ext, options.id),
       blob: octet(k.bytes, k.mime),
+      purpose: 'stegoCover',
     };
     await verifyStegoKeyCover(
       await blobBytes(dl.blob),
@@ -290,7 +321,10 @@ async function buildDisguisedMode(
       undefined,
       options.onProgress,
     );
-    return [{ name: vaultName, blob: octet(container) }, ...(await deliverFactor())];
+    return [
+      { name: vaultName, blob: octet(container), purpose: 'vault' },
+      ...(await deliverFactor()),
+    ];
   }
   // non-possession
   if (!options.threshold) throw new Error('non-possession mode requires a threshold');
@@ -306,7 +340,7 @@ async function buildDisguisedMode(
     options.onProgress,
   );
   return [
-    { name: vaultName, blob: octet(container) },
+    { name: vaultName, blob: octet(container), purpose: 'vault' },
     ...shareDownloads(shares, k, n),
     ...(await deliverFactor()),
   ];
@@ -334,7 +368,7 @@ export async function saveFileToBinary(
     userEntropy?: string | undefined;
     onProgress?: OnProgress | undefined;
   },
-): Promise<{ keyMode: KeyMode; variant: BinaryVariant }> {
+): Promise<{ keyMode: KeyMode; variant: BinaryVariant; manifest: ManifestEntry[] }> {
   assertBrowserInputs(
     [
       file,
@@ -356,6 +390,9 @@ export async function saveFileToBinary(
     // plain path stays on the worker. keyfile/stego compose with these modes as an
     // extra external key factor (§10.3) layered on top of the duress password / shares.
     if (mode !== 'plain') {
+      // Minted before the downloads so a cover photo with no filename still gets
+      // a stable, brand-free name from `stegoKeyName`.
+      const modeId = toHex(randomBytes(4));
       const downloads = await buildDisguisedMode(file, content, {
         mode,
         password: options.password,
@@ -365,10 +402,10 @@ export async function saveFileToBinary(
         decoy: options.decoy,
         threshold: options.threshold,
         onProgress: options.onProgress,
+        id: modeId,
       });
-      const modeId = toHex(randomBytes(4));
-      await deliver(downloads, `stegoshard-${modeId}`);
-      return { keyMode, variant: 'disguised' };
+      await deliver(downloads, saveFolder(modeId, true));
+      return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
     }
     const { container, keyBlock: keyFactor } = await encryptBinaryDisguisedInWorker(
       file.name,
@@ -378,8 +415,9 @@ export async function saveFileToBinary(
       options.userEntropy,
       options.onProgress,
     );
-    const downloads: { name: string; blob: Blob }[] = [
-      { name: binaryVaultName('disguised'), blob: octet(container) },
+    const disguisedId = toHex(randomBytes(4));
+    const downloads: Download[] = [
+      { name: binaryVaultName('disguised'), blob: octet(container), purpose: 'vault' },
     ];
     if (keyMode === 'stego') {
       if (!options.stego) throw new Error('stego mode requires a cover image and password');
@@ -390,9 +428,10 @@ export async function saveFileToBinary(
         keyFactor,
         options.stego.password,
       );
-      const dl = {
-        name: stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
+      const dl: Download = {
+        name: stegoKeyName(options.stego.cover.name, stegoKey.ext, disguisedId),
         blob: octet(stegoKey.bytes, stegoKey.mime),
+        purpose: 'stegoCover',
       };
       downloads.push(dl);
       await verifyStegoKeyCover(
@@ -406,11 +445,11 @@ export async function saveFileToBinary(
       downloads.push({
         name: binaryKeyName('disguised'),
         blob: octet(wrapBinary(keyFactor, 'disguised')),
+        purpose: 'keyfile',
       });
     }
-    const disguisedId = toHex(randomBytes(4));
-    await deliver(downloads, `stegoshard-${disguisedId}`);
-    return { keyMode, variant: 'disguised' };
+    await deliver(downloads, saveFolder(disguisedId, true));
+    return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
   }
 
   const keyBlock = key.keyBlock;
@@ -425,21 +464,25 @@ export async function saveFileToBinary(
     options.userEntropy,
     options.onProgress,
   );
-  const downloads: { name: string; blob: Blob }[] = [
-    { name: binaryVaultName(options.variant), blob: octet(container) },
+  // Only the branded .ssbn reaches here — every disguised path returned above.
+  const id = toHex(randomBytes(4));
+  const downloads: Download[] = [
+    { name: binaryVaultName(options.variant), blob: octet(container), purpose: 'vault' },
   ];
 
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const stegoKey = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
     downloads.push({
-      name: stegoKeyName(options.stego.cover.name, stegoKey.ext, ''),
+      name: stegoKeyName(options.stego.cover.name, stegoKey.ext, id),
       blob: octet(stegoKey.bytes, stegoKey.mime),
+      purpose: 'stegoCover',
     });
   } else if (keyMode === 'keyfile') {
     downloads.push({
       name: binaryKeyName(options.variant),
       blob: octet(wrapBinary(keyBlock, options.variant)),
+      purpose: 'keyfile',
     });
   }
   // The container round-trip is verified inside the worker; here we only still
@@ -454,9 +497,8 @@ export async function saveFileToBinary(
     );
   }
   // No setId on the binary path — group the vault + key under a random-id folder.
-  const id = toHex(randomBytes(4));
-  await deliver(downloads, `stegoshard-${id}`);
-  return { keyMode, variant: options.variant };
+  await deliver(downloads, saveFolder(id, false));
+  return { keyMode, variant: options.variant, manifest: manifestOf(downloads) };
 }
 
 export interface GallerySaveResult {
@@ -465,6 +507,7 @@ export interface GallerySaveResult {
   m: number;
   decoys: number;
   setId: string;
+  manifest: ManifestEntry[];
 }
 
 /**
@@ -500,14 +543,14 @@ export async function saveGalleryToDisk(
   const setHex = toHex(res.setId);
 
   // Two covers can share a basename, and gallery reuses cover names — disambiguate.
-  const downloads: { name: string; blob: Blob }[] = [];
+  const downloads: Download[] = [];
   const used = new Set<string>();
   for (const img of res.images) {
     const { name, blob } = await galleryImageToBlob(img);
     let unique = name;
     for (let n = 2; used.has(unique); n++) unique = name.replace(/(\.[^.]+)?$/, `-${n}$1`);
     used.add(unique);
-    downloads.push({ name: unique, blob });
+    downloads.push({ name: unique, blob, purpose: 'photos' });
   }
   // A separate key rides alongside the photos when not embedded.
   if (keyMode === 'stego') {
@@ -518,13 +561,15 @@ export async function saveGalleryToDisk(
     downloads.push({
       name: stegoKeyName(options.stego.cover.name, k.ext, setHex),
       blob: octet(k.bytes, k.mime),
+      purpose: 'stegoCover',
     });
   } else if (keyMode === 'keyfile') {
-    // Deniability caveat: a `.key` (and its telltale name) sitting beside the
-    // photos gives the gallery away. keyfile trades deniability for a key you
-    // can store apart from the photos — opt-in, unlike the deniable stego/embedded
-    // modes. Stego keeps the cover's own filename (blends in); keyfile does not.
-    downloads.push({ name: `stegoshard-${setHex}.key`, blob: octet(res.keyBlock) });
+    // Deniability caveat: a `.key` sitting beside the photos gives the gallery
+    // away by its extension alone — restore finds it with `isKey()`, so it cannot
+    // become fully generic. Dropping the project name narrows the tell without
+    // removing it. keyfile trades deniability for a key you can store apart from
+    // the photos — opt-in, unlike the deniable stego/embedded modes.
+    downloads.push({ name: `${setHex}.key`, blob: octet(res.keyBlock), purpose: 'keyfile' });
   }
 
   // Non-possession (Mode B): the shares recover the secret that gates verification.
@@ -560,7 +605,14 @@ export async function saveGalleryToDisk(
   // Neutral folder name (the bare set id, no "stegoshard-" prefix) so grouping
   // the photos doesn't itself betray the gallery.
   await deliver(downloads, setHex);
-  return { imageCount: res.images.length, k: res.k, m: res.m, decoys: res.decoys, setId: setHex };
+  return {
+    imageCount: res.images.length,
+    k: res.k,
+    m: res.m,
+    decoys: res.decoys,
+    setId: setHex,
+    manifest: manifestOf(downloads),
+  };
 }
 
 /** Restore a secret from a set of gallery photos (blind winnowing) and download it. */

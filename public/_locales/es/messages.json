@@ -882,6 +882,30 @@
   "recoveryLossless": {
     "message": "Consérvalas tal cual — redimensionar, recomprimir o pasarlas por un servicio que recodifique imágenes las destruye."
   },
+  "filesCreatedHeading": {
+    "message": "Archivos creados:"
+  },
+  "filePurposeVault": {
+    "message": "La caja fuerte — contiene tu archivo"
+  },
+  "filePurposeArchive": {
+    "message": "Todas las imágenes en un .zip"
+  },
+  "filePurposeDocument": {
+    "message": "Hoja imprimible"
+  },
+  "filePurposePhotos": {
+    "message": "Fotos fragmento — conserva el conjunto completo"
+  },
+  "filePurposeKeyfile": {
+    "message": "Clave separada — necesaria con tu contraseña"
+  },
+  "filePurposeStegoCover": {
+    "message": "Foto que contiene la clave oculta"
+  },
+  "filePurposeShare": {
+    "message": "Fragmento de recuperación — para un titular"
+  },
   "onboardingTitle": {
     "message": "Bienvenido a StegoShard"
   },
