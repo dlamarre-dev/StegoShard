@@ -12,6 +12,8 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
+import { zipSync } from 'fflate';
+import { BUNDLE_NAME } from '../src/ui/bundle';
 import jpeg from 'jpeg-js';
 import {
   type BinaryVariant,
@@ -29,7 +31,10 @@ import {
   galleryEncode,
   randomBytes,
   serializeKeyBlock,
+  buildDuressDbContainer,
+  buildNonPossessionDbContainer,
   exportVault,
+  shareFileText,
   exportVaultBinary,
   exportVaultBinaryDisguised,
   getCodec,
@@ -57,6 +62,8 @@ if (!outRoot) {
 const ARGON2 = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 const PASSWORD = 'correct horse battery staple';
 const FILENAME = 'secret-notes.txt';
+const DECOY_FILENAME = 'grocery-list.txt';
+const DURESS_PASSWORD = 'a different unrelated duress phrase';
 
 function pseudoRandom(len: number, seed: number): Uint8Array {
   let s = seed >>> 0;
@@ -381,6 +388,146 @@ async function generateDisguisedNpStego(name: string, content: Uint8Array): Prom
   console.log(`fixture ${name}: disguised non-possession + stego (k=${k} n=${n})`);
 }
 
+/**
+ * A multi-file save (SPEC §4 FLAGS bit 1): the envelope carries a `.zip` of
+ * several files instead of one. Covers both the image path and the binary
+ * container, because the flag rides in the envelope and must survive either.
+ *
+ * This is the case that motivated the matrix: the flag shipped without a
+ * cross-implementation fixture, and the Python decoder wrote out `bundle.zip`
+ * for a week before anyone noticed the asymmetry.
+ */
+async function generateBundle(name: string, asBinary: boolean): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const files = [
+    { name: 'notes.txt', bytes: pseudoRandom(300, 11) },
+    { name: 'key.pem', bytes: pseudoRandom(700, 22) },
+    { name: 'photo.bin', bytes: pseudoRandom(1500, 33) },
+  ];
+  const zipped = zipSync(Object.fromEntries(files.map((f) => [f.name, f.bytes])), { level: 0 });
+
+  const key = await makeKey();
+  const manifest: Record<string, unknown> = {
+    password: PASSWORD,
+    filename: BUNDLE_NAME,
+    entries: files.map((f) => f.name),
+  };
+
+  if (asBinary) {
+    const { container } = await exportVaultBinary(BUNDLE_NAME, zipped, key, {
+      keyMode: 'embedded',
+      variant: 'branded',
+      bundle: true,
+    });
+    const vaultName = binaryVaultName('branded');
+    writeFileSync(join(dir, vaultName), container);
+    manifest.vault = vaultName;
+  } else {
+    const { imagePayloads } = await exportVault(BUNDLE_NAME, zipped, key, {
+      keyMode: 'embedded',
+      bundle: true,
+    });
+    const codec = getCodec(CODEC_QR_GRID);
+    imagePayloads.forEach((payload, i) => {
+      writePng(join(dir, `image-${String(i + 1).padStart(2, '0')}.png`), {
+        data: new Uint8ClampedArray(codec.encode(payload, PROFILE_DISK).data),
+        width: codec.encode(payload, PROFILE_DISK).width,
+        height: codec.encode(payload, PROFILE_DISK).height,
+      });
+    });
+  }
+
+  // Each original file, so the test can compare every entry, not just the count.
+  for (const f of files) writeFileSync(join(dir, `expected-${f.name}`), f.bytes);
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  console.log(
+    `fixture ${name}: bundle of ${files.length} files (${asBinary ? 'binary' : 'images'})`,
+  );
+}
+
+/**
+ * A disguised .db in DURESS (Mode A, §10.9): two regions, two passwords. The
+ * real one yields the real payload, the duress one a plausible decoy, and
+ * neither unlock reveals which region it opened.
+ *
+ * Python must reach both without any hint from the container about which slot
+ * is which — the property §10.10 pins on the TypeScript side.
+ */
+async function generateDuress(name: string, content: Uint8Array): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const decoy = pseudoRandom(900, 4242);
+  const { container } = await buildDuressDbContainer(
+    FILENAME,
+    content,
+    DECOY_FILENAME,
+    decoy,
+    PASSWORD,
+    DURESS_PASSWORD,
+  );
+  const vaultName = binaryVaultName('disguised');
+  writeFileSync(join(dir, vaultName), container);
+  writeFileSync(join(dir, 'expected.bin'), content);
+  writeFileSync(join(dir, 'expected-decoy.bin'), decoy);
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify(
+      {
+        password: PASSWORD,
+        duressPassword: DURESS_PASSWORD,
+        filename: FILENAME,
+        decoyFilename: DECOY_FILENAME,
+        vault: vaultName,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`fixture ${name}: disguised .db in duress mode`);
+}
+
+/**
+ * Non-possession with the share files the app and the CLI actually write: a
+ * dash-grouped Crockford base32 token wrapped in instructions, not the raw 38
+ * bytes. The existing np-stego fixture ships `share-*.bin`, which tests the
+ * maths but not the file a user is handed.
+ */
+async function generateNpShareText(name: string, content: Uint8Array): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const k = 2;
+  const n = 3;
+  const { container, shares } = await buildNonPossessionDbContainer(
+    FILENAME,
+    content,
+    PASSWORD,
+    k,
+    n,
+  );
+  const vaultName = binaryVaultName('disguised');
+  writeFileSync(join(dir, vaultName), container);
+  // Byte-for-byte what a deniable save writes, neutral heading included.
+  shares.forEach((share, i) =>
+    writeFileSync(
+      join(dir, `recovery-${i + 1}.txt`),
+      shareFileText(share, i + 1, n, k, 'and load them at restore.', 'neutral'),
+    ),
+  );
+  writeFileSync(join(dir, 'expected.bin'), content);
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify({ password: PASSWORD, filename: FILENAME, k, n, vault: vaultName }, null, 2),
+  );
+  console.log(`fixture ${name}: non-possession with share .txt files (k=${k} n=${n})`);
+}
+
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
 // The 8-colour grid (SPEC §2.2) — a much larger payload per image, so this also
@@ -398,4 +545,8 @@ await generateGallery('gallery-keyfile', false, 'keyfile');
 await generateGallery('gallery-stego', false, 'stego');
 await generateBinary('binary-disguised-stego', 'stego', 'disguised', content);
 await generateDisguisedNpStego('binary-disguised-np-stego', content);
+await generateBundle('bundle-images', false);
+await generateBundle('bundle-binary', true);
+await generateDuress('binary-disguised-duress', content);
+await generateNpShareText('binary-disguised-np-sharetext', content);
 console.log(`fixtures written to ${outRoot}`);
