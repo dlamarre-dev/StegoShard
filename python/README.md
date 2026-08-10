@@ -48,6 +48,11 @@ python -m stegoshard.decode ./vault/cache.db --out ./restored
 python -m stegoshard.decode ./images/ --key stegoshard-abcd1234.key
 python -m stegoshard.decode ./vault/cache.db --key ./vault/IMG_2043.png
 
+# Non-possession vaults (SPEC §10.6) are gated on threshold shares you hold
+# none of alone — pass any k of the n share files:
+python -m stegoshard.decode ./vault/cache.db \
+  --share ./vault/recovery-1.txt --share ./vault/recovery-3.txt --out ./restored
+
 # Gallery Mode (SPEC §9): a secret fragmented across a folder of photos,
 # decoded blindly — decoys and unrelated photos are ignored automatically:
 python -m stegoshard.decode ./album/ --gallery --out ./restored
@@ -128,28 +133,35 @@ restored = decode_vault(payloads, "your password", key_block)
 
 ### Threshold shares (non-possession, SPEC §10.6)
 
-A Mode B vault is gated on a quorum of share files the writer never kept. The
-decoder recovers the gating secret from **raw 38-byte shares** and passes it in:
+A Mode B vault is gated on a quorum of share files the writer never kept. Pass
+any `k` of them:
 
-```python
-from stegoshard import decode_vault_binary
-from stegoshard.shamir import shamir_recover
-
-secret = shamir_recover([share_a_bytes, share_b_bytes])   # any k of the n
-restored = decode_vault_binary(container, "your password", secret=secret)
+```bash
+python -m stegoshard.decode ./vault/cache.db \
+  --share ./vault/recovery-1.txt --share ./vault/recovery-3.txt --out ./restored
 ```
 
-Below the threshold this raises `WrongPasswordError`, exactly as a wrong password
-does — a sub-threshold set must be indistinguishable from a bad credential.
+The share files carry their 38 bytes as a dash-grouped **Crockford base32**
+token (no `I`, `L`, `O`, `U`, so a handwritten share cannot be mistranscribed
+into a different valid one) wrapped in instructions. The token is located by
+pattern, so the surrounding prose — in any of the eight shipped languages — is
+ignored, and a user who pastes only the token is equally fine.
 
-> **Limitation.** The share files the app and the Node CLI write
-> (`recovery-1.txt`) carry the share as a dash-grouped **Crockford base32** token
-> (no `I`, `L`, `O`, `U`), and this decoder has no reader for that text: it takes
-> the 38 raw bytes. Restoring a Mode B vault from the `.txt` files therefore
-> means decoding that token yourself, and `python -m stegoshard.decode` has no
-> `--share` option. Every other path — including a keyfile or stego key — is
-> fully supported here. This is the one place where independent recovery is not
-> yet turnkey.
+From Python:
+
+```python
+from pathlib import Path
+from stegoshard import decode_vault_binary
+from stegoshard.shamir import decode_share_text, shamir_recover
+
+shares = [decode_share_text(Path(p).read_text()) for p in ("recovery-1.txt", "recovery-3.txt")]
+restored = decode_vault_binary(container, "your password", secret=shamir_recover(shares))
+```
+
+Below the threshold this reports **`wrong password`**, exactly as a bad
+credential does. That is deliberate: a sub-threshold set must not confirm that
+the password was right (SPEC §10.6). The same `--share` flag works with
+`--gallery`.
 
 ## What you need to keep
 
@@ -172,5 +184,6 @@ Gallery Mode needs every photo in the set, also losslessly.
 | `qr.py`          | QR image → payload bytes                                    |
 | `stego.py`       | deniable stego extraction (key block + gallery, SPEC §5/§9) |
 | `gallery.py`     | Gallery Mode blind decode (SPEC §9)                         |
+| `shamir.py`      | threshold-share recovery + share text (SPEC §10.6)          |
 | `pipeline.py`    | images + password → restored file                           |
 | `decode.py`      | command-line entry point                                    |

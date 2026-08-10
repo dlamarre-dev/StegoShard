@@ -24,6 +24,7 @@ from .codecs import decode_any
 from .crypto import WrongPasswordError
 from .format import unpack_bundle
 from .pipeline import MissingKeyError, decode_vault, decode_vault_binary
+from .shamir import decode_share_text, shamir_recover
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
 
@@ -127,6 +128,24 @@ def _gather_image_bytes(paths: list[str]) -> list[bytes]:
     return images
 
 
+def _recover_secret(share_paths: list[str] | None) -> bytes | None:
+    """Recover the Mode B gating secret from a quorum of share files (SPEC §10.6).
+
+    Each file holds its share as a dash-grouped Crockford base32 token wrapped in
+    instructions, so `decode_share_text` locates the token rather than decoding
+    the prose around it. Below the threshold the interpolation simply yields a
+    wrong secret, which the vault then rejects as a wrong password — deliberately
+    indistinguishable.
+    """
+    if not share_paths:
+        return None
+    shares = []
+    for path in share_paths:
+        with open(path, encoding="utf-8") as fh:
+            shares.append(decode_share_text(fh.read()))
+    return shamir_recover(shares)
+
+
 def _restore_gallery(args: argparse.Namespace) -> int:
     from .gallery import GalleryRestoreError, decode_gallery
 
@@ -138,7 +157,7 @@ def _restore_gallery(args: argparse.Namespace) -> int:
     # A keyfile/stego gallery delivers its key separately (a .key or a cover photo).
     key_block = _resolve_key(args.key, password) if args.key else None
     try:
-        restored = decode_gallery(images, password, key_block)
+        restored = decode_gallery(images, password, key_block, secret=_recover_secret(args.share))
     except GalleryRestoreError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -184,6 +203,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="restore a Gallery Mode secret hidden across the given photos (SPEC §9)",
     )
+    parser.add_argument(
+        "--share",
+        action="append",
+        metavar="FILE",
+        help="a threshold share file for a non-possession vault (repeatable, SPEC §10.6)",
+    )
     args = parser.parse_args(argv)
 
     if args.gallery:
@@ -216,10 +241,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
     try:
+        secret = _recover_secret(args.share)
         if binary_vault is not None:
-            restored = decode_vault_binary(binary_vault, password, key_block)
+            restored = decode_vault_binary(binary_vault, password, key_block, secret=secret)
         else:
-            restored = decode_vault(payloads, password, key_block)
+            restored = decode_vault(payloads, password, key_block, secret=secret)
     except WrongPasswordError:
         print("wrong password", file=sys.stderr)
         return 1

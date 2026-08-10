@@ -13,6 +13,7 @@ checksum = SHA-256(version||index||value)[0:4] (transcription detection only).
 from __future__ import annotations
 
 import hashlib
+import re
 
 from .gf256 import gf_add, gf_div, gf_mul
 
@@ -24,6 +25,55 @@ _SHARE_BODY_LEN = 1 + 1 + SECRET_LEN
 
 class ShareChecksumError(Exception):
     """Raised when a share's checksum fails — a transcription error, not auth."""
+
+
+# --- Transcribable share text (Crockford base32) ------------------------------
+#
+# Mirrors `base32Decode` / `decodeShareText` in src/core/shamir.ts. The share
+# files the app and the Node CLI write carry the 38 bytes as a dash-grouped
+# token surrounded by instruction prose, so a reader has to pick the token out
+# rather than decode the whole file.
+
+#: Crockford base32 — no I, L, O or U, so a handwritten share cannot be
+#: mistranscribed into a different valid one.
+BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+#: The token itself: groups of up to five characters joined by dashes.
+_SHARE_TOKEN = re.compile(r"[0-9A-Za-z]{5}(?:-[0-9A-Za-z]{1,5})+")
+
+
+def base32_decode(text: str) -> bytes:
+    """Decode Crockford base32, ignoring dashes, spaces and line breaks."""
+    bits = 0
+    value = 0
+    out = bytearray()
+    for char in text.upper():
+        idx = BASE32_ALPHABET.find(char)
+        if idx < 0:
+            continue  # separator, or a stray character the alphabet excludes
+        value = (value << 5) | idx
+        bits += 5
+        if bits >= 8:
+            out.append((value >> (bits - 8)) & 0xFF)
+            bits -= 8
+    return bytes(out)
+
+
+def decode_share_text(text: str) -> bytes:
+    """Read one share out of the text of a `recovery-N.txt` file.
+
+    The file also holds a heading and instructions; the token is located by
+    pattern so that prose — in any of the eight shipped languages — is ignored.
+    Falls back to decoding the whole text, which is what a user who pasted only
+    the token would supply.
+    """
+    match = _SHARE_TOKEN.search(text)
+    share = base32_decode(match.group(0) if match else text)
+    if len(share) != SHARE_LEN:
+        raise ValueError(
+            f"share: expected {SHARE_LEN} bytes, got {len(share)} — is this a share file?"
+        )
+    return share
 
 
 def _checksum(body: bytes) -> bytes:
