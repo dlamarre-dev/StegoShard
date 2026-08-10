@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "パスワードが一致しません。"
   },
+  "errPasswordTooShort": {
+    "message": "$COUNT$ 文字以上にしてください。この下限は省略できません。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "金庫の鍵を作成しました。"
   },

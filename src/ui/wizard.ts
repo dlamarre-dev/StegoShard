@@ -35,7 +35,13 @@ import {
   firstCodecThatFits,
   formatSize,
 } from './estimate';
-import { generatePassphrase, isStrongNewPassword, passwordStrength } from './password';
+import {
+  MIN_PASSWORD_LENGTH,
+  generatePassphrase,
+  isStrongNewPassword,
+  meetsPasswordFloor,
+  passwordStrength,
+} from './password';
 
 export interface WizardCamera {
   open: () => void;
@@ -798,6 +804,15 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       if (state.action === 'save') {
         const createsPassword =
           env.needsSavePassword || state.dest === 'gallery' || state.dest === 'sqlite';
+        // The hard floor first: it is not waivable, so it must not be routed
+        // through the confirm dialog that waives the advisory tier below.
+        if (createsPassword && !meetsPasswordFloor(state.savePassword)) {
+          runBtn.disabled = false;
+          prog.done();
+          status.classList.add('error');
+          status.textContent = msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH));
+          return;
+        }
         if (
           createsPassword &&
           !isStrongNewPassword(state.savePassword) &&

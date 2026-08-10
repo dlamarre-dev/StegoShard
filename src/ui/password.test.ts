@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   GENERATED_PASSPHRASE_BITS,
+  MIN_PASSWORD_LENGTH,
   extraEntropyBits,
   generatePassphrase,
   isStrongNewPassword,
+  meetsPasswordFloor,
   passwordStrength,
 } from './password';
 
@@ -30,6 +32,36 @@ describe('new-password policy', () => {
     expect(isStrongNewPassword(generatePassphrase())).toBe(true);
     expect(isStrongNewPassword('password')).toBe(false);
     expect(isStrongNewPassword('a'.repeat(40))).toBe(false);
+  });
+
+  describe('the hard floor', () => {
+    it('is exactly MIN_PASSWORD_LENGTH characters', () => {
+      expect(MIN_PASSWORD_LENGTH).toBe(12);
+      expect(meetsPasswordFloor('a'.repeat(MIN_PASSWORD_LENGTH - 1))).toBe(false);
+      expect(meetsPasswordFloor('a'.repeat(MIN_PASSWORD_LENGTH))).toBe(true);
+    });
+
+    it('rejects an empty password', () => {
+      expect(meetsPasswordFloor('')).toBe(false);
+    });
+
+    // The floor is length-only on purpose: it is the one rule that cannot be
+    // waived, so it must be one a user can satisfy without guessing at a scorer.
+    // Judging *quality* is `isStrongNewPassword`'s job, and that tier is
+    // dismissible.
+    it('is length-only — a long weak password clears the floor but is not strong', () => {
+      const weakButLong = 'a'.repeat(MIN_PASSWORD_LENGTH);
+      expect(meetsPasswordFloor(weakButLong)).toBe(true);
+      expect(isStrongNewPassword(weakButLong)).toBe(false);
+    });
+
+    it('anything the advisory tier calls strong already clears the floor', () => {
+      for (let i = 0; i < 50; i++) {
+        const p = generatePassphrase();
+        expect(isStrongNewPassword(p)).toBe(true);
+        expect(meetsPasswordFloor(p)).toBe(true);
+      }
+    });
   });
 });
 

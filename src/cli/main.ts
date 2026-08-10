@@ -35,7 +35,12 @@ import {
   type OnProgress,
   type Progress,
 } from '@core';
-import { isStrongNewPassword, passwordStrength } from '../ui/password';
+import {
+  MIN_PASSWORD_LENGTH,
+  isStrongNewPassword,
+  meetsPasswordFloor,
+  passwordStrength,
+} from '../ui/password';
 
 const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
 
@@ -115,7 +120,9 @@ Save options:
   --password-hint <t>    Password hint printed on the instruction sheet
   --key-location <t>     Where the key is kept, printed on the sheet
   --font <path>          A .ttf/.otf for CJK instruction text (paper)
-  --allow-weak-password  Acknowledge and allow a weak password for a new vault
+  --allow-weak-password  Acknowledge a weak (but >= 12 character) password for a
+                         new vault. The 12-character minimum itself cannot be
+                         waived by this or any other flag.
 
 Restore options:
   --out <dir>            Output directory (default: current directory)
@@ -296,6 +303,15 @@ async function requireStrongOrAcknowledged(
   label = 'password',
 ): Promise<void> {
   if (isStrongNewPassword(password)) return;
+  // The hard floor is checked before --allow-weak-password is even consulted: a
+  // minimum a flag can switch off is not a minimum. Scripted callers that hit
+  // this need a longer password, not another flag.
+  if (!meetsPasswordFloor(password)) {
+    fail(
+      `the ${label} is too short: ${password.length} character(s), minimum ${MIN_PASSWORD_LENGTH}. ` +
+        'This floor cannot be waived — an offline attacker holding the vault can grind it at leisure.',
+    );
+  }
   const estimate = passwordStrength(password);
   const warning =
     `Warning: the ${label} is weak (estimated ${estimate.bits} bits). ` +

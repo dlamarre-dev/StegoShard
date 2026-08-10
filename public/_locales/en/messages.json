@@ -359,6 +359,15 @@
     "message": "Passwords do not match.",
     "description": "Validation error."
   },
+  "errPasswordTooShort": {
+    "message": "Use at least $COUNT$ characters. This minimum cannot be skipped.",
+    "description": "Validation error: the new password is below the non-waivable minimum length.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Vault key created.",
     "description": "Options: success."

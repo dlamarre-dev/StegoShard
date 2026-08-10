@@ -19,9 +19,11 @@ import {
 } from './keystore';
 import { downloadBlob } from './image-io';
 import {
+  MIN_PASSWORD_LENGTH,
   extraEntropyBits,
   generatePassphrase,
   isStrongNewPassword,
+  meetsPasswordFloor,
   passwordStrength,
 } from './password';
 import { clearUserEntropy, installUserEntropy } from '@core';
@@ -46,6 +48,10 @@ export function wireKeyManager(onChange: () => void = () => {}): void {
   /** Validate a new password + confirmation; returns an error message or null. */
   function validateNewPassword(pw: string, confirm: string): string | null {
     if (!pw) return msg('errNoPassword');
+    // The hard floor, before `acceptPassword` offers to waive anything.
+    if (!meetsPasswordFloor(pw)) {
+      return msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH));
+    }
     if (pw !== confirm) return msg('errPasswordMismatch');
     return null;
   }
