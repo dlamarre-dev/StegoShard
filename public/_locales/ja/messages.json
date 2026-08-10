@@ -994,6 +994,30 @@
     "message": "単独で開ける情報は一切手元に残りません。n 個のシェアファイルのうち任意の k 個が必要です。",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "追加のエントロピーを加える（任意・上級）",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "作成するシェア数 (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "必要なシェア数 (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "$N$ 個のうち $K$ 個のシェアを集める必要があります。",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "有効な k-of-n のしきい値を入力してください（1 ≤ k ≤ n）。",
     "description": "Error: invalid threshold."

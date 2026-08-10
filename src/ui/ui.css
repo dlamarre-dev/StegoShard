@@ -203,7 +203,9 @@ label {
 
 input[type='text'],
 input[type='password'],
-input[type='file'] {
+input[type='file'],
+textarea,
+select.field {
   width: 100%;
   padding: 9px 11px;
   font: inherit;
@@ -215,7 +217,9 @@ input[type='file'] {
 }
 
 input[type='text']:focus,
-input[type='password']:focus {
+input[type='password']:focus,
+textarea:focus,
+select.field:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
@@ -641,6 +645,8 @@ hr {
    lives in .seg-hint and appears on hover or keyboard focus. Wrapping matters:
    six destinations do not fit one row in the extension popup. */
 .segmented {
+  /* Positioning context for .seg-hint — see the note there. */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -650,9 +656,11 @@ hr {
   background: var(--surface-2);
 }
 .seg-item {
-  position: relative;
   flex: 1 1 84px;
   min-width: 84px;
+  /* Let a long-press open the hint without the browser waiting on a
+     double-tap-to-zoom gesture first. */
+  touch-action: manipulation;
 }
 .segmented label {
   display: flex;
@@ -698,25 +706,27 @@ hr {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
-/* Hover/focus explanation, drawn over the following content rather than
+/* Hover/long-press explanation, drawn over the following content rather than
    reflowing the form every time the pointer moves.
 
-   `display: none` rather than a hidden-but-laid-out box: an absolutely
-   positioned element still contributes to the document's scrollable overflow
-   even at `visibility: hidden`, and a 220px hint centred on an 84px option
-   sticks out past a phone viewport — which made the whole page scroll sideways
-   with nothing visible to explain it. The cost is the fade-in; the fade-out
-   still runs. The max-width also tracks the viewport so a hint that *is* on
-   screen cannot overflow it either. */
+   Anchored to the `.segmented` container, not to the individual option. Pinning
+   it to an 84px option meant a 220px hint had to be centred and then nudged back
+   at the row edges — and the `:first-child`/`:last-child` nudges silently missed
+   the first option of a *wrapped* row, which is neither. That left the hint 22px
+   off-screen on the left and gave the whole page 22px of horizontal scroll on the
+   right. Anchored to the container it simply cannot overflow, at any width and
+   any wrap position, with no measuring code to keep correct.
+
+   `display: none` rather than a hidden-but-laid-out box: an absolutely positioned
+   element contributes to the document's scrollable overflow even at
+   `visibility: hidden`. */
 .seg-hint {
   position: absolute;
   display: none;
   z-index: 5;
   top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: min(220px, calc(100vw - 24px));
+  left: 8px;
+  max-width: min(320px, calc(100% - 16px));
   padding: 7px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -727,25 +737,23 @@ hr {
   font-weight: 400;
   line-height: 1.35;
   text-align: left;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease;
 }
-.seg-item:hover .seg-hint,
-.seg-item:focus-within .seg-hint {
+
+/* Hover only where hovering is real. On touch, `:hover` sticks after a tap and
+   the hint never leaves — the same complaint in a different costume. Touch gets
+   the long-press path in tooltips.ts, which sets `.hint-open`. */
+@media (hover: hover) and (pointer: fine) {
+  .seg-item:hover .seg-hint {
+    display: block;
+  }
+}
+
+/* Long-press, and keyboard focus-visible, both routed through this class so a
+   single owner can guarantee one hint open at a time. Deliberately NOT
+   `:focus-within`: clicking an option focuses its radio, which pinned the hint
+   open for as long as the option stayed selected. */
+.seg-item.hint-open .seg-hint {
   display: block;
-  opacity: 1;
-  visibility: visible;
-}
-/* Keep the hint inside the card at the row's edges. */
-.seg-item:first-child .seg-hint {
-  left: 0;
-  transform: none;
-}
-.seg-item:last-child .seg-hint {
-  left: auto;
-  right: 0;
-  transform: none;
 }
 
 /* Progressive disclosure of advanced options. */
@@ -1214,4 +1222,55 @@ details.advanced[open] > summary::before {
 .manifest-purpose {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+/* Auto-growing textarea (the optional extra-entropy field).
+   Sized by a replicated copy of its own text in an overlaid grid cell rather
+   than by writing `style.height` from JS: only a data attribute changes, so
+   nothing here depends on inline styles the CSP does not allow. Capped at four
+   lines, after which the textarea scrolls. */
+.grow-wrap {
+  /* Four lines of text, plus the field's own padding and borders. */
+  --grow-max: calc(4 * 1.5em + 20px);
+  display: grid;
+}
+/* The replicated copy is what sizes the grid row, so it is what has to be
+   capped — a max-height on the wrapper alone leaves the row (and the textarea
+   stretched to it) at full height and simply overflows. */
+.grow-wrap::after {
+  content: attr(data-replicated-value) ' ';
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  visibility: hidden;
+  max-height: var(--grow-max);
+  overflow: hidden;
+}
+.grow-wrap > textarea,
+.grow-wrap::after {
+  grid-area: 1 / 1 / 2 / 2;
+  padding: 9px 11px;
+  font: inherit;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+.grow-wrap > textarea {
+  resize: none;
+  max-height: var(--grow-max);
+  overflow-y: auto;
+  border-color: var(--border);
+}
+
+/* Threshold picker: n then k, each under its own label. A row of two labelled
+   selects rather than two bare number boxes with a slash between them — the
+   old layout gave no clue which box was which, and let k exceed n. */
+.threshold-row {
+  display: flex;
+  gap: 12px;
+}
+.threshold-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.threshold-field label {
+  margin-top: 0;
 }

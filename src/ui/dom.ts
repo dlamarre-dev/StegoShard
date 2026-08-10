@@ -10,6 +10,9 @@ export {
   wireDropzone,
   reflectFiles,
   renderManifest,
+  THRESHOLD_MIN,
+  wireAutoGrow,
+  wireThreshold,
 } from './domhelpers';
 
 /** Localized message lookup (extension: chrome.i18n). */

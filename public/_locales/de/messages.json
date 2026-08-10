@@ -994,6 +994,30 @@
     "message": "Sie behalten nichts, das dies allein öffnet — beliebige k der n Anteilsdateien genügen.",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "Zusätzliche Entropie hinzufügen (optional, Experte)",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "Zu erstellende Anteile (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "Benötigte Anteile (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "Sie müssen $K$ der $N$ Anteile zusammentragen.",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "Geben Sie einen gültigen k-von-n-Schwellenwert ein (1 ≤ k ≤ n).",
     "description": "Error: invalid threshold."

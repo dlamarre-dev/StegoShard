@@ -22,6 +22,9 @@ import {
   renderManifest,
   setStatus,
   show,
+  THRESHOLD_MIN,
+  wireAutoGrow,
+  wireThreshold,
   wireDropzone,
 } from '../ui/domhelpers';
 import {
@@ -52,6 +55,7 @@ import {
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
+import { wireTooltips } from '../ui/tooltips';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
 if (window.top !== window.self) {
@@ -60,6 +64,7 @@ if (window.top !== window.self) {
 }
 
 localizeDom();
+wireTooltips();
 el('build-version').textContent =
   `v${__STEGOSHARD_VERSION__} · ${__STEGOSHARD_COMMIT__.slice(0, 12)}`;
 wireLanguageSelect(el<HTMLSelectElement>('lang-select'), () => {
@@ -86,6 +91,8 @@ const savePw = el<HTMLInputElement>('save-pw');
 const estimate = el('estimate');
 const estimateLine = el('estimate-line');
 const extraEntropy = el<HTMLTextAreaElement>('extra-entropy');
+const entropyToggle = el<HTMLInputElement>('entropy-toggle');
+const entropyFields = el('entropy-fields');
 const extraEntropyBits = el('extra-entropy-bits');
 const saveSize = el('save-size');
 const noFormat = el('no-format');
@@ -111,8 +118,9 @@ const decoyDrop = el('decoy-drop');
 const decoyName = el('decoy-name');
 const decoyFile = el<HTMLInputElement>('decoy-file');
 const thresholdFields = el('threshold-fields');
-const thresholdK = el<HTMLInputElement>('threshold-k');
-const thresholdN = el<HTMLInputElement>('threshold-n');
+const thresholdK = el<HTMLSelectElement>('threshold-k');
+const thresholdN = el<HTMLSelectElement>('threshold-n');
+const thresholdSummary = el('threshold-summary');
 const factorDuressHint = el('factor-duress-hint');
 const addBand = el<HTMLInputElement>('add-band');
 const addBandLabel = el('add-band-label');
@@ -176,14 +184,20 @@ const selectedRestoreMode = () => pick<RestoreMode>('restore-mode', 'standard');
 const selectedAccessMode = () => pick<AccessMode>('accessmode', 'plain');
 
 /** Read + validate the k-of-n threshold; null if either field is out of range. */
+/**
+ * Read the k-of-n threshold. The picker cannot express k > n (see
+ * `wireThreshold`), so the range check that remains is a backstop against a
+ * future markup change, not a path the user can reach.
+ */
 function readThreshold(): { k: number; n: number } | undefined {
   const k = Number(thresholdK.value);
   const n = Number(thresholdN.value);
-  if (!Number.isInteger(k) || !Number.isInteger(n) || k < 1 || n < 1 || k > n || n > 255) {
-    return undefined;
-  }
+  if (!Number.isInteger(k) || !Number.isInteger(n) || k < THRESHOLD_MIN || k > n) return undefined;
   return { k, n };
 }
+wireThreshold(thresholdN, thresholdK, (k, n) => {
+  thresholdSummary.textContent = msg('thresholdSummary', [String(k), String(n)]);
+});
 
 function reflectFile(drop: HTMLElement, chip: HTMLElement, input: HTMLInputElement): void {
   const file = input.files?.[0];
@@ -463,6 +477,10 @@ function renderEntropyBits(): void {
 }
 
 extraEntropy.addEventListener('input', renderEntropyBits);
+wireAutoGrow(extraEntropy);
+// Optional expert field: folded away by default so the save form stays short,
+// on the same pattern as the readable-label option above it.
+entropyToggle.addEventListener('change', () => show(entropyFields, entropyToggle.checked));
 
 async function makeKey(password: string): Promise<VaultKey> {
   const { dek, block } = await createKeyBlock(password);

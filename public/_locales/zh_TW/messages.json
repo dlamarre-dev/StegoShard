@@ -994,6 +994,30 @@
     "message": "您不會保留任何能單獨開啟它的東西——n 個分片檔案中的任意 k 個即可。",
     "description": "Hint under the threshold inputs."
   },
+  "labelExtraEntropy": {
+    "message": "加入額外亂度（選用，進階）",
+    "description": "Checkbox that reveals the optional extra-entropy field."
+  },
+  "labelThresholdN": {
+    "message": "要建立的分片數 (n)",
+    "description": "Threshold picker: how many shares to create."
+  },
+  "labelThresholdK": {
+    "message": "所需的分片數 (k)",
+    "description": "Threshold picker: how many shares are needed to restore."
+  },
+  "thresholdSummary": {
+    "message": "您需要收集 $N$ 個分片中的 $K$ 個。",
+    "description": "Threshold picker: plain-language summary of the current k-of-n choice.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
   "errNoThreshold": {
     "message": "請輸入有效的 k-of-n 門檻（1 ≤ k ≤ n）。",
     "description": "Error: invalid threshold."
