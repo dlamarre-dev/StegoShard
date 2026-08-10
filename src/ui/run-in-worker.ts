@@ -149,6 +149,7 @@ export async function encryptBinaryInWorker(
   variant: BinaryVariant,
   userEntropy?: string | undefined,
   onProgress?: OnProgress,
+  bundle = false,
 ): Promise<Uint8Array> {
   // Fresh, independent copy of the DEK bytes — safe to transfer. The key block is
   // small and reused by the caller, so it is copied (not transferred).
@@ -163,6 +164,7 @@ export async function encryptBinaryInWorker(
       keyMode,
       variant,
       userEntropy,
+      bundle,
     },
     [content.buffer, rawDek.buffer],
     onProgress,
@@ -182,9 +184,10 @@ export async function encryptBinaryDisguisedInWorker(
   keyMode: KeyMode,
   userEntropy?: string | undefined,
   onProgress?: OnProgress,
+  bundle = false,
 ): Promise<{ container: Uint8Array; keyBlock: Uint8Array }> {
   const res = await call<{ container: Uint8Array; keyBlock: Uint8Array }>(
-    { op: 'encryptBinaryDisguised', filename, content, password, keyMode, userEntropy },
+    { op: 'encryptBinaryDisguised', filename, content, password, keyMode, userEntropy, bundle },
     [content.buffer],
     onProgress,
   );
@@ -199,8 +202,8 @@ export async function decryptBinaryInWorker(
   keyBlock: Uint8Array | undefined,
   secret?: Uint8Array | undefined,
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
-  return call<{ filename: string; content: Uint8Array }>(
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+  return call<{ filename: string; content: Uint8Array; bundled: boolean }>(
     { op: 'decryptBinary', container, password, keyBlock, secret },
     [container.buffer],
     onProgress,

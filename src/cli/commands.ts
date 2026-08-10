@@ -77,8 +77,9 @@ import {
   galleryImageToFile,
   imageDataToPng,
 } from './node-image-io';
-import { gatherImageFiles, gatherInputs } from './inputs';
+import { gatherImageFiles, gatherInputs, walk } from './inputs';
 import { buildCliPaperPdf } from './paper';
+import { BUNDLE_NAME, packBundle, unpackBundle } from '../ui/bundle';
 
 export { WrongPasswordError, MissingKeyError };
 
@@ -160,7 +161,8 @@ export type CodecChoice = 'color' | 'qr';
 export const CODEC_CHOICES: readonly CodecChoice[] = ['color', 'qr'];
 
 export interface SaveOptions {
-  inputFile: string;
+  /** Files and/or directories. Several inputs are zipped into one bundle. */
+  inputs: string[];
   outDir: string;
   password: string;
   paper: boolean;
@@ -236,11 +238,12 @@ async function externalKey(
 /** Save the disguised .db vault in the requested access mode (§10). */
 async function runSaveDisguised(
   opts: SaveOptions,
-  content: Uint8Array,
+  input: { name: string; content: Uint8Array; bundle: boolean },
   onProgress?: OnProgress,
 ): Promise<SaveResult> {
+  const content = input.content;
   const mode = opts.mode ?? 'plain';
-  const name = basename(opts.inputFile);
+  const name = input.name;
   const outName = binaryVaultName('disguised');
   const keyMode = opts.keyMode ?? 'embedded';
   // keyfile/stego mint a 32-byte external key factor (§10.3); it composes with any
@@ -281,6 +284,8 @@ async function runSaveDisguised(
       keyFactor,
       DEFAULT_ARGON2,
       onProgress,
+      undefined,
+      input.bundle,
     );
     const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
     return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
@@ -298,6 +303,8 @@ async function runSaveDisguised(
       keyFactor,
       DEFAULT_ARGON2,
       onProgress,
+      undefined,
+      input.bundle,
     );
     const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
     shares.forEach((share, i) => {
@@ -322,7 +329,7 @@ async function runSaveDisguised(
     name,
     content,
     opts.password,
-    { keyMode },
+    { keyMode, bundle: input.bundle },
     onProgress,
   );
   await verifyDisguisedExport(container, dek, regionIndex, name, content, onProgress);
@@ -340,14 +347,43 @@ async function runSaveDisguised(
   return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
 }
 
+/**
+ * Resolve the save inputs — files, directories, or a mix — into the single
+ * (name, content) pair the envelope carries.
+ *
+ * One input stays exactly as it always was: same name, same bytes, no bundle
+ * flag, so the commonest save is unchanged. Several inputs (or a directory) are
+ * zipped and marked with SPEC §4 FLAGS bit1, which restore reverses.
+ */
+function readSaveInputs(paths: string[]): {
+  name: string;
+  content: Uint8Array;
+  bundle: boolean;
+  count: number;
+} {
+  const files: string[] = [];
+  for (const path of paths) {
+    if (statSync(path).isDirectory()) files.push(...walk(path));
+    else files.push(path);
+  }
+  if (files.length === 0) throw new Error('save: no input files found');
+  if (files.length === 1) {
+    const only = files[0]!;
+    return { name: basename(only), content: read(only), bundle: false, count: 1 };
+  }
+  const packed = packBundle(files.map((f) => ({ name: basename(f), bytes: read(f) })));
+  return { name: BUNDLE_NAME, content: packed, bundle: true, count: files.length };
+}
+
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   allowOverwrite = Boolean(opts.force);
-  const content = read(opts.inputFile);
+  const input = readSaveInputs(opts.inputs);
+  const content = input.content;
 
   // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
   // region gets its own DEK — the managed key is not used on this supported path).
   if (opts.binary === 'disguised') {
-    return runSaveDisguised(opts, content, onProgress);
+    return runSaveDisguised(opts, input, onProgress);
   }
   // A non-plain access mode is only meaningful on the supported .db path.
   if (opts.mode && opts.mode !== 'plain') {
@@ -360,13 +396,13 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   if (opts.binary) {
     const variant = opts.binary;
     const { container, keyBlock, keyMode } = await exportVaultBinary(
-      basename(opts.inputFile),
+      input.name,
       content,
       key,
-      { keyMode: opts.keyMode, variant },
+      { keyMode: opts.keyMode, variant, bundle: input.bundle },
       onProgress,
     );
-    await verifyBinaryExport(container, key.dek, basename(opts.inputFile), content, onProgress);
+    await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
     const outs = [emit(opts.outDir, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
       const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
@@ -382,16 +418,16 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
   const codecId = codecIdForSave(opts.paper, opts.codec);
 
-  const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(
-    basename(opts.inputFile),
-    content,
-    key,
-    { profile, codecId, keyMode: opts.keyMode },
-  );
+  const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(input.name, content, key, {
+    profile,
+    codecId,
+    keyMode: opts.keyMode,
+    bundle: input.bundle,
+  });
   // Read it back from the header rather than trusting the request, so the
   // rendered pixels and the recovery line can never disagree with the payload.
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
-  await verifyImageExport(imagePayloads, key.dek, basename(opts.inputFile), content);
+  await verifyImageExport(imagePayloads, key.dek, input.name, content);
   const setHex = toHex(setId);
   const outs: OutFile[] = [];
   const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
@@ -491,7 +527,10 @@ function recoverSecret(sharePaths: string[] | undefined): Promise<Uint8Array> | 
 }
 
 export interface RestoreResult {
+  /** First file written; the only one unless the vault held a bundle. */
   outPath: string;
+  /** Every file written, in bundle order. */
+  files: string[];
   filename: string;
   seen: number;
   decoded: number;
@@ -546,15 +585,14 @@ export async function runRestore(
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
     // Threshold shares (Mode B) recover the secret that gates the .db slot.
     const secret = await recoverSecret(opts.sharePaths);
-    const { filename, content } = await importVaultBinary(
+    const { filename, content, bundled } = await importVaultBinary(
       read(binaryVaultPath),
       opts.password,
       { keyBlock, secret: secret ?? null },
       onProgress,
     );
-    const outName = basename(filename) || 'restored.bin';
-    const outPath = writeOut(opts.outDir, outName, content);
-    return { outPath, filename, seen: 1, decoded: 1 };
+    const written = writeRestored(opts.outDir, filename, content, bundled);
+    return { outPath: written[0]!, files: written, filename, seen: 1, decoded: 1 };
   }
 
   const gathered = await gatherInputs(opts.inputs);
@@ -565,10 +603,12 @@ export async function runRestore(
     throw new Error('no readable StegoShard images found in the inputs');
   }
 
-  const { filename, content } = await importVault(gathered.payloads, opts.password, { keyBlock });
-  const outName = basename(filename) || 'restored.bin';
-  const outPath = writeOut(opts.outDir, outName, content);
-  return { outPath, filename, seen: gathered.seen, decoded: gathered.decoded };
+  const { filename, content, bundled } = await importVault(gathered.payloads, opts.password, {
+    keyBlock,
+  });
+  const written = writeRestored(opts.outDir, filename, content, bundled);
+  const outPath = written[0]!;
+  return { outPath, files: written, filename, seen: gathered.seen, decoded: gathered.decoded };
 }
 
 // --- Gallery Mode (SPEC §9) --------------------------------------------------
@@ -704,6 +744,22 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   const outName = basename(filename) || 'restored.bin';
   const outPath = writeOut(opts.outDir, outName, content);
   return { outPath, filename, seen: covers.length };
+}
+
+/**
+ * Write what a restore recovered. A bundle (SPEC §4 FLAGS bit1) is unpacked
+ * back into its files; anything else is the single file it has always been.
+ * Returns the paths written, first one first.
+ */
+function writeRestored(
+  dir: string,
+  filename: string,
+  content: Uint8Array,
+  bundled: boolean,
+): string[] {
+  if (!bundled) return [writeOut(dir, basename(filename) || 'restored.bin', content)];
+  // unpackBundle reduces every entry to a basename, so nothing can escape `dir`.
+  return unpackBundle(content).map((f) => writeOut(dir, f.name, f.bytes));
 }
 
 export async function runEstimate(

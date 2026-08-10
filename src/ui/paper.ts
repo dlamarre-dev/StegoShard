@@ -37,6 +37,8 @@ import {
 } from './paper-build';
 
 export interface PaperOptions {
+  /** The content is a .zip of several files (SPEC §4 FLAGS bit1). */
+  bundle?: boolean | undefined;
   keyMode: KeyMode;
   title?: string | undefined;
   date?: string | undefined;
@@ -146,6 +148,7 @@ export async function saveFileToPaper(
   const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
     profile: PROFILE_PAPER,
     keyMode: options.keyMode,
+    bundle: options.bundle,
   });
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
   await verifyImageExport(imagePayloads, key.dek, file.name, content);

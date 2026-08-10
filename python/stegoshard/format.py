@@ -5,7 +5,9 @@ from __future__ import annotations
 import gzip
 import io
 import struct
+import zipfile
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from .reedsolomon import reconstruct_data
 
@@ -19,6 +21,7 @@ KEY_BLOCK_PREFIX_LEN = 44  # magic+ver+iter+mem+par+salt+iv+len (before wrapped)
 
 IV_LEN = 12
 FLAG_COMPRESSED = 0x01
+FLAG_BUNDLE = 0x02
 
 # Guards for untrusted input (mirror the TypeScript decoder).
 MAX_CONTENT_BYTES = 1024 * 1024  # image/PDF export cap; bounds gzip on that path
@@ -184,6 +187,40 @@ def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
     o += IV_LEN
     ciphertext = blob[o:]
     return key_block, content_salt, iv, ciphertext
+
+
+def is_bundle(envelope: bytes) -> bool:
+    """True when CONTENT is a .zip of several files (SPEC §4 FLAGS bit 1).
+
+    `parse_envelope` deliberately ignores this bit and returns the .zip as-is:
+    that is what a decoder written before the bit existed does, and proving the
+    payload is still recoverable that way is part of what this reference is for.
+    Callers that want the individual files pass the content to `unpack_bundle`.
+    """
+    if len(envelope) < 1:
+        raise ValueError("payload: too short")
+    return bool(envelope[0] & FLAG_BUNDLE)
+
+
+def unpack_bundle(content: bytes) -> list[tuple[str, bytes]]:
+    """Split a bundle's .zip back into (name, bytes) pairs.
+
+    Each entry is reduced to a basename. The archive comes out of a decrypted
+    vault, but its entry names were chosen by whoever wrote that vault, so a
+    `../` entry must not be able to escape the output directory.
+    """
+    out: list[tuple[str, bytes]] = []
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            name = PurePosixPath(info.filename.replace("\\", "/")).name
+            if not name or name in (".", ".."):
+                continue
+            out.append((name, zf.read(info)))
+    if not out:
+        raise ValueError("bundle: no readable entries")
+    return out
 
 
 def parse_envelope(

@@ -83,7 +83,7 @@ describe('CLI round-trips', () => {
     const content = pattern(3000);
     const input = writeSecret(dir, content);
     const { imageCount } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -106,7 +106,7 @@ describe('CLI round-trips', () => {
     await installUserEntropy('4 1 6 2 5 3 3 6 1 dice rolls from a real die');
     try {
       await runSave({
-        inputFile: input,
+        inputs: [input],
         outDir: join(dir, 'out'),
         password: PW,
         paper: false,
@@ -130,7 +130,7 @@ describe('CLI round-trips', () => {
     const content = pattern(2500, 9);
     const input = writeSecret(dir, content);
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -151,7 +151,7 @@ describe('CLI round-trips', () => {
     const content = pattern(1500, 3);
     const input = writeSecret(dir, content);
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -182,7 +182,7 @@ describe('CLI round-trips', () => {
     const input = writeSecret(dir, content);
     const cover = writeCover(dir);
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -215,7 +215,7 @@ describe('CLI round-trips', () => {
     const input = writeSecret(dir, content);
     const cover = writeJpegCover(dir); // named photo.jpg
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -242,7 +242,7 @@ describe('CLI round-trips', () => {
     const content = pattern(5000, 31);
     const input = writeSecret(dir, content);
     const { files, binary, imageCount } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -267,7 +267,7 @@ describe('CLI round-trips', () => {
     const content = pattern(2000, 37);
     const input = writeSecret(dir, content);
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -303,7 +303,7 @@ describe('CLI round-trips', () => {
       const input = writeSecret(dir, content);
       const cover = writeCover(dir); // named cover.png
       const { files } = await runSave({
-        inputFile: input,
+        inputs: [input],
         outDir: join(dir, 'out'),
         password: PW,
         paper: false,
@@ -340,7 +340,7 @@ describe('CLI round-trips', () => {
     const content = new Uint8Array(300 * 1024); // zeros → gzips to ~1 image
     const input = writeSecret(dir, content);
     const { sizeWarning } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,
@@ -388,7 +388,7 @@ describe('CLI round-trips', () => {
       const input = writeSecret(dir, content);
       const est = await runEstimate(input, false, codec);
       const { imageCount } = await runSave({
-        inputFile: input,
+        inputs: [input],
         outDir: join(dir, 'out'),
         password: PW,
         paper: false,
@@ -415,7 +415,7 @@ describe('CLI round-trips', () => {
     const input = writeSecret(dir, content);
     const outDir = join(dir, 'out');
     const { files, imageCount } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir,
       password: PW,
       paper: false,
@@ -434,7 +434,7 @@ describe('CLI round-trips', () => {
     const content = pattern(5000, 91);
     const input = writeSecret(dir, content);
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: false,

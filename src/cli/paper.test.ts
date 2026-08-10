@@ -36,7 +36,7 @@ describe('CLI paper PDF', () => {
     writeFileSync(input, content);
 
     const { files } = await runSave({
-      inputFile: input,
+      inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
       paper: true,

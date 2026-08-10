@@ -25,6 +25,7 @@ import {
   unlockKeyBlock,
 } from '@core';
 import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
+import { resolveSaveInput } from './bundle';
 
 export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
@@ -81,8 +82,8 @@ export interface StegoInput {
 
 export interface SaveRequest {
   dest: SaveDestination;
-  /** The secret to protect. */
-  file: File;
+  /** The secret(s) to protect. Several files are zipped into one bundle. */
+  files: File[];
   /**
    * The vault key for every destination except `gallery` (which derives its own
    * key from `galleryPassword`). The extension passes its managed session key;
@@ -238,6 +239,9 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> 
 }
 
 async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
+  // One file passes through untouched; several are zipped and marked, so every
+  // destination below sees the single (name, blob) the envelope carries.
+  const { file, bundle } = await resolveSaveInput(req.files);
   if (req.dest === 'gallery') {
     const covers = req.covers ?? [];
     if (!req.galleryPassword) throw new Error('gallery mode requires a password');
@@ -249,7 +253,8 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
     if (accessMode === 'nonpossession' && !req.threshold) {
       throw new Error(msg('errNoThreshold'));
     }
-    const res = await saveGalleryToDisk(req.file, covers, req.galleryPassword, {
+    const res = await saveGalleryToDisk(file, covers, req.galleryPassword, {
+      bundle,
       keyMode,
       stego: req.stego,
       mode: accessMode,
@@ -263,7 +268,8 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
 
   if (req.dest === 'paper') {
     const { saveFileToPaper } = await import('./paper');
-    const { imageCount, manifest } = await saveFileToPaper(req.file, req.key, {
+    const { imageCount, manifest } = await saveFileToPaper(file, req.key, {
+      bundle,
       keyMode,
       title: req.label?.title || undefined,
       date: req.label?.date,
@@ -291,7 +297,8 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
       throw new Error(msg('errDuressInputs'));
     }
     if (accessMode === 'nonpossession' && !req.threshold) throw new Error(msg('errNoThreshold'));
-    const { variant: saved, manifest } = await saveFileToBinary(req.file, req.key, {
+    const { variant: saved, manifest } = await saveFileToBinary(file, req.key, {
+      bundle,
       keyMode,
       variant,
       stego: req.stego,
@@ -307,7 +314,8 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
   }
 
   // disk
-  const { imageCount, manifest } = await saveFileToDisk(req.file, req.key, {
+  const { imageCount, manifest } = await saveFileToDisk(file, req.key, {
+    bundle,
     keyMode,
     codecId: codecIdFor('disk', req.codec),
     label: req.label,

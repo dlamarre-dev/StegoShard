@@ -20,7 +20,8 @@ All multi-byte integers are **big-endian**. All lengths are in bytes.
 
 ```
 file bytes
-  → payload envelope         (§4)   [FLAGS][NAME_LEN][FILENAME][CONTENT], content gzip-optional
+  → payload envelope         (§4)   [FLAGS][NAME_LEN][FILENAME][CONTENT], content gzip-optional,
+                                     optionally a .zip bundle of several files
   → AES-GCM encrypt (DEK)    (§5)   → ciphertext
   → vault blob               (§6)   [KB_LEN][key block][IV][ciphertext]
   → Reed-Solomon erasure     (§7)   k data + m parity shards, equal length
@@ -224,12 +225,25 @@ AES-GCM, §5).
 [ FLAGS 1 ][ NAME_LEN u16 ][ FILENAME (UTF-8, NAME_LEN bytes) ][ CONTENT ]
 ```
 
-- `FLAGS` bit 0 (`0x01`): `CONTENT` is **gzip-compressed** (RFC 1952). Other bits
-  reserved, zero.
+- `FLAGS` bit 0 (`0x01`): `CONTENT` is **gzip-compressed** (RFC 1952).
+- `FLAGS` bit 1 (`0x02`): `CONTENT` is a **.zip holding several files** (a
+  _bundle_). Composable with bit 0. Other bits reserved, zero.
 - `FILENAME`: original file name, UTF-8. Carried **inside** the encrypted envelope,
-  so neither the name nor the file type leaks.
+  so neither the name nor the file type leaks. For a bundle it is `bundle.zip`.
 - `CONTENT`: the original file bytes, gzip-compressed only when that is smaller
   (otherwise stored raw and bit 0 is clear).
+
+**Bundles.** A save of one file never sets bit 1: its envelope is byte-identical
+to what a pre-bundle writer produced. Several files (or a directory) are zipped
+**stored, not deflated** — the envelope gzips the result immediately after, and
+compressing twice buys nothing — and bit 1 is set. A reader that unpacks the zip
+must reduce each entry to a basename before writing: the archive comes out of a
+decrypted vault, but its entry names were chosen by whoever wrote that vault, so
+`../` must not escape the output directory.
+
+A decoder written before bit 1 existed masks only bit 0, so it hands back the
+`.zip` under the name `bundle.zip` instead of unpacking it. That is degraded, not
+wrong, and is why the bit could be added without a version bump.
 
 ---
 

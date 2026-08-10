@@ -184,8 +184,9 @@ export async function buildSegmentedBlob(
   keyMode: KeyMode,
   onProgress?: OnProgress,
   chunkSize: number = DEFAULT_CHUNK_SIZE,
+  bundle = false,
 ): Promise<Uint8Array> {
-  const envelope = await buildPayload(filename, content);
+  const envelope = await buildPayload(filename, content, { bundle });
   onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
 
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
@@ -267,7 +268,7 @@ export async function decodeSegmentedBlob(
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const parsed = parseHeader(blob);
   const kbBytes = parsed.keyBlock.length > 0 ? parsed.keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
@@ -289,7 +290,7 @@ export async function decodeSegmentedBlobWithDek(
   dek: CryptoKey,
   maxContentBytes: number,
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const parsed = parseHeader(blob);
   const cek = await deriveContentKey(dek, parsed.contentSalt);
   const envelope = await decryptChunks(blob, parsed, cek, maxContentBytes, onProgress);
@@ -435,12 +436,13 @@ export async function buildPlainSegmentedBlobMulti(
   onProgress?: OnProgress,
   chunkSize: number = DEFAULT_CHUNK_SIZE,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<{ blob: Uint8Array; regionIndex: number; dek: Uint8Array }> {
   const vaultSalt = randomBytes(VAULT_SALT_LEN);
   const kek = await deriveSlotKek(password, vaultSalt, keyFactor, params);
   const dek = randomBytes(DEK_LEN);
   const regionIndex = randomBytes(1)[0]! & 1;
-  const envelope = await buildPayload(filename, content);
+  const envelope = await buildPayload(filename, content, { bundle });
   onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
   const blob = await buildMultiRegionSegmentedBlob(
     vaultSalt,
@@ -558,7 +560,7 @@ export async function decodeMultiRegionSegmentedBlob(
     secret?: Uint8Array | null;
   },
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const parsed = parseMultiHead(blob, opts.maxContentBytes);
   onProgress?.({ phase: 'unlock', done: 0, total: 0 });
   let candidates: CryptoKey[];
@@ -596,7 +598,7 @@ export async function decodeMultiRegionSegmentedBlobWithDek(
   regionIndex: number,
   maxContentBytes: number,
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const parsed = parseMultiHead(blob, maxContentBytes);
   const stream = parsed.regionArea.subarray(regionIndex * parsed.S, (regionIndex + 1) * parsed.S);
   const envelope = await decryptRegionStream(
