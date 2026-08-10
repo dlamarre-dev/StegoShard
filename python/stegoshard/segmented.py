@@ -122,7 +122,7 @@ def _decrypt_chunks(
 def decode_segmented_blob(
     blob: bytes, password: str, key_block: bytes | None, max_content_bytes: int
 ):
-    """Decode a segmented blob with a password. Returns (filename, content).
+    """Decode a segmented blob with a password. Returns (filename, content, bundled).
 
     Raises MissingKeyError when the key block is neither embedded nor supplied.
     """
@@ -228,7 +228,7 @@ def decode_multiregion_segmented_blob(
     memory_kib: int,
     parallelism: int,
     secret: bytes | None = None,
-) -> tuple[str, bytes]:
+) -> tuple[str, bytes, bool]:
     """Decode a multi-region segmented blob (SPEC §10.7): open the slot array
     (constant-work), then decrypt ONLY the one region the credential unlocks.
     `secret` is the recovered Shamir S for a Mode B (threshold-gated) slot."""

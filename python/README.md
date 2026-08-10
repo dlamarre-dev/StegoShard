@@ -31,7 +31,7 @@ uv pip compile --universal --python-version 3.12 --generate-hashes \
 All dependencies are common PyPI packages with prebuilt wheels (no system
 libraries needed): `zxing-cpp`, `Pillow`, `argon2-cffi`, `cryptography`.
 
-## Use
+## Use from the command line
 
 ```bash
 # Images on disk (a folder, a .zip, or a list of files):
@@ -39,17 +39,127 @@ python -m stegoshard.decode ./my-vault-images/ --out ./restored
 python -m stegoshard.decode stegoshard-abcd1234.zip
 python -m stegoshard.decode page-01.png page-02.png page-03.png
 
-# Keyfile-mode sets need the separate .key (also auto-detected inside a zip/folder):
-python -m stegoshard.decode ./images/ --key stegoshard-abcd1234.key
+# A single binary container (SPEC §8) — a branded .ssbn or a disguised .db:
+python -m stegoshard.decode ./vault/stegoshard-vault.ssbn --out ./restored
+python -m stegoshard.decode ./vault/cache.db --out ./restored
 
-# Gallery Mode (SPEC §9): restore a secret fragmented across a folder of photos,
-# decoded blindly (decoys and foreign photos are ignored automatically):
+# Keyfile-mode sets need the separate key. `--key` takes a .key, a binary key
+# container (settings.db), or the cover photo a stego key is hidden in:
+python -m stegoshard.decode ./images/ --key stegoshard-abcd1234.key
+python -m stegoshard.decode ./vault/cache.db --key ./vault/IMG_2043.png
+
+# Gallery Mode (SPEC §9): a secret fragmented across a folder of photos,
+# decoded blindly — decoys and unrelated photos are ignored automatically:
 python -m stegoshard.decode ./album/ --gallery --out ./restored
 ```
 
 The password is prompted unless you pass `--password`. Restoring tolerates
 missing images (Reed-Solomon erasure coding), and photos of printed pages are
 downscaled automatically before decoding.
+
+**Several files in one vault.** A multi-file save travels as a `.zip` inside the
+envelope (SPEC §4 FLAGS bit 1). The decoder unpacks it for you:
+
+```
+$ python -m stegoshard.decode ./vault/stegoshard-vault.ssbn --out ./restored
+restored 3 files:
+  ./restored/notes.txt
+  ./restored/key.pem
+  ./restored/photo.jpg
+```
+
+## Use as a library
+
+The package exposes the same pipeline the CLI drives. Everything is lazily
+imported, so the pure modules (`gf256`, `reedsolomon`, `format`) work without the
+crypto or QR dependencies installed.
+
+```python
+from pathlib import Path
+from stegoshard import decode_any, decode_vault, decode_vault_binary
+from stegoshard.format import unpack_bundle
+
+# --- from a set of images -------------------------------------------------
+payloads = []
+for path in sorted(Path("my-vault-images").glob("*.png")):
+    payload = decode_any(path.read_bytes())   # None if it is not a vault image
+    if payload is not None:
+        payloads.append(payload)
+
+restored = decode_vault(payloads, "your password")
+
+# --- or from a single binary container (.ssbn / .db) ----------------------
+restored = decode_vault_binary(Path("vault/cache.db").read_bytes(), "your password")
+
+# --- write the result -----------------------------------------------------
+if restored.bundled:                      # several files were saved together
+    for name, data in unpack_bundle(restored.content):
+        Path("restored", name).write_bytes(data)
+else:
+    Path("restored", restored.filename).write_bytes(restored.content)
+```
+
+`decode_vault` and `decode_vault_binary` return a `RestoredFile`
+(`filename`, `content`, `bundled`). Both raise:
+
+| Exception            | Meaning                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WrongPasswordError` | The password did not unwrap the key block. Also raised for a sub-threshold share set, deliberately: a Mode B vault must not confirm that the password was right. |
+| `MissingKeyError`    | A keyfile/stego vault was opened without its external key. Pass `key_block=`.                                                                                    |
+
+### Keys held outside the vault
+
+```python
+from stegoshard import extract_key_block_from_image, unwrap_binary
+
+# A plain .key file:
+key_block = Path("stegoshard-abcd1234.key").read_bytes()
+
+# A binary key container (settings.db beside a disguised cache.db):
+unwrapped = unwrap_binary(Path("vault/settings.db").read_bytes())
+key_block = unwrapped[0] if unwrapped else None
+
+# A key hidden in an ordinary-looking cover photo (stego mode). Keyed by the
+# vault password, so it needs that too:
+key_block = extract_key_block_from_image(Path("IMG_2043.png").read_bytes(), "your password")
+
+restored = decode_vault(payloads, "your password", key_block)
+```
+
+### Threshold shares (non-possession, SPEC §10.6)
+
+A Mode B vault is gated on a quorum of share files the writer never kept. The
+decoder recovers the gating secret from **raw 38-byte shares** and passes it in:
+
+```python
+from stegoshard import decode_vault_binary
+from stegoshard.shamir import shamir_recover
+
+secret = shamir_recover([share_a_bytes, share_b_bytes])   # any k of the n
+restored = decode_vault_binary(container, "your password", secret=secret)
+```
+
+Below the threshold this raises `WrongPasswordError`, exactly as a wrong password
+does — a sub-threshold set must be indistinguishable from a bad credential.
+
+> **Limitation.** The share files the app and the Node CLI write
+> (`recovery-1.txt`) carry the share as a dash-grouped **Crockford base32** token
+> (no `I`, `L`, `O`, `U`), and this decoder has no reader for that text: it takes
+> the 38 raw bytes. Restoring a Mode B vault from the `.txt` files therefore
+> means decoding that token yourself, and `python -m stegoshard.decode` has no
+> `--share` option. Every other path — including a keyfile or stego key — is
+> fully supported here. This is the one place where independent recovery is not
+> yet turnkey.
+
+## What you need to keep
+
+| Key mode   | To restore you need                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `embedded` | The images (or the container) and the password.                                                                            |
+| `keyfile`  | Those, plus the separate `.key` / `settings.db`.                                                                           |
+| `stego`    | Those, plus the cover photo — **stored losslessly**. Re-encoding it (a chat app, a photo service) destroys the hidden key. |
+
+Gallery Mode needs every photo in the set, also losslessly.
 
 ## Layout
 

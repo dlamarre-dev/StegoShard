@@ -149,7 +149,7 @@ def test_vault_blob_decrypts_to_expected_content(v):
 
     dek = unwrap_dek(parse_key_block(key_block_bytes), v["password"])
     cek = derive_content_key(dek, content_salt)
-    filename, content = parse_envelope(decrypt_content(cek, iv, ciphertext))
+    filename, content, _ = parse_envelope(decrypt_content(cek, iv, ciphertext))
     assert filename == v["filename"]
     assert content == _hx(v["contentHex"])
 
@@ -210,7 +210,7 @@ def test_multiregion_vault_blob_rejects_wrong_credential(v):
 @pytest.mark.parametrize("v", VECTORS["multiRegionSegmentedBlob"], ids=lambda v: v["name"])
 def test_multiregion_segmented_blob_decodes_like_typescript(v):
     """The .db-geometry multi-region segmented blob (§10.7) decodes identically."""
-    filename, content = decode_multiregion_segmented_blob(
+    filename, content, _ = decode_multiregion_segmented_blob(
         _hx(v["blobHex"]),
         v["password"],
         _factor(v),

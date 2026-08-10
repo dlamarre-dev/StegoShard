@@ -50,6 +50,9 @@ class MissingKeyError(Exception):
 class RestoredFile:
     filename: str
     content: bytes
+    #: CONTENT is a .zip of several files (SPEC §4 FLAGS bit 1). Pass it to
+    #: ``stegoshard.format.unpack_bundle`` to get the originals back.
+    bundled: bool = False
 
 
 def decode_vault(
@@ -121,8 +124,8 @@ def _decode_vault_blob(
     dek = unwrap_dek(parse_key_block(kb_bytes), password)
     cek = derive_content_key(dek, content_salt)
     envelope = decrypt_content(cek, iv, ciphertext)
-    filename, content = parse_envelope(envelope, max_content_bytes)
-    return RestoredFile(filename, content)
+    filename, content, bundled = parse_envelope(envelope, max_content_bytes)
+    return RestoredFile(filename, content, bundled)
 
 
 def decode_multiregion_vault_blob(
@@ -150,8 +153,8 @@ def decode_multiregion_vault_blob(
     cek = derive_region_key(dek, content_salt, region_index)
     plaintext = AESGCM(cek).decrypt(iv, ciphertext, None)
     envelope = parse_region_plaintext(plaintext, max_content_bytes)
-    filename, content = parse_envelope(envelope, max_content_bytes)
-    return RestoredFile(filename, content)
+    filename, content, bundled = parse_envelope(envelope, max_content_bytes)
+    return RestoredFile(filename, content, bundled)
 
 
 def decode_vault_binary(
@@ -173,7 +176,7 @@ def decode_vault_binary(
     S for a Mode B (threshold-gated) .db vault — the two compose as extra layers."""
     unwrapped = unwrap_binary(container)
     if unwrapped is not None and unwrapped[1] == "disguised":
-        filename, content = decode_multiregion_segmented_blob(
+        filename, content, bundled = decode_multiregion_segmented_blob(
             unwrapped[0],
             password,
             key_factor,
@@ -183,7 +186,9 @@ def decode_vault_binary(
             parallelism,
             secret,
         )
-        return RestoredFile(filename, content)
+        return RestoredFile(filename, content, bundled)
     blob = unwrapped[0] if unwrapped else container
-    filename, content = decode_segmented_blob(blob, password, key_block, MAX_CONTENT_BYTES_BINARY)
-    return RestoredFile(filename, content)
+    filename, content, bundled = decode_segmented_blob(
+        blob, password, key_block, MAX_CONTENT_BYTES_BINARY
+    )
+    return RestoredFile(filename, content, bundled)

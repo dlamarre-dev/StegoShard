@@ -190,13 +190,7 @@ def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
 
 
 def is_bundle(envelope: bytes) -> bool:
-    """True when CONTENT is a .zip of several files (SPEC §4 FLAGS bit 1).
-
-    `parse_envelope` deliberately ignores this bit and returns the .zip as-is:
-    that is what a decoder written before the bit existed does, and proving the
-    payload is still recoverable that way is part of what this reference is for.
-    Callers that want the individual files pass the content to `unpack_bundle`.
-    """
+    """True when CONTENT is a .zip of several files (SPEC §4 FLAGS bit 1)."""
     if len(envelope) < 1:
         raise ValueError("payload: too short")
     return bool(envelope[0] & FLAG_BUNDLE)
@@ -225,7 +219,14 @@ def unpack_bundle(content: bytes) -> list[tuple[str, bytes]]:
 
 def parse_envelope(
     envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES
-) -> tuple[str, bytes]:
+) -> tuple[str, bytes, bool]:
+    """Split an envelope into (filename, content, bundled) — SPEC §4.
+
+    `bundled` reports FLAGS bit 1; the caller decides whether to `unpack_bundle`
+    the content. A reader that ignores the bit entirely still recovers the .zip
+    intact, which `test_bundle.py` asserts — that is the property that let the
+    bit be added without a format version bump.
+    """
     if len(envelope) < 3:
         raise ValueError("payload: too short")
     flags = envelope[0]
@@ -244,4 +245,4 @@ def parse_envelope(
             raise ValueError("decompressed data exceeds the allowed size")
     else:
         content = stored
-    return filename, content
+    return filename, content, bool(flags & FLAG_BUNDLE)

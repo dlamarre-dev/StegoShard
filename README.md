@@ -334,6 +334,9 @@ tool.
 | [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                     |
 | [Format specification](SPEC.md)                                                                        | The beta on-disk / on-image format candidate (`FORMAT_VERSION = 1`).                            |
 | [Cryptographic review dossier](docs/CRYPTO-REVIEW.md)                                                  | Claims → where enforced → which test proves it, for auditors.                                   |
+| [Claims register](docs/CLAIMS.md)                                                                      | Every security/resilience claim, its evidence, and the limits it does **not** cover.            |
+| [Python reference decoder](python/README.md)                                                           | Restore a vault without the extension: install, CLI, and the library API.                       |
+| [Release QA protocol](docs/QA.md)                                                                      | The physical capture matrix a release is signed off against (print, photo, scan).               |
 | [Roadmap](docs/ROADMAP.md) · [Privacy](docs/PRIVACY.md) · [Terms](docs/TERMS.md)                       | Direction, privacy policy, terms of use.                                                        |
 | [Localization](docs/LOCALIZATION.md) · [Store guide](docs/STORE.md) · [Versioning](docs/VERSIONING.md) | Translation setup, store submission, format-version policy.                                     |
 | [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)                                              | How to contribute; how to report vulnerabilities.                                               |
