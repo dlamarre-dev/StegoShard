@@ -335,3 +335,97 @@ def test_binary_disguised_np_stego_composes():
         container, manifest["password"], key_factor=factor, secret=secret
     )
     assert restored.content == expected
+
+
+# --- The cross-implementation matrix: every save path, Node encodes → Python
+# --- restores. Added after three separate asymmetries (multi-file bundles, then
+# --- share files) were each found by hand rather than by CI.
+
+
+def test_bundle_from_images_restores_every_file():
+    """A multi-file save (SPEC §4 FLAGS bit 1) carried by an image set."""
+    from stegoshard.format import unpack_bundle
+
+    d = FIXTURES / "bundle-images"
+    manifest = json.loads((d / "manifest.json").read_text())
+    payloads = []
+    for img in sorted(d.glob("image-*.png")):
+        payload = decode_any(img.read_bytes())
+        assert payload is not None, f"failed to decode {img.name}"
+        payloads.append(payload)
+
+    restored = decode_vault(payloads, manifest["password"])
+    assert restored.bundled, "the bundle flag did not survive the image round trip"
+    assert restored.filename == manifest["filename"]
+
+    files = dict(unpack_bundle(restored.content))
+    assert sorted(files) == sorted(manifest["entries"])
+    for name in manifest["entries"]:
+        assert files[name] == (d / f"expected-{name}").read_bytes()
+
+
+def test_bundle_from_a_binary_container_restores_every_file():
+    """The same bundle in a single .ssbn — the flag rides in the envelope, so it
+    must survive whichever container carries it."""
+    from stegoshard import decode_vault_binary
+    from stegoshard.format import unpack_bundle
+
+    d = FIXTURES / "bundle-binary"
+    manifest = json.loads((d / "manifest.json").read_text())
+    restored = decode_vault_binary((d / manifest["vault"]).read_bytes(), manifest["password"])
+    assert restored.bundled
+
+    files = dict(unpack_bundle(restored.content))
+    assert sorted(files) == sorted(manifest["entries"])
+    for name in manifest["entries"]:
+        assert files[name] == (d / f"expected-{name}").read_bytes()
+
+
+def test_duress_container_opens_both_ways():
+    """Mode A (§10.9): the real password yields the real payload, the duress one a
+    decoy, and neither unlock says which region it opened."""
+    from stegoshard import decode_vault_binary
+
+    d = FIXTURES / "binary-disguised-duress"
+    manifest = json.loads((d / "manifest.json").read_text())
+    container = (d / manifest["vault"]).read_bytes()
+
+    real = decode_vault_binary(container, manifest["password"])
+    assert real.content == (d / "expected.bin").read_bytes()
+    assert real.filename == manifest["filename"]
+
+    decoy = decode_vault_binary(container, manifest["duressPassword"])
+    assert decoy.content == (d / "expected-decoy.bin").read_bytes()
+    assert decoy.filename == manifest["decoyFilename"]
+
+    # §10.10 on the Python side: the two unlocks expose the same surface, so
+    # nothing in the result distinguishes the real region from the decoy.
+    assert vars(real).keys() == vars(decoy).keys()
+
+    with pytest.raises(WrongPasswordError):
+        decode_vault_binary(container, "neither of the two passwords")
+
+
+def test_non_possession_from_the_share_files_a_user_is_handed():
+    """Mode B (§10.6) restored from `recovery-N.txt` — the dash-grouped Crockford
+    base32 the app writes, not the raw 38 bytes the older fixture ships."""
+    from stegoshard import decode_vault_binary
+    from stegoshard.shamir import decode_share_text, shamir_recover
+
+    d = FIXTURES / "binary-disguised-np-sharetext"
+    manifest = json.loads((d / "manifest.json").read_text())
+    container = (d / manifest["vault"]).read_bytes()
+    texts = sorted(d.glob("recovery-*.txt"))
+    assert len(texts) == manifest["n"]
+
+    shares = [decode_share_text(p.read_text()) for p in texts[: manifest["k"]]]
+    restored = decode_vault_binary(container, manifest["password"], secret=shamir_recover(shares))
+    assert restored.content == (d / "expected.bin").read_bytes()
+
+    # One short of the quorum is indistinguishable from a wrong password.
+    with pytest.raises(WrongPasswordError):
+        decode_vault_binary(
+            container,
+            manifest["password"],
+            secret=shamir_recover(shares[: manifest["k"] - 1]),
+        )
