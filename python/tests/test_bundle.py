@@ -6,7 +6,6 @@ import io
 import zipfile
 
 import pytest
-
 from stegoshard.format import FLAG_BUNDLE, is_bundle, unpack_bundle
 
 

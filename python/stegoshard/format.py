@@ -6,8 +6,8 @@ import gzip
 import io
 import struct
 import zipfile
-from pathlib import PurePosixPath
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from .reedsolomon import reconstruct_data
 
