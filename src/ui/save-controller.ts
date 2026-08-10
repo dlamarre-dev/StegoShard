@@ -13,6 +13,7 @@
 import {
   type BinaryVariant,
   type KeyMode,
+  type ManifestEntry,
   type OnProgress,
   type VaultKey,
   CODEC_COLOR_GRID,
@@ -181,9 +182,26 @@ function galleryNote(msg: Msg, keyMode: KeyMode, imageCount: number): string {
 }
 
 /**
+ * The result of a save: the localized summary line, plus what was actually
+ * written.
+ *
+ * The manifest is not decoration. Deniable destinations name their artifacts
+ * after nothing in particular — `cache.db`, `recovery-1.txt` — so without a list
+ * saying which file is which, the user is left guessing. It is returned for
+ * every destination, because that need does not depend on the naming.
+ */
+export interface SaveOutcome {
+  note: string;
+  manifest: ManifestEntry[];
+}
+
+/**
  * What the user must keep to restore, given the destination and key mode, plus
  * whether the artifacts must be stored losslessly (the fragile LSB carriers).
  * Returns i18n keys so both surfaces render the same recovery checklist.
+ *
+ * Complements `SaveOutcome.manifest`: this says what to keep, that says what was
+ * created.
  */
 export interface RecoveryGuidance {
   items: string[];
@@ -210,7 +228,7 @@ export function recoveryGuidance(dest: SaveDestination, keyMode: KeyMode): Recov
  * not ask it for. The pipeline worker runs on its own thread with its own module
  * state, so requests routed through it carry the string along (see disk.ts).
  */
-export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
+export async function runSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
   if (req.userEntropy) await installUserEntropy(req.userEntropy);
   try {
     return await performSave(req, msg);
@@ -219,7 +237,7 @@ export async function runSave(req: SaveRequest, msg: Msg): Promise<{ note: strin
   }
 }
 
-async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }> {
+async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
   if (req.dest === 'gallery') {
     const covers = req.covers ?? [];
     if (!req.galleryPassword) throw new Error('gallery mode requires a password');
@@ -237,7 +255,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
       mode: accessMode,
       threshold: req.threshold,
     });
-    return { note: galleryNote(msg, keyMode, res.imageCount) };
+    return { note: galleryNote(msg, keyMode, res.imageCount), manifest: res.manifest };
   }
 
   if (!req.key) throw new Error('a vault key is required');
@@ -245,7 +263,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
 
   if (req.dest === 'paper') {
     const { saveFileToPaper } = await import('./paper');
-    const { imageCount } = await saveFileToPaper(req.file, req.key, {
+    const { imageCount, manifest } = await saveFileToPaper(req.file, req.key, {
       keyMode,
       title: req.label?.title || undefined,
       date: req.label?.date,
@@ -255,7 +273,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
       stego: req.stego,
       locale: req.locale,
     });
-    return { note: msg('statusSavedPdf', String(imageCount)) };
+    return { note: msg('statusSavedPdf', String(imageCount)), manifest };
   }
 
   if (req.dest === 'binary' || req.dest === 'sqlite') {
@@ -273,7 +291,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
       throw new Error(msg('errDuressInputs'));
     }
     if (accessMode === 'nonpossession' && !req.threshold) throw new Error(msg('errNoThreshold'));
-    const { variant: saved } = await saveFileToBinary(req.file, req.key, {
+    const { variant: saved, manifest } = await saveFileToBinary(req.file, req.key, {
       keyMode,
       variant,
       stego: req.stego,
@@ -285,16 +303,16 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<{ note: string }
       userEntropy: req.userEntropy,
       onProgress: req.onProgress,
     });
-    return { note: binaryNote(msg, keyMode, saved) };
+    return { note: binaryNote(msg, keyMode, saved), manifest };
   }
 
   // disk
-  const { imageCount } = await saveFileToDisk(req.file, req.key, {
+  const { imageCount, manifest } = await saveFileToDisk(req.file, req.key, {
     keyMode,
     codecId: codecIdFor('disk', req.codec),
     label: req.label,
     asZip: req.asZip ?? true,
     stego: req.stego,
   });
-  return { note: diskNote(msg, keyMode, imageCount) };
+  return { note: diskNote(msg, keyMode, imageCount), manifest };
 }

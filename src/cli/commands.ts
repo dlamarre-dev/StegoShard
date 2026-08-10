@@ -61,8 +61,10 @@ import {
   shamirRecover,
   randomBytes,
   KEY_FACTOR_LEN,
+  type FilePurpose,
   type ImageDataLike,
   type KeyMode,
+  type ManifestEntry,
   type OnProgress,
   type VaultKey,
 } from '@core';
@@ -98,11 +100,35 @@ function writeOut(dir: string, name: string, bytes: Uint8Array): string {
   return path;
 }
 
+/**
+ * One written file plus what it is for.
+ *
+ * Recorded at the point of writing rather than inferred from the name later:
+ * the deniable destinations name their artifacts `cache.db` / `recovery-1.txt`
+ * precisely so the name says nothing, which makes after-the-fact classification
+ * both unreliable and self-defeating.
+ */
+type OutFile = { path: string; purpose: FilePurpose };
+
+/** Write a file and record its purpose. */
+function emit(dir: string, name: string, bytes: Uint8Array, purpose: FilePurpose): OutFile {
+  return { path: writeOut(dir, name, bytes), purpose };
+}
+
+/**
+ * Shape the written files for `SaveResult`. `files` is derived from `manifest`
+ * rather than tracked alongside it, so the two cannot fall out of step.
+ */
+const asFiles = (outs: readonly OutFile[]) => ({
+  files: outs.map((o) => o.path),
+  manifest: outs.map((o) => ({ name: o.path, purpose: o.purpose })),
+});
+
 /** Write the external key artifact, copying the cover's timestamps when stego. */
 function writeExternalKey(
   dir: string,
   ext: { name: string; bytes: Uint8Array; mimicPath?: string },
-): string {
+): OutFile {
   const path = writeOut(dir, ext.name, ext.bytes);
   if (ext.mimicPath) {
     try {
@@ -112,7 +138,8 @@ function writeExternalKey(
       // timestamp mimicry is best-effort
     }
   }
-  return path;
+  // `mimicPath` is set only when the key rode inside the user's cover photo.
+  return { path, purpose: ext.mimicPath ? 'stegoCover' : 'keyfile' };
 }
 
 async function makeKey(password: string): Promise<VaultKey> {
@@ -162,7 +189,10 @@ export interface SaveOptions {
 }
 
 export interface SaveResult {
+  /** Written paths, in write order. Derived from `manifest`. */
   files: string[];
+  /** The same files, each tagged with what it is for. */
+  manifest: ManifestEntry[];
   imageCount: number;
   setId: string;
   keyMode: KeyMode;
@@ -219,11 +249,16 @@ async function runSaveDisguised(
 
   /** Deliver the minted key factor as a .key container (keyfile) or hidden in a
    *  cover photo (stego), keyed by the per-save password. */
-  async function deliverFactor(): Promise<string[]> {
+  async function deliverFactor(): Promise<OutFile[]> {
     if (!keyFactor) return [];
     if (keyMode === 'keyfile') {
       return [
-        writeOut(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised')),
+        emit(
+          opts.outDir,
+          binaryKeyName('disguised'),
+          wrapBinary(keyFactor, 'disguised'),
+          'keyfile',
+        ),
       ];
     }
     const ext = await externalKey('stego', keyFactor, '', opts.password, opts.cover, 'factor');
@@ -247,8 +282,8 @@ async function runSaveDisguised(
       DEFAULT_ARGON2,
       onProgress,
     );
-    const files = [writeOut(opts.outDir, outName, container), ...(await deliverFactor())];
-    return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+    const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
+    return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
   }
 
   if (mode === 'nonpossession') {
@@ -264,20 +299,22 @@ async function runSaveDisguised(
       DEFAULT_ARGON2,
       onProgress,
     );
-    const files = [writeOut(opts.outDir, outName, container), ...(await deliverFactor())];
+    const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
     shares.forEach((share, i) => {
+      // Deniable path: neutral filename and a neutral heading inside the file.
       const body = shareFileText(
         share,
         i + 1,
         n,
         k,
         'and load them at restore with --share <file>.',
+        'neutral',
       );
-      files.push(
-        writeOut(opts.outDir, `stegoshard-share-${i + 1}.txt`, new TextEncoder().encode(body)),
+      outs.push(
+        emit(opts.outDir, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'),
       );
     });
-    return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+    return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
   }
 
   // plain
@@ -289,18 +326,18 @@ async function runSaveDisguised(
     onProgress,
   );
   await verifyDisguisedExport(container, dek, regionIndex, name, content, onProgress);
-  const files = [writeOut(opts.outDir, outName, container)];
+  const outs = [emit(opts.outDir, outName, container, 'vault')];
   if (keyMode === 'keyfile') {
-    files.push(
-      writeOut(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyBlock, 'disguised')),
+    outs.push(
+      emit(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyBlock, 'disguised'), 'keyfile'),
     );
   } else if (keyMode === 'stego') {
     // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
     // cover, keyed by the same per-save password that derives the slot KEK.
     const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover, 'factor');
-    if (ext) files.push(writeExternalKey(opts.outDir, ext));
+    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
   }
-  return { files, imageCount: 0, setId: '', keyMode, binary: 'disguised' };
+  return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
 }
 
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
@@ -330,14 +367,16 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       onProgress,
     );
     await verifyBinaryExport(container, key.dek, basename(opts.inputFile), content, onProgress);
-    const files = [writeOut(opts.outDir, binaryVaultName(variant), container)];
+    const outs = [emit(opts.outDir, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
       const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
-      if (ext) files.push(writeExternalKey(opts.outDir, ext));
+      if (ext) outs.push(writeExternalKey(opts.outDir, ext));
     } else if (keyMode === 'keyfile') {
-      files.push(writeOut(opts.outDir, binaryKeyName(variant), wrapBinary(keyBlock, variant)));
+      outs.push(
+        emit(opts.outDir, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'),
+      );
     }
-    return { files, imageCount: 0, setId: '', keyMode, binary: variant };
+    return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: variant };
   }
 
   const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
@@ -354,7 +393,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
   await verifyImageExport(imagePayloads, key.dek, basename(opts.inputFile), content);
   const setHex = toHex(setId);
-  const files: string[] = [];
+  const outs: OutFile[] = [];
   const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
   // Large secrets sprawl into many images; nudge toward --binary before writing.
   const sizeWarning =
@@ -374,10 +413,10 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       keyLocation: opts.keyLocation,
       fontPath: opts.fontPath,
     });
-    files.push(writeOut(opts.outDir, `stegoshard-${setHex}.pdf`, built.pdf));
-    if (ext) files.push(writeExternalKey(opts.outDir, ext));
+    outs.push(emit(opts.outDir, `stegoshard-${setHex}.pdf`, built.pdf, 'document'));
+    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
     return {
-      files,
+      ...asFiles(outs),
       imageCount: imagePayloads.length,
       setId: setHex,
       keyMode,
@@ -407,16 +446,18 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
     if (ext && keyMode === 'keyfile') entries[ext.name] = ext.bytes;
-    files.push(writeOut(opts.outDir, `stegoshard-${setHex}.zip`, zipSync(entries, { level: 0 })));
+    outs.push(
+      emit(opts.outDir, `stegoshard-${setHex}.zip`, zipSync(entries, { level: 0 }), 'archive'),
+    );
     // The stego image is always delivered on its own (an innocuous photo).
-    if (ext && keyMode === 'stego') files.push(writeExternalKey(opts.outDir, ext));
+    if (ext && keyMode === 'stego') outs.push(writeExternalKey(opts.outDir, ext));
   } else {
-    for (const p of pngs) files.push(writeOut(opts.outDir, p.name, p.bytes));
-    if (ext) files.push(writeExternalKey(opts.outDir, ext));
+    for (const p of pngs) outs.push(emit(opts.outDir, p.name, p.bytes, 'vault'));
+    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
   }
 
   return {
-    files,
+    ...asFiles(outs),
     imageCount: imagePayloads.length,
     setId: setHex,
     keyMode,
@@ -551,7 +592,10 @@ export interface GallerySaveOptions {
 }
 
 export interface GallerySaveResult {
+  /** Written paths, in write order. Derived from `manifest`. */
   files: string[];
+  /** The same files, each tagged with what it is for. */
+  manifest: ManifestEntry[];
   k: number;
   m: number;
   decoys: number;
@@ -600,13 +644,13 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
   const setHex = toHex(res.setId);
 
   const used = new Set<string>();
-  const files = res.images.map((img) => {
+  const outs: OutFile[] = res.images.map((img) => {
     const f = galleryImageToFile(img);
     let name = f.name;
     // Two covers can share a basename; disambiguate so nothing is overwritten.
     for (let n = 2; used.has(name); n++) name = f.name.replace(/(\.[^.]+)?$/, `-${n}$1`);
     used.add(name);
-    return writeOut(opts.outDir, name, f.bytes);
+    return emit(opts.outDir, name, f.bytes, 'photos');
   });
   // Deliver the external key alongside the photos for keyfile/stego galleries.
   // Gallery is a multi-region path → the external artifact is the 32-byte factor.
@@ -618,24 +662,26 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     opts.keyCover,
     'factor',
   );
-  if (ext) files.push(writeExternalKey(opts.outDir, ext));
+  if (ext) outs.push(writeExternalKey(opts.outDir, ext));
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {
     const { k, n } = opts.threshold;
     res.shares.forEach((share, i) => {
+      // Gallery is a deniable destination: neutral filename, neutral heading.
       const body = shareFileText(
         share,
         i + 1,
         n,
         k,
         'and load them at restore with --share <file>.',
+        'neutral',
       );
-      files.push(
-        writeOut(opts.outDir, `stegoshard-share-${i + 1}.txt`, new TextEncoder().encode(body)),
+      outs.push(
+        emit(opts.outDir, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'),
       );
     });
   }
-  return { files, k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
+  return { ...asFiles(outs), k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
 }
 
 export interface GalleryRestoreResult {

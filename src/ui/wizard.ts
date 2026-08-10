@@ -7,8 +7,13 @@
  * each supplies its differences through a `WizardEnv`.
  */
 
-import { type KeyMode, type VaultKey } from '@core';
-import { friendlyError as friendlyErrorWith, reflectFiles, wireDropzone } from './domhelpers';
+import { type KeyMode, type ManifestEntry, type VaultKey } from '@core';
+import {
+  friendlyError as friendlyErrorWith,
+  reflectFiles,
+  renderManifest,
+  wireDropzone,
+} from './domhelpers';
 import {
   CODEC_CHOICES,
   type CodecChoice,
@@ -816,9 +821,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         }
         const req = await buildSaveRequest();
         req.onProgress = prog.onProgress;
-        const { note } = await runSave(req, msg);
+        const { note, manifest } = await runSave(req, msg);
         prog.done();
-        showDone(note);
+        showDone(note, manifest);
       } else {
         const { note } = await runRestore(
           {
@@ -860,7 +865,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     return { bar, fill };
   }
 
-  function showDone(note: string): void {
+  function showDone(note: string, manifest: readonly ManifestEntry[] = []): void {
     state.done = true;
     // Don't keep the plaintext password alive in the closure after completion.
     state.savePassword = '';
@@ -881,6 +886,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             text: msg(state.action === 'save' ? 'savedTitle' : 'restoredTitle'),
           }),
           h('p', { class: 'result-note', text: note }),
+          // What was written, before what to keep: on the deniable destinations
+          // these filenames are the only thing identifying the downloads.
+          renderManifest(manifest, msg),
           guidance
             ? h(
                 'div',

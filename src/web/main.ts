@@ -15,7 +15,15 @@ import {
   type KeyMode,
   type VaultKey,
 } from '@core';
-import { el, pick, reflectFiles, setStatus, show, wireDropzone } from '../ui/domhelpers';
+import {
+  el,
+  pick,
+  reflectFiles,
+  renderManifest,
+  setStatus,
+  show,
+  wireDropzone,
+} from '../ui/domhelpers';
 import {
   type Estimates,
   envelopeLenForEstimate,
@@ -458,9 +466,16 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     const req = await build();
     req.userEntropy = entropy || undefined;
     req.onProgress = prog.onProgress;
-    const { note } = await runSave(req, msg);
+    const { note, manifest } = await runSave(req, msg);
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
+    // Name every file that was just written. On the deniable destinations the
+    // names are deliberately anonymous, so this is the only thing telling the
+    // user which download is the vault and which is the key.
+    const files = el('save-recovery');
+    files.replaceChildren();
+    const rendered = renderManifest(manifest, msg);
+    if (rendered) files.append(rendered);
     show(saveResult, true);
     savePw.value = ''; // don't leave the secret in the field after use
     duressPw.value = '';

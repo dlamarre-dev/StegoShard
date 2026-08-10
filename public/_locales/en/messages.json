@@ -971,6 +971,30 @@
   "recoveryLossless": {
     "message": "Keep these exactly as saved — resizing, re-compressing, or sending them through a service that re-encodes images destroys them."
   },
+  "filesCreatedHeading": {
+    "message": "Files created:"
+  },
+  "filePurposeVault": {
+    "message": "The vault — holds your file"
+  },
+  "filePurposeArchive": {
+    "message": "All images bundled in one .zip"
+  },
+  "filePurposeDocument": {
+    "message": "Printable sheet"
+  },
+  "filePurposePhotos": {
+    "message": "Fragment photos — keep the whole set"
+  },
+  "filePurposeKeyfile": {
+    "message": "Separate key — needed with your password"
+  },
+  "filePurposeStegoCover": {
+    "message": "Photo holding the hidden key"
+  },
+  "filePurposeShare": {
+    "message": "Recovery share — for one holder"
+  },
   "onboardingTitle": {
     "message": "Welcome to StegoShard"
   },

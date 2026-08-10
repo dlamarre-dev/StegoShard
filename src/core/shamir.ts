@@ -103,10 +103,25 @@ export function encodeShareText(share: Uint8Array): string {
 }
 
 /**
+ * Wording of the share file's first line.
+ *
+ * The deniable destinations (disguised `.db`, gallery) name nothing after the
+ * project — a generically named `.txt` whose first line reads "StegoShard"
+ * would give the whole set away the moment anyone opened it. The overt
+ * destinations keep the branded heading, which is a useful self-identifying cue
+ * when you find a share years later.
+ */
+export type ShareTextStyle = 'branded' | 'neutral';
+
+/**
  * The body of a per-holder share `.txt` (§10.8 item 4): the encoded share, how to
  * gather + load a quorum, and the "holding a share makes you a target" warning.
  * `loadHint` is the one surface-specific line (e.g. the CLI's `--share` vs the app's
  * unlock flow), so the CLI and the app produce byte-identical files otherwise.
+ *
+ * Only the heading varies with `style`; the encoded body and both warning lines
+ * are identical either way, so a share stays parseable regardless of which
+ * destination wrote it.
  */
 export function shareFileText(
   share: Uint8Array,
@@ -114,9 +129,14 @@ export function shareFileText(
   n: number,
   k: number,
   loadHint: string,
+  style: ShareTextStyle = 'branded',
 ): string {
+  const heading =
+    style === 'neutral'
+      ? `Recovery share ${index} of ${n}`
+      : `StegoShard threshold share ${index} of ${n}`;
   return (
-    `StegoShard threshold share ${index} of ${n}\n\n` +
+    `${heading}\n\n` +
     `${encodeShareText(share)}\n\n` +
     `Gather any ${k} of the ${n} shares ${loadHint}\n` +
     `Holding a share makes YOU a point of pressure — keep it accordingly.\n`

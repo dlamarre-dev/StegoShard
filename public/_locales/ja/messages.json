@@ -882,6 +882,30 @@
   "recoveryLossless": {
     "message": "保存されたままの状態で保管してください。リサイズ・再圧縮、または画像を再エンコードするサービスを通すと破損します。"
   },
+  "filesCreatedHeading": {
+    "message": "作成されたファイル:"
+  },
+  "filePurposeVault": {
+    "message": "保管庫 — ファイル本体が入っています"
+  },
+  "filePurposeArchive": {
+    "message": "すべての画像をまとめた .zip"
+  },
+  "filePurposeDocument": {
+    "message": "印刷用シート"
+  },
+  "filePurposePhotos": {
+    "message": "断片の写真 — セット全体を保管してください"
+  },
+  "filePurposeKeyfile": {
+    "message": "別鍵 — パスワードと併せて必要です"
+  },
+  "filePurposeStegoCover": {
+    "message": "鍵を隠した写真"
+  },
+  "filePurposeShare": {
+    "message": "復元シェア — 保有者 1 名分"
+  },
   "onboardingTitle": {
     "message": "StegoShard へようこそ"
   },

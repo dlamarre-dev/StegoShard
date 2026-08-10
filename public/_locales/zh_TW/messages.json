@@ -882,6 +882,30 @@
   "recoveryLossless": {
     "message": "請原樣保存——縮放、重新壓縮，或透過會重新編碼影像的服務傳送都會使其損毀。"
   },
+  "filesCreatedHeading": {
+    "message": "已建立的檔案："
+  },
+  "filePurposeVault": {
+    "message": "保險庫 — 存放您的檔案"
+  },
+  "filePurposeArchive": {
+    "message": "所有影像打包成一個 .zip"
+  },
+  "filePurposeDocument": {
+    "message": "可列印的頁面"
+  },
+  "filePurposePhotos": {
+    "message": "碎片照片 — 請保留整組"
+  },
+  "filePurposeKeyfile": {
+    "message": "獨立金鑰 — 需與密碼一起使用"
+  },
+  "filePurposeStegoCover": {
+    "message": "藏有金鑰的照片"
+  },
+  "filePurposeShare": {
+    "message": "復原分片 — 供一位持有者保管"
+  },
   "onboardingTitle": {
     "message": "歡迎使用 StegoShard"
   },

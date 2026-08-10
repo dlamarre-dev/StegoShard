@@ -19,6 +19,7 @@ import {
   toHex,
   verifyImageExport,
   type KeyMode,
+  type ManifestEntry,
   type VaultKey,
 } from '@core';
 import { downloadBlob, embedKeyImage, imageDataToPngBlob, stegoKeyName } from './image-io';
@@ -138,7 +139,7 @@ export async function saveFileToPaper(
   file: File,
   key: VaultKey,
   options: PaperOptions,
-): Promise<{ imageCount: number; setId: string; keyMode: KeyMode }> {
+): Promise<{ imageCount: number; setId: string; keyMode: KeyMode; manifest: ManifestEntry[] }> {
   assertBlobSize(file, MAX_FILE_BYTES);
   if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
@@ -168,23 +169,24 @@ export async function saveFileToPaper(
     keyLocation: options.keyLocation,
   });
 
-  downloadBlob(
-    new Blob([pdfBytes as BufferSource], { type: 'application/pdf' }),
-    `stegoshard-${setHex}.pdf`,
-  );
+  const manifest: ManifestEntry[] = [];
+  const pdfName = `stegoshard-${setHex}.pdf`;
+  manifest.push({ name: pdfName, purpose: 'document' });
+  downloadBlob(new Blob([pdfBytes as BufferSource], { type: 'application/pdf' }), pdfName);
 
   // For keyfile/stego modes the key block is not on paper — deliver it too:
   // hidden in the cover photo (stego) or as a plain .key file (keyfile).
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
-    downloadBlob(
-      new Blob([key.bytes as BufferSource], { type: key.mime }),
-      stegoKeyName(options.stego.cover.name, key.ext, setHex),
-    );
+    const name = stegoKeyName(options.stego.cover.name, key.ext, setHex);
+    manifest.push({ name, purpose: 'stegoCover' });
+    downloadBlob(new Blob([key.bytes as BufferSource], { type: key.mime }), name);
   } else if (keyMode !== 'embedded') {
-    downloadBlob(new Blob([keyBlock as BufferSource]), `stegoshard-${setHex}.key`);
+    const name = `stegoshard-${setHex}.key`;
+    manifest.push({ name, purpose: 'keyfile' });
+    downloadBlob(new Blob([keyBlock as BufferSource]), name);
   }
 
-  return { imageCount: imagePayloads.length, setId: setHex, keyMode };
+  return { imageCount: imagePayloads.length, setId: setHex, keyMode, manifest };
 }

@@ -1,7 +1,16 @@
 import browser from 'webextension-polyfill';
 import { friendlyError as friendlyErrorWith } from './domhelpers';
 
-export { el, show, setStatus, pick, errText, wireDropzone, reflectFiles } from './domhelpers';
+export {
+  el,
+  show,
+  setStatus,
+  pick,
+  errText,
+  wireDropzone,
+  reflectFiles,
+  renderManifest,
+} from './domhelpers';
 
 /** Localized message lookup (extension: chrome.i18n). */
 export function msg(key: string, subs?: string | string[]): string {

@@ -6,6 +6,7 @@
 
 export * from './bytes';
 export * from './types';
+export * from './manifest';
 export * from './crc32';
 export * from './brand';
 export * from './gf256';

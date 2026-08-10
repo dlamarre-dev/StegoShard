@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { WARN_FILE_BYTES, type KeyMode } from '@core';
+import { WARN_FILE_BYTES, type KeyMode, type ManifestEntry } from '@core';
 import {
   type Estimates,
   envelopeLenForEstimate,
@@ -8,7 +8,17 @@ import {
   formatSize,
 } from './estimate';
 import { localizeDom } from './i18n';
-import { el, friendlyError, msg, pick, reflectFiles, setStatus, show, wireDropzone } from './dom';
+import {
+  el,
+  friendlyError,
+  msg,
+  pick,
+  reflectFiles,
+  renderManifest,
+  setStatus,
+  show,
+  wireDropzone,
+} from './dom';
 import { getSession, isKeySet, lock, unlock } from './keystore';
 import { type Destination, getPrefs, savePrefs, type Workflow } from './prefs';
 import { wireKeyManager } from './keymanager';
@@ -591,10 +601,20 @@ for (const radio of document.querySelectorAll('input[name="restore-mode"]')) {
 reflectRestoreMode();
 
 /** Run a prepared save request through the shared controller, driving the UI. */
-/** Populate the expert save-result recovery checklist ("what to keep to restore"). */
-function renderRecovery(guidance: { items: string[]; lossless: boolean }): void {
+/**
+ * Populate the expert save-result panel: what was written ("files created"),
+ * then what to keep to restore. The manifest comes first because it names the
+ * files the user is looking at right now — on the deniable destinations those
+ * names say nothing on their own.
+ */
+function renderRecovery(
+  guidance: { items: string[]; lossless: boolean },
+  manifest: readonly ManifestEntry[] = [],
+): void {
   const box = el('save-recovery');
   box.replaceChildren();
+  const files = renderManifest(manifest, msg);
+  if (files) box.append(files);
   const heading = document.createElement('p');
   heading.className = 'result-recovery-heading';
   heading.textContent = msg('recoveryHeading');
@@ -621,10 +641,10 @@ async function doSave(req: SaveRequest): Promise<void> {
   req.onProgress = prog.onProgress;
   setStatus(saveStatus, msg(destKey('statusSaving', req.dest)));
   try {
-    const { note } = await runSave(req, msg);
+    const { note, manifest } = await runSave(req, msg);
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
-    renderRecovery(recoveryGuidance(req.dest, req.keyMode ?? 'embedded'));
+    renderRecovery(recoveryGuidance(req.dest, req.keyMode ?? 'embedded'), manifest);
     show(saveResult, true);
     // Don't leave secrets sitting in the popup's DOM after the operation.
     stegoPw.value = '';

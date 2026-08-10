@@ -6,7 +6,7 @@
 
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import { runRestore, runSave } from './commands';
@@ -162,7 +162,7 @@ describe('CLI .db non-possession (Mode B)', () => {
     });
     const vault = save.files.find((f) => f.endsWith('.db'))!;
     const shares = readdirSync(outDir)
-      .filter((f) => f.startsWith('stegoshard-share-'))
+      .filter((f) => basename(f).startsWith('recovery-'))
       .map((f) => join(outDir, f));
     expect(shares.length).toBe(3);
 
@@ -203,7 +203,7 @@ describe('CLI .db non-possession (Mode B)', () => {
     const vault = save.files.find((f) => f.endsWith('.db'))!;
     const keyImage = save.files.find((f) => f.endsWith('cover.png'))!;
     const shares = readdirSync(outDir)
-      .filter((f) => f.startsWith('stegoshard-share-'))
+      .filter((f) => basename(f).startsWith('recovery-'))
       .map((f) => join(outDir, f));
     expect(shares.length).toBe(3);
 
