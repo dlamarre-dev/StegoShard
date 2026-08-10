@@ -36,7 +36,12 @@ import {
   type StegoInput,
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
-import { extraEntropyBits as extraEntropyBitsOf, isStrongNewPassword } from './password';
+import {
+  MIN_PASSWORD_LENGTH,
+  extraEntropyBits as extraEntropyBitsOf,
+  isStrongNewPassword,
+  meetsPasswordFloor,
+} from './password';
 import { makeProgressUI } from './progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from './wizard';
 
@@ -132,8 +137,22 @@ const restoreStatus = el('restore-status');
 const restoreProgress = el('restore-progress');
 const restoreProgressBar = el('restore-progress-bar');
 
-const acceptNewPassword = (password: string): boolean =>
-  isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
+/**
+ * Gate a newly-created credential.
+ *
+ * Two tiers: below `MIN_PASSWORD_LENGTH` is a hard floor this refuses outright,
+ * because the vault's confidentiality rests entirely on this secret and the
+ * attacker grinds it offline. Above the floor but short of `isStrongNewPassword`
+ * is advisory — the user may knowingly accept it. A rejection explains itself; a
+ * cancelled confirmation stays silent, since the user just made that choice.
+ */
+const acceptNewPassword = (password: string, status: HTMLElement): boolean => {
+  if (!meetsPasswordFloor(password)) {
+    setStatus(status, msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH)), true);
+    return false;
+  }
+  return isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
+};
 const restoreResult = el('restore-result');
 const restoreResultNote = el('restore-result-note');
 const restoreAdvanced = el('restore-advanced');
@@ -677,7 +696,7 @@ saveBtn.addEventListener('click', async () => {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
     if (covers.length === 0) return setStatus(saveStatus, msg('errNoCovers'), true);
     if (!gallerySavePw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
-    if (!acceptNewPassword(gallerySavePw.value)) return;
+    if (!acceptNewPassword(gallerySavePw.value, saveStatus)) return;
     const gKeyMode = selectedGalleryKeyMode();
     let gStego: StegoInput | undefined;
     if (gKeyMode === 'stego') {
@@ -715,7 +734,7 @@ saveBtn.addEventListener('click', async () => {
   if (dest === 'sqlite' && !sqliteSavePw.value) {
     return setStatus(saveStatus, msg('errNoPassword'), true);
   }
-  if (dest === 'sqlite' && !acceptNewPassword(sqliteSavePw.value)) return;
+  if (dest === 'sqlite' && !acceptNewPassword(sqliteSavePw.value, saveStatus)) return;
   // §10 access mode + its inputs (the .db path only; other dests stay plain).
   const accessMode = dest === 'sqlite' ? selectedAccessMode() : 'plain';
   // key-file / stego delivery composes with every .db access mode (§10.3).
@@ -726,7 +745,7 @@ saveBtn.addEventListener('click', async () => {
   if (accessMode === 'duress') {
     const d = decoyFile.files?.[0];
     if (!duressPw.value || !d) return setStatus(saveStatus, msg('errDuressInputs'), true);
-    if (!acceptNewPassword(duressPw.value)) return;
+    if (!acceptNewPassword(duressPw.value, saveStatus)) return;
     duressPassword = duressPw.value;
     decoy = d;
   } else if (accessMode === 'nonpossession') {

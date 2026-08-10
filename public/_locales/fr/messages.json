@@ -339,6 +339,15 @@
     "message": "Les mots de passe ne correspondent pas.",
     "description": "Validation error."
   },
+  "errPasswordTooShort": {
+    "message": "Utilisez au moins $COUNT$ caractères. Ce minimum ne peut pas être ignoré.",
+    "description": "Validation error: the new password is below the non-waivable minimum length.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Clé de coffre créée.",
     "description": "Options: success."

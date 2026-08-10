@@ -49,6 +49,18 @@ export interface PasswordStrength {
   score: 0 | 1 | 2 | 3 | 4;
 }
 
+/**
+ * Hard floor for a newly-created credential. No surface may waive it — not the
+ * app's confirm dialog, not the CLI's --allow-weak-password.
+ *
+ * The whole confidentiality of a vault rests on this one secret, and the threat
+ * model assumes the attacker holds the artifact and grinds it offline at their
+ * leisure. A dismissible warning is the wrong control for that: the person
+ * clicking through it is exactly the person who will not survive the attack.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/** The advisory tier: comfortably strong rather than merely allowed. */
 export const MIN_NEW_PASSWORD_LENGTH = 16;
 export const MIN_NEW_PASSWORD_SCORE = 3;
 
@@ -70,6 +82,17 @@ export function passwordStrength(pw: string): PasswordStrength {
   const bits = Math.round(rawBits * Math.min(1, 0.3 + 0.7 * uniqueRatio));
   const score = bits < 40 ? 0 : bits < 60 ? 1 : bits < 80 ? 2 : bits < 100 ? 3 : 4;
   return { bits, score: score as PasswordStrength['score'] };
+}
+
+/**
+ * The hard floor, checked before anything else offers to waive it.
+ *
+ * Deliberately **not** applied to restore/unlock: a vault created under an older
+ * policy must stay openable, and refusing to try a password the user already has
+ * would destroy data rather than protect it.
+ */
+export function meetsPasswordFloor(pw: string): boolean {
+  return pw.length >= MIN_PASSWORD_LENGTH;
 }
 
 /** Policy for newly-created credentials. Restore/unlock deliberately do not use it. */

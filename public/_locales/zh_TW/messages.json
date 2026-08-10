@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "兩次密碼不一致。"
   },
+  "errPasswordTooShort": {
+    "message": "請至少使用 $COUNT$ 個字元。此下限無法略過。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "已建立保險庫金鑰。"
   },

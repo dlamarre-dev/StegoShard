@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "As senhas não coincidem."
   },
+  "errPasswordTooShort": {
+    "message": "Use pelo menos $COUNT$ caracteres. Este mínimo não pode ser ignorado.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Chave do cofre criada."
   },

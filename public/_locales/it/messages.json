@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "Le password non corrispondono."
   },
+  "errPasswordTooShort": {
+    "message": "Usa almeno $COUNT$ caratteri. Questo minimo non può essere ignorato.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Chiave della cassaforte creata."
   },

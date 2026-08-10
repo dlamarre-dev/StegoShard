@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "Die Passwörter stimmen nicht überein."
   },
+  "errPasswordTooShort": {
+    "message": "Verwenden Sie mindestens $COUNT$ Zeichen. Dieses Minimum lässt sich nicht übergehen.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Tresorschlüssel erstellt."
   },

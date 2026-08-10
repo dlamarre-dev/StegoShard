@@ -246,6 +246,14 @@
   "errPasswordMismatch": {
     "message": "Las contraseñas no coinciden."
   },
+  "errPasswordTooShort": {
+    "message": "Usa al menos $COUNT$ caracteres. Este mínimo no se puede omitir.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "statusKeyCreated": {
     "message": "Clave de la caja fuerte creada."
   },

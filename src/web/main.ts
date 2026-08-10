@@ -43,7 +43,12 @@ import {
   type StegoInput,
 } from '../ui/save-controller';
 import { runRestore, type RestoreMode } from '../ui/restore-controller';
-import { extraEntropyBits as extraEntropyBitsOf, isStrongNewPassword } from '../ui/password';
+import {
+  MIN_PASSWORD_LENGTH,
+  extraEntropyBits as extraEntropyBitsOf,
+  isStrongNewPassword,
+  meetsPasswordFloor,
+} from '../ui/password';
 import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
@@ -126,8 +131,22 @@ const saveProgressBar = el('save-progress-bar');
 const saveResult = el('save-result');
 const saveResultNote = el('save-result-note');
 
-const acceptNewPassword = (password: string): boolean =>
-  isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
+/**
+ * Gate a newly-created credential.
+ *
+ * Two tiers: below `MIN_PASSWORD_LENGTH` is a hard floor this refuses outright,
+ * because the vault's confidentiality rests entirely on this secret and the
+ * attacker grinds it offline. Above the floor but short of `isStrongNewPassword`
+ * is advisory — the user may knowingly accept it. A rejection explains itself; a
+ * cancelled confirmation stays silent, since the user just made that choice.
+ */
+const acceptNewPassword = (password: string, status: HTMLElement): boolean => {
+  if (!meetsPasswordFloor(password)) {
+    setStatus(status, msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH)), true);
+    return false;
+  }
+  return isStrongNewPassword(password) || confirm(msg('confirmWeakPassword'));
+};
 
 const restoreFiles = el<HTMLInputElement>('restore-files');
 const restoreDrop = el('restore-drop');
@@ -499,7 +518,7 @@ saveBtn.addEventListener('click', async () => {
   const file = saveFile.files?.[0];
   if (!file) return setStatus(saveStatus, msg('errNoFile'), true);
   if (!savePw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
-  if (!acceptNewPassword(savePw.value)) return;
+  if (!acceptNewPassword(savePw.value, saveStatus)) return;
 
   if (dest === 'gallery') {
     const covers = galleryCovers.files ? Array.from(galleryCovers.files) : [];
@@ -541,7 +560,7 @@ saveBtn.addEventListener('click', async () => {
   if (accessMode === 'duress') {
     const d = decoyFile.files?.[0];
     if (!duressPw.value || !d) return setStatus(saveStatus, msg('errDuressInputs'), true);
-    if (!acceptNewPassword(duressPw.value)) return;
+    if (!acceptNewPassword(duressPw.value, saveStatus)) return;
     duressPassword = duressPw.value;
     decoy = d;
   } else if (accessMode === 'nonpossession') {
