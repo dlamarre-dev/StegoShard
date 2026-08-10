@@ -77,8 +77,16 @@ describe('Mode A — Duress (SPEC §10.5)', () => {
       params: TEST_PARAMS,
       maxContentBytes: CAP,
     });
-    // No mode / region / slot field leaks to the caller.
-    expect(Object.keys(real).sort()).toEqual(['content', 'filename']);
+    const decoy = await decodeMultiRegionVaultBlob(blob, 'duresspassword-different', {
+      params: TEST_PARAMS,
+      maxContentBytes: CAP,
+    });
+    // No mode / region / slot field leaks to the caller. `bundled` describes the
+    // plaintext the writer stored (SPEC §4 FLAGS bit1), not which region opened,
+    // so the invariant that matters is that both unlocks expose the *same*
+    // surface — assert that rather than a hardcoded list alone.
+    expect(Object.keys(real).sort()).toEqual(['bundled', 'content', 'filename']);
+    expect(Object.keys(decoy).sort()).toEqual(Object.keys(real).sort());
   });
 
   it('a wrong (neither) password fails uniformly', async () => {

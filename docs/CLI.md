@@ -6,7 +6,11 @@ It can both **create** and **restore** vaults — unlike the decode-only Python 
 decoder.
 
 ```bash
-npm run cli -- save secret.txt --out ./vault           # → PNG images
+npm run cli -- save secret.txt --out ./vault
+
+# Several files, or a whole directory: zipped into one bundle inside the vault
+# and unpacked back to the originals on restore.
+npm run cli -- save notes.txt key.pem ./photos --out ./vault           # → PNG images
 npm run cli -- restore ./vault --out ./restored        # ← images / folder / .zip / .pdf
 npm run cli -- estimate secret.txt                     # how many images it will take
 ```

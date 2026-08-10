@@ -129,6 +129,8 @@ export interface GalleryEncodeOptions {
    */
   mode?: 'plain' | 'nonpossession';
   threshold?: { k: number; n: number } | undefined;
+  /** CONTENT is a .zip of several files (SPEC §4 FLAGS bit1). */
+  bundle?: boolean | undefined;
 }
 export interface GalleryEncodeResult {
   images: GalleryImage[];
@@ -390,6 +392,7 @@ export async function galleryEncode(
         GALLERY_LADDER,
         params,
         keyFactor,
+        options.bundle,
       ));
       if (keyFactor) keyBlock = keyFactor;
     }
@@ -456,7 +459,7 @@ async function reconstructGroup(
   keyFactor: Uint8Array | undefined,
   params: Argon2Params,
   secret: Uint8Array | undefined,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const first = members[0]!.header;
   const { k, m, blobLen } = first;
   const slots: (Uint8Array | null)[] = new Array(k + m).fill(null);
@@ -498,7 +501,7 @@ export async function galleryDecode(
   images: GalleryCover[],
   password: string,
   options: GalleryDecodeOptions = {},
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const params = options.params ?? DEFAULT_ARGON2;
   const { posKey, aeadKey } = await galleryKeys(password, params);
 

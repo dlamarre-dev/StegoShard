@@ -49,7 +49,7 @@ describe('CLI .db duress (Mode A)', () => {
       const outDir = tmp();
 
       const save = await runSave({
-        inputFile: secret,
+        inputs: [secret],
         outDir,
         password: REAL_PW,
         paper: false,
@@ -83,7 +83,7 @@ describe('CLI .db duress (Mode A)', () => {
     const outDir = tmp();
 
     const save = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: REAL_PW,
       paper: false,
@@ -128,7 +128,7 @@ describe('CLI .db duress (Mode A)', () => {
     const decoy = write(dir, 'decoy.txt', 'y');
     await expect(
       runSave({
-        inputFile: secret,
+        inputs: [secret],
         outDir: tmp(),
         password: 'hunter2-abcdef',
         paper: false,
@@ -150,7 +150,7 @@ describe('CLI .db non-possession (Mode B)', () => {
     const outDir = tmp();
 
     const save = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: REAL_PW,
       paper: false,
@@ -189,7 +189,7 @@ describe('CLI .db non-possession (Mode B)', () => {
     const outDir = tmp();
 
     const save = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: REAL_PW,
       paper: false,
@@ -241,7 +241,7 @@ describe('CLI mode refusal on excluded paths', () => {
     const secret = write(dir, 's.txt', 'x');
     await expect(
       runSave({
-        inputFile: secret,
+        inputs: [secret],
         outDir: tmp(),
         password: REAL_PW,
         paper: false,

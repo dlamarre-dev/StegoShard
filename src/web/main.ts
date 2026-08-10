@@ -56,6 +56,7 @@ import { makeProgressUI } from '../ui/progress-ui';
 import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { wireTooltips } from '../ui/tooltips';
+import { resolveSaveInput } from '../ui/bundle';
 import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
 
 if (window.top !== window.self) {
@@ -266,22 +267,33 @@ function storedCodec(): CodecChoice {
 const destRadios = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[name="dest"]'));
 
+/**
+ * Every file the user picked. Several are zipped into one bundle by the save
+ * controller, so from here on the estimates and the size line describe the
+ * bundle, which is what actually gets encrypted.
+ */
+const pickedFiles = (): File[] => (saveFile.files ? Array.from(saveFile.files) : []);
+
 /** Recompute availability for the dropped file, grey unavailable destinations, and render. */
 async function refreshEstimates(): Promise<void> {
-  const file = saveFile.files?.[0] ?? null;
-  if (!file) {
+  const picked = pickedFiles();
+  const first = picked[0] ?? null;
+  if (!first) {
     estimates = null;
     for (const r of destRadios()) r.disabled = false;
     renderEstimate();
     return;
   }
+  let file: File;
   let len: number;
   try {
+    // Estimate the bundle, not the first file: that is what gets encrypted.
+    ({ file } = await resolveSaveInput(picked));
     len = await envelopeLenForEstimate(file);
   } catch {
     return; // couldn't read the file — leave destinations enabled, no estimate
   }
-  if (saveFile.files?.[0] !== file) return; // a newer file superseded this
+  if (saveFile.files?.[0] !== first) return; // a newer pick superseded this
   envelope = { file, len };
   recomputeEstimates(); // also applies the gating
   const est = estimates;
@@ -308,11 +320,11 @@ async function refreshEstimates(): Promise<void> {
  * cannot live in `refreshEstimates` alone.
  */
 function recomputeEstimates(): void {
-  const file = saveFile.files?.[0];
-  if (file && envelope?.file === file) {
+  const env = envelope;
+  if (env) {
     estimates = estimatesFrom(
-      file.size,
-      envelope.len,
+      env.file.size,
+      env.len,
       destRadios().map((r) => r.value as Dest),
       msg,
       { keyMode: selectedKeyMode(), codec: selectedCodec() },
@@ -354,7 +366,8 @@ function renderCodecCounts(): void {
 
 /** Render the size line and the estimate / no-format line. */
 function renderEstimate(): void {
-  const file = saveFile.files?.[0];
+  // The bundle's size once resolved, else the raw pick while it is computing.
+  const file = envelope?.file ?? pickedFiles()[0];
   saveSize.textContent = file ? formatSize(file.size) : '—';
   const anyOk = !estimates || destRadios().some((r) => estimates![r.value as Dest]?.available);
   show(noFormat, Boolean(file) && !anyOk);
@@ -559,7 +572,7 @@ saveBtn.addEventListener('click', async () => {
     }
     await doSave(async () => ({
       dest,
-      file,
+      files: pickedFiles(),
       covers,
       galleryPassword: savePw.value,
       keyMode: gKeyMode,
@@ -601,7 +614,7 @@ saveBtn.addEventListener('click', async () => {
 
   await doSave(async () => ({
     dest,
-    file,
+    files: pickedFiles(),
     key: await makeKey(savePw.value),
     // The disguised .db path derives its slot KEK from the per-save password.
     password: dest === 'sqlite' ? savePw.value : undefined,

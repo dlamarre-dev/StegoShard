@@ -156,6 +156,8 @@ export interface ExportOptions {
   codecId?: number | undefined;
   /** 'embedded' stores the key block in the images; others deliver it externally. */
   keyMode?: KeyMode | undefined;
+  /** CONTENT is a .zip of several files (SPEC §4 FLAGS bit1). */
+  bundle?: boolean | undefined;
 }
 
 export interface ExportResult {
@@ -268,8 +270,9 @@ export async function buildVaultBlob(
   content: Uint8Array,
   key: VaultKey,
   keyMode: KeyMode,
+  bundle = false,
 ): Promise<Uint8Array> {
-  const envelope = await buildPayload(filename, content);
+  const envelope = await buildPayload(filename, content, { bundle });
   // Encrypt under a per-export subkey (CEK) derived from the DEK and a fresh
   // random salt, so the random-IV collision bound is per-export even though the
   // DEK is shared across vaults (SPEC §6).
@@ -287,7 +290,7 @@ export async function decodeVaultBlob(
   blob: Uint8Array,
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const { keyBlock, contentSalt, iv, ciphertext } = parseVaultBlob(blob);
   // Embedded key block travels in the blob; otherwise the caller must supply it.
   const kbBytes = keyBlock.length > 0 ? keyBlock : opts.keyBlock;
@@ -373,12 +376,13 @@ export async function buildPlainVaultBlobMulti(
   ladder: readonly number[],
   params: Argon2Params = DEFAULT_ARGON2,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<{ blob: Uint8Array; regionIndex: number; dek: Uint8Array }> {
   const vaultSalt = randomBytes(VAULT_SALT_LEN);
   const kek = await deriveSlotKek(password, vaultSalt, keyFactor, params);
   const dek = randomBytes(DEK_LEN);
   const regionIndex = randomBytes(1)[0]! & 1; // CSPRNG bit: real region equally likely 0 or 1
-  const envelope = await buildPayload(filename, content);
+  const envelope = await buildPayload(filename, content, { bundle });
   const blob = await buildMultiRegionVaultBlob(
     vaultSalt,
     [{ kek, dek, regionIndex }],
@@ -431,7 +435,7 @@ async function decodeRegion(
   regionIndex: number,
   dek: Uint8Array,
   maxContentBytes: number,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const block = regionArea.subarray(regionIndex * R, (regionIndex + 1) * R);
   const contentSalt = block.subarray(0, CONTENT_SALT_LEN);
   const iv = block.subarray(CONTENT_SALT_LEN, CONTENT_SALT_LEN + IV_LEN);
@@ -458,7 +462,7 @@ export async function decodeMultiRegionVaultBlob(
     /** Recovered Shamir secret S for a Mode B (threshold-gated) slot (§10.6). */
     secret?: Uint8Array | null;
   },
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const { vaultSalt, slotArray, regionArea, R } = splitMultiRegionBlob(blob);
   let candidates: CryptoKey[];
   try {
@@ -485,7 +489,7 @@ export async function decodeMultiRegionVaultBlobWithDek(
   dek: Uint8Array,
   regionIndex: number,
   maxContentBytes = MAX_FILE_BYTES_BINARY,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const { regionArea, R } = splitMultiRegionBlob(blob);
   return decodeRegion(regionArea, R, regionIndex, dek, maxContentBytes);
 }
@@ -503,7 +507,7 @@ export async function exportVault(
   const codecId = options.codecId ?? CODEC_QR_GRID;
   const keyMode = options.keyMode ?? 'embedded';
 
-  const blob = await buildVaultBlob(filename, content, key, keyMode);
+  const blob = await buildVaultBlob(filename, content, key, keyMode, options.bundle);
 
   const k = Math.max(1, Math.ceil(blob.length / dataPerShard(codecId, profile)));
   const m = parityCount(k);
@@ -543,7 +547,7 @@ export async function importVault(
   payloads: Uint8Array[],
   password: string,
   opts: { keyBlock?: Uint8Array | undefined } = {},
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const blob = await reassembleBlob(payloads);
   return decodeVaultBlob(blob, password, {
     keyBlock: opts.keyBlock,
@@ -666,7 +670,12 @@ export async function exportVaultBinary(
   filename: string,
   content: Uint8Array,
   key: VaultKey,
-  options: { keyMode?: KeyMode; variant?: BinaryVariant; maxBytes?: number } = {},
+  options: {
+    keyMode?: KeyMode;
+    variant?: BinaryVariant;
+    maxBytes?: number;
+    bundle?: boolean | undefined;
+  } = {},
   onProgress?: OnProgress,
 ): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
   const variant = options.variant ?? 'branded';
@@ -679,7 +688,15 @@ export async function exportVaultBinary(
     throw new FileTooLargeError(content.length, maxBytes);
   }
   const keyMode = options.keyMode ?? 'embedded';
-  const blob = await buildSegmentedBlob(filename, content, key, keyMode, onProgress);
+  const blob = await buildSegmentedBlob(
+    filename,
+    content,
+    key,
+    keyMode,
+    onProgress,
+    undefined,
+    options.bundle,
+  );
   return { container: wrapBinary(blob, variant), keyMode, keyBlock: key.keyBlock };
 }
 
@@ -695,7 +712,7 @@ export async function exportVaultBinaryDisguised(
   filename: string,
   content: Uint8Array,
   password: string,
-  options: { keyMode?: KeyMode; maxBytes?: number } = {},
+  options: { keyMode?: KeyMode; maxBytes?: number; bundle?: boolean | undefined } = {},
   onProgress?: OnProgress,
 ): Promise<{
   container: Uint8Array;
@@ -722,6 +739,7 @@ export async function exportVaultBinaryDisguised(
       onProgress,
       DEFAULT_CHUNK_SIZE,
       keyFactor,
+      options.bundle,
     );
   } catch (err) {
     if (err instanceof BucketTooLargeError) {
@@ -755,7 +773,7 @@ export async function importVaultBinary(
     secret?: Uint8Array | null;
   } = {},
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const unwrapped = unwrapBinary(container);
   const blob = unwrapped?.payload ?? container;
   const maxContentBytes = opts.maxBytes ?? MAX_FILE_BYTES_BINARY;
@@ -807,7 +825,7 @@ export async function decodeVaultBlobWithDek(
   blob: Uint8Array,
   dek: CryptoKey,
   maxContentBytes = MAX_FILE_BYTES_BINARY,
-): Promise<{ filename: string; content: Uint8Array }> {
+): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const { contentSalt, iv, ciphertext } = parseVaultBlob(blob);
   const cek = await deriveContentKey(dek, contentSalt);
   const envelope = await decryptBytes(cek, iv, ciphertext);

@@ -86,17 +86,29 @@ function manifestLines(manifest: readonly ManifestEntry[]): string {
     .join('\n')}\n`;
 }
 
+/**
+ * What a restore produced. A bundle unpacks to several files, so naming the
+ * envelope ("bundle.zip") and one output path would describe neither.
+ */
+function restoredLine(res: { filename: string; outPath: string; files?: string[] }): string {
+  const files = res.files ?? [res.outPath];
+  if (files.length === 1) return `Restored ${res.filename} -> ${files[0]}\n`;
+  return `Restored ${files.length} files:\n${files.map((f) => `  ${f}`).join('\n')}\n`;
+}
+
 const USAGE = `StegoShard — encrypt a file into resilient images, an opaque binary
 file, or a decoy database, and restore it.
 
 Usage:
-  stegoshard save <file> [options]
+  stegoshard save <file|dir ...> [options]
   stegoshard restore <images|folder|zip|pdf ...> [options]
   stegoshard estimate <file> [--paper] [--codec color|qr]
   stegoshard gallery-save <file> <cover-photos|folder ...> [options]
   stegoshard gallery-restore <photos|folder ...> [options]
 
 Save options:
+  Several inputs (or a directory) are zipped into one bundle inside the vault;
+  restore unpacks them back to the original files. One input is stored as-is.
   --out <dir>            Output directory (default: current directory)
   --paper                Produce a printable PDF (high-ECC) instead of PNGs
   --zip                  Bundle the PNG set into a single .zip (disk mode)
@@ -449,8 +461,8 @@ async function main(argv: string[]): Promise<number> {
   const outDir = (values.out as string) ?? '.';
 
   if (command === 'save') {
-    const inputFile = positionals[0];
-    if (!inputFile) fail('save: missing <file>');
+    const inputs = positionals;
+    if (inputs.length === 0) fail('save: missing <file|dir ...>');
     const keyMode = ((values['key-mode'] as string) ?? 'embedded') as KeyMode;
     if (!KEY_MODES.includes(keyMode)) fail(`save: invalid --key-mode "${keyMode}"`);
     if (keyMode === 'stego' && !values.cover)
@@ -487,7 +499,7 @@ async function main(argv: string[]): Promise<number> {
     // generated.
     await installEntropy(values);
     const opts: SaveOptions = {
-      inputFile,
+      inputs,
       outDir,
       password,
       paper: Boolean(values.paper),
@@ -544,7 +556,7 @@ async function main(argv: string[]): Promise<number> {
     );
     progress.done();
     process.stderr.write(`decoded ${res.decoded} of ${res.seen} image(s)\n`);
-    process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
+    process.stdout.write(restoredLine(res));
     return 0;
   }
 
@@ -608,7 +620,7 @@ async function main(argv: string[]): Promise<number> {
       force,
     });
     process.stderr.write(`scanned ${res.seen} photo(s)\n`);
-    process.stdout.write(`Restored ${res.filename} -> ${res.outPath}\n`);
+    process.stdout.write(restoredLine(res));
     return 0;
   }
 

@@ -60,6 +60,7 @@ async function nonPossessionParts(
   n: number,
   params: Argon2Params,
   keyFactor: Uint8Array | null,
+  bundle: boolean,
 ): Promise<{
   vaultSalt: Uint8Array;
   slotEntries: SlotEntry[];
@@ -79,7 +80,7 @@ async function nonPossessionParts(
 
   const dek = randomBytes(DEK_LEN);
   const regionIndex = randomBytes(1)[0]! & 1; // real region equally likely 0 or 1
-  const envelope = await buildPayload(filename, content);
+  const envelope = await buildPayload(filename, content, { bundle });
   const shares = await shamirSplit(secret, k, n);
   secret.fill(0); // writer retains nothing about the threshold secret
 
@@ -103,6 +104,7 @@ export async function buildNonPossessionVaultBlob(
   ladder: readonly number[],
   params: Argon2Params = DEFAULT_ARGON2,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<NonPossessionResult> {
   const { vaultSalt, slotEntries, live, shares, regionIndex, dek } = await nonPossessionParts(
     filename,
@@ -112,6 +114,7 @@ export async function buildNonPossessionVaultBlob(
     n,
     params,
     keyFactor,
+    bundle,
   );
   const blob = await buildMultiRegionVaultBlob(vaultSalt, slotEntries, live, ladder);
   return { blob, shares, regionIndex, dek };
@@ -129,6 +132,7 @@ export async function buildNonPossessionSegmentedBlob(
   onProgress?: OnProgress,
   chunkSize?: number,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<NonPossessionResult> {
   const { vaultSalt, slotEntries, live, shares, regionIndex, dek } = await nonPossessionParts(
     filename,
@@ -138,6 +142,7 @@ export async function buildNonPossessionSegmentedBlob(
     n,
     params,
     keyFactor,
+    bundle,
   );
   const blob = await buildMultiRegionSegmentedBlob(
     vaultSalt,
@@ -228,6 +233,7 @@ async function duressParts(
   duressPassword: string,
   params: Argon2Params,
   keyFactor: Uint8Array | null,
+  bundle: boolean,
 ): Promise<{
   vaultSalt: Uint8Array;
   slotEntries: SlotEntry[];
@@ -251,7 +257,9 @@ async function duressParts(
   // both derivations are byte-identical to the password-only deriveKEK.
   const kekReal = await deriveSlotKek(realPassword, vaultSalt, keyFactor, params);
   const kekDuress = await deriveSlotKek(duressPassword, vaultSalt, null, params);
-  const realEnvelope = await buildPayload(realFilename, realContent);
+  // Only the real side can be a bundle: the decoy is the single file the writer
+  // nominated with --decoy.
+  const realEnvelope = await buildPayload(realFilename, realContent, { bundle });
   const decoyEnvelope = await buildPayload(decoyFilename, decoyContent);
 
   return {
@@ -283,6 +291,7 @@ export async function buildDuressVaultBlob(
   ladder: readonly number[],
   params: Argon2Params = DEFAULT_ARGON2,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<DuressResult> {
   const { vaultSalt, slotEntries, live, result } = await duressParts(
     realFilename,
@@ -293,6 +302,7 @@ export async function buildDuressVaultBlob(
     duressPassword,
     params,
     keyFactor,
+    bundle,
   );
   const blob = await buildMultiRegionVaultBlob(vaultSalt, slotEntries, live, ladder);
   return { blob, real: { regionIndex: result.regionIndex, dek: result.dek }, decoy: result.decoy };
@@ -311,6 +321,7 @@ export async function buildDuressSegmentedBlob(
   onProgress?: OnProgress,
   chunkSize?: number,
   keyFactor: Uint8Array | null = null,
+  bundle = false,
 ): Promise<DuressResult> {
   const { vaultSalt, slotEntries, live, result } = await duressParts(
     realFilename,
@@ -321,6 +332,7 @@ export async function buildDuressSegmentedBlob(
     duressPassword,
     params,
     keyFactor,
+    bundle,
   );
   const blob = await buildMultiRegionSegmentedBlob(
     vaultSalt,
@@ -390,6 +402,7 @@ export async function buildDuressDbContainer(
   params: Argon2Params = DEFAULT_ARGON2,
   onProgress?: OnProgress,
   chunkSize?: number,
+  bundle = false,
 ): Promise<{ container: Uint8Array }> {
   const { blob, real, decoy } = await buildDuressSegmentedBlob(
     realFilename,
@@ -403,6 +416,7 @@ export async function buildDuressDbContainer(
     onProgress,
     chunkSize,
     keyFactor,
+    bundle,
   );
   await verifyDbRegion(blob, real.dek, real.regionIndex, realFilename, realContent);
   await verifyDbRegion(blob, decoy.dek, decoy.regionIndex, decoyFilename, decoyContent);
@@ -424,6 +438,7 @@ export async function buildNonPossessionDbContainer(
   params: Argon2Params = DEFAULT_ARGON2,
   onProgress?: OnProgress,
   chunkSize?: number,
+  bundle = false,
 ): Promise<{ container: Uint8Array; shares: Uint8Array[] }> {
   const { blob, shares, regionIndex, dek } = await buildNonPossessionSegmentedBlob(
     filename,
@@ -436,6 +451,7 @@ export async function buildNonPossessionDbContainer(
     onProgress,
     chunkSize,
     keyFactor,
+    bundle,
   );
   await verifyDbRegion(blob, dek, regionIndex, filename, content);
   return { container: wrapBinary(blob, 'disguised'), shares };

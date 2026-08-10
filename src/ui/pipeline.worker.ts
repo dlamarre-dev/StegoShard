@@ -42,6 +42,7 @@ type RunReq =
       /** Expert extra entropy: this thread has its own module state, so the
        *  layer installed on the page does not reach here on its own. */
       userEntropy?: string | undefined;
+      bundle?: boolean | undefined;
     }
   | {
       id: number;
@@ -51,6 +52,7 @@ type RunReq =
       password: string;
       keyMode: KeyMode;
       userEntropy?: string | undefined;
+      bundle?: boolean | undefined;
     }
   | {
       id: number;
@@ -85,7 +87,12 @@ async function runEncrypt(req: Extract<RunReq, { op: 'encryptBinary' }>): Promis
       req.filename,
       req.content,
       key,
-      { keyMode: req.keyMode, variant: req.variant, maxBytes: MAX_FILE_BYTES_BINARY_UI },
+      {
+        keyMode: req.keyMode,
+        variant: req.variant,
+        maxBytes: MAX_FILE_BYTES_BINARY_UI,
+        bundle: req.bundle,
+      },
       onProgress,
     );
     await verifyBinaryExport(container, dek, req.filename, req.content, onProgress);
@@ -111,7 +118,7 @@ async function runEncryptDisguised(
       req.filename,
       req.content,
       req.password,
-      { keyMode: req.keyMode, maxBytes: MAX_FILE_BYTES_BINARY_UI },
+      { keyMode: req.keyMode, maxBytes: MAX_FILE_BYTES_BINARY_UI, bundle: req.bundle },
       onProgress,
     );
     await verifyDisguisedExport(container, dek, regionIndex, req.filename, req.content, onProgress);
@@ -127,13 +134,16 @@ async function runEncryptDisguised(
 
 async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promise<Reply> {
   const onProgress: OnProgress = (p) => ctx.postMessage({ id: req.id, type: 'progress', p });
-  const { filename, content } = await importVaultBinary(
+  const { filename, content, bundled } = await importVaultBinary(
     req.container,
     req.password,
     { keyBlock: req.keyBlock, secret: req.secret ?? null, maxBytes: MAX_FILE_BYTES_BINARY_UI },
     onProgress,
   );
-  return { message: { id: req.id, type: 'result', filename, content }, transfer: [content.buffer] };
+  return {
+    message: { id: req.id, type: 'result', filename, content, bundled },
+    transfer: [content.buffer],
+  };
 }
 
 // Dispatch by operation via a fixed table rather than a branch, so the op is a

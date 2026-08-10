@@ -54,7 +54,7 @@ describe('deniable destinations name nothing after the project', () => {
     const secret = write(dir, 'secret.txt', 'deniable naming check\n');
 
     const res = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: PW,
       paper: false,
@@ -87,7 +87,7 @@ describe('deniable destinations name nothing after the project', () => {
     const secret = write(dir, 'secret.txt', 'keyfile naming check\n');
 
     const res = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: PW,
       paper: false,
@@ -138,7 +138,7 @@ describe('overt destinations stay branded', () => {
     const secret = write(dir, 'secret.txt', 'overt naming check\n');
 
     const res = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir,
       password: PW,
       paper: false,

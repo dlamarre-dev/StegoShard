@@ -743,7 +743,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     if (state.dest === 'gallery') {
       return {
         dest: 'gallery',
-        file: state.file!,
+        files: [state.file!],
         covers: state.covers,
         galleryPassword: state.savePassword,
         keyMode: state.keyMode,
@@ -753,7 +753,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const key = await env.getSaveKey(state.savePassword);
     return {
       dest: state.dest,
-      file: state.file!,
+      files: [state.file!],
       key,
       // The disguised .db path derives its slot KEK from this per-save password.
       password: state.dest === 'sqlite' ? state.savePassword : undefined,

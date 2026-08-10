@@ -40,19 +40,22 @@ beforeEach(() => {
 
 describe('runSave routing', () => {
   it('routes disk saves and reports the image count with the embedded note', async () => {
-    const { note } = await runSave({ dest: 'disk', file, key, keyMode: 'embedded' }, msg);
+    const { note } = await runSave({ dest: 'disk', files: [file], key, keyMode: 'embedded' }, msg);
     expect(saveFileToDisk).toHaveBeenCalledOnce();
     expect(saveFileToDisk.mock.calls[0]![2]).toMatchObject({ keyMode: 'embedded', asZip: true });
     expect(note).toBe('statusSaved:7');
   });
 
   it('picks the keyfile note for keyfile mode', async () => {
-    const { note } = await runSave({ dest: 'disk', file, key, keyMode: 'keyfile' }, msg);
+    const { note } = await runSave({ dest: 'disk', files: [file], key, keyMode: 'keyfile' }, msg);
     expect(note).toBe('statusSavedKeyfile:7');
   });
 
   it('routes binary saves as the branded variant', async () => {
-    const { note } = await runSave({ dest: 'binary', file, key, keyMode: 'embedded' }, msg);
+    const { note } = await runSave(
+      { dest: 'binary', files: [file], key, keyMode: 'embedded' },
+      msg,
+    );
     expect(saveFileToBinary).toHaveBeenCalledOnce();
     expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ variant: 'branded' });
     expect(note).toBe('statusSavedBinary:binaryVariantBranded');
@@ -60,7 +63,7 @@ describe('runSave routing', () => {
 
   it('routes sqlite saves as the disguised variant with the per-save password', async () => {
     const { note } = await runSave(
-      { dest: 'sqlite', file, key, keyMode: 'embedded', password: 'pw' },
+      { dest: 'sqlite', files: [file], key, keyMode: 'embedded', password: 'pw' },
       msg,
     );
     expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({
@@ -72,14 +75,19 @@ describe('runSave routing', () => {
 
   it('rejects a disguised .db save with no per-save password', async () => {
     await expect(
-      runSave({ dest: 'sqlite', file, key, keyMode: 'embedded' }, msg),
+      runSave({ dest: 'sqlite', files: [file], key, keyMode: 'embedded' }, msg),
     ).rejects.toThrow();
   });
 
   it('routes gallery saves with the covers + gallery password, no vault key needed', async () => {
     const covers = [new File([new Uint8Array([9])], 'a.jpg')];
-    const { note } = await runSave({ dest: 'gallery', file, covers, galleryPassword: 'pw' }, msg);
+    const { note } = await runSave(
+      { dest: 'gallery', files: [file], covers, galleryPassword: 'pw' },
+      msg,
+    );
     expect(saveGalleryToDisk).toHaveBeenCalledWith(file, covers, 'pw', {
+      // A single file is passed straight through: no zip, no bundle flag.
+      bundle: false,
       keyMode: 'embedded',
       stego: undefined,
       mode: 'plain',
@@ -90,11 +98,11 @@ describe('runSave routing', () => {
   });
 
   it('rejects a gallery save with no password', async () => {
-    await expect(runSave({ dest: 'gallery', file, covers: [] }, msg)).rejects.toThrow();
+    await expect(runSave({ dest: 'gallery', files: [file], covers: [] }, msg)).rejects.toThrow();
   });
 
   it('requires a vault key for non-gallery destinations', async () => {
-    await expect(runSave({ dest: 'disk', file }, msg)).rejects.toThrow();
+    await expect(runSave({ dest: 'disk', files: [file] }, msg)).rejects.toThrow();
   });
 });
 
@@ -105,7 +113,7 @@ describe('extra user entropy', () => {
       installedDuringSave = hasUserEntropy();
       return { imageCount: 7, setId: 'ab', keyMode: 'embedded' };
     });
-    await runSave({ dest: 'disk', file, key, userEntropy: 'dice 4 1 6 2' }, msg);
+    await runSave({ dest: 'disk', files: [file], key, userEntropy: 'dice 4 1 6 2' }, msg);
     expect(installedDuringSave).toBe(true);
     expect(hasUserEntropy()).toBe(false);
   });
@@ -114,12 +122,14 @@ describe('extra user entropy', () => {
     saveFileToDisk.mockImplementationOnce(async () => {
       throw new Error('boom');
     });
-    await expect(runSave({ dest: 'disk', file, key, userEntropy: 'dice' }, msg)).rejects.toThrow();
+    await expect(
+      runSave({ dest: 'disk', files: [file], key, userEntropy: 'dice' }, msg),
+    ).rejects.toThrow();
     expect(hasUserEntropy()).toBe(false);
   });
 
   it('reaches the worker path, which has its own module state', async () => {
-    await runSave({ dest: 'binary', file, key, userEntropy: 'dice' }, msg);
+    await runSave({ dest: 'binary', files: [file], key, userEntropy: 'dice' }, msg);
     expect(saveFileToBinary.mock.calls[0]![2]).toMatchObject({ userEntropy: 'dice' });
   });
 
@@ -129,7 +139,7 @@ describe('extra user entropy', () => {
       installedDuringSave = hasUserEntropy();
       return { imageCount: 7, setId: 'ab', keyMode: 'embedded' };
     });
-    await runSave({ dest: 'disk', file, key }, msg);
+    await runSave({ dest: 'disk', files: [file], key }, msg);
     expect(installedDuringSave).toBe(false);
   });
 });

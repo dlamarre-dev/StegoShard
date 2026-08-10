@@ -74,7 +74,7 @@ function read(path: string): Uint8Array {
 }
 
 /** Recursively collect file paths from a directory. */
-function walk(dir: string): string[] {
+export function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);

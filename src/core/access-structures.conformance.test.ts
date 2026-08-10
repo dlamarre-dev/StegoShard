@@ -170,10 +170,32 @@ describe('§10.10 tamper: a corrupted slot array fails, never redirects', () => 
 });
 
 describe('§10.10 no leakage of slot/region/mode', () => {
-  it('the decode surface returns only { filename, content }', async () => {
+  it('the decode surface returns only { filename, content, bundled }', async () => {
     const { blob } = await buildPlainVaultBlobMulti('note.txt', small(), 'pw', GALLERY_LADDER, P);
     const out = await decodeMultiRegionVaultBlob(blob, 'pw', { params: P, maxContentBytes: CAP });
-    expect(Object.keys(out).sort()).toEqual(['content', 'filename']);
+    // Tripwire on the exact surface: nothing naming the slot, region or access
+    // mode may reach the caller. `bundled` is a property of the plaintext the
+    // writer stored and takes the same value whichever region held it, so it
+    // cannot distinguish one from another.
+    expect(Object.keys(out).sort()).toEqual(['bundled', 'content', 'filename']);
+  });
+
+  it('bundled is region-blind: a bundle in either region unlocks identically', async () => {
+    // Written 8 times: the live region is a CSPRNG bit, so this exercises both
+    // placements without depending on which one a given run picked.
+    for (let i = 0; i < 8; i++) {
+      const { blob } = await buildPlainVaultBlobMulti(
+        'b.zip',
+        small(),
+        'pw',
+        GALLERY_LADDER,
+        P,
+        null,
+        true,
+      );
+      const out = await decodeMultiRegionVaultBlob(blob, 'pw', { params: P, maxContentBytes: CAP });
+      expect(out.bundled).toBe(true);
+    }
   });
 
   it('no core module logs to the console (would be a side channel)', () => {

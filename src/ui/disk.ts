@@ -46,6 +46,7 @@ import {
   encryptBinaryInWorker,
 } from './run-in-worker';
 import { Unzip, UnzipInflate, zipSync } from 'fflate';
+import { unpackBundle } from './bundle';
 import {
   decodeImageBytes,
   downloadBlob,
@@ -71,6 +72,8 @@ import {
 
 export interface SaveOptions {
   keyMode: KeyMode;
+  /** The content is a .zip of several files (SPEC §4 FLAGS bit1). */
+  bundle?: boolean | undefined;
   /** Image codec (SPEC §2). Defaults to qr-grid when unset. */
   codecId?: number | undefined;
   /** When set, a readable title band is drawn above each image. */
@@ -117,6 +120,33 @@ async function deliver(downloads: { name: string; blob: Blob }[], subdir: string
   }
 }
 
+/**
+ * Hand a restored payload back to the user.
+ *
+ * A bundle (SPEC §4 FLAGS bit1) becomes one download per original file, spaced
+ * by `deliver` — browsers throttle or block downloads fired in a burst.
+ * Anything else is the single file it has always been.
+ */
+async function deliverRestored(
+  filename: string,
+  content: Uint8Array,
+  bundled: boolean,
+): Promise<void> {
+  if (!bundled) {
+    downloadBlob(new Blob([content as BufferSource]), filename);
+    return;
+  }
+  // No containing folder: a single-file restore drops straight into Downloads,
+  // and a bundle should not behave differently (nor invent an English name).
+  await deliver(
+    unpackBundle(content).map((f) => ({
+      name: f.name,
+      blob: new Blob([f.bytes as BufferSource]),
+    })),
+    '',
+  );
+}
+
 const octet = (bytes: Uint8Array, type = 'application/octet-stream'): Blob =>
   new Blob([bytes as BufferSource], { type });
 
@@ -156,6 +186,7 @@ export async function saveFileToDisk(
     profile: PROFILE_DISK,
     codecId: options.codecId,
     keyMode: options.keyMode,
+    bundle: options.bundle,
   });
   const codecId = decodeHeader(imagePayloads[0]!).codecId;
   const codec = getCodec(codecId);
@@ -265,6 +296,8 @@ async function buildDisguisedMode(
     onProgress?: OnProgress | undefined;
     /** Random id for this save, so a nameless cover still yields a stable filename. */
     id: string;
+    /** The content is a .zip of several files (SPEC §4 FLAGS bit1). */
+    bundle?: boolean | undefined;
   },
 ): Promise<Download[]> {
   const vaultName = binaryVaultName('disguised');
@@ -320,6 +353,8 @@ async function buildDisguisedMode(
       keyFactor,
       undefined,
       options.onProgress,
+      undefined,
+      options.bundle,
     );
     return [
       { name: vaultName, blob: octet(container), purpose: 'vault' },
@@ -338,6 +373,8 @@ async function buildDisguisedMode(
     keyFactor,
     undefined,
     options.onProgress,
+    undefined,
+    options.bundle,
   );
   return [
     { name: vaultName, blob: octet(container), purpose: 'vault' },
@@ -366,6 +403,8 @@ export async function saveFileToBinary(
     /** Expert extra entropy. Forwarded to the worker, which has its own module
      *  state and so cannot see the layer installed on this thread. */
     userEntropy?: string | undefined;
+    /** The content is a .zip of several files (SPEC §4 FLAGS bit1). */
+    bundle?: boolean | undefined;
     onProgress?: OnProgress | undefined;
   },
 ): Promise<{ keyMode: KeyMode; variant: BinaryVariant; manifest: ManifestEntry[] }> {
@@ -403,6 +442,7 @@ export async function saveFileToBinary(
         threshold: options.threshold,
         onProgress: options.onProgress,
         id: modeId,
+        bundle: options.bundle,
       });
       await deliver(downloads, saveFolder(modeId, true));
       return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
@@ -414,6 +454,7 @@ export async function saveFileToBinary(
       keyMode,
       options.userEntropy,
       options.onProgress,
+      options.bundle,
     );
     const disguisedId = toHex(randomBytes(4));
     const downloads: Download[] = [
@@ -463,6 +504,7 @@ export async function saveFileToBinary(
     options.variant,
     options.userEntropy,
     options.onProgress,
+    options.bundle,
   );
   // Only the branded .ssbn reaches here — every disguised path returned above.
   const id = toHex(randomBytes(4));
@@ -526,6 +568,7 @@ export async function saveGalleryToDisk(
     stego?: SaveOptions['stego'];
     mode?: AccessMode;
     threshold?: { k: number; n: number } | undefined;
+    bundle?: boolean | undefined;
   } = {},
 ): Promise<GallerySaveResult> {
   assertBlobSize(secret, MAX_FILE_BYTES);
@@ -536,6 +579,7 @@ export async function saveGalleryToDisk(
   const galleryCovers = await Promise.all(covers.map(fileToGalleryCover));
   const res = await galleryEncode(secret.name, content, password, galleryCovers, {
     keyMode,
+    bundle: options.bundle,
     // Duress is refused upstream (winnowing block); gallery does plain + Mode B.
     mode: mode === 'nonpossession' ? 'nonpossession' : 'plain',
     threshold: options.threshold,
@@ -637,8 +681,11 @@ export async function restoreGalleryFromDisk(
         : ((await extractKeyFactorImage(keyFile, password)) ?? undefined);
   }
   // Mode B (non-possession): `secret` is recovered from a threshold share quorum.
-  const { filename, content } = await galleryDecode(covers, password, { keyBlock, secret });
-  downloadBlob(new Blob([content as BufferSource]), filename);
+  const { filename, content, bundled } = await galleryDecode(covers, password, {
+    keyBlock,
+    secret,
+  });
+  await deliverRestored(filename, content, bundled);
   return { filename };
 }
 
@@ -772,14 +819,14 @@ export async function restoreFileFromDisk(
     for (const file of files) {
       const bytes = await boundedBlobBytes(file, MAX_BROWSER_CONTAINER_BYTES);
       if (unwrapBinary(bytes)) {
-        const { filename, content } = await decryptBinaryInWorker(
+        const { filename, content, bundled } = await decryptBinaryInWorker(
           bytes,
           password,
           keyBlock,
           secret,
           onProgress,
         );
-        downloadBlob(new Blob([content as BufferSource]), filename);
+        await deliverRestored(filename, content, bundled);
         return { filename };
       }
     }
@@ -810,7 +857,7 @@ export async function restoreFileFromDisk(
   }
   if (payloads.length === 0) throw new Error('restore: no readable images found');
 
-  const { filename, content } = await importVault(payloads, password, { keyBlock });
-  downloadBlob(new Blob([content as BufferSource]), filename);
+  const { filename, content, bundled } = await importVault(payloads, password, { keyBlock });
+  await deliverRestored(filename, content, bundled);
   return { filename };
 }

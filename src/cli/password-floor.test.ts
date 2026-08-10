@@ -28,7 +28,7 @@ describe('the password floor never blocks a restore', () => {
     writeFileSync(secret, 'a vault made under the old policy\n');
 
     const saved = await runSave({
-      inputFile: secret,
+      inputs: [secret],
       outDir: join(dir, 'vault'),
       password: SHORT_PW,
       paper: false,
