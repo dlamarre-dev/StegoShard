@@ -22,6 +22,7 @@ import zipfile
 from .binary_container import looks_like_binary_container, unwrap_binary
 from .codecs import decode_any
 from .crypto import WrongPasswordError
+from .format import unpack_bundle
 from .pipeline import MissingKeyError, decode_vault, decode_vault_binary
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")
@@ -142,11 +143,31 @@ def _restore_gallery(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    os.makedirs(args.out, exist_ok=True)
-    out_path = os.path.join(args.out, os.path.basename(restored.filename) or "restored.bin")
-    with open(out_path, "wb") as fh:
-        fh.write(restored.content)
-    print(f"restored {restored.filename} -> {out_path}")
+    return _write_restored(args.out, restored)
+
+
+def _write_restored(out_dir: str, restored) -> int:
+    """Write what a restore recovered, unpacking a bundle into its files.
+
+    `unpack_bundle` reduces each entry to a basename, so nothing an archive
+    names can escape `out_dir` (SPEC §4).
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    if not restored.bundled:
+        out_path = os.path.join(out_dir, os.path.basename(restored.filename) or "restored.bin")
+        with open(out_path, "wb") as fh:
+            fh.write(restored.content)
+        print(f"restored {restored.filename} -> {out_path}")
+        return 0
+    written = []
+    for name, data in unpack_bundle(restored.content):
+        path = os.path.join(out_dir, name)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        written.append(path)
+    print(f"restored {len(written)} files:")
+    for path in written:
+        print(f"  {path}")
     return 0
 
 
@@ -210,12 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"not a valid StegoShard vault: {exc}", file=sys.stderr)
         return 1
 
-    os.makedirs(args.out, exist_ok=True)
-    out_path = os.path.join(args.out, os.path.basename(restored.filename) or "restored.bin")
-    with open(out_path, "wb") as fh:
-        fh.write(restored.content)
-    print(f"restored {restored.filename} -> {out_path}")
-    return 0
+    return _write_restored(args.out, restored)
 
 
 if __name__ == "__main__":
