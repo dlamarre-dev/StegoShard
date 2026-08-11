@@ -8,7 +8,7 @@
     "description": "Store listing description (max 132 chars)."
   },
   "popupTagline": {
-    "message": "Encrypt a file into resilient images: disk or paper.",
+    "message": "Encrypt your files into resilient images, an opaque file, or a decoy database.",
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
@@ -28,7 +28,7 @@
     "description": "Header status pill when the vault is unlocked."
   },
   "webIntro": {
-    "message": "A free, open-source web version: no install, no account, and nothing leaves your device. Save a file as images or restore one.",
+    "message": "A free, open-source web version. No install, no account, and nothing leaves your device. Save files here, or restore them.",
     "description": "Intro banner on the web app."
   },
   "unlockHeading": {
@@ -135,10 +135,6 @@
   "keyModeHelp": {
     "message": "With a separate key file, a leaked image reveals nothing on its own, but you must keep the .key too.",
     "description": "Key-mode explanation (shown under a Why? disclosure)."
-  },
-  "dropTitle": {
-    "message": "Drop your file here",
-    "description": "File drop zone title."
   },
   "dropTitleMulti": {
     "message": "Drop your files here",
@@ -272,7 +268,7 @@
     }
   },
   "errNoFile": {
-    "message": "Choose a file first.",
+    "message": "Choose at least one file.",
     "description": "Validation error."
   },
   "errNoImages": {
@@ -749,7 +745,7 @@
     "description": "Wizard: restore action description."
   },
   "wizFileTitle": {
-    "message": "Which file do you want to protect?",
+    "message": "Which files do you want to protect?",
     "description": "Wizard: save file step."
   },
   "wizDestTitle": {
@@ -789,7 +785,7 @@
     "description": "Wizard: final review step."
   },
   "wizReviewFile": {
-    "message": "File",
+    "message": "Files",
     "description": "Wizard: review label for the chosen file."
   },
   "wizRunSave": {
@@ -877,6 +873,15 @@
   "wizTooLarge": {
     "message": "too large (max 1 MB)",
     "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeGallery": {
+    "message": "too large for photos (~$MAX$ KB compressed)",
+    "description": "Wizard/expert: gallery unavailable: past the photo-carrier bucket ceiling, in KB.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "wizTooLargeBinary": {
     "message": "too large (max 256 MiB)",

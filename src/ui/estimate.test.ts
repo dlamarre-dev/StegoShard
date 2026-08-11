@@ -101,6 +101,44 @@ describe('estimates', () => {
     expect(disk.available).toBe(false);
   });
 
+  // A photo carrier pads two regions into one bucket, so its ceiling is the top
+  // rung of GALLERY_LADDER (64 KiB), far below the 1 MB image cap. The arithmetic
+  // for the shard split *throws* past that rung, and the estimate pass used to
+  // let it escape: the whole update was abandoned, so the expert form kept the
+  // previous file's size on screen and the wizard concluded that nothing at all
+  // could hold the file. Every destination here is reachable for a 229 KB secret.
+  const PAST_GALLERY = 229 * 1024;
+
+  it('reports the gallery as full instead of throwing past its bucket ladder', () => {
+    const e = estimateFor('gallery', PAST_GALLERY, PAST_GALLERY, msg);
+    expect(e.available).toBe(false);
+    expect(e.reason).toBe('wizTooLargeGallery:64');
+  });
+
+  it('leaves the other destinations usable for a secret the gallery cannot take', () => {
+    const all = estimatesFrom(
+      PAST_GALLERY,
+      PAST_GALLERY,
+      ['disk', 'binary', 'sqlite', 'gallery'],
+      msg,
+      { codec: 'color' },
+    );
+    expect(all.gallery!.available).toBe(false);
+    for (const dest of ['disk', 'binary', 'sqlite'] as const) {
+      expect(all[dest]!.available, dest).toBe(true);
+    }
+  });
+
+  it('caps the decoy .db at its own ladder, not the browser input limit', () => {
+    // The .db writer pads two regions to a shared bucket topping out at 64 MiB;
+    // a 100 MiB envelope is under the 256 MiB input cap and used to be offered,
+    // then failed at the very end of the save.
+    const past = 100 * 1024 * 1024;
+    expect(estimateFor('sqlite', past, past, msg).available).toBe(false);
+    // The branded .ssbn has no ladder, so it still takes it.
+    expect(estimateFor('binary', past, past, msg).available).toBe(true);
+  });
+
   it('estimatesFrom covers every requested destination', () => {
     const all = estimatesFrom(ENVELOPE, ENVELOPE, ['disk', 'paper', 'binary'], msg, {
       codec: 'color',

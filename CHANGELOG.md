@@ -72,9 +72,29 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   restore zone counts its image set the same way.
 - **Em dashes are gone from the UI copy**, in all eight locales and on the legal
   pages, replaced with the punctuation each sentence actually calls for.
+- **File zones add up.** Picking or dropping files one at a time now appends to
+  what a multi-file zone already holds instead of discarding it, with the size
+  and the available formats recomputed after each addition; a file picked twice
+  is kept once, and the clear control is how you start over.
+- **The guided flow saves several files**, bundling them exactly as expert mode
+  does. It kept one file before, so a second pick silently replaced the first.
+- **The header says what the app does**: the tagline names the images, the opaque
+  file and the decoy database rather than just "disk or paper", and the stale
+  "Google Photos requires the browser extension" note is gone from the locales
+  that still carried it.
 
 ### Fixed
 
+- **A file between ~64 KB and 1 MB broke the estimate pass.** Photo-carrier
+  capacity is bounded by its bucket ladder, and the arithmetic _throws_ past the
+  top rung; nothing caught it, so in expert mode the update was abandoned (the
+  size line kept describing the file picked before) and the guided flow concluded
+  that no format at all could hold the file. Every other destination takes a
+  229 KB secret happily. The gallery now reports its own ceiling instead of
+  claiming "max 1 MB".
+- **The decoy `.db` was offered for files it cannot hold.** Its two padded
+  regions top out at 64 MiB, but the estimate only checked the 256 MiB browser
+  input cap, so a larger file failed at the very end of the save.
 - In expert mode the save and restore cards no longer start on different lines:
   the adjacent-card margin applied inside the two-column grid, pushing the
   restore card 20 px down.
