@@ -61,7 +61,7 @@ describe('Shamir secret sharing (SPEC §10.6.1)', () => {
 
   it('rejects duplicate shares with a clean error (not a raw division-by-zero)', async () => {
     const shares = await shamirSplit(secret(), 2, 3);
-    // The same share loaded twice — a natural UX/transcription mistake.
+    // The same share loaded twice, a natural UX/transcription mistake.
     await expect(shamirRecover([shares[0]!, shares[0]!])).rejects.toBeInstanceOf(ShareSetError);
     // A distinct pair still recovers, so the guard is specific to duplicates.
     await expect(shamirRecover([shares[0]!, shares[1]!])).resolves.toHaveLength(SECRET_LEN);

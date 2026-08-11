@@ -1,4 +1,4 @@
-"""Non-image binary container (SPEC §8) — mirrors src/core/binary-container.ts.
+"""Non-image binary container (SPEC §8); mirrors src/core/binary-container.ts.
 
 Two variants wrap an already-encrypted vault blob (or a key block) in a single
 file: a self-labelling 'branded' blob, or a 'disguised' one that IS a complete,

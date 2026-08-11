@@ -100,7 +100,7 @@ describe('JPEG stego round-trip', () => {
 
     // The entropy stream is the SAME (camera's own Huffman coding), not
     // re-serialized: unstuffing both, they differ in only the flipped coefficient
-    // bytes — the theoretical minimum (≤ payload bits), never a full re-encode.
+    // bytes, the theoretical minimum (≤ payload bits), never a full re-encode.
     const unstuff = (b: Uint8Array, s: number, e: number): number[] => {
       const o: number[] = [];
       for (let i = s; i < e; i++) {

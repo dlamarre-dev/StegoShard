@@ -2,9 +2,9 @@
  * Managed vault key, persisted in the browser (plan §4).
  *
  * At rest, `chrome.storage.local` holds only the *wrapped* DEK block (salt,
- * Argon2id params, IV, wrapped DEK) — useless without the password.
+ * Argon2id params, IV, wrapped DEK), useless without the password.
  *
- * Once unlocked, the raw DEK is kept in `chrome.storage.session` — a volatile,
+ * Once unlocked, the raw DEK is kept in `chrome.storage.session`, a volatile,
  * in-memory store shared across the extension's pages. This lets the popup stay
  * unlocked across reopens (and survives a service-worker recycle) instead of
  * re-prompting every time, yet it is never written to disk and is cleared when

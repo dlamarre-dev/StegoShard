@@ -1,5 +1,5 @@
 /**
- * Gather CLI restore inputs — the headless counterpart to `restoreFileFromDisk`
+ * Gather CLI restore inputs: the headless counterpart to `restoreFileFromDisk`
  * in `src/ui/disk.ts` and the Python decoder's `_gather` (decode.py).
  *
  * Expands a list of paths (image files, directories, `.zip`, `.pdf`) into decoded

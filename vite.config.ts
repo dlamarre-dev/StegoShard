@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 // The explicit `.ts` is deliberate, and this is the only import in the repo that
 // carries one.
 //
-// Node loads this config file directly — Vite 8 is moving to `configLoader:
+// Node loads this config file directly; Vite 8 is moving to `configLoader:
 // 'native'`, which strips types and hands the result to the ordinary ESM
 // resolver. That resolver needs a complete relative specifier; it will not try
 // `./src/manifest.config.ts` for you. Everything under `src/` is bundled by
@@ -51,10 +51,10 @@ export default defineConfig(() => {
     worker: { format: 'es' as const },
     build: {
       // One directory per target so the Chrome and Firefox manifests never
-      // clobber each other — load dist/chrome or dist/firefox accordingly.
+      // clobber each other; load dist/chrome or dist/firefox accordingly.
       outDir: resolve(import.meta.dirname, `dist/${target}`),
       emptyOutDir: true,
-      // Extensions load files by path, not by hashed URL — stable names keep the
+      // Extensions load files by path, not by hashed URL, so stable names keep the
       // manifest references valid across builds.
       rollupOptions: {
         input: {

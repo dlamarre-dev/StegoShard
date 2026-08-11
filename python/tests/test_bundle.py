@@ -30,7 +30,7 @@ def test_round_trips_several_files() -> None:
 
 def test_strips_path_traversal_from_entry_names() -> None:
     # The archive is decrypted from a vault, but its entry names were chosen by
-    # whoever wrote that vault — a traversal must not escape the output dir.
+    # whoever wrote that vault; a traversal must not escape the output dir.
     out = dict(unpack_bundle(_zip({"../../etc/passwd": b"nope", "sub/ok.txt": b"yes"})))
     assert set(out) == {"passwd", "ok.txt"}
     for name in out:
@@ -43,7 +43,7 @@ def test_rejects_an_archive_with_nothing_readable() -> None:
 
 
 def _bomb(size: int) -> bytes:
-    """A small archive that expands to `size` bytes — zeroes deflate to nothing."""
+    """A small archive that expands to `size` bytes; zeroes deflate to nothing."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("big.bin", b"\x00" * size)

@@ -152,7 +152,7 @@ const restoreProgressBar = el('restore-progress-bar');
  * Two tiers: below `MIN_PASSWORD_LENGTH` is a hard floor this refuses outright,
  * because the vault's confidentiality rests entirely on this secret and the
  * attacker grinds it offline. Above the floor but short of `isStrongNewPassword`
- * is advisory — the user may knowingly accept it. A rejection explains itself; a
+ * is advisory; the user may knowingly accept it. A rejection explains itself; a
  * cancelled confirmation stays silent, since the user just made that choice.
  */
 const acceptNewPassword = (password: string, status: HTMLElement): boolean => {
@@ -213,7 +213,7 @@ function reflectDestination(): void {
   const sqlite = dest === 'sqlite';
   show(sqliteFields, sqlite);
   // The .db path offers key-mode delivery (embedded / keyfile / stego) in every
-  // access mode — the factor is an extra layer on top of the mode (§10.3).
+  // access mode; the factor is an extra layer on top of the mode (§10.3).
   show(keymodeFields, !gallery);
   // §10 access mode is offered on the deniable paths; duress is .db-only (§10.11).
   const deniable = gallery || sqlite;
@@ -266,7 +266,7 @@ function reflectKeyMode(): void {
   show(stegoFields, showStego);
   show(stegoPwField, showStego && !sqlite);
   // For a duress .db with a key-file/stego factor, that factor protects the REAL
-  // file only — the decoy still opens on the duress password alone. Flag it so the
+  // file only; the decoy still opens on the duress password alone. Flag it so the
   // user isn't surprised the decoy needs no cover.
   show(
     factorDuressHint,
@@ -504,7 +504,7 @@ function applyAvailability(): void {
   for (const r of destRadios()) r.disabled = !est[r.value as Destination]?.available;
 
   // A codec that would blow the image limit disqualifies the codec, not the
-  // destination — so grey the codec and move off it, leaving the destination be.
+  // destination, so grey the codec and move off it, leaving the destination be.
   const here = est[selectedDest()];
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="codec"]')) {
     radio.disabled = here?.codecFits ? here.codecFits[radio.value as CodecChoice] === false : false;
@@ -538,7 +538,7 @@ async function refreshEstimates(): Promise<void> {
     ({ file } = await resolveSaveInput(picked));
     len = await envelopeLenForEstimate(file);
   } catch {
-    return; // couldn't read the file — leave destinations enabled, no estimate
+    return; // couldn't read the file; leave destinations enabled, no estimate
   }
   if (saveFile.files?.[0] !== first) return; // a newer pick superseded this
   envelope = { file, len };
@@ -657,7 +657,7 @@ reflectRestoreMode();
 /**
  * Populate the expert save-result panel: what was written ("files created"),
  * then what to keep to restore. The manifest comes first because it names the
- * files the user is looking at right now — on the deniable destinations those
+ * files the user is looking at right now; on the deniable destinations those
  * names say nothing on their own.
  */
 function renderRecovery(
@@ -706,7 +706,7 @@ async function doSave(req: SaveRequest): Promise<void> {
     duressPw.value = '';
     // Also clear the extra entropy: reusing the same string across saves would
     // quietly turn a one-off contribution into a fixed one. Only on success,
-    // deliberately — after a failed save the user would otherwise have to type a
+    // deliberately: after a failed save the user would otherwise have to type a
     // page of dice rolls again, and keeping it costs nothing: every install
     // draws a fresh session salt, so the next attempt gets a new keystream.
     extraEntropy.value = '';

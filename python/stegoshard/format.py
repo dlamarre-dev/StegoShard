@@ -1,4 +1,4 @@
-"""Binary format parsing — mirrors SPEC.md §3–§7 (all integers big-endian)."""
+"""Binary format parsing; mirrors SPEC.md §3–§7 (all integers big-endian)."""
 
 from __future__ import annotations
 
@@ -214,7 +214,7 @@ def unpack_bundle(
     - Entry names are reduced to a basename, so a `../` entry cannot escape the
       output directory.
     - Expansion is bounded. The envelope's gzip guard bounds the .zip's own
-      size; without this, a small archive could still inflate without limit —
+      size; without this, a small archive could still inflate without limit,
       the classic nested-bomb shape.
     """
     out: list[tuple[str, bytes]] = []
@@ -243,11 +243,11 @@ def unpack_bundle(
 def parse_envelope(
     envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES
 ) -> tuple[str, bytes, bool]:
-    """Split an envelope into (filename, content, bundled) — SPEC §4.
+    """Split an envelope into (filename, content, bundled); SPEC §4.
 
     `bundled` reports FLAGS bit 1; the caller decides whether to `unpack_bundle`
     the content. A reader that ignores the bit entirely still recovers the .zip
-    intact, which `test_bundle.py` asserts — that is the property that let the
+    intact, which `test_bundle.py` asserts; that is the property that let the
     bit be added without a format version bump.
     """
     if len(envelope) < 3:

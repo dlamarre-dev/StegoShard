@@ -3,7 +3,7 @@
  *
  * The envelope carries a single name + blob (SPEC §4), so a multi-file save zips
  * its inputs and sets FLAGS bit1. This lives outside `@core` because core reaches
- * only for the platform streams API — that restraint is what lets the Python
+ * only for the platform streams API; that restraint is what lets the Python
  * reference decoder inflate a payload with its standard library.
  *
  * Shared by the browser surfaces and the CLI so the two cannot disagree about
@@ -29,7 +29,7 @@ export interface BundleFile {
 /**
  * Bounds on expanding a bundle.
  *
- * The .zip comes out of a *decrypted* vault, so reaching it needs the password —
+ * The .zip comes out of a *decrypted* vault, so reaching it needs the password,
  * but that is exactly the position someone is in when a colleague shares a vault
  * with them, and the archive's contents were chosen by whoever built it. The
  * outer gzip guard bounds the .zip's own size; nothing bounded what it expands
@@ -84,7 +84,7 @@ export function unpackBundle(
 ): BundleFile[] {
   let entries = 0;
   let declaredTotal = 0;
-  // Checked in the filter, i.e. *before* fflate inflates each entry — refusing
+  // Checked in the filter, i.e. *before* fflate inflates each entry, refusing
   // after the fact would already have paid the memory.
   const filter = (info: UnzipFileInfo): boolean => {
     if (info.name.endsWith('/')) return false;
@@ -120,7 +120,7 @@ export function unpackBundle(
  * Resolve the files a user picked into the single (name, blob) the envelope
  * carries, plus whether it is a bundle.
  *
- * One file passes through untouched — same name, same bytes, no flag — so the
+ * One file passes through untouched (same name, same bytes, no flag) so the
  * commonest save produces exactly the envelope it always did. Several are zipped
  * and marked. Returning a `File` lets every downstream path (estimates,
  * verification, the worker) stay as it was.

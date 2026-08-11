@@ -1,8 +1,8 @@
 /**
- * Password entropy helpers (A2, UX only — no format impact).
+ * Password entropy helpers (A2, UX only; no format impact).
  *
  * `passwordStrength` gives a deliberately conservative *estimate* of a typed
- * password's strength to nudge users away from weak secrets — Argon2id only
+ * password's strength to nudge users away from weak secrets, since Argon2id only
  * multiplies the cost of a guessing attack, so the password's own entropy is the
  * real ceiling on confidentiality. `generatePassphrase` produces a high-entropy
  * secret from the platform CSPRNG for users who would rather not invent one.
@@ -50,7 +50,7 @@ export interface PasswordStrength {
 }
 
 /**
- * Hard floor for a newly-created credential. No surface may waive it — not the
+ * Hard floor for a newly-created credential. No surface may waive it: not the
  * app's confirm dialog, not the CLI's --allow-weak-password.
  *
  * The whole confidentiality of a vault rests on this one secret, and the threat
@@ -68,7 +68,7 @@ export const MIN_NEW_PASSWORD_SCORE = 3;
  * Estimate password strength from character-class diversity and length, damped
  * by the ratio of distinct characters so that runs like `aaaaaaaa` don't score
  * as if every character were independent. This is a heuristic lower bound, not a
- * dictionary/pattern analysis — the UI presents it as an estimate.
+ * dictionary/pattern analysis, and the UI presents it as an estimate.
  */
 export function passwordStrength(pw: string): PasswordStrength {
   if (pw.length === 0) return { bits: 0, score: 0 };
@@ -105,15 +105,15 @@ export function isStrongNewPassword(pw: string): boolean {
 /**
  * Estimate the bits contributed by typed *extra entropy* (the expert save
  * option). `passwordStrength` alone is the wrong tool here: its repetition
- * damping is floored at 0.3, so holding one key down to fill the box — the
- * obvious degenerate input for a field that says "type randomly" — would be
+ * damping is floored at 0.3, so holding one key down to fill the box, the
+ * obvious degenerate input for a field that says "type randomly", would be
  * reported as ~144 bits when it is worth nothing.
  *
  * So take the smaller of two estimates: the character-class heuristic above (a
  * ceiling: you cannot beat length × log2(alphabet)), and length × the Shannon
  * entropy of the characters actually typed, which is 0 for a single repeated
- * character and near-maximal for varied input. Order-0 only — it does not catch
- * `abababab` — but it removes the failure mode the field invites while leaving a
+ * character and near-maximal for varied input. Order-0 only, so it does not catch
+ * `abababab`, but it removes the failure mode the field invites while leaving a
  * page of dice rolls scored on its real length.
  *
  * Still only an estimate, and nothing hangs on it: the CSPRNG is mixed in

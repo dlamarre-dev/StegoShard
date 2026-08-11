@@ -1,7 +1,7 @@
 """Pick the right image codec for an image, and decode it (SPEC §2).
 
 The per-image header lives *inside* the payload, so ``CODEC_ID`` cannot tell a
-decoder which codec to use — it has to guess from the pixels. A qr-grid symbol is
+decoder which codec to use; it has to guess from the pixels. A qr-grid symbol is
 pure greyscale; a color-grid symbol is mostly saturated. One cheap number
 separates them, and either way both are tried, so a wrong guess only costs a
 second attempt.

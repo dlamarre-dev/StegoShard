@@ -1,6 +1,6 @@
 /**
  * Disk destination flow (plan §6): the offline default, needing no network
- * permission. Save renders the vault's image set to PNG files — either as
+ * permission. Save renders the vault's image set to PNG files, either as
  * individual downloads or bundled into one .zip; restore reads image files (or
  * a .zip) back and reconstructs the original file.
  */
@@ -124,7 +124,7 @@ async function deliver(downloads: { name: string; blob: Blob }[], subdir: string
  * Hand a restored payload back to the user.
  *
  * A bundle (SPEC §4 FLAGS bit1) becomes one download per original file, spaced
- * by `deliver` — browsers throttle or block downloads fired in a burst.
+ * by `deliver`; browsers throttle or block downloads fired in a burst.
  * Anything else is the single file it has always been.
  */
 async function deliverRestored(
@@ -207,7 +207,7 @@ export async function saveFileToDisk(
   }
   // The key block is external for keyfile/stego modes. In stego mode it is
   // hidden inside the user's cover photo (a lossless PNG); otherwise it is a
-  // plain .key file. Bundled into the .zip only for the .key case — the stego
+  // plain .key file. Bundled into the .zip only for the .key case; the stego
   // image is always delivered on its own so it can be stored as an innocuous
   // photo, separate from the obviously-StegoShard set.
   let externalKey: { name: string; bytes: Uint8Array; mime: string } | undefined;
@@ -228,7 +228,7 @@ export async function saveFileToDisk(
   }
 
   // Collect everything this save produces, then deliver. A separate key (a .key
-  // or a stego cover) is always delivered on its own — never inside the .zip —
+  // or a stego cover) is always delivered on its own, never inside the .zip,
   // so the two factors stay physically separate.
   const downloads: Download[] = [];
   if (options.asZip) {
@@ -506,7 +506,7 @@ export async function saveFileToBinary(
     options.onProgress,
     options.bundle,
   );
-  // Only the branded .ssbn reaches here — every disguised path returned above.
+  // Only the branded .ssbn reaches here; every disguised path returned above.
   const id = toHex(randomBytes(4));
   const downloads: Download[] = [
     { name: binaryVaultName(options.variant), blob: octet(container), purpose: 'vault' },
@@ -538,7 +538,7 @@ export async function saveFileToBinary(
       keyBlock,
     );
   }
-  // No setId on the binary path — group the vault + key under a random-id folder.
+  // No setId on the binary path; group the vault + key under a random-id folder.
   await deliver(downloads, saveFolder(id, false));
   return { keyMode, variant: options.variant, manifest: manifestOf(downloads) };
 }
@@ -557,7 +557,7 @@ export interface GallerySaveResult {
  * plus decoys, then download every (modified) photo, keeping each cover's own
  * filename so the set blends into a photo library (no telltale zip). By default
  * the key is embedded in the fragments; keyMode 'keyfile'/'stego' deliver it
- * separately (a loose .key or hidden in a cover photo — a deniability trade-off).
+ * separately (a loose .key or hidden in a cover photo), a deniability trade-off.
  */
 export async function saveGalleryToDisk(
   secret: File,
@@ -586,7 +586,7 @@ export async function saveGalleryToDisk(
   });
   const setHex = toHex(res.setId);
 
-  // Two covers can share a basename, and gallery reuses cover names — disambiguate.
+  // Two covers can share a basename, and gallery reuses cover names, so disambiguate.
   const downloads: Download[] = [];
   const used = new Set<string>();
   for (const img of res.images) {
@@ -609,10 +609,10 @@ export async function saveGalleryToDisk(
     });
   } else if (keyMode === 'keyfile') {
     // Deniability caveat: a `.key` sitting beside the photos gives the gallery
-    // away by its extension alone — restore finds it with `isKey()`, so it cannot
+    // away by its extension alone; restore finds it with `isKey()`, so it cannot
     // become fully generic. Dropping the project name narrows the tell without
     // removing it. keyfile trades deniability for a key you can store apart from
-    // the photos — opt-in, unlike the deniable stego/embedded modes.
+    // the photos, opt-in unlike the deniable stego/embedded modes.
     downloads.push({ name: `${setHex}.key`, blob: octet(res.keyBlock), purpose: 'keyfile' });
   }
 
@@ -733,7 +733,7 @@ export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlo
       total += chunk.length;
       if (size > MAX_ENTRY_BYTES) throw new Error('restore: a .zip entry is too large');
       if (total > MAX_TOTAL_BYTES) throw new Error('restore: .zip contents are too large');
-      parts.push(chunk.slice()); // fflate may reuse the buffer — copy it
+      parts.push(chunk.slice()); // fflate may reuse the buffer, so copy it
       if (final) {
         const bytes = parts.length === 1 ? parts[0]! : concatChunks(parts, size);
         if (isKey(name)) keyBlock = bytes;
@@ -761,7 +761,7 @@ function concatChunks(parts: Uint8Array[], total: number): Uint8Array {
  * Reconstruct the original file from image files, a .zip of them, a printed
  * PDF (paper mode), or a mix. The separate key, when needed, may be a `.key`
  * file (loose or inside the zip) or a **stego cover image** that hides the key
- * block — the latter is de-embedded with the restore password. `extraPayloads`
+ * block; the latter is de-embedded with the restore password. `extraPayloads`
  * lets callers add already-decoded payloads (e.g. live camera captures).
  */
 export async function restoreFileFromDisk(
@@ -852,7 +852,7 @@ export async function restoreFileFromDisk(
 
   for (const bytes of images) {
     const payload = await decodeImageBytes(bytes);
-    // A single unreadable image is fine — erasure coding tolerates losses.
+    // A single unreadable image is fine; erasure coding tolerates losses.
     if (payload) payloads.push(payload);
   }
   if (payloads.length === 0) throw new Error('restore: no readable images found');

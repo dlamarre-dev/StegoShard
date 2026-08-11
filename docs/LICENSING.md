@@ -12,7 +12,7 @@ under MIT cannot later revoke the rights already granted for that copy.
 
 ## Decision gate before 1.0 or outside contributions
 
-Before accepting a non-trivial external code contribution—or changing the license—the
+Before accepting a non-trivial external code contribution, or changing the license, the
 maintainer must obtain appropriate legal advice and record decisions on:
 
 1. The objective: broad adoption (MIT), reciprocal source sharing (GPLv3), network

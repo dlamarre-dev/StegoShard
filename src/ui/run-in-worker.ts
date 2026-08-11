@@ -49,7 +49,7 @@ function pump(): void {
       getWorker().postMessage({ id: next.id, ...next.message }, next.transfer);
       return;
     } catch (err) {
-      // Dispatch can fail synchronously — workers blocked by policy, or a
+      // Dispatch can fail synchronously: workers blocked by policy, or a
       // transfer list the structured clone cannot handle. The slot was already
       // marked busy above, and no reply will ever arrive to free it, so unwind
       // it here: without this the queue stays pinned to a dead id and every
@@ -151,7 +151,7 @@ export async function encryptBinaryInWorker(
   onProgress?: OnProgress,
   bundle = false,
 ): Promise<Uint8Array> {
-  // Fresh, independent copy of the DEK bytes — safe to transfer. The key block is
+  // Fresh, independent copy of the DEK bytes, safe to transfer. The key block is
   // small and reused by the caller, so it is copied (not transferred).
   const rawDek = await exportDekRaw(key.dek);
   const res = await call<{ container: Uint8Array }>(

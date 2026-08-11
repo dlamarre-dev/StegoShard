@@ -3,7 +3,7 @@
  *
  * Covers the PDFs StegoShard's paper mode generates (FlateDecode RGB/Gray
  * image XObjects) plus the common scanner output (DCTDecode = plain JPEG).
- * Anything else (exotic color spaces, JBIG2, CCITT) is skipped — a lost page
+ * Anything else (exotic color spaces, JBIG2, CCITT) is skipped; a lost page
  * is tolerated by the erasure coding, and foreign images simply fail to decode.
  *
  * Split in two layers so the PDF walking is testable under Node:
@@ -31,7 +31,7 @@ function componentsFor(dict: PDFRawStream['dict']): number {
   const name = asName(cs);
   if (name === 'DeviceRGB') return 3;
   if (name === 'DeviceGray') return 1;
-  // ICCBased: [ /ICCBased <stream with /N 1|3> ] — treat by component count.
+  // ICCBased: [ /ICCBased <stream with /N 1|3> ]; treat by component count.
   if (cs instanceof PDFArray && asName(cs.get(0)) === 'ICCBased') {
     const streamRef = cs.get(1);
     const stream = streamRef ? dict.context.lookup(streamRef) : undefined;
@@ -60,7 +60,7 @@ function toImageData(raw: Uint8Array, width: number, height: number, comps: numb
 
 /**
  * Enumerate the PDF's image XObjects and return the ones we can materialize.
- * Never throws on a malformed *image* — it is skipped; throws only when the
+ * Never throws on a malformed *image*, which is skipped; throws only when the
  * document itself is not a readable PDF.
  */
 export async function extractPdfImages(bytes: Uint8Array): Promise<PdfImage[]> {
@@ -110,12 +110,12 @@ export async function extractPdfImages(bytes: Uint8Array): Promise<PdfImage[]> {
       try {
         raw = unzlibSync(obj.getContents(), { out: new Uint8Array(needed) });
       } catch {
-        continue; // over-cap (potential bomb), predicted, or corrupt — skip
+        continue; // over-cap (potential bomb), predicted, or corrupt, so skip
       }
       if (raw.length < needed) continue;
       images.push({ kind: 'pixels', img: toImageData(raw, width, height, comps) });
     } catch {
-      // Unsupported or corrupt XObject — skip it.
+      // Unsupported or corrupt XObject, so skip it.
     }
   }
   return images;
@@ -139,7 +139,7 @@ function downscale(img: ImageDataLike, maxSide: number): ImageDataLike {
 
 /**
  * Decode every readable QR payload out of a PDF (browser entry point).
- * Unreadable images are dropped — erasure coding tolerates losses.
+ * Unreadable images are dropped; erasure coding tolerates losses.
  */
 export async function extractPdfPayloads(bytes: Uint8Array): Promise<Uint8Array[]> {
   // Lazy import keeps image-io (and its canvas helpers) off this module's

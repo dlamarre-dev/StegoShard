@@ -6,7 +6,7 @@
  * fails the run.
  *
  * Deterministic: seed from `--seed=N`, else GITHUB_RUN_ID (coverage-over-time in
- * CI), else a fixed constant. No dependencies — a small LCG PRNG, same shape as
+ * CI), else a fixed constant. No dependencies: a small LCG PRNG, same shape as
  * the seeded fuzzing in crypto.hardening.test.ts.
  *
  *   npm run fuzz -- --iters=20000 --seed=123

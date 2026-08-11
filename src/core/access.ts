@@ -3,7 +3,7 @@
  * blob builders (vault.ts / segmented.ts), the gated KEK (crypto.ts), and Shamir
  * sharing (shamir.ts).
  *
- * Mode B — Non-possession (§10.6): ONE live slot whose KEK is gated on threshold
+ * Mode B, Non-possession (§10.6): ONE live slot whose KEK is gated on threshold
  * material the holder does not possess, ONE real region, and NO decoy (the second
  * region is CSPRNG to the same bucket). The secret `S` is split into `n` shares
  * (any `k` recover it) and returned for out-of-band delivery to holders; the
@@ -11,7 +11,7 @@
  * enters the container. "I cannot decrypt this" is then literally true for anyone
  * below the threshold.
  *
- * Mode A — Duress (§10.5): TWO live slots over TWO real regions — one credential
+ * Mode A, Duress (§10.5): TWO live slots over TWO real regions, one credential
  * opens the real region, an independent duress credential opens a plausible decoy.
  * Each region has its own DEK, so the duress credential never exposes the real one.
  */
@@ -44,7 +44,7 @@ import type { OnProgress } from './progress';
 export interface NonPossessionResult {
   /** The multi-region container blob (feed to the gallery fragmenter or SQLite packer). */
   blob: Uint8Array;
-  /** `n` serialized 38-byte Shamir shares — deliver `k` to holders; never persist. */
+  /** `n` serialized 38-byte Shamir shares; deliver `k` to holders; never persist. */
   shares: Uint8Array[];
   /** The live region index + its DEK, for post-save verification only. */
   regionIndex: number;
@@ -72,7 +72,7 @@ async function nonPossessionParts(
   const vaultSalt = randomBytes(VAULT_SALT_LEN);
   const secret = randomBytes(SECRET_LEN);
   // The base KEK optionally mixes in the keyfile/stego factor (§10.3), then is
-  // gated on the threshold secret — so an unlock needs password + factor + shares.
+  // gated on the threshold secret, so an unlock needs password + factor + shares.
   // This matches the decoder's slotKekCandidates (slotKekRaw → gateKek) exactly.
   const baseKek = await slotKekRaw(password, vaultSalt, keyFactor, params);
   const gatedKek = await gateKek(baseKek, secret, vaultSalt);
@@ -155,7 +155,7 @@ export async function buildNonPossessionSegmentedBlob(
   return { blob, shares, regionIndex, dek };
 }
 
-// --- Mode A — Duress (§10.5) ---------------------------------------------------
+// --- Mode A, Duress (§10.5) ---------------------------------------------------
 
 /** Why two credentials were judged too related to use as real + duress. */
 export type CredentialRelation = 'equal' | 'case' | 'contains' | 'reverse' | 'near';
@@ -196,7 +196,7 @@ const reverse = (s: string) => [...s].reverse().join('');
 /**
  * Judge whether a duress password is independent enough from the real one to be
  * safe (§10.5): a cracker who recovers one MUST NOT cheaply recover the other.
- * Author-time UX ONLY — the result is never stored or encoded (any stored relation
+ * Author-time UX ONLY; the result is never stored or encoded (any stored relation
  * would itself be a distinguisher §10.2). Compares on NFC-normalized text.
  */
 export function credentialsIndependent(real: string, duress: string): CredentialCheck {
@@ -248,12 +248,12 @@ async function duressParts(
   const decoyRegionIndex = 1 - realRegionIndex;
   const dekReal = randomBytes(DEK_LEN);
   const dekDecoy = randomBytes(DEK_LEN);
-  // The keyfile/stego factor (§10.3) gates the REAL slot ONLY — an extra layer on
+  // The keyfile/stego factor (§10.3) gates the REAL slot ONLY, an extra layer on
   // the payload worth protecting. The decoy slot deliberately takes NO factor: a
   // decoy exists to be surrendered under coercion, so it must open on the duress
   // password alone (requiring an extra artifact to reveal the decoy would defeat
   // the purpose). The stego cover is keyed by the real password, so the duress
-  // opener can't extract the factor anyway — and doesn't need to. With no factor
+  // opener can't extract the factor anyway, and doesn't need to. With no factor
   // both derivations are byte-identical to the password-only deriveKEK.
   const kekReal = await deriveSlotKek(realPassword, vaultSalt, keyFactor, params);
   const kekDuress = await deriveSlotKek(duressPassword, vaultSalt, null, params);
@@ -362,7 +362,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 /**
  * Verify one region of a freshly built multi-region `.db` blob restores to the
- * expected `(filename, content)` with its authoring DEK — a self-check run before
+ * expected `(filename, content)` with its authoring DEK, a self-check run before
  * the container is handed over. Throws `VerificationError` on any mismatch.
  */
 export async function verifyDbRegion(

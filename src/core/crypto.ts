@@ -8,7 +8,7 @@
  *
  * The stored/exported artifact is the *wrapped DEK block*: it is useless without
  * the password. Recovery therefore needs the password AND this block (embedded
- * in the images, a .key file, or a stego image — see plan §4).
+ * in the images, a .key file, or a stego image; see plan §4).
  *
  * No home-grown crypto: AES-GCM comes from WebCrypto, Argon2id from the audited
  * hash-wasm WASM build. All parameters here are frozen in SPEC.md so the Python
@@ -69,7 +69,7 @@ export function validateArgon2Params(p: Argon2Params): void {
  * password search over the old 64 MiB × t=3 baseline, but latency and mobile
  * viability remain release-QA gates. Tests override these with cheaper values,
  * and the Python reference decoder mirrors them for the stego/gallery layer
- * (whose cost is not stored — see python/stegoshard/stego.py).
+ * (whose cost is not stored; see python/stegoshard/stego.py).
  */
 export const DEFAULT_ARGON2: Argon2Params = {
   iterations: 4,
@@ -82,7 +82,7 @@ export const DEFAULT_ARGON2: Argon2Params = {
  *
  * Some users do not want to trust the platform CSPRNG alone (a suspect hardware
  * RNG, a cloned VM, a browser they do not control). When they install a string
- * of their own — mashed keys, dice rolls — every draw becomes
+ * of their own (mashed keys, dice rolls), every draw becomes
  *
  *     output = getRandomValues() XOR HMAC-SHA256(K, counter)
  *
@@ -91,7 +91,7 @@ export const DEFAULT_ARGON2: Argon2Params = {
  * single byte, so if the user's string is worthless ("aaaa", or nothing at all)
  * the output is exactly today's CSPRNG output, and if the CSPRNG is worthless
  * the output is still unpredictable to anyone who does not know the string.
- * Neither source can weaken the other — XOR with an independent stream can only
+ * Neither source can weaken the other: XOR with an independent stream can only
  * preserve or add uncertainty.
  *
  * It affects generation only. Nothing about it is stored, so a vault written
@@ -102,7 +102,7 @@ const USER_ENTROPY_INFO = new TextEncoder().encode('stegoshard/v1/user-entropy')
 
 interface EntropyPool {
   /** hash-wasm HMAC instance: the factory is async, init/update/digest are sync
-   *  — required, because `randomBytes` is synchronous by contract. */
+   *    Required, because `randomBytes` is synchronous by contract. */
   hmac: IHasher;
   /** Monotonic block counter; never repeats within a session. */
   counter: number;
@@ -149,7 +149,7 @@ export function hasUserEntropy(): boolean {
 /** Next keystream block: HMAC(K, u64be(counter++)). */
 function keystreamBlock(p: EntropyPool): Uint8Array {
   const ctr = new Uint8Array(8);
-  // counter is a JS number: safe up to 2^53 blocks — unreachable in a session.
+  // counter is a JS number: safe up to 2^53 blocks, unreachable in a session.
   writeU32(ctr, 0, Math.floor(p.counter / 0x1_0000_0000));
   writeU32(ctr, 4, p.counter >>> 0);
   p.counter++;
@@ -181,7 +181,7 @@ function mixUserEntropy(out: Uint8Array): void {
  * Cryptographically secure random bytes. `getRandomValues` caps at 65536 bytes
  * per call, so larger requests (e.g. filling a dead region up to the .db bucket
  * ceiling, §10.4) are filled in windows. When the user has installed extra
- * entropy (see above), it is XORed in afterwards — the CSPRNG is consulted
+ * entropy (see above), it is XORed in afterwards; the CSPRNG is consulted
  * either way, so this can never produce *less* randomness than before.
  */
 export function randomBytes(len: number): Uint8Array {
@@ -203,7 +203,7 @@ export function randomBytes(len: number): Uint8Array {
  * platforms/keyboards can emit the same text as different byte sequences
  * (precomposed "é" vs. "e" + combining accent); NFC makes the KEK depend on the
  * *text*, not on how it happened to be encoded, so a vault created on one device
- * unlocks on another. Frozen in SPEC.md — both the extension and the Python
+ * unlocks on another. Frozen in SPEC.md, so both the extension and the Python
  * reference decoder must normalize identically.
  */
 export function normalizePassword(password: string): string {
@@ -236,7 +236,7 @@ export async function deriveKEK(
 /**
  * Generate a fresh, extractable DEK (needed so it can be wrapped). Built from
  * `randomBytes` rather than `subtle.generateKey` so that it goes through the
- * same single entropy tap as every other secret — including the optional
+ * same single entropy tap as every other secret, including the optional
  * user-entropy layer, which `subtle.generateKey` would bypass. The §10 paths
  * already mint their DEKs this way (access.ts, vault.ts).
  */
@@ -283,7 +283,7 @@ export async function encryptBytes(
  * AES-GCM seal with a caller-supplied 12-byte nonce and additional authenticated
  * data (AAD). Returns `ciphertext || tag` (WebCrypto's combined form). Used by the
  * segmented binary format (STREAM), where the caller manages a strict per-chunk
- * nonce discipline — unlike `encryptBytes`, which picks a random IV. Keeping the
+ * nonce discipline, unlike `encryptBytes`, which picks a random IV. Keeping the
  * two on separate helpers ensures the random-IV and counter-nonce disciplines are
  * never accidentally crossed.
  */
@@ -325,7 +325,7 @@ export async function decryptBytes(
   ciphertext: Uint8Array,
 ): Promise<Uint8Array> {
   // GCM accepts any nonzero IV length, but this format only ever produces
-  // 12-byte IVs — reject anything else instead of silently diverging.
+  // 12-byte IVs; reject anything else instead of silently diverging.
   if (iv.length !== IV_LEN) throw new RangeError('decrypt: bad iv length');
   const pt = await subtle.decrypt(
     { name: 'AES-GCM', iv: iv as BufferSource },
@@ -338,7 +338,7 @@ export async function decryptBytes(
 /**
  * HKDF-SHA256 (RFC 5869) key derivation. Used to split one high-entropy secret
  * (e.g. an Argon2id output) into several independent, domain-separated subkeys
- * via distinct `info` labels — safer than reusing the same bytes for two jobs.
+ * via distinct `info` labels, which is safer than reusing the same bytes for two jobs.
  * `salt` defaults to empty (the IKM is already high-entropy). Reproduced by the
  * Python reference decoder, so it is part of the versioned pre-1.0 format candidate.
  */
@@ -366,7 +366,7 @@ const CONTENT_INFO = new TextEncoder().encode('stegoshard/vault/content');
  * The DEK is reused across vaults (the keystore holds one), which alone would
  * make the AES-GCM random-IV collision bound accumulate across every export
  * under that key. A fresh random `salt` per export gives each export its own CEK,
- * so the (key, IV) space is per-export and the bound resets — one export is one
+ * so the (key, IV) space is per-export and the bound resets: one export is one
  * message. The raw DEK never leaves this function. Versioned format candidate (SPEC §6);
  * mirrored by the Python reference decoder.
  */
@@ -389,7 +389,7 @@ export async function wrapDEK(
 ): Promise<{ iv: Uint8Array; wrapped: Uint8Array }> {
   // Copy into a private buffer before zeroizing. Per the Web Crypto spec
   // exportKey returns a fresh ArrayBuffer, but some runtimes (observed under
-  // Deno) hand back memory that still aliases the live CryptoKey — filling that
+  // Deno) hand back memory that still aliases the live CryptoKey, so filling that
   // would corrupt the DEK itself. `.slice()` guarantees an independent copy, so
   // the zeroization can never scribble on key material.
   const rawDek = (await subtle.exportKey('raw', dek)).slice(0);
@@ -506,7 +506,7 @@ export async function createKeyBlock(
   return { dek, block: { salt, params, iv, wrapped } };
 }
 
-/** Thrown when the DEK cannot be unwrapped — almost always a wrong password. */
+/** Thrown when the DEK cannot be unwrapped; almost always a wrong password. */
 export class WrongPasswordError extends Error {
   constructor() {
     super('wrong password');
@@ -548,7 +548,7 @@ export async function rewrapKeyBlock(
 // key slots over REGION_COUNT payload regions, instead of the single 92-byte
 // "SSKY" key block above. Each live slot AES-GCM-wraps an INDEPENDENT per-region
 // DEK plus the index of the region it unlocks; dead slots are indistinguishable
-// CSPRNG. The array is magicless — the geometry is known from the decode
+// CSPRNG. The array is magicless; the geometry is known from the decode
 // entrypoint (a gallery decode / a `.db` variant), never read from a byte, so no
 // field can distinguish a decoy container from a plain one (§10.2).
 
@@ -571,7 +571,7 @@ const SLOT_KEK_INFO = new TextEncoder().encode('stegoshard/v1/slot-kek');
 /**
  * Length of the external key factor (the keyfile / stego secret) mixed into the
  * slot KEK on the multi-region paths. A fresh random 32-byte secret, delivered as
- * a `.key` file or hidden in a cover image — it looks like random bytes, unlike
+ * a `.key` file or hidden in a cover image, and it looks like random bytes, unlike
  * the old serialized key block, which aids the deniability it serves.
  */
 export const KEY_FACTOR_LEN = 32;
@@ -583,7 +583,7 @@ export const KEY_FACTOR_LEN = 32;
 // able self-check the 92-byte key block has: after de-whitening, a wrong password
 // yields random bytes, so extraction must be able to tell "this is a factor" from
 // "this is noise". A raw 32-byte factor has no such structure, so stego wraps it
-// in a fixed, magic-framed envelope. (The `.key` file stays the bare 32 bytes —
+// in a fixed, magic-framed envelope. (The `.key` file stays the bare 32 bytes,
 // on disk a magic would be a distinguisher; under stego the whole envelope is
 // whitened, so its structure never appears on the wire.)
 const KEY_FACTOR_MAGIC = Uint8Array.from([0x53, 0x53, 0x4b, 0x46]); // "SSKF"
@@ -623,7 +623,7 @@ export function importAesGcmKey(raw: Uint8Array): Promise<CryptoKey> {
  * Derive the raw KEK bytes (Argon2id output) from a password + per-vault salt.
  * Unlike `deriveKEK` (which imports and zeroizes), this hands back the 32 raw
  * bytes so a caller can both import an AES-GCM key AND feed them to `gateKek`
- * (SPEC §10.6.2) — running Argon2id exactly once per candidate. The caller MUST
+ * (SPEC §10.6.2), running Argon2id exactly once per candidate. The caller MUST
  * zeroize the returned buffer.
  */
 export async function deriveKekBytes(
@@ -647,7 +647,7 @@ export async function deriveKekBytes(
  * OPTIONAL external key factor (a random keyfile / stego secret) mixed in via HKDF
  * for domain separation. With no factor this is the password-only ("embedded")
  * KEK. The slot KEK's Argon2 parameters are the format-defined DEFAULT_ARGON2 and are NOT
- * stored in the container (like the gallery/stego keys) — the geometry carries no
+ * stored in the container (like the gallery/stego keys); the geometry carries no
  * cost field, so the decoder uses the same frozen cost.
  */
 /**
@@ -699,8 +699,8 @@ export async function gateKek(
 }
 
 /**
- * Candidate slot KEKs for an unlock: the ungated KEK, plus — when threshold
- * material is supplied — the gated KEK, derived from the SAME single Argon2id
+ * Candidate slot KEKs for an unlock: the ungated KEK, plus, when threshold
+ * material is supplied, the gated KEK, derived from the SAME single Argon2id
  * output. So a with-shares unlock adds only cheap HKDF over a without-shares one,
  * preserving the constant-work timing property (§10.3.1). Sub-threshold shares
  * yield a wrong `secret` → a wrong gated KEK → no slot opens (inability, §10.6.1).
@@ -715,7 +715,7 @@ export async function slotKekCandidates(
   // Argon2id runs EXACTLY ONCE; every candidate below is a cheap HKDF/import over
   // its output, so the constant-work timing property is Argon2-bound (§10.4).
   const kekBytes = await deriveKekBytes(password, vaultSalt, params);
-  // Base KEKs to attempt: the password-only KEK, and — when a factor is supplied —
+  // Base KEKs to attempt: the password-only KEK, and, when a factor is supplied,
   // the factor-mixed KEK. BOTH are offered because a duress decoy slot (§10.9) is
   // sealed WITHOUT the factor while the real slot is sealed WITH it, and restore
   // presents the factor for either credential (it can't know which region a
@@ -843,9 +843,9 @@ export async function tryOpenSlot(
 /**
  * Constant-work slot open (SPEC §10.3.1). Attempts EVERY candidate KEK against
  * EVERY slot with no early exit, so total work depends only on the number of
- * candidate KEKs — never on which slot matched or whether any did. A well-formed
+ * candidate KEKs, never on which slot matched or whether any did. A well-formed
  * container yields exactly one match; zero (wrong credential) and more than one
- * (malformed — fail closed) both surface as the single uniform `WrongPasswordError`,
+ * (malformed, fail closed) both surface as the single uniform `WrongPasswordError`,
  * leaking nothing about the cause, which slot index matched, or the region.
  */
 export async function openSlotArray(
@@ -871,7 +871,7 @@ export async function openSlotArray(
 
 /**
  * Unlock a slot array from a password: derive one KEK (Argon2id runs ONCE) over
- * the shared per-vault salt and open the array. Salt reuse across slots is sound —
+ * the shared per-vault salt and open the array. Salt reuse across slots is sound:
  * the per-vault CSPRNG salt already defeats cross-vault precomputation, and
  * distinct passwords yield distinct KEKs regardless. Any failure maps to the
  * uniform `WrongPasswordError`. For the threshold (Mode B) path a caller instead
@@ -901,7 +901,7 @@ export async function unlockSlotArray(
 /**
  * Unbiased in-place Fisher–Yates shuffle using rejection-sampled indices from the
  * CSPRNG, so live-slot position is uniform over authorings (a biased shuffle would
- * leak the live slot's location — §10.10 slot-randomness test).
+ * leak the live slot's location; §10.10 slot-randomness test).
  */
 export function secureShuffle<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {

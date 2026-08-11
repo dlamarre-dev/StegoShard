@@ -2,7 +2,7 @@
  * Codec resolution and sniffing.
  *
  * The per-image header lives inside the payload, so `CODEC_ID` cannot tell a
- * decoder which codec to use — it has to guess from the pixels and fall back.
+ * decoder which codec to use; it has to guess from the pixels and fall back.
  * These tests pin that behaviour, including the case where the guess is wrong.
  */
 

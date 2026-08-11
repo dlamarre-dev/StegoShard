@@ -336,7 +336,7 @@ describe('CLI round-trips', () => {
   it('warns when a secret over 256 KiB is saved as images', SLOW, async () => {
     const dir = tmp();
     // Over the warn threshold by raw size, but highly compressible so it still
-    // encodes to a handful of images — the warning keys on content.length.
+    // encodes to a handful of images; the warning keys on content.length.
     const content = new Uint8Array(300 * 1024); // zeros → gzips to ~1 image
     const input = writeSecret(dir, content);
     const { sizeWarning } = await runSave({

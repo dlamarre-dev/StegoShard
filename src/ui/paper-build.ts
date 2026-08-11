@@ -2,7 +2,7 @@
  * Environment-neutral paper-PDF builder (SPEC §6 paper destination). Shared by
  * the browser (`paper.ts`, canvas text) and the CLI (`src/cli/paper.ts`, fontkit
  * vector text). Like `pdf-restore.ts`, this module is Node-safe: it imports only
- * pdf-lib, the codec-neutral types, and the pure text wrapper — no canvas, no
+ * pdf-lib, the codec-neutral types, and the pure text wrapper: no canvas, no
  * `navigator`, no file/blob APIs. Callers inject:
  *   - a `TextEngine` (how instruction/label text becomes PDF content), and
  *   - `encodeQr` + `pngEncode` (how a payload becomes an embeddable PNG).
@@ -12,7 +12,7 @@ import { type PDFDocument, type PDFPage, rgb } from 'pdf-lib';
 import { ACCENT_TOP, STEGO_PATH, type ImageDataLike } from '@core';
 import { wrapText } from './text-wrap';
 
-/** Public project page — printed so the data can be restored without the store. */
+/** Public project page; printed so the data can be restored without the store. */
 export const PROJECT_URL = 'https://github.com/dlamarre-dev/StegoShard';
 
 /** The brand accent, as a pdf-lib color. */
@@ -313,7 +313,7 @@ const MASTHEAD_MARK = 34;
  * Stamp the app mark as a *vector* path rather than an embedded PNG.
  *
  * Vector keeps it crisp at any print DPI, needs no per-environment asset loading
- * through `BuildPaperInput`, and — the practical reason — adds no image XObject
+ * through `BuildPaperInput`, and, the practical reason, adds no image XObject
  * to the page. A logo PNG would be enumerated by `pdf-restore.ts` on every
  * restore, pass its `width < 16` filter, and cost a wasted inflate plus decode
  * attempts per page.
@@ -325,7 +325,7 @@ const MASTHEAD_MARK = 34;
  */
 function drawMark(page: PDFPage, x: number, yTop: number, size: number): void {
   const opts = { x, y: yTop, scale: size / 128, borderWidth: 0 };
-  // `drawRectangle` has no corner radius, so the tile is a path too — both share
+  // `drawRectangle` has no corner radius, so the tile is a path too, so both share
   // the silhouette's 128-unit space, so one scale positions them together.
   page.drawSvgPath(TILE_PATH, { ...opts, color: ACCENT });
   page.drawSvgPath(STEGO_PATH, { ...opts, color: rgb(1, 1, 1) });
@@ -374,7 +374,7 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
   // The per-page "Page x / N" line uses the primary (chosen) locale's word.
   const pageWord = instructionLangs(input.locale)[0]!.page;
 
-  // Per-page furniture is identical on every page — prepare it once.
+  // Per-page furniture is identical on every page, so prepare it once.
   const title = input.title ? await text.prepare(input.title, 15, { bold: true }) : undefined;
   const footers: PreparedText[] = [];
   for (const line of [...instructionLangs(input.locale).map((c) => c.footer), PROJECT_URL]) {

@@ -9,11 +9,11 @@ import type { CodecChoice } from './save-controller';
 
 const PREFS_KEY = 'stegoshard.prefs';
 
-// 'binary' = branded .ssbn, 'sqlite' = disguised .db (SPEC §8) — two destinations
+// 'binary' = branded .ssbn, 'sqlite' = disguised .db (SPEC §8): two destinations
 // over the one binary container.
 export type Destination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
-/** Which UI to show at launch — the step-by-step wizard or the dense one-screen UI. */
+/** Which UI to show at launch: the step-by-step wizard or the dense one-screen UI. */
 export type Workflow = 'guided' | 'expert';
 
 export interface Prefs {

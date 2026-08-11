@@ -40,7 +40,7 @@ function fromHex(hex: string): Uint8Array {
   return out;
 }
 
-/** Deterministic patterned bytes (NOT random — these are fixed test inputs). */
+/** Deterministic patterned bytes (NOT random; these are fixed test inputs). */
 function pattern(len: number, seed: number): Uint8Array {
   let s = seed >>> 0;
   return Uint8Array.from({ length: len }, () => {
@@ -594,7 +594,7 @@ function evalPolyGen(coeffs: Uint8Array, s0: number, x: number): number {
   return gfAdd(s0, gfMul(acc, x));
 }
 
-/** Deterministic Shamir shares (fixed coefficients) — a frozen split KAT. */
+/** Deterministic Shamir shares (fixed coefficients); a frozen split KAT. */
 async function makeShamirVector(
   name: string,
   secret: Uint8Array,

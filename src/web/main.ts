@@ -1,5 +1,5 @@
 /**
- * Web app entry — a standalone, install-free version of StegoShard's offline
+ * Web app entry: a standalone, install-free version of StegoShard's offline
  * core (Disk + Paper + Gallery). It reuses the exact same core, codec, and
  * disk/paper flows as the extension via the shared save/restore controllers; it
  * just generates a fresh vault key per save (the wrapped key travels with the
@@ -146,7 +146,7 @@ const saveResultNote = el('save-result-note');
  * Two tiers: below `MIN_PASSWORD_LENGTH` is a hard floor this refuses outright,
  * because the vault's confidentiality rests entirely on this secret and the
  * attacker grinds it offline. Above the floor but short of `isStrongNewPassword`
- * is advisory — the user may knowingly accept it. A rejection explains itself; a
+ * is advisory; the user may knowingly accept it. A rejection explains itself; a
  * cancelled confirmation stays silent, since the user just made that choice.
  */
 const acceptNewPassword = (password: string, status: HTMLElement): boolean => {
@@ -213,7 +213,7 @@ function reflectDestination(): void {
   // to it (nor to binary/sqlite, which are single opaque files).
   show(galleryFields, gallery);
   // The .db path offers key-mode delivery (embedded / keyfile / stego) in every
-  // access mode — the factor is an extra layer on top of the mode (§10.3).
+  // access mode; the factor is an extra layer on top of the mode (§10.3).
   show(keymodeFields, !gallery);
   show(estimateLine, !gallery);
   // The codec choice only exists where we render image symbols.
@@ -294,7 +294,7 @@ async function refreshEstimates(): Promise<void> {
     ({ file } = await resolveSaveInput(picked));
     len = await envelopeLenForEstimate(file);
   } catch {
-    return; // couldn't read the file — leave destinations enabled, no estimate
+    return; // couldn't read the file; leave destinations enabled, no estimate
   }
   if (saveFile.files?.[0] !== first) return; // a newer pick superseded this
   envelope = { file, len };
@@ -319,7 +319,7 @@ async function refreshEstimates(): Promise<void> {
 /**
  * Re-derive the counts from the cached envelope for the current selections, then
  * re-apply the gating. Both the codec and the key mode move the image count, so
- * either can make an option stop fitting — see the extension's copy for why this
+ * either can make an option stop fitting; see the extension's copy for why this
  * cannot live in `refreshEstimates` alone.
  */
 function recomputeEstimates(): void {
@@ -390,7 +390,7 @@ function reflectKeyMode(): void {
   const dest = selectedDest();
   show(stegoFields, dest !== 'gallery' && selectedKeyMode() === 'stego');
   // A duress .db with a key-file/stego factor: that factor protects the REAL file
-  // only — the decoy still opens on the duress password alone.
+  // only; the decoy still opens on the duress password alone.
   show(
     factorDuressHint,
     dest === 'sqlite' && selectedAccessMode() === 'duress' && selectedKeyMode() !== 'embedded',
@@ -511,8 +511,8 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
   show(saveResult, false);
   const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
   setStatus(saveStatus, msg(destKey('statusSaving', selectedDest())));
-  // On the web the vault key is minted here, inside `build()` — ahead of
-  // `runSave` — so the extra entropy has to be installed before that, or the key
+  // On the web the vault key is minted here, inside `build()`, ahead of
+  // `runSave`, so the extra entropy has to be installed before that, or the key
   // block's own salt and DEK would miss the layer. `runSave` re-seeds it for the
   // rest of the save; the request still carries the string for the worker thread.
   const entropy = extraEntropy.value.trim();
@@ -535,7 +535,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     savePw.value = ''; // don't leave the secret in the field after use
     duressPw.value = '';
     // Clearing the entropy too: a string kept across saves stops being a
-    // one-off contribution and becomes a fixed one. Success only, deliberately —
+    // one-off contribution and becomes a fixed one. Success only, deliberately:
     // a failed save should not cost the user a page of re-typed dice rolls, and
     // keeping it is harmless since each install draws a fresh session salt.
     extraEntropy.value = '';
@@ -722,7 +722,7 @@ function rememberWorkflow(w: 'guided' | 'expert'): void {
   try {
     localStorage.setItem('stegoshard.workflow', w);
   } catch {
-    // storage may be unavailable (private mode) — the chooser still works.
+    // storage may be unavailable (private mode); the chooser still works.
   }
 }
 
@@ -757,7 +757,7 @@ try {
   show(el('rec-guided'), last === 'guided');
   show(el('rec-expert'), last === 'expert');
 } catch {
-  // ignore — no stored preference
+  // ignore: no stored preference
 }
 
 showView();

@@ -6,7 +6,7 @@
  * per target here so the rest of the codebase stays browser-agnostic.
  */
 
-// Edge is Chromium — its build is identical to Chrome's; it is a separate
+// Edge is Chromium; its build is identical to Chrome's; it is a separate
 // target only so packaging emits a clearly named artifact for the Edge store.
 export type Target = 'chrome' | 'edge' | 'firefox';
 

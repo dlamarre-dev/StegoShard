@@ -30,7 +30,7 @@ function collect(dir: string): Record<string, Uint8Array> {
       const data = readFileSync(join(dir, name));
       entries[name.split('\\').join('/')] = new Uint8Array(data);
     } catch {
-      // Directory entry — skip.
+      // Directory entry, so skip.
     }
   }
   return entries;

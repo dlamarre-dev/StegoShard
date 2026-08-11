@@ -1,6 +1,6 @@
 /**
  * Self-describing per-image header (plan §1), replicated in every image so any
- * single surviving image describes the whole set — there is no separate
+ * single surviving image describes the whole set; there is no separate
  * "manifest image" to protect.
  *
  * Fixed layout (33 bytes, big-endian), frozen in SPEC.md:

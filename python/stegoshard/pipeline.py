@@ -173,7 +173,7 @@ def decode_vault_binary(
     container (§10.7); branded `.ssbn` and bare payloads are single-region (§8.1).
 
     `key_factor` is the keyfile/stego secret (§10.3); `secret` is the recovered Shamir
-    S for a Mode B (threshold-gated) .db vault — the two compose as extra layers."""
+    S for a Mode B (threshold-gated) .db vault; the two compose as extra layers."""
     unwrapped = unwrap_binary(container)
     if unwrapped is not None and unwrapped[1] == "disguised":
         filename, content, bundled = decode_multiregion_segmented_blob(

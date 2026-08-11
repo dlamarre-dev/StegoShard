@@ -42,7 +42,7 @@ describe('post-save verification: image export', () => {
   it('rejects when a shard payload is corrupted beyond RS tolerance', async () => {
     const key = await makeKey();
     const { imagePayloads } = await exportVault(NAME, CONTENT, key);
-    // Corrupt every payload's shard region — no k-subset can reconstruct the blob.
+    // Corrupt every payload's shard region; no k-subset can reconstruct the blob.
     const corrupted = imagePayloads.map((p) => {
       const c = p.slice();
       c[c.length - 1] = c[c.length - 1]! ^ 0xff;

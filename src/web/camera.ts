@@ -1,7 +1,7 @@
 /**
  * Live camera capture for the restore flow (mobile-first): open the rear
  * camera, scan the printed pages continuously, and collect each page's QR
- * payload directly — no need to take photos and pick them from the gallery.
+ * payload directly, with no need to take photos and pick them from the gallery.
  *
  * Decoded payloads are deduplicated (pointing at the same page twice is
  * harmless) and handed to the normal import path alongside file uploads.
@@ -86,7 +86,7 @@ export function wireCamera(ids: CameraElements, onChange: (count: number) => voi
         setTimeout(() => video.classList.remove('detected'), 350);
       }
     } catch {
-      // No readable QR in this frame — keep scanning.
+      // No readable QR in this frame, so keep scanning.
     }
   };
 

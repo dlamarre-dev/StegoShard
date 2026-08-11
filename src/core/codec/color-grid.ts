@@ -1,7 +1,7 @@
 /**
  * Color-grid codec (SPEC §2.2, `CODEC_ID = 2`): the digital-output counterpart
- * to qr-grid. Each module carries one of eight colors — the corners of the RGB
- * cube — so a module is worth **3 bits** instead of QR's ~0.75, roughly tripling
+ * to qr-grid. Each module carries one of eight colors (the corners of the RGB
+ * cube), so a module is worth **3 bits** instead of QR's ~0.75, roughly tripling
  * the bytes per image.
  *
  * The eight colors are maximally separated in RGB, which is what lets this
@@ -16,7 +16,7 @@
  * rather than inventing a second one. That code is an *erasure* code, so every
  * block carries a CRC-32: the decoder checks each block, marks the failures as
  * erasures, and lets RS rebuild them. Blocks map to *contiguous* module runs
- * (module order is column-major, so a block is a vertical stripe) — localized
+ * (module order is column-major, so a block is a vertical stripe), which localizes
  * damage then destroys a few blocks completely rather than lightly corrupting
  * all of them, which is what an erasure code can actually absorb.
  *
@@ -38,7 +38,7 @@ const FINDER = 7;
 /**
  * Finders reserve one extra module on their two inner sides as a white
  * separator. Without it a neighbouring dark data module merges with the outer
- * ring and destroys the run signature the detector looks for — the same reason
+ * ring and destroys the run signature the detector looks for, the same reason
  * QR puts a separator around its finders.
  */
 const FINDER_BOX = FINDER + 1;
@@ -175,15 +175,15 @@ function paintFixedPatterns(cells: Uint8Array, n: number): void {
       }
     }
   }
-  // The separator ring needs no painting — unset cells are already white.
+  // The separator ring needs no painting; unset cells are already white.
   for (let v = 0; v < CAL_LEN; v++) cells[CAL_ROW * n + v] = v;
 }
 
 /**
  * A tiny deterministic PRNG for the filler that pads a part-full symbol.
  *
- * The filler sits *outside* the encryption — it is codec-level padding in the
- * image — so leaving it zeroed painted a flat black band whose width advertised
+ * The filler sits *outside* the encryption; it is codec-level padding in the
+ * image, so leaving it zeroed painted a flat black band whose width advertised
  * how much of the capacity the secret actually used. Pseudo-random filler makes
  * a part-full symbol look like a full one.
  *
@@ -205,7 +205,7 @@ function buildStoredBytes(payload: Uint8Array, lay: Layout): Uint8Array {
   writeU32(region, 0, payload.length);
   region.set(payload, LEN_PREFIX);
   // Filler is covered by the block CRCs and the RS parity like any other byte,
-  // and the decoder never looks at it — it slices exactly `payload.length`.
+  // and the decoder never looks at it, since it slices exactly `payload.length`.
   const filler = makeFiller(crc32(payload));
   for (let i = LEN_PREFIX + payload.length; i < region.length; i++) region[i] = filler();
 
@@ -304,7 +304,7 @@ function toLuma(img: ImageDataLike): Uint8Array {
   return out;
 }
 
-/** Midpoint between the darkest and lightest luma — the symbol is high contrast. */
+/** Midpoint between the darkest and lightest luma; the symbol is high contrast. */
 function lumaThreshold(luma: Uint8Array): number {
   let lo = 255;
   let hi = 0;
@@ -318,8 +318,8 @@ function lumaThreshold(luma: Uint8Array): number {
 /**
  * Scratch buffers for the run-length scan, reused across every row and column.
  *
- * Rejecting a photo that is not a color grid is the hot path — a restore feeds
- * every image through here — and a noisy megapixel photo produces a run per
+ * Rejecting a photo that is not a color grid is the hot path (a restore feeds
+ * every image through here) and a noisy megapixel photo produces a run per
  * couple of pixels. Allocating per row (or per candidate window) turns that into
  * millions of short-lived objects, so the scan writes into these instead.
  */
@@ -367,7 +367,7 @@ interface PatternHit {
 
 /**
  * Find the 1:1:3:1:1 dark-light-dark-light-dark run signature in a scanned line
- * — the same signature QR uses, and the reason the finders carry a white
+ * the same signature QR uses, and the reason the finders carry a white
  * separator on their inner sides. Appends to `out`.
  */
 function findPatternHits(scan: RunScan, out: PatternHit[]): void {
@@ -430,7 +430,7 @@ function locateFinders(img: ImageDataLike): { corners: Point[]; unit: number } {
     findPatternHits(rowScan, rowHits);
     for (const hit of rowHits) {
       // A real finder shows the same signature vertically through its centre, at
-      // the same module pitch. Requiring both — and requiring them to agree —
+      // the same module pitch. Requiring both, and requiring them to agree,
       // is what keeps captions and brand text from posing as finders.
       const x = Math.round(hit.centre);
       if (x < 0 || x >= width) continue;
@@ -492,7 +492,7 @@ function locateFinders(img: ImageDataLike): { corners: Point[]; unit: number } {
 /**
  * Bilinear map from grid coordinates to pixels, anchored on the four finder
  * centres. Digital images are axis-aligned and at most uniformly rescaled, so
- * this absorbs everything they do to us without needing a homography solve —
+ * this absorbs everything they do to us without needing a homography solve,
  * and it stays trivial to mirror in the Python reference decoder.
  */
 function samplePoint(corners: Point[], u: number, v: number): Point {
@@ -629,7 +629,7 @@ function decode(image: ImageDataLike): Uint8Array {
 
   // Neither the grid size nor the orientation is written anywhere. The finder
   // pitch gives a good estimate of the grid size, so try the closest match
-  // first; the others stay as a fallback. Only the sampling repeats —
+  // first; the others stay as a fallback. Only the sampling repeats,
   // Reed-Solomon runs once, at the end.
   const estimated = spanPx / unit + FINDER;
   const ordered = [...GRIDS].sort((a, b) => Math.abs(a.n - estimated) - Math.abs(b.n - estimated));

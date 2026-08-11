@@ -1,4 +1,4 @@
-"""Deniable SQLite container (SPEC §8) — mirrors src/core/sqlite-container.ts.
+"""Deniable SQLite container (SPEC §8); mirrors src/core/sqlite-container.ts.
 
 The vault blob is stored inside a genuine, minimal SQLite 3 database as the BLOB
 value of one row of a `cache(k TEXT, v BLOB)` table (spilling into a proper

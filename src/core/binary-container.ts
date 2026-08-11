@@ -14,7 +14,7 @@
  *                   See src/core/sqlite-container.ts and docs/CRYPTO-REVIEW.md §6b.
  *
  * The payload is already an authenticated ciphertext (vault blob) or a wrapped
- * key block, so the wrapper adds no secrecy — only packaging. Unwrapping a file
+ * key block, so the wrapper adds no secrecy, only packaging. Unwrapping a file
  * that is neither variant returns null; callers may then treat the bytes as a
  * bare payload (e.g. a raw .key), letting AES-GCM be the final arbiter.
  */
@@ -24,7 +24,7 @@ import { SQLITE_MAGIC, packSqlite, unpackSqlite } from './sqlite-container';
 
 export type BinaryVariant = 'branded' | 'disguised';
 
-/** "SSBN" — StegoShard BiNary container. */
+/** "SSBN": StegoShard BiNary container. */
 export const BINARY_MAGIC = Uint8Array.from([0x53, 0x53, 0x42, 0x4e]);
 export const BINARY_VERSION = 1;
 

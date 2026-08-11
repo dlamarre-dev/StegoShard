@@ -1,5 +1,5 @@
 /**
- * Generate the sample images shown in the README — one per output form, using
+ * Generate the sample images shown in the README: one per output form, using
  * the production pipeline so they are exactly what the tool writes.
  *
  * Run with: npm run samples
@@ -101,7 +101,7 @@ const qr = await sampleImage('sample-qr-grid', CODEC_QR_GRID, content);
 console.log(`\n${content.length} bytes: ${color} colour images vs ${qr} QR images`);
 
 // Paper is capped far lower per page (767 bytes of shard), so it gets a much
-// smaller secret — enough to show the page furniture without committing a
+// smaller secret, enough to show the page furniture without committing a
 // twenty-page PDF to the repo.
 await samplePaper(pseudoRandom(600, 77));
 console.log(`\nsamples written to ${OUT}`);

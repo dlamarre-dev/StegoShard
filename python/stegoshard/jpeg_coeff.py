@@ -222,7 +222,7 @@ def _decode_scan(data, scan_start, frame, dc_tables, ac_tables, restart_interval
 
 
 def eligible_coefficients(model: JpegModel) -> list[tuple[list[int], int]]:
-    """Ordered (block, k) refs of AC coefficients with |coef| ≥ 2 — the stego
+    """Ordered (block, k) refs of AC coefficients with |coef| ≥ 2; the stego
     carriers, in the same order as src/core/jpeg-coeff.ts."""
     refs: list[tuple[list[int], int]] = []
     for comp in model.components:

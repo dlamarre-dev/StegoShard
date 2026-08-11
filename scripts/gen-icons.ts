@@ -1,5 +1,5 @@
 /**
- * Generate the extension icons (16/32/48/128 px) as PNGs — a rounded accent
+ * Generate the extension icons (16/32/48/128 px) as PNGs: a rounded accent
  * square with a white stegosaurus silhouette (kept in sync with the master
  * public/icons/icon.svg). Rendered at 4× and box-downscaled for antialiasing.
  * Run with: npm run icons

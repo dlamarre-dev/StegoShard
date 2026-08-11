@@ -1,7 +1,7 @@
 /**
  * Instruction-sheet localization data (shared by the web app, extension, and
- * CLI paper output). Guards that every locale is complete — including the
- * `page` word used for the "Page x / N" line — and that locale selection maps
+ * CLI paper output). Guards that every locale is complete, including the
+ * `page` word used for the "Page x / N" line, and that locale selection maps
  * as expected.
  *
  * Also guards the page *geometry*, which nothing did before: the brand mark must
@@ -135,7 +135,7 @@ function contentStreams(bytes: Uint8Array): string {
     try {
       out += Buffer.from(unzlibSync(raw.subarray(start, end))).toString('latin1');
     } catch {
-      // Not a deflate stream (e.g. raw image data) — skip it.
+      // Not a deflate stream (e.g. raw image data), so skip it.
     }
   }
   return out;
@@ -159,7 +159,7 @@ function mul(a: Mat, b: Mat): Mat {
  * Every image placement in the document's content streams.
  *
  * pdf-lib emits a chain of `cm` transforms before each `Do`, so the effective
- * placement is their composition — reading a single `cm` gives the wrong answer.
+ * placement is their composition; reading a single `cm` gives the wrong answer.
  * Requiring the trailing `Do` is also what separates an image from the brand
  * mark's vector paths, which emit `cm` transforms of their own.
  */

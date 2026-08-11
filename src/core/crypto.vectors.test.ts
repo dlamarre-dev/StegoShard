@@ -11,8 +11,8 @@
  *
  * On top of the frozen vectors, the AES-GCM implementation is checked against
  * two authoritative test cases from the original GCM specification (McGrew &
- * Viega, also in NIST's CAVP set) so the platform itself — not just our two
- * implementations agreeing with each other — is validated.
+ * Viega, also in NIST's CAVP set) so the platform itself, not just our two
+ * implementations agreeing with each other, is validated.
  */
 
 import { readFileSync } from 'node:fs';
@@ -368,7 +368,7 @@ describe('frozen vectors: duress (Mode A, §10.5)', () => {
       const real = await decodeMultiRegionVaultBlob(blob, v.realPassword, opts);
       expect(real.filename).toBe(v.realFilename);
       expect(toHex(real.content)).toBe(v.realContentHex);
-      // The duress credential yields ONLY the decoy — never the real content.
+      // The duress credential yields ONLY the decoy, never the real content.
       const duress = await decodeMultiRegionVaultBlob(blob, v.duressPassword, opts);
       expect(duress.filename).toBe(v.decoyFilename);
       expect(toHex(duress.content)).toBe(v.decoyContentHex);

@@ -14,7 +14,7 @@ its inner sides. A calibration run of the eight colours, in canonical order, sit
 in the row just below the top-left finder box. Everything else carries data, read
 column-major, packed MSB-first, split into 64-byte Reed-Solomon blocks each
 followed by its CRC-32. Whatever sits between the payload and the end of the last
-block is filler with no defined content — this decoder reads exactly the declared
+block is filler with no defined content; this decoder reads exactly the declared
 payload length and ignores the rest. Nothing about the geometry is written into the image: the
 finders give the module pitch, the pitch gives ``n``, and ``n`` selects the rest.
 """
@@ -112,8 +112,8 @@ def _runs(dark: list[bool]) -> tuple[list[int], list[int], bool]:
 def _pattern_hits(dark: list[bool]) -> list[tuple[float, float]]:
     """Find the 1:1:3:1:1 dark-light-dark-light-dark runs; return (centre, unit).
 
-    Rejecting an image that is not a color grid is the hot path — a restore feeds
-    every image through here — so this avoids building a tuple per run window.
+    Rejecting an image that is not a color grid is the hot path (a restore feeds
+    every image through here) so this avoids building a tuple per run window.
     """
     starts, lengths, first_dark = _runs(dark)
     hits: list[tuple[float, float]] = []
@@ -149,7 +149,7 @@ def _locate_finders(
 ) -> tuple[list[tuple[float, float]], float]:
     """Locate the four corner finders.
 
-    Returns their centres as (x, y) pixels, plus the module pitch they imply —
+    Returns their centres as (x, y) pixels, plus the module pitch they imply,
     the pitch is what lets the caller pick the right grid size straight away
     instead of trying each one.
     """
@@ -169,8 +169,8 @@ def _locate_finders(
             if not 0 <= x < width:
                 continue
             # A real finder shows the same signature vertically through its
-            # centre, at the same pitch. Requiring both — and requiring them to
-            # agree — keeps captions and brand text from posing as finders.
+            # centre, at the same pitch. Requiring both, and requiring them to
+            # agree, keeps captions and brand text from posing as finders.
             if x not in columns:
                 col = [luma[i * width + x] < threshold for i in range(height)]
                 columns[x] = _pattern_hits(col)
@@ -326,7 +326,7 @@ def _read_blocks(sampler: _Sampler, lay: Layout, turns: int) -> tuple[list[bytes
 def decode_pixels(img: Image.Image) -> bytes | None:
     """Decode an already-loaded RGB image, or None if no grid is readable."""
     width, height = img.size
-    # `tobytes()` is the oldest, most stable pixel accessor Pillow has — packed
+    # `tobytes()` is the oldest, most stable pixel accessor Pillow has: packed
     # RGB, three bytes per pixel. `getdata()` is deprecated, and anything newer
     # would narrow the Pillow versions this decoder runs on.
     raw = img.tobytes()
@@ -341,7 +341,7 @@ def decode_pixels(img: Image.Image) -> bytes | None:
 
     # Neither the grid size nor the orientation is written anywhere. The finder
     # pitch gives a good estimate of the grid size, so try the closest match
-    # first; the others stay as a fallback. Only the sampling repeats —
+    # first; the others stay as a fallback. Only the sampling repeats,
     # Reed-Solomon runs once.
     estimated = span_px / unit + FINDER
     ordered = sorted(GRIDS, key=lambda g: abs(g[0] - estimated))

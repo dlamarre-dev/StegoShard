@@ -2,7 +2,7 @@
 
 A standalone, dependency-light implementation of the StegoShard format
 ([SPEC.md](../SPEC.md)). It restores a vault from its images **without the browser
-extension** — the long-term survival guarantee: as long as you keep the images
+extension**, the long-term survival guarantee: as long as you keep the images
 (or a printout), your password, and this open-source script, your data is
 recoverable.
 
@@ -39,7 +39,7 @@ python -m stegoshard.decode ./my-vault-images/ --out ./restored
 python -m stegoshard.decode stegoshard-abcd1234.zip
 python -m stegoshard.decode page-01.png page-02.png page-03.png
 
-# A single binary container (SPEC §8) — a branded .ssbn or a disguised .db:
+# A single binary container (SPEC §8), either a branded .ssbn or a disguised .db:
 python -m stegoshard.decode ./vault/stegoshard-vault.ssbn --out ./restored
 python -m stegoshard.decode ./vault/cache.db --out ./restored
 
@@ -49,12 +49,12 @@ python -m stegoshard.decode ./images/ --key stegoshard-abcd1234.key
 python -m stegoshard.decode ./vault/cache.db --key ./vault/IMG_2043.png
 
 # Non-possession vaults (SPEC §10.6) are gated on threshold shares you hold
-# none of alone — pass any k of the n share files:
+# none of alone; pass any k of the n share files:
 python -m stegoshard.decode ./vault/cache.db \
   --share ./vault/recovery-1.txt --share ./vault/recovery-3.txt --out ./restored
 
 # Gallery Mode (SPEC §9): a secret fragmented across a folder of photos,
-# decoded blindly — decoys and unrelated photos are ignored automatically:
+# decoded blindly: decoys and unrelated photos are ignored automatically:
 python -m stegoshard.decode ./album/ --gallery --out ./restored
 ```
 
@@ -87,7 +87,7 @@ from stegoshard.format import unpack_bundle
 # --- from a set of images -------------------------------------------------
 payloads = []
 for path in sorted(Path("my-vault-images").glob("*.png")):
-    payload = decode_any(path.read_bytes())   # None if it is not a vault image
+    payload = decode_any(path.read_bytes())  # None if it is not a vault image
     if payload is not None:
         payloads.append(payload)
 
@@ -97,7 +97,7 @@ restored = decode_vault(payloads, "your password")
 restored = decode_vault_binary(Path("vault/cache.db").read_bytes(), "your password")
 
 # --- write the result -----------------------------------------------------
-if restored.bundled:                      # several files were saved together
+if restored.bundled:  # several files were saved together
     for name, data in unpack_bundle(restored.content):
         Path("restored", name).write_bytes(data)
 else:
@@ -144,7 +144,7 @@ python -m stegoshard.decode ./vault/cache.db \
 The share files carry their 38 bytes as a dash-grouped **Crockford base32**
 token (no `I`, `L`, `O`, `U`, so a handwritten share cannot be mistranscribed
 into a different valid one) wrapped in instructions. The token is located by
-pattern, so the surrounding prose — in any of the eight shipped languages — is
+pattern, so the surrounding prose, in any of the eight shipped languages, is
 ignored, and a user who pastes only the token is equally fine.
 
 From Python:
@@ -165,11 +165,11 @@ the password was right (SPEC §10.6). The same `--share` flag works with
 
 ## What you need to keep
 
-| Key mode   | To restore you need                                                                                                        |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `embedded` | The images (or the container) and the password.                                                                            |
-| `keyfile`  | Those, plus the separate `.key` / `settings.db`.                                                                           |
-| `stego`    | Those, plus the cover photo — **stored losslessly**. Re-encoding it (a chat app, a photo service) destroys the hidden key. |
+| Key mode   | To restore you need                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `embedded` | The images (or the container) and the password.                                                                           |
+| `keyfile`  | Those, plus the separate `.key` / `settings.db`.                                                                          |
+| `stego`    | Those, plus the cover photo, **stored losslessly**. Re-encoding it (a chat app, a photo service) destroys the hidden key. |
 
 Gallery Mode needs every photo in the set, also losslessly.
 

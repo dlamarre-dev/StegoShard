@@ -8,8 +8,8 @@
  *    public/icons/icon.svg), so it can be point-tested directly and rasterized
  *    with no font, no canvas and no image asset. `scripts/gen-icons.ts` imports
  *    it from here too, so the path has a single owner.
- *  - A 5x7 bitmap font. The CLI has no rasterizer at all — `NodeTextEngine`
- *    emits PDF vector draw commands, not pixels — so drawing a caption onto a
+ *  - A 5x7 bitmap font. The CLI has no rasterizer at all; `NodeTextEngine`
+ *    emits PDF vector draw commands, not pixels, so drawing a caption onto a
  *    PNG needs glyph data, and the repo had none.
  *
  * The font covers ASCII 32..90 (space through 'Z'); lowercase is folded to
@@ -275,7 +275,7 @@ export const RECOVERY_HOST = 'GITHUB.COM/DLAMARRE-DEV/STEGOSHARD';
 
 /**
  * The lines stamped under the wordmark. They name the format version and the
- * image codec, then point at the specification — so a file found long after the
+ * image codec, then point at the specification, so a file found long after the
  * fact says what it is and where to go to read it.
  */
 export function recoveryLines(codecName: string): string[] {
@@ -284,7 +284,7 @@ export function recoveryLines(codecName: string): string[] {
 
 export interface BrandBandInput {
   /**
-   * Recovery hint printed under the wordmark — what this file is and where the
+   * Recovery hint printed under the wordmark: what this file is and where the
    * format is specified, so an image found years from now leads somewhere.
    */
   recovery: readonly string[];
@@ -301,7 +301,7 @@ function scaleFor(width: number): number {
  * Fit a line to the available width: shrink it as far as scale 1, then truncate.
  *
  * Shrinking is preferred because the recovery URL is only worth printing whole.
- * Truncation is the backstop for an over-long user caption — clipping at the
+ * Truncation is the backstop for an over-long user caption, clipping at the
  * canvas edge would look like a rendering bug rather than a deliberate cut.
  */
 export function fitLine(text: string, avail: number, max: number): { text: string; scale: number } {

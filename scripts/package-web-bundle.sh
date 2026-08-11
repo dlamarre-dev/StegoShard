@@ -3,7 +3,7 @@
 # Assemble the downloadable offline web bundle from an already-built tree.
 #
 # Shared by the release workflow (.github/workflows/pages.yml) and the release
-# dry run, so the two cannot drift — the dry run's whole purpose is to exercise
+# dry run, so the two cannot drift; the dry run's whole purpose is to exercise
 # what the release actually does, which it cannot do against a copy.
 #
 # Expects `npm run build:web` and `npm run build:web:offline` to have run.
@@ -22,7 +22,7 @@ set -euo pipefail
 version="${1:-}"
 
 # Only trust GITHUB_REF_NAME when it is genuinely a tag. Actions sets it on
-# every event, so on a pull request it holds something like "73/merge" — which
+# every event, so on a pull request it holds something like "73/merge", which
 # silently produced "stegoshard-web-73/merge.zip" and a zip I/O error.
 if [ -z "$version" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
   version="${GITHUB_REF_NAME#v}"
@@ -37,14 +37,14 @@ case "$version" in
   # Must also *start* alphanumeric: a mistyped flag reaching this as a
   # positional argument would otherwise become part of the archive name.
   '' | [!0-9A-Za-z]* | *[!0-9A-Za-z.+-]*)
-    echo "::error::refusing to package version '$version' — expected a plain version such as 1.2.3"
+    echo "::error::refusing to package version '$version'; expected a plain version such as 1.2.3"
     exit 1
     ;;
 esac
 
 for dir in web-dist web-dist-offline; do
   if [ ! -d "$dir" ]; then
-    echo "::error::$dir is missing — run 'npm run build:web' and 'npm run build:web:offline' first"
+    echo "::error::$dir is missing; run 'npm run build:web' and 'npm run build:web:offline' first"
     exit 1
   fi
 done

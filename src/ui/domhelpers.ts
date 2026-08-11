@@ -167,7 +167,7 @@ const PURPOSE_KEY: Record<FilePurpose, string> = {
  * "Files created" list for the save-result panel.
  *
  * Built here rather than in each surface because the wizard and the expert view
- * must describe the same save identically — and because deniable destinations
+ * must describe the same save identically, and because deniable destinations
  * make this the only place the user learns what `cache.db` and `recovery-1.txt`
  * actually are.
  *
@@ -230,7 +230,7 @@ export const THRESHOLD_MAX = 10;
  * Wire the k-of-n threshold selects so an invalid pair is unreachable.
  *
  * The old pair of number boxes let k exceed n and reported it only at save time
- * as a bare "missing threshold" — the user had no way to see what was wrong. A
+ * as a bare "missing threshold"; the user had no way to see what was wrong. A
  * picker that cannot express the invalid state needs no error message at all.
  *
  * n is chosen first and bounds k. Both start at 2: k=1 means a single holder

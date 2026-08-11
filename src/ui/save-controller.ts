@@ -34,7 +34,7 @@ export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery'
  *
  * 'color' packs ~3x the bytes per image, so a vault needs about a third as many
  * files; 'qr' is the conservative choice, readable by any phone. Paper is always
- * 'qr' — print, ink and camera white balance make colour a liability there.
+ * 'qr': print, ink and camera white balance make colour a liability there.
  */
 export type CodecChoice = 'color' | 'qr';
 
@@ -111,8 +111,8 @@ export interface SaveRequest {
   password?: string | undefined;
   /**
    * §10 access mode for the deniable paths. 'plain' (default), 'duress' (Mode A,
-   * `.db` only — needs `duressPassword` + `decoy`), or 'nonpossession' (Mode B,
-   * gallery or `.db` — needs `threshold`, delivers Shamir shares).
+   * `.db` only, needs `duressPassword` + `decoy`), or 'nonpossession' (Mode B,
+   * gallery or `.db`, needs `threshold`, delivers Shamir shares).
    */
   accessMode?: AccessMode | undefined;
   /** Mode A: the duress password + the plausible decoy file it reveals. */
@@ -123,7 +123,7 @@ export interface SaveRequest {
   /**
    * Expert option: extra entropy typed by the user (mashed keys, dice rolls),
    * XORed into every random draw of this save on top of the platform CSPRNG,
-   * which is always used regardless. Generation-side only — nothing is stored,
+   * which is always used regardless. Generation-side only; nothing is stored,
    * so restoring needs no trace of it. Never persisted: a remembered entropy
    * string is a reused one.
    */
@@ -187,7 +187,7 @@ function galleryNote(msg: Msg, keyMode: KeyMode, imageCount: number): string {
  * written.
  *
  * The manifest is not decoration. Deniable destinations name their artifacts
- * after nothing in particular — `cache.db`, `recovery-1.txt` — so without a list
+ * after nothing in particular (`cache.db`, `recovery-1.txt`) so without a list
  * saying which file is which, the user is left guessing. It is returned for
  * every destination, because that need does not depend on the naming.
  */
@@ -216,7 +216,7 @@ export function recoveryGuidance(dest: SaveDestination, keyMode: KeyMode): Recov
   if (keyMode === 'keyfile') items.push('recoveryKeyfile');
   else if (keyMode === 'stego') items.push('recoveryCover');
   // LSB carriers (a stego key cover, or Gallery Mode's photos) are destroyed by
-  // any recompression/resize — call that out explicitly.
+  // any recompression/resize, so call that out explicitly.
   const lossless = keyMode === 'stego' || dest === 'gallery';
   return { items, lossless };
 }
@@ -284,7 +284,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
 
   if (req.dest === 'binary' || req.dest === 'sqlite') {
     // Two destinations map to the one binary container: 'binary' is a branded
-    // .ssbn (an EXCLUDED path — single-region, managed key), 'sqlite' is the
+    // .ssbn (an EXCLUDED path, single-region and managed key), 'sqlite' is the
     // disguised .db, which under §10 is a mandatory multi-region container keyed
     // by a per-save PASSWORD (each region gets its own DEK; the managed key is
     // not used on this supported path).

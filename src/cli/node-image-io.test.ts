@@ -1,5 +1,5 @@
 /**
- * Headless image I/O: fast-png round-trip and — the load-bearing part — the
+ * Headless image I/O: fast-png round-trip and, the load-bearing part, the
  * area-average downscaler must keep a QR decodable after a simulated photo
  * (upscale + noise + a repetitive background pattern that provokes moiré).
  * A bad resize corrupts the QR silently, so this is tested aggressively.

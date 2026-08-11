@@ -7,7 +7,7 @@ import { builtinModules } from 'node:module';
  * Build the CLI into a single self-contained ESM bundle with a shebang, so it
  * can be published to npm (`npx stegoshard`) and fed to `deno compile` for
  * standalone per-OS binaries. All npm deps are bundled (hash-wasm inlines its
- * WASM as base64, as in the web build); only Node's own builtins stay external —
+ * WASM as base64, as in the web build); only Node's own builtins stay external.
  * both Node and Deno (via its node: compat, included by `deno compile`) provide
  * them, so no npm resolution happens at compile time.
  */

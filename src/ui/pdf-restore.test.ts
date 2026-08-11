@@ -1,7 +1,7 @@
 /**
  * PDF extraction round-trip: a QR image embedded in a PDF (the way paper mode
  * embeds it, and the way scanners do with JPEG) must come back out and decode
- * to the exact payload. Runs under Node — only the pure extraction layer is
+ * to the exact payload. Runs under Node; only the pure extraction layer is
  * exercised (no canvas).
  */
 
@@ -25,7 +25,7 @@ import { extractPdfImages } from './pdf-restore';
 const codec = getCodec(CODEC_QR_GRID);
 
 // QR encode/decode of full pages is CPU-heavy and runs several times slower
-// under CI coverage instrumentation than locally — give these tests headroom.
+// under CI coverage instrumentation than locally, so give these tests headroom.
 const SLOW = { timeout: 60_000 };
 
 function makePayload(len: number): Uint8Array {
@@ -73,7 +73,7 @@ describe('extractPdfImages', () => {
       try {
         decoded.push(codec.decode(image.img));
       } catch {
-        // e.g. the alpha SMask that pdf-lib splits off — not a QR, skipped.
+        // e.g. the alpha SMask that pdf-lib splits off; not a QR, skipped.
       }
     }
     expect(decoded.length).toBe(1);
@@ -172,7 +172,7 @@ describe('end-to-end: full vault through a PDF', () => {
         try {
           payloads.push(codec.decode(image.img));
         } catch {
-          // SMask / non-QR image — skipped.
+          // SMask / non-QR image, skipped.
         }
       }
       expect(payloads.length).toBe(imagePayloads.length);

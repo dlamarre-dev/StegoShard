@@ -2,7 +2,7 @@
 
 StegoShard's UI strings live in `public/_locales/<code>/messages.json` and are
 resolved with `chrome.i18n` (see `src/ui/i18n.ts`). The browser locale is
-followed automatically — there is no in-app language switcher for the main UI
+followed automatically; there is no in-app language switcher for the main UI
 (plan §7). Missing keys fall back to the default locale (`en`), so a partially
 translated locale still works. The standalone web app bundles all eight
 catalogs at build time and selects one from `navigator.language` (see
@@ -52,7 +52,7 @@ submission.
 
 The plan calls for store images generated from a single HTML/SVG template whose
 captions come from these same locale files, rendered to PNG per locale with a
-headless browser (Playwright). That pipeline is **not implemented yet** — a
+headless browser (Playwright). That pipeline is **not implemented yet**; a
 Phase 6 / release task. Until then, store screenshots are produced manually.
 
 ## Adding or updating a locale

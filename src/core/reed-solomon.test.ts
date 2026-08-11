@@ -8,7 +8,7 @@ import {
 } from './reed-solomon';
 
 function randomShards(k: number, len: number, seed: number): Uint8Array[] {
-  // Deterministic pseudo-random data (no Math.random — keeps tests reproducible).
+  // Deterministic pseudo-random data (no Math.random, which keeps tests reproducible).
   let s = seed >>> 0;
   const next = () => {
     s = (s * 1664525 + 1013904223) >>> 0;

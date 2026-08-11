@@ -48,7 +48,7 @@ describe('SPEC §4 FLAGS bit1 (bundle)', () => {
 
   /**
    * The property that makes the new bit safe to add before 1.0: a decoder that
-   * predates it masks only bit0, hands back the .zip, and is never *wrong* —
+   * predates it masks only bit0, hands back the .zip, and is never *wrong*,
    * just less helpful. This models exactly that reader.
    */
   it('a decoder that ignores bit1 still recovers the content', async () => {

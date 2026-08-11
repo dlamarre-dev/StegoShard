@@ -1,7 +1,7 @@
 /**
  * Behaviour for the segmented-control hints (`.seg-hint`).
  *
- * Positioning is entirely CSS — the hint is anchored to the `.segmented`
+ * Positioning is entirely CSS; the hint is anchored to the `.segmented`
  * container so it cannot overflow. This module owns only *when* a hint is
  * visible, and guarantees at most one is open at a time.
  *
@@ -59,7 +59,7 @@ export function wireTooltips(): void {
     'pointerdown',
     (e) => {
       // Any press anywhere dismisses the current hint, including a press on
-      // another option — that is what keeps it to one at a time.
+      // another option; that is what keeps it to one at a time.
       close();
       if (e.pointerType === 'mouse') return; // mouse gets hover, in CSS
       const item = itemOf(e.target);

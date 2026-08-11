@@ -67,7 +67,7 @@ describe('CLI paper PDF', () => {
       fontPath: undefined,
     });
     // Either a CJK font was found (rendered zh_TW) or it fell back to English
-    // with a warning — both are valid; the PDF must always be produced.
+    // with a warning; both are valid, the PDF must always be produced.
     expect(built.pdf.length).toBeGreaterThan(0);
     if (built.effectiveLocale === 'en') {
       expect(built.fontWarning).toMatch(/font/i);

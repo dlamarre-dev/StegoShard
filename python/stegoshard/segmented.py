@@ -1,4 +1,4 @@
-"""Segmented binary vault format (SPEC §8) — mirrors src/core/segmented.ts.
+"""Segmented binary vault format (SPEC §8); mirrors src/core/segmented.ts.
 
 The non-image ".ssbn"/".db" payload is a self-describing header followed by a
 sequence of AES-256-GCM chunks sealed under a STREAM nonce discipline (the

@@ -4,13 +4,13 @@
  * Each payload region on a multi-region container is padded to a shared length
  * bucket BEFORE encryption, so the ciphertext length reveals only the bucket.
  * The true (unpadded) length must therefore travel *inside* the encrypted
- * region, never in any container header — otherwise a header field would leak
+ * region, never in any container header; otherwise a header field would leak
  * which region is larger, defeating the §10.2 invariant.
  *
  *   region_plaintext (bucket bytes) = [ REGION_LEN u32 ][ envelope ][ zero-pad ]
  *
  * The pad is zeros (hidden by encryption). Only a wholly *dead* region (one no
- * slot points at) is filled with CSPRNG bytes instead — and that happens at the
+ * slot points at) is filled with CSPRNG bytes instead, and that happens at the
  * blob layer, not here, because a dead region has no DEK to encrypt with.
  *
  * Mirrored by the Python reference decoder (python/stegoshard/format.py).
@@ -40,7 +40,7 @@ export function padRegionPlaintext(envelope: Uint8Array, bucket: number): Uint8A
  * Recover the envelope from a decrypted region plaintext. `REGION_LEN` is bounded
  * against both the bucket and `maxContentBytes` BEFORE slicing, so a corrupt or
  * hostile length can never drive an over-large read. Returns the envelope slice
- * (still an envelope — the caller runs `parsePayload` with its own gzip guard).
+ * (still an envelope; the caller runs `parsePayload` with its own gzip guard).
  */
 export function parseRegionPlaintext(plaintext: Uint8Array, maxContentBytes: number): Uint8Array {
   if (plaintext.length < REGION_LEN_FIELD) throw new Error('region: too short');

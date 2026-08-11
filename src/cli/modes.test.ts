@@ -68,7 +68,7 @@ describe('CLI .db duress (Mode A)', () => {
       const real = await runRestore({ inputs: [vault], outDir: realOut, password: REAL_PW });
       expect(readFileSync(real.outPath, 'utf8')).toBe('REAL: seed alpha bravo charlie');
 
-      // The duress password restores ONLY the decoy — indistinguishable success.
+      // The duress password restores ONLY the decoy: indistinguishable success.
       const decoyOut = tmp();
       const dur = await runRestore({ inputs: [vault], outDir: decoyOut, password: DURESS_PW });
       expect(readFileSync(dur.outPath, 'utf8')).toBe('DECOY: shopping list, gym times');
