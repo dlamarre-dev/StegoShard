@@ -139,7 +139,7 @@ export function shareFileText(
     `${heading}\n\n` +
     `${encodeShareText(share)}\n\n` +
     `Gather any ${k} of the ${n} shares ${loadHint}\n` +
-    `Holding a share makes YOU a point of pressure — keep it accordingly.\n`
+    `Holding a share makes YOU a point of pressure; keep it accordingly.\n`
   );
 }
 

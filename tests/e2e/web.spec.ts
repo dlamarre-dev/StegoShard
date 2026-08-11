@@ -18,7 +18,7 @@ test('web app stays local, is accessible, and round-trips a file', async ({ page
   });
 
   await page.goto('./');
-  await expect(page).toHaveTitle('StegoShard — encrypt files into resilient images');
+  await expect(page).toHaveTitle('StegoShard: encrypt files into resilient images');
   await expect(page.locator('#build-version')).toContainText(`v${version}`);
   await page.locator('#choose-expert').click();
   await expect(page.locator('#expert-view')).toBeVisible();

@@ -6,7 +6,7 @@
     "message": "Guarde segredos em imagens: backup resiliente com correção de erros, esteganografia com negação plausível, ou ambos."
   },
   "popupTagline": {
-    "message": "Cifre um arquivo em imagens resilientes — disco ou papel."
+    "message": "Cifre um arquivo em imagens resilientes: disco ou papel."
   },
   "optionsTitle": {
     "message": "Configurações do StegoShard"
@@ -33,7 +33,7 @@
     "message": "Bloquear"
   },
   "statusUnlocked": {
-    "message": "Desbloqueado — você pode salvar arquivos."
+    "message": "Desbloqueado: você pode salvar arquivos."
   },
   "noKeyTitle": {
     "message": "Ainda sem chave do cofre"
@@ -78,7 +78,7 @@
     "message": "Nota de localização da chave (opcional)"
   },
   "paperCleartextWarn": {
-    "message": "A folha de instruções não é cifrada — escreva uma dica, nunca a senha."
+    "message": "A folha de instruções não é cifrada: escreva uma dica, nunca a senha."
   },
   "statusSavedPdf": {
     "message": "Pronto. PDF de $COUNT$ página(s) baixado. Guarde bem sua senha.",
@@ -98,7 +98,7 @@
     "message": "Ficheiro-chave"
   },
   "keyModeHelp": {
-    "message": "Com um arquivo de chave separado, uma imagem vazada não revela nada sozinha — mas você também precisa guardar o .key."
+    "message": "Com um arquivo de chave separado, uma imagem vazada não revela nada sozinha, mas você também precisa guardar o .key."
   },
   "labelAddBand": {
     "message": "Adicionar um rótulo legível nas imagens"
@@ -107,10 +107,10 @@
     "message": "Título do rótulo"
   },
   "titlePlaceholder": {
-    "message": "Nomeie este cofre — ex. «Arquivo Alfa». Evite «Chaves Bitcoin»."
+    "message": "Nomeie este cofre, ex. «Arquivo Alfa». Evite «Chaves Bitcoin»."
   },
   "bandWarning": {
-    "message": "O rótulo não é cifrado — nunca coloque um segredo nele."
+    "message": "O rótulo não é cifrado; nunca coloque um segredo nele."
   },
   "labelKeyFile": {
     "message": "Arquivo de chave (.key)"
@@ -241,7 +241,7 @@
     "message": "Criar a chave"
   },
   "passwordHint": {
-    "message": "A senha não pode ser recuperada. Se você esquecê-la, seus cofres se perdem — considere exportar sua chave."
+    "message": "A senha não pode ser recuperada. Se você esquecê-la, seus cofres se perdem; considere exportar sua chave."
   },
   "errPasswordMismatch": {
     "message": "As senhas não coincidem."
@@ -308,6 +308,14 @@
   "dropTitle": {
     "message": "Solte o arquivo aqui"
   },
+  "dropTitleMulti": {
+    "message": "Solte seus arquivos aqui",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "Remover",
+    "description": "Button that clears the files picked in a drop zone."
+  },
   "dropPrompt": {
     "message": "ou clique para escolher"
   },
@@ -324,7 +332,7 @@
     "message": "Restaurado"
   },
   "webIntro": {
-    "message": "Uma versão web gratuita e de código aberto — sem instalação, sem conta e nada sai do seu dispositivo. Salve um arquivo como imagens ou restaure um. (O Google Fotos requer a extensão do navegador.)"
+    "message": "Uma versão web gratuita e de código aberto: sem instalação, sem conta e nada sai do seu dispositivo. Salve um arquivo como imagens ou restaure um. (O Google Fotos requer a extensão do navegador.)"
   },
   "btnScanCamera": {
     "message": "Escanear páginas com a câmera",
@@ -364,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "A chave está oculta nesta foto. Mantenha o arquivo salvo como está — salvar de novo, redimensionar ou recomprimir destrói a chave. Uma capa JPEG continua um JPEG do mesmo tamanho e nome; um PNG continua um PNG. Guarde-o separado das imagens.",
+    "message": "A chave está oculta nesta foto. Mantenha o arquivo salvo como está: salvar de novo, redimensionar ou recomprimir destrói a chave. Uma capa JPEG continua um JPEG do mesmo tamanho e nome; um PNG continua um PNG. Guarde-o separado das imagens.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -384,7 +392,7 @@
     "description": "Stego: cover photo too small to hold the key block."
   },
   "statusSavedStego": {
-    "message": "$COUNT$ imagem(ns) salva(s). Sua chave está oculta na foto de capa — guarde esse PNG e sua senha para restaurar.",
+    "message": "$COUNT$ imagem(ns) salva(s). Sua chave está oculta na foto de capa; guarde esse PNG e sua senha para restaurar.",
     "description": "Status after saving with the key hidden in a cover photo.",
     "placeholders": {
       "count": {
@@ -413,11 +421,11 @@
     "description": "Popup: disguised binary variant option."
   },
   "binaryVariantHelpBranded": {
-    "message": "Um único ficheiro opaco com nome StegoShard — fácil de encontrar e sem tentar esconder-se.",
+    "message": "Um único ficheiro opaco com nome StegoShard: fácil de encontrar e sem tentar esconder-se.",
     "description": "Popup: help text for the branded binary variant."
   },
   "binaryVariantHelpDisguised": {
-    "message": "Adiciona um cabeçalho de base de dados SQLite para que numa pasta apareça como uma base de dados de aplicação normal. Uma camada extra contra um olhar distraído — não contra uma ferramenta que a abra de facto.",
+    "message": "Adiciona um cabeçalho de base de dados SQLite para que numa pasta apareça como uma base de dados de aplicação normal. Uma camada extra contra um olhar distraído, não contra uma ferramenta que a abra de facto.",
     "description": "Popup: help text for the disguised binary variant."
   },
   "sizeWarnImages": {
@@ -451,7 +459,7 @@
     }
   },
   "statusSavedBinaryStego": {
-    "message": "Concluído. $VARIANT$ transferido. A sua chave está escondida na foto de capa — guarde essa imagem e a sua palavra-passe.",
+    "message": "Concluído. $VARIANT$ transferido. A sua chave está escondida na foto de capa; guarde essa imagem e a sua palavra-passe.",
     "description": "Popup: status after saving a binary vault in stego mode.",
     "placeholders": {
       "variant": {
@@ -460,7 +468,7 @@
     }
   },
   "galleryHeading": {
-    "message": "Galeria — esconder em fotos",
+    "message": "Galeria: esconder em fotos",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -476,7 +484,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "Galeria — restaurar a partir de fotos",
+    "message": "Galeria: restaurar a partir de fotos",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -513,7 +521,7 @@
     "description": "Gallery Mode validation: no cover photos chosen."
   },
   "errGalleryTooFew": {
-    "message": "Fotos insuficientes — adicione pelo menos $COUNT$.",
+    "message": "Fotos insuficientes: adicione pelo menos $COUNT$.",
     "description": "Gallery Mode error: not enough photos.",
     "placeholders": {
       "count": {
@@ -687,11 +695,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "Um PDF para impressão — um QR por página, resiste à impressão e à digitalização.",
+    "message": "Um PDF para impressão: um QR por página, resiste à impressão e à digitalização.",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "Um único arquivo opaco em vez de imagens — ideal para segredos maiores.",
+    "message": "Um único arquivo opaco em vez de imagens, ideal para segredos maiores.",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -699,7 +707,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "A chave viaja dentro das imagens. O mais simples — você guarda apenas uma senha.",
+    "message": "A chave viaja dentro das imagens. O mais simples: você guarda apenas uma senha.",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -715,7 +723,7 @@
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
-    "message": "Um arquivo disfarçado de banco de dados SQLite comum — a triagem de tipo o lê como um .db.",
+    "message": "Um arquivo disfarçado de banco de dados SQLite comum; a triagem de tipo o lê como um .db.",
     "description": "Wizard: disguised-SQLite destination description."
   },
   "statusGallerySavedKeyfile": {
@@ -796,7 +804,7 @@
     }
   },
   "wizGalleryCovers": {
-    "message": "Adicione pelo menos $N$ fotos (JPG ou PNG — idealmente todas do mesmo formato).",
+    "message": "Adicione pelo menos $N$ fotos (JPG ou PNG, idealmente todas do mesmo formato).",
     "description": "Wizard gallery step: how many cover photos to add.",
     "placeholders": {
       "n": {
@@ -870,7 +878,7 @@
     "message": "Para restaurar depois, guarda:"
   },
   "recoveryPassword": {
-    "message": "A tua palavra-passe — não há recuperação se a perderes"
+    "message": "A tua palavra-passe: não há recuperação se a perderes"
   },
   "recoveryImages": {
     "message": "As imagens guardadas"
@@ -888,13 +896,13 @@
     "message": "A foto de capa que contém a chave escondida"
   },
   "recoveryLossless": {
-    "message": "Mantém-nas exatamente como estão — redimensionar, recomprimir ou enviá-las por um serviço que recodifica imagens destrói-as."
+    "message": "Mantém-nas exatamente como estão: redimensionar, recomprimir ou enviá-las por um serviço que recodifica imagens destrói-as."
   },
   "filesCreatedHeading": {
     "message": "Arquivos criados:"
   },
   "filePurposeVault": {
-    "message": "O cofre — contém o seu arquivo"
+    "message": "O cofre: contém o seu arquivo"
   },
   "filePurposeArchive": {
     "message": "Todas as imagens reunidas em um .zip"
@@ -903,16 +911,16 @@
     "message": "Folha para impressão"
   },
   "filePurposePhotos": {
-    "message": "Fotos fragmento — guarde o conjunto inteiro"
+    "message": "Fotos fragmento: guarde o conjunto inteiro"
   },
   "filePurposeKeyfile": {
-    "message": "Chave separada — necessária com a sua senha"
+    "message": "Chave separada: necessária com a sua senha"
   },
   "filePurposeStegoCover": {
     "message": "Foto que guarda a chave oculta"
   },
   "filePurposeShare": {
-    "message": "Parte de recuperação — para um detentor"
+    "message": "Parte de recuperação, para um detentor"
   },
   "onboardingTitle": {
     "message": "Bem-vindo ao StegoShard"
@@ -921,13 +929,13 @@
     "message": "O StegoShard cifra o teu ficheiro e guarda-o na forma que escolheres. Há duas famílias de saída:"
   },
   "onboardingDeniable": {
-    "message": "Disfarça-se como ficheiros comuns — um conjunto de fotos ou uma base de dados de aparência real. Escolhe quando o objetivo é ocultar que existe um segredo."
+    "message": "Disfarça-se como ficheiros comuns: um conjunto de fotos ou uma base de dados de aparência real. Escolhe quando o objetivo é ocultar que existe um segredo."
   },
   "onboardingOvert": {
-    "message": "Abertamente StegoShard — imagens QR, um PDF imprimível ou um ficheiro simples. Escolhe para uma cópia de segurança simples e resiliente."
+    "message": "Abertamente StegoShard: imagens QR, um PDF imprimível ou um ficheiro simples. Escolhe para uma cópia de segurança simples e resiliente."
   },
   "onboardingKeep": {
-    "message": "Em qualquer caso, guarda a tua palavra-passe — não há recuperação se a perderes."
+    "message": "Em qualquer caso, guarda a tua palavra-passe; não há recuperação se a perderes."
   },
   "onboardingDismiss": {
     "message": "Começar"
@@ -975,7 +983,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "Produzir uma isca sob coação pode, em alguns lugares, constituir declaração falsa — um crime. Leia primeiro o modelo de ameaças.",
+    "message": "Produzir uma isca sob coação pode, em alguns lugares, constituir declaração falsa, um crime. Leia primeiro o modelo de ameaças.",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
@@ -983,7 +991,7 @@
     "description": "Link to the threat-model duress/legal section, shown under the duress warning."
   },
   "factorDuressHint": {
-    "message": "Com um arquivo de chave ou capa estego, o fator extra protege apenas o seu arquivo real — a isca ainda abre apenas com a senha de coação.",
+    "message": "Com um arquivo de chave ou capa estego, o fator extra protege apenas o seu arquivo real; a isca ainda abre apenas com a senha de coação.",
     "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
   },
   "labelThreshold": {
@@ -991,7 +999,7 @@
     "description": "Label for the Shamir k-of-n threshold."
   },
   "thresholdHint": {
-    "message": "Você não guarda nada que abra isto sozinho — quaisquer k dos n arquivos de partes abrem.",
+    "message": "Você não guarda nada que abra isto sozinho; quaisquer k dos n arquivos de partes abrem.",
     "description": "Hint under the threshold inputs."
   },
   "labelExtraEntropy": {
@@ -1041,7 +1049,7 @@
     "message": "Grelha a cores"
   },
   "codecColorDesc": {
-    "message": "Oito cores por quadrado em vez de preto e branco — cerca de três vezes mais dados e, por isso, cerca de um terço dos ficheiros. Ideal para armazenamento local."
+    "message": "Oito cores por quadrado em vez de preto e branco: cerca de três vezes mais dados e, por isso, cerca de um terço dos ficheiros. Ideal para armazenamento local."
   },
   "codecQr": {
     "message": "Código QR"
@@ -1050,7 +1058,7 @@
     "message": "Um código QR simples a preto e branco que qualquer telemóvel lê. Mais ficheiros para o mesmo segredo, mas a escolha mais segura se as imagens tiverem de sobreviver a esta aplicação."
   },
   "codecHelp": {
-    "message": "Ambos são restaurados da mesma forma — o StegoShard lê qualquer um automaticamente. A cor concentra mais em cada imagem; o QR é o formato mais universalmente legível. As páginas impressas usam sempre QR."
+    "message": "Ambos são restaurados da mesma forma: o StegoShard lê qualquer um automaticamente. A cor concentra mais em cada imagem; o QR é o formato mais universalmente legível. As páginas impressas usam sempre QR."
   },
   "codecCount": {
     "message": "$N$ ficheiros",
@@ -1095,13 +1103,13 @@
     "message": "A cifrar e a escrever o ficheiro…"
   },
   "keyModeEmbeddedDescFile": {
-    "message": "A chave viaja dentro do ficheiro. O mais simples — basta guardar uma palavra-passe."
+    "message": "A chave viaja dentro do ficheiro. O mais simples: basta guardar uma palavra-passe."
   },
   "keyModeKeyfileDescFile": {
     "message": "Um ficheiro .key separado, guardado à parte do ficheiro do cofre. São precisos ambos para restaurar."
   },
   "keyModeHelpFile": {
-    "message": "Com um ficheiro de chave separado, um ficheiro de cofre divulgado não revela nada por si só — mas tem de guardar também o .key."
+    "message": "Com um ficheiro de chave separado, um ficheiro de cofre divulgado não revela nada por si só, mas tem de guardar também o .key."
   },
   "restoreModeHeading": {
     "message": "A partir de quê quer restaurar?"

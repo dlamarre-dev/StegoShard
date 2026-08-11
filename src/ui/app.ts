@@ -625,26 +625,28 @@ function renderCodecCounts(): void {
   }
 }
 
-wireDropzone(fileDrop, saveFile, () => {
-  reflectFile(fileDrop, dzFile, saveFile);
+/** Every zone gets the same localized clear control (see `wireDropzone`). */
+const dropzone = (zone: HTMLElement, input: HTMLInputElement, onChange: () => void): void =>
+  wireDropzone(zone, input, onChange, msg('btnClearFiles'));
+
+dropzone(fileDrop, saveFile, () => {
+  // Several files are zipped into one bundle, so the zone counts them.
+  reflectFiles(fileDrop, dzFile, saveFile);
   show(saveResult, false);
   void refreshEstimates();
 });
-wireDropzone(restoreDrop, restoreFiles, () =>
-  reflectFile(restoreDrop, restoreDzFile, restoreFiles),
-);
-wireDropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
-wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
-wireDropzone(sharesDrop, restoreShares, () =>
-  reflectFiles(sharesDrop, sharesDzFile, restoreShares),
-);
-wireDropzone(galleryCoversDrop, galleryCovers, () =>
+// The restore zone takes a whole image set, so it counts them the same way.
+dropzone(restoreDrop, restoreFiles, () => reflectFiles(restoreDrop, restoreDzFile, restoreFiles));
+dropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
+dropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
+dropzone(sharesDrop, restoreShares, () => reflectFiles(sharesDrop, sharesDzFile, restoreShares));
+dropzone(galleryCoversDrop, galleryCovers, () =>
   reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers),
 );
-wireDropzone(galleryCoverDrop, galleryCover, () =>
+dropzone(galleryCoverDrop, galleryCover, () =>
   reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
 );
-wireDropzone(decoyDrop, decoyFile, () => reflectFile(decoyDrop, decoyName, decoyFile));
+dropzone(decoyDrop, decoyFile, () => reflectFile(decoyDrop, decoyName, decoyFile));
 
 for (const radio of document.querySelectorAll('input[name="restore-mode"]')) {
   radio.addEventListener('change', reflectRestoreMode);

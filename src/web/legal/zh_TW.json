@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — 隱私權政策",
-    "heading": "StegoShard — 隱私權政策",
+    "title": "StegoShard：隱私權政策",
+    "heading": "StegoShard：隱私權政策",
     "updatedLabel": "最後更新",
     "home": "首頁",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — 在本機儲存包裝金鑰與偏好設定。"
+                "：在本機儲存包裝金鑰與偏好設定。"
               ],
               ["公開版擴充功能不要求身分或主機權限。"]
             ]
@@ -95,8 +95,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — 服務條款",
-    "heading": "StegoShard — 服務條款",
+    "title": "StegoShard：服務條款",
+    "heading": "StegoShard：服務條款",
     "updatedLabel": "最後更新",
     "home": "首頁",
     "intro": [
@@ -147,7 +147,7 @@
                 {
                   "b": "若您遺失密碼或金鑰，您的資料將永久無法復原"
                 },
-                " — 任何人都無法為您還原。"
+                "，任何人都無法為您還原。"
               ],
               ["請在彼此獨立的位置保存多份復原成品，不要依賴單一媒體。"],
               ["請僅將 StegoShard 用於合法目的，且僅用於您有權儲存的資料。"]

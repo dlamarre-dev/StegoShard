@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — Privacy Policy",
-    "heading": "StegoShard — Privacy Policy",
+    "title": "StegoShard: Privacy Policy",
+    "heading": "StegoShard: Privacy Policy",
     "updatedLabel": "Last updated",
     "home": "Home",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — save the wrapped key and preferences locally."
+                ": save the wrapped key and preferences locally."
               ],
               ["Public extension builds request no identity or host permissions."]
             ]
@@ -95,8 +95,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — Terms of Service",
-    "heading": "StegoShard — Terms of Service",
+    "title": "StegoShard: Terms of Service",
+    "heading": "StegoShard: Terms of Service",
     "updatedLabel": "Last updated",
     "home": "Home",
     "intro": [
@@ -147,7 +147,7 @@
                 {
                   "b": "If you lose your password or key, your data is permanently unrecoverable"
                 },
-                " — no one can restore it for you."
+                "; no one can restore it for you."
               ],
               [
                 "Keep multiple copies of your recovery artifacts across independent locations. Do not rely on a single medium."

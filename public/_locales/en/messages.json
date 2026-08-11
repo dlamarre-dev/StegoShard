@@ -8,7 +8,7 @@
     "description": "Store listing description (max 132 chars)."
   },
   "popupTagline": {
-    "message": "Encrypt a file into resilient images — disk or paper.",
+    "message": "Encrypt a file into resilient images: disk or paper.",
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
@@ -28,7 +28,7 @@
     "description": "Header status pill when the vault is unlocked."
   },
   "webIntro": {
-    "message": "A free, open-source web version — no install, no account, and nothing leaves your device. Save a file as images or restore one.",
+    "message": "A free, open-source web version: no install, no account, and nothing leaves your device. Save a file as images or restore one.",
     "description": "Intro banner on the web app."
   },
   "unlockHeading": {
@@ -48,7 +48,7 @@
     "description": "Popup: lock button."
   },
   "statusUnlocked": {
-    "message": "Unlocked — you can save files.",
+    "message": "Unlocked: you can save files.",
     "description": "Popup: status when unlocked."
   },
   "noKeyTitle": {
@@ -108,7 +108,7 @@
     "description": "Popup: key location note printed on the instruction sheet."
   },
   "paperCleartextWarn": {
-    "message": "The instruction sheet is not encrypted — write a hint, never the password.",
+    "message": "The instruction sheet is not encrypted: write a hint, never the password.",
     "description": "Popup: cleartext warning for the instruction sheet fields."
   },
   "statusSavedPdf": {
@@ -133,12 +133,20 @@
     "description": "Keyfile key mode (plain language)."
   },
   "keyModeHelp": {
-    "message": "With a separate key file, a leaked image reveals nothing on its own — but you must keep the .key too.",
+    "message": "With a separate key file, a leaked image reveals nothing on its own, but you must keep the .key too.",
     "description": "Key-mode explanation (shown under a Why? disclosure)."
   },
   "dropTitle": {
     "message": "Drop your file here",
     "description": "File drop zone title."
+  },
+  "dropTitleMulti": {
+    "message": "Drop your files here",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "Clear",
+    "description": "Button that clears the files picked in a drop zone."
   },
   "dropPrompt": {
     "message": "or click to choose",
@@ -169,11 +177,11 @@
     "description": "Popup: readable band title input."
   },
   "titlePlaceholder": {
-    "message": "Name this vault — e.g. “Archive Alpha”. Avoid names like “Bitcoin keys”.",
+    "message": "Name this vault, e.g. “Archive Alpha”. Avoid names like “Bitcoin keys”.",
     "description": "Popup: pedagogical placeholder for the label title."
   },
   "bandWarning": {
-    "message": "The label is not encrypted — never put a secret in it.",
+    "message": "The label is not encrypted; never put a secret in it.",
     "description": "Popup: cleartext warning for the readable band."
   },
   "labelKeyFile": {
@@ -233,7 +241,7 @@
     "description": "Popup: status while saving."
   },
   "statusSaved": {
-    "message": "Done. Downloaded $COUNT$ image(s). Keep your password safe — it cannot be recovered.",
+    "message": "Done. Downloaded $COUNT$ image(s). Keep your password safe; it cannot be recovered.",
     "description": "Popup: status after saving.",
     "placeholders": {
       "count": {
@@ -352,7 +360,7 @@
     "description": "Options: create key button."
   },
   "passwordHint": {
-    "message": "Your password cannot be recovered. If you forget it, your vaults are lost — consider exporting your key.",
+    "message": "Your password cannot be recovered. If you forget it, your vaults are lost; consider exporting your key.",
     "description": "Options: password warning."
   },
   "errPasswordMismatch": {
@@ -474,7 +482,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "The key is hidden inside this photo. Keep the saved file exactly as-is — re-saving, resizing, or re-compressing it destroys the key. A JPEG cover stays a JPEG of the same size and name; a PNG stays a PNG. Store it apart from the images.",
+    "message": "The key is hidden inside this photo. Keep the saved file exactly as-is: re-saving, resizing, or re-compressing it destroys the key. A JPEG cover stays a JPEG of the same size and name; a PNG stays a PNG. Store it apart from the images.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -494,7 +502,7 @@
     "description": "Stego: cover photo too small to hold the key block."
   },
   "statusSavedStego": {
-    "message": "Saved $COUNT$ image(s). Your key is hidden in the cover photo — keep that PNG and your password to restore.",
+    "message": "Saved $COUNT$ image(s). Your key is hidden in the cover photo; keep that PNG and your password to restore.",
     "description": "Status after saving with the key hidden in a cover photo.",
     "placeholders": {
       "count": {
@@ -535,11 +543,11 @@
     "description": "Popup: disguised binary variant option."
   },
   "binaryVariantHelpBranded": {
-    "message": "A single opaque file with a StegoShard name — easy to find later, and it makes no attempt to hide.",
+    "message": "A single opaque file with a StegoShard name: easy to find later, and it makes no attempt to hide.",
     "description": "Popup: help text for the branded binary variant."
   },
   "binaryVariantHelpDisguised": {
-    "message": "Adds a SQLite-database header so a folder listing reads it as an ordinary app database. An extra layer against a casual glance — not against a tool that actually opens it.",
+    "message": "Adds a SQLite-database header so a folder listing reads it as an ordinary app database. An extra layer against a casual glance, not against a tool that actually opens it.",
     "description": "Popup: help text for the disguised binary variant."
   },
   "sizeWarnImages": {
@@ -555,7 +563,7 @@
     }
   },
   "statusSavedBinary": {
-    "message": "Done. Downloaded a $VARIANT$. Keep your password safe — it cannot be recovered.",
+    "message": "Done. Downloaded a $VARIANT$. Keep your password safe; it cannot be recovered.",
     "description": "Popup: status after saving a binary vault (embedded key).",
     "placeholders": {
       "variant": {
@@ -573,7 +581,7 @@
     }
   },
   "statusSavedBinaryStego": {
-    "message": "Done. Downloaded a $VARIANT$. Your key is hidden in the cover photo — keep that image and your password.",
+    "message": "Done. Downloaded a $VARIANT$. Your key is hidden in the cover photo; keep that image and your password.",
     "description": "Popup: status after saving a binary vault in stego mode.",
     "placeholders": {
       "variant": {
@@ -582,7 +590,7 @@
     }
   },
   "galleryHeading": {
-    "message": "Gallery — hide across photos",
+    "message": "Gallery: hide across photos",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -590,7 +598,7 @@
     "description": "Gallery Mode: short explanation under the heading."
   },
   "galleryPasswordHint": {
-    "message": "Gallery uses the password above — it both encrypts the secret and decides where in each photo it hides. There is no key file to keep.",
+    "message": "Gallery uses the password above: it both encrypts the secret and decides where in each photo it hides. There is no key file to keep.",
     "description": "Gallery Mode: note that the save password is also the gallery password."
   },
   "gallerySecretTitle": {
@@ -602,7 +610,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "Gallery — restore from photos",
+    "message": "Gallery: restore from photos",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -639,7 +647,7 @@
     "description": "Gallery Mode validation: no cover photos chosen."
   },
   "errGalleryTooFew": {
-    "message": "Not enough photos — add at least $COUNT$.",
+    "message": "Not enough photos: add at least $COUNT$.",
     "description": "Gallery Mode error: not enough photos.",
     "placeholders": {
       "count": {
@@ -797,11 +805,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "A printable PDF — one QR per page, survives printing and scanning.",
+    "message": "A printable PDF: one QR per page, survives printing and scanning.",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "One opaque file instead of images — best for larger secrets.",
+    "message": "One opaque file instead of images, best for larger secrets.",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -809,7 +817,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "The key travels inside the images. Simplest — one password is all you keep.",
+    "message": "The key travels inside the images. Simplest: one password is all you keep.",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -825,7 +833,7 @@
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
-    "message": "One file disguised as an ordinary SQLite database — file-type triage reads it as a .db.",
+    "message": "One file disguised as an ordinary SQLite database; file-type triage reads it as a .db.",
     "description": "Wizard: disguised-SQLite destination description."
   },
   "statusGallerySavedKeyfile": {
@@ -906,7 +914,7 @@
     }
   },
   "wizGalleryCovers": {
-    "message": "Add at least $N$ photos (JPG or PNG — ideally all the same format).",
+    "message": "Add at least $N$ photos (JPG or PNG, ideally all the same format).",
     "description": "Wizard gallery step: how many cover photos to add.",
     "placeholders": {
       "n": {
@@ -960,7 +968,7 @@
     "message": "To restore later, keep:"
   },
   "recoveryPassword": {
-    "message": "Your password — there is no recovery if you lose it"
+    "message": "Your password: there is no recovery if you lose it"
   },
   "recoveryImages": {
     "message": "The saved images"
@@ -978,13 +986,13 @@
     "message": "The cover photo holding the hidden key"
   },
   "recoveryLossless": {
-    "message": "Keep these exactly as saved — resizing, re-compressing, or sending them through a service that re-encodes images destroys them."
+    "message": "Keep these exactly as saved: resizing, re-compressing, or sending them through a service that re-encodes images destroys them."
   },
   "filesCreatedHeading": {
     "message": "Files created:"
   },
   "filePurposeVault": {
-    "message": "The vault — holds your file"
+    "message": "The vault: holds your file"
   },
   "filePurposeArchive": {
     "message": "All images bundled in one .zip"
@@ -993,16 +1001,16 @@
     "message": "Printable sheet"
   },
   "filePurposePhotos": {
-    "message": "Fragment photos — keep the whole set"
+    "message": "Fragment photos: keep the whole set"
   },
   "filePurposeKeyfile": {
-    "message": "Separate key — needed with your password"
+    "message": "Separate key: needed with your password"
   },
   "filePurposeStegoCover": {
     "message": "Photo holding the hidden key"
   },
   "filePurposeShare": {
-    "message": "Recovery share — for one holder"
+    "message": "Recovery share, for one holder"
   },
   "onboardingTitle": {
     "message": "Welcome to StegoShard"
@@ -1011,13 +1019,13 @@
     "message": "StegoShard encrypts your file, then saves it in the form you pick. There are two families of output:"
   },
   "onboardingDeniable": {
-    "message": "Blends in as ordinary files — a set of photos, or a real-looking database. Pick this when the goal is to hide that a secret exists at all."
+    "message": "Blends in as ordinary files: a set of photos, or a real-looking database. Pick this when the goal is to hide that a secret exists at all."
   },
   "onboardingOvert": {
-    "message": "Openly StegoShard — QR images, a printable PDF, or a plain file. Pick this for a straightforward, resilient backup."
+    "message": "Openly StegoShard: QR images, a printable PDF, or a plain file. Pick this for a straightforward, resilient backup."
   },
   "onboardingKeep": {
-    "message": "Either way, keep your password — there is no recovery if you lose it."
+    "message": "Either way, keep your password; there is no recovery if you lose it."
   },
   "onboardingDismiss": {
     "message": "Get started"
@@ -1071,7 +1079,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "Producing a decoy under duress can, in some places, be a false statement — a crime. Read the threat model first.",
+    "message": "Producing a decoy under duress can, in some places, be a false statement, a crime. Read the threat model first.",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
@@ -1079,7 +1087,7 @@
     "description": "Link to the threat-model duress/legal section, shown under the duress warning."
   },
   "factorDuressHint": {
-    "message": "With a key file or stego cover, the extra factor protects your real file only — the decoy still opens with the duress password alone.",
+    "message": "With a key file or stego cover, the extra factor protects your real file only; the decoy still opens with the duress password alone.",
     "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
   },
   "labelThreshold": {
@@ -1087,7 +1095,7 @@
     "description": "Label for the Shamir k-of-n threshold."
   },
   "thresholdHint": {
-    "message": "You keep nothing that opens this alone — any k of the n share files do.",
+    "message": "You keep nothing that opens this alone; any k of the n share files do.",
     "description": "Hint under the threshold inputs."
   },
   "labelExtraEntropy": {
@@ -1139,7 +1147,7 @@
     "description": "Codec option: the 8-colour grid."
   },
   "codecColorDesc": {
-    "message": "Eight colours per square instead of black and white — about three times the data, so roughly a third as many files. Best for disk storage.",
+    "message": "Eight colours per square instead of black and white: about three times the data, so roughly a third as many files. Best for disk storage.",
     "description": "Codec option description: the 8-colour grid."
   },
   "codecQr": {
@@ -1151,7 +1159,7 @@
     "description": "Codec option description: a standard QR code."
   },
   "codecHelp": {
-    "message": "Both are restored the same way — StegoShard reads either automatically. Colour packs more into each image; QR is the more universally readable format. Printed pages always use QR.",
+    "message": "Both are restored the same way: StegoShard reads either automatically. Colour packs more into each image; QR is the more universally readable format. Printed pages always use QR.",
     "description": "Explanation shown under the codec picker."
   },
   "codecCount": {
@@ -1191,7 +1199,7 @@
     "description": "Explanation under the extra-entropy field on the key-creation form: only here can the vault key itself be covered."
   },
   "extraEntropyHelp": {
-    "message": "Whatever you type here is mixed (XORed) into every random value this save generates, on top of the browser's secure random generator — which is used regardless. It can only add uncertainty, never replace it, so a weak string cannot weaken your vault. It covers this save's salts, nonces and other generated values; a vault key already held in the key store was created earlier and is not affected. Nothing about it is stored: you never re-enter it to restore.",
+    "message": "Whatever you type here is mixed (XORed) into every random value this save generates, on top of the browser's secure random generator, which is used regardless. It can only add uncertainty, never replace it, so a weak string cannot weaken your vault. It covers this save's salts, nonces and other generated values; a vault key already held in the key store was created earlier and is not affected. Nothing about it is stored: you never re-enter it to restore.",
     "description": "Explanation shown under the extra-entropy field."
   },
   "btnSaveFile": {
@@ -1207,7 +1215,7 @@
     "description": "Progress status when the destination writes one file."
   },
   "keyModeEmbeddedDescFile": {
-    "message": "The key travels inside the file. Simplest — one password is all you keep.",
+    "message": "The key travels inside the file. Simplest: one password is all you keep.",
     "description": "Embedded key mode description when the output is a single file."
   },
   "keyModeKeyfileDescFile": {
@@ -1215,7 +1223,7 @@
     "description": "Key-file mode description when the output is a single file."
   },
   "keyModeHelpFile": {
-    "message": "With a separate key file, a leaked vault file reveals nothing on its own — but you must keep the .key too.",
+    "message": "With a separate key file, a leaked vault file reveals nothing on its own, but you must keep the .key too.",
     "description": "Key-mode help when the output is a single file."
   },
   "restoreModeHeading": {

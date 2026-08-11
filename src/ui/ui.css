@@ -170,6 +170,13 @@ body {
   margin-top: 20px;
 }
 
+/* Inside the grid, `gap` already separates the cards. Leaving the adjacent-card
+   margin on would push the second column down by 20px, so the save and restore
+   cards would no longer start on the same line. */
+.grid > .card + .card {
+  margin-top: 0;
+}
+
 .banner {
   margin-bottom: 20px;
 }
@@ -553,6 +560,29 @@ hr {
   display: none;
 }
 
+/* Undo a wrong pick without reloading the page. Injected by `wireDropzone`, so
+   every zone on both surfaces has one; it appears only once the zone holds a
+   selection. It sits just under the zone (never inside it: the zone is a
+   `role="button"`) and centred, following the zone's own centred content. */
+.dz-clear {
+  display: none;
+  width: auto;
+  margin: 6px auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-decoration: underline;
+}
+.dropzone.has-file + .dz-clear {
+  display: block;
+}
+.dz-clear:hover,
+.dz-clear:focus-visible {
+  color: var(--text);
+}
+
 /* Compact dropzone variant (e.g. the optional .key file). */
 .dropzone-sm {
   padding: 14px 16px;
@@ -687,7 +717,9 @@ hr {
 .seg-note {
   font-weight: 500;
   font-size: 0.72rem;
-  opacity: 0.85;
+  /* No fade: at this size the note needs 4.5:1, and dimming the accent on the
+     selected option dropped it to 4.2:1. The counts only render once a file is
+     picked, which is why the axe pass over the empty page never saw it. */
 }
 .segmented input {
   position: absolute;

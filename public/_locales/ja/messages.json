@@ -6,7 +6,7 @@
     "message": "秘密を画像に保存：誤り訂正付きの復元性の高いバックアップ、否認可能なステガノグラフィ、またはその両方。"
   },
   "popupTagline": {
-    "message": "ファイルを復元性の高い画像に暗号化 — ディスクまたは紙。"
+    "message": "ファイルを復元性の高い画像に暗号化：ディスクまたは紙。"
   },
   "optionsTitle": {
     "message": "StegoShard の設定"
@@ -33,7 +33,7 @@
     "message": "ロック"
   },
   "statusUnlocked": {
-    "message": "ロック解除済み — ファイルを保存できます。"
+    "message": "ロック解除済み：ファイルを保存できます。"
   },
   "noKeyTitle": {
     "message": "金庫の鍵がまだありません"
@@ -78,7 +78,7 @@
     "message": "鍵の保管場所メモ（任意）"
   },
   "paperCleartextWarn": {
-    "message": "説明シートは暗号化されません — ヒントのみを書き、パスワードは決して書かないでください。"
+    "message": "説明シートは暗号化されません。ヒントのみを書き、パスワードは決して書かないでください。"
   },
   "statusSavedPdf": {
     "message": "完了。$COUNT$ ページの PDF をダウンロードしました。パスワードを大切に保管してください。",
@@ -107,10 +107,10 @@
     "message": "ラベルのタイトル"
   },
   "titlePlaceholder": {
-    "message": "この金庫に名前を — 例「アーカイブ Alpha」。「ビットコインの鍵」などは避けてください。"
+    "message": "この金庫に名前を：例「アーカイブ Alpha」。「ビットコインの鍵」などは避けてください。"
   },
   "bandWarning": {
-    "message": "ラベルは暗号化されません — 秘密を書き込まないでください。"
+    "message": "ラベルは暗号化されません。秘密を書き込まないでください。"
   },
   "labelKeyFile": {
     "message": "鍵ファイル（.key）"
@@ -241,7 +241,7 @@
     "message": "鍵を作成"
   },
   "passwordHint": {
-    "message": "パスワードは復元できません。忘れると金庫は失われます — 鍵のエクスポートをご検討ください。"
+    "message": "パスワードは復元できません。忘れると金庫は失われます。鍵のエクスポートをご検討ください。"
   },
   "errPasswordMismatch": {
     "message": "パスワードが一致しません。"
@@ -307,6 +307,14 @@
   },
   "dropTitle": {
     "message": "ここにファイルをドロップ"
+  },
+  "dropTitleMulti": {
+    "message": "ここにファイルをドロップ",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "クリア",
+    "description": "Button that clears the files picked in a drop zone."
   },
   "dropPrompt": {
     "message": "またはクリックして選択"
@@ -460,7 +468,7 @@
     }
   },
   "galleryHeading": {
-    "message": "ギャラリー — 写真に隠す",
+    "message": "ギャラリー：写真に隠す",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -476,7 +484,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "ギャラリー — 写真から復元",
+    "message": "ギャラリー：写真から復元",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -687,11 +695,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "印刷可能な PDF — 1 ページに 1 つの QR。印刷とスキャンに耐えます。",
+    "message": "印刷可能な PDF：1 ページに 1 つの QR。印刷とスキャンに耐えます。",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "画像の代わりに単一の不透明なファイル — 大きめの秘密に最適。",
+    "message": "画像の代わりに単一の不透明なファイル、大きめの秘密に最適。",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -699,7 +707,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "鍵は画像の中に含まれます。最も簡単 — 保管するのはパスワードだけです。",
+    "message": "鍵は画像の中に含まれます。最も簡単：保管するのはパスワードだけです。",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -894,7 +902,7 @@
     "message": "作成されたファイル:"
   },
   "filePurposeVault": {
-    "message": "保管庫 — ファイル本体が入っています"
+    "message": "保管庫：ファイル本体が入っています"
   },
   "filePurposeArchive": {
     "message": "すべての画像をまとめた .zip"
@@ -903,16 +911,16 @@
     "message": "印刷用シート"
   },
   "filePurposePhotos": {
-    "message": "断片の写真 — セット全体を保管してください"
+    "message": "断片の写真：セット全体を保管してください"
   },
   "filePurposeKeyfile": {
-    "message": "別鍵 — パスワードと併せて必要です"
+    "message": "別鍵：パスワードと併せて必要です"
   },
   "filePurposeStegoCover": {
     "message": "鍵を隠した写真"
   },
   "filePurposeShare": {
-    "message": "復元シェア — 保有者 1 名分"
+    "message": "復元シェア、保有者 1 名分"
   },
   "onboardingTitle": {
     "message": "StegoShard へようこそ"
@@ -921,10 +929,10 @@
     "message": "StegoShard はファイルを暗号化し、選んだ形式で保存します。出力には2つの系統があります："
   },
   "onboardingDeniable": {
-    "message": "通常のファイルに紛れます — 写真のセットや、本物に見えるデータベース。秘密の存在自体を隠したいときに選びます。"
+    "message": "通常のファイルに紛れます：写真のセットや、本物に見えるデータベース。秘密の存在自体を隠したいときに選びます。"
   },
   "onboardingOvert": {
-    "message": "明示的に StegoShard — QR画像、印刷可能なPDF、または単純なファイル。手軽で頑丈なバックアップに選びます。"
+    "message": "明示的に StegoShard：QR画像、印刷可能なPDF、または単純なファイル。手軽で頑丈なバックアップに選びます。"
   },
   "onboardingKeep": {
     "message": "いずれの場合もパスワードを保管してください。失うと復元できません。"
@@ -975,7 +983,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "強要下でおとりを提示する行為は、地域によっては虚偽陳述——犯罪——になり得ます。まず脅威モデルをお読みください。",
+    "message": "強要下でおとりを提示する行為は、地域によっては虚偽陳述、すなわち犯罪になり得ます。まず脅威モデルをお読みください。",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {

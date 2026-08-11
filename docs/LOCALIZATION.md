@@ -11,7 +11,7 @@ catalogs at build time and selects one from `navigator.language` (see
 ## Target locales (8)
 
 Default **English (`en`)**, plus EFIGS (fr, it, de, es), generic Portuguese
-(`pt`), Japanese (`ja`), and Traditional Chinese (`zh_TW`). All 261 message keys
+(`pt`), Japanese (`ja`), and Traditional Chinese (`zh_TW`). All 274 message keys
 are present in every locale.
 
 ## Review status

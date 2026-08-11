@@ -9,7 +9,7 @@
       content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; worker-src 'self'; connect-src 'none'; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'"
     />
     <meta name="google-site-verification" content="6Ds3RKHLz46hfpQwb__ZTQ0Tuk_0d2ZMGwfy6S0WJ9s" />
-    <title>StegoShard — encrypt files into resilient images</title>
+    <title>StegoShard: encrypt files into resilient images</title>
     <meta
       name="description"
       content="Encrypt a file into robust, error-corrected images you can store on disk or print. Open source, offline, nothing leaves your device."
@@ -85,7 +85,7 @@
               <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
             </svg>
             <span class="dz-prompt">
-              <span class="dz-title" data-i18n="dropTitle"></span><br />
+              <span class="dz-title" data-i18n="dropTitleMulti"></span><br />
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="dz-file" class="dz-file"></span>
@@ -95,7 +95,7 @@
             class="dropzone-input"
             type="file"
             multiple
-            data-i18n-aria-label="dropTitle"
+            data-i18n-aria-label="dropTitleMulti"
           />
           <p id="size-line" class="muted estimate-line">
             <span data-i18n="labelFileSize"></span> <span id="save-size" class="badge">—</span>
@@ -499,7 +499,12 @@
               <div id="duress-fields" hidden>
                 <label class="stack-gap" data-i18n="labelDuressPassword" for="duress-pw"></label>
                 <input id="duress-pw" type="password" autocomplete="new-password" />
-                <div id="decoy-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                <div
+                  id="decoy-drop"
+                  class="dropzone dropzone-sm stack-gap"
+                  tabindex="0"
+                  role="button"
+                >
                   <span class="dz-prompt">
                     <span class="dz-title" data-i18n="decoyTitle"></span><br />
                     <span class="muted" data-i18n="dropPrompt"></span>

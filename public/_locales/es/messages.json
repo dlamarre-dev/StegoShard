@@ -6,7 +6,7 @@
     "message": "Guarda secretos en imágenes: copia resiliente con corrección de errores, esteganografía con negación plausible, o ambas."
   },
   "popupTagline": {
-    "message": "Cifra un archivo en imágenes resilientes — disco o papel."
+    "message": "Cifra un archivo en imágenes resilientes: disco o papel."
   },
   "optionsTitle": {
     "message": "Ajustes de StegoShard"
@@ -107,7 +107,7 @@
     "message": "Título de la etiqueta"
   },
   "titlePlaceholder": {
-    "message": "Nombra esta caja fuerte — p. ej. «Archivo Alfa». Evita «Claves Bitcoin»."
+    "message": "Nombra esta caja fuerte, p. ej. «Archivo Alfa». Evita «Claves Bitcoin»."
   },
   "bandWarning": {
     "message": "La etiqueta no está cifrada: nunca pongas un secreto en ella."
@@ -308,6 +308,14 @@
   "dropTitle": {
     "message": "Suelta tu archivo aquí"
   },
+  "dropTitleMulti": {
+    "message": "Suelta tus archivos aquí",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "Quitar",
+    "description": "Button that clears the files picked in a drop zone."
+  },
   "dropPrompt": {
     "message": "o haz clic para elegir"
   },
@@ -413,7 +421,7 @@
     "description": "Popup: disguised binary variant option."
   },
   "binaryVariantHelpBranded": {
-    "message": "Un único archivo opaco con nombre de StegoShard — fácil de encontrar y sin intención de ocultarse.",
+    "message": "Un único archivo opaco con nombre de StegoShard: fácil de encontrar y sin intención de ocultarse.",
     "description": "Popup: help text for the branded binary variant."
   },
   "binaryVariantHelpDisguised": {
@@ -460,7 +468,7 @@
     }
   },
   "galleryHeading": {
-    "message": "Galería — ocultar en fotos",
+    "message": "Galería: ocultar en fotos",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -476,7 +484,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "Galería — restaurar desde fotos",
+    "message": "Galería: restaurar desde fotos",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -870,7 +878,7 @@
     "message": "Para restaurar después, conserva:"
   },
   "recoveryPassword": {
-    "message": "Tu contraseña — no hay recuperación si la pierdes"
+    "message": "Tu contraseña: no hay recuperación si la pierdes"
   },
   "recoveryImages": {
     "message": "Las imágenes guardadas"
@@ -888,13 +896,13 @@
     "message": "La foto de portada que contiene la clave oculta"
   },
   "recoveryLossless": {
-    "message": "Consérvalas tal cual — redimensionar, recomprimir o pasarlas por un servicio que recodifique imágenes las destruye."
+    "message": "Consérvalas tal cual: redimensionar, recomprimir o pasarlas por un servicio que recodifique imágenes las destruye."
   },
   "filesCreatedHeading": {
     "message": "Archivos creados:"
   },
   "filePurposeVault": {
-    "message": "La caja fuerte — contiene tu archivo"
+    "message": "La caja fuerte: contiene tu archivo"
   },
   "filePurposeArchive": {
     "message": "Todas las imágenes en un .zip"
@@ -903,16 +911,16 @@
     "message": "Hoja imprimible"
   },
   "filePurposePhotos": {
-    "message": "Fotos fragmento — conserva el conjunto completo"
+    "message": "Fotos fragmento: conserva el conjunto completo"
   },
   "filePurposeKeyfile": {
-    "message": "Clave separada — necesaria con tu contraseña"
+    "message": "Clave separada: necesaria con tu contraseña"
   },
   "filePurposeStegoCover": {
     "message": "Foto que contiene la clave oculta"
   },
   "filePurposeShare": {
-    "message": "Fragmento de recuperación — para un titular"
+    "message": "Fragmento de recuperación, para un titular"
   },
   "onboardingTitle": {
     "message": "Bienvenido a StegoShard"
@@ -921,13 +929,13 @@
     "message": "StegoShard cifra tu archivo y lo guarda en la forma que elijas. Hay dos familias de salida:"
   },
   "onboardingDeniable": {
-    "message": "Se camufla como archivos normales — un conjunto de fotos o una base de datos de aspecto real. Elígelo cuando el objetivo es ocultar que existe un secreto."
+    "message": "Se camufla como archivos normales: un conjunto de fotos o una base de datos de aspecto real. Elígelo cuando el objetivo es ocultar que existe un secreto."
   },
   "onboardingOvert": {
-    "message": "Abiertamente StegoShard — imágenes QR, un PDF imprimible o un archivo simple. Elígelo para una copia de seguridad sencilla y resiliente."
+    "message": "Abiertamente StegoShard: imágenes QR, un PDF imprimible o un archivo simple. Elígelo para una copia de seguridad sencilla y resiliente."
   },
   "onboardingKeep": {
-    "message": "En cualquier caso, guarda tu contraseña — no hay recuperación si la pierdes."
+    "message": "En cualquier caso, guarda tu contraseña; no hay recuperación si la pierdes."
   },
   "onboardingDismiss": {
     "message": "Empezar"
@@ -975,7 +983,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "Producir un señuelo bajo coacción puede, en algunos lugares, constituir una declaración falsa — un delito. Lee primero el modelo de amenazas.",
+    "message": "Producir un señuelo bajo coacción puede, en algunos lugares, constituir una declaración falsa, un delito. Lee primero el modelo de amenazas.",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
