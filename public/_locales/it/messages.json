@@ -6,7 +6,7 @@
     "message": "Conserva i segreti nelle immagini: backup resiliente con correzione d'errore, steganografia negabile, o entrambi."
   },
   "popupTagline": {
-    "message": "Cifra un file in immagini resilienti: disco o carta."
+    "message": "Cifra i tuoi file in immagini resilienti, un file opaco o un database esca."
   },
   "optionsTitle": {
     "message": "Impostazioni di StegoShard"
@@ -169,7 +169,7 @@
     }
   },
   "errNoFile": {
-    "message": "Scegli prima un file."
+    "message": "Scegli almeno un file."
   },
   "errNoImages": {
     "message": "Scegli i file immagine da cui ripristinare."
@@ -305,9 +305,6 @@
   "statusKeyErased": {
     "message": "Chiave della cassaforte cancellata."
   },
-  "dropTitle": {
-    "message": "Trascina qui il tuo file"
-  },
   "dropTitleMulti": {
     "message": "Trascina qui i tuoi file",
     "description": "Title of the save file drop zone, which accepts several files."
@@ -332,7 +329,7 @@
     "message": "Ripristinato"
   },
   "webIntro": {
-    "message": "Una versione web gratuita e open source: nessuna installazione, nessun account e nulla lascia il tuo dispositivo. Salva un file come immagini o ripristinalo. (Google Foto richiede l'estensione del browser.)"
+    "message": "Una versione web gratuita e open source. Nessuna installazione, nessun account e nulla lascia il tuo dispositivo. Salva i tuoi file qui, o ripristinali."
   },
   "btnScanCamera": {
     "message": "Scansiona le pagine con la fotocamera",
@@ -639,7 +636,7 @@
     "description": "Wizard: restore action description."
   },
   "wizFileTitle": {
-    "message": "Quale file vuoi proteggere?",
+    "message": "Quali file vuoi proteggere?",
     "description": "Wizard: save file step."
   },
   "wizDestTitle": {
@@ -767,6 +764,15 @@
   "wizTooLarge": {
     "message": "troppo grande (max 1 MB)",
     "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeGallery": {
+    "message": "troppo grande per le foto (~$MAX$ KB compresso)",
+    "description": "Wizard/expert: gallery unavailable: past the photo-carrier bucket ceiling, in KB.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "wizTooLargeBinary": {
     "message": "troppo grande (max 256 MiB)",

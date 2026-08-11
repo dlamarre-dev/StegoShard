@@ -274,8 +274,19 @@ const destRadios = (): HTMLInputElement[] =>
  */
 const pickedFiles = (): File[] => (saveFile.files ? Array.from(saveFile.files) : []);
 
+/**
+ * Which selection the newest estimate belongs to.
+ *
+ * Comparing the first picked file was enough while a pick replaced the whole
+ * selection; now that a zone accumulates, adding a file leaves `files[0]` alone,
+ * so two runs would both believe they were current and the slower one could
+ * overwrite the newer numbers.
+ */
+let pickSerial = 0;
+
 /** Recompute availability for the dropped file, grey unavailable destinations, and render. */
 async function refreshEstimates(): Promise<void> {
+  const serial = ++pickSerial;
   const picked = pickedFiles();
   const first = picked[0] ?? null;
   if (!first) {
@@ -294,9 +305,15 @@ async function refreshEstimates(): Promise<void> {
     ({ file } = await resolveSaveInput(picked));
     len = await envelopeLenForEstimate(file);
   } catch {
-    return; // couldn't read the file; leave destinations enabled, no estimate
+    // Couldn't read the selection. Drop what we knew rather than leaving the
+    // previous file's size and counts on screen beside the new file's name.
+    envelope = null;
+    estimates = null;
+    for (const r of destRadios()) r.disabled = false;
+    renderEstimate();
+    return;
   }
-  if (saveFile.files?.[0] !== first) return; // a newer pick superseded this
+  if (serial !== pickSerial) return; // a newer pick superseded this
   envelope = { file, len };
   recomputeEstimates(); // also applies the gating
   const est = estimates;

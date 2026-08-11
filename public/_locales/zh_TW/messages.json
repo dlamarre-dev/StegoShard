@@ -6,7 +6,7 @@
     "message": "把機密存於圖像：具錯誤更正、具韌性的備份、可否認的隱寫術，或兩者兼具。"
   },
   "popupTagline": {
-    "message": "把檔案加密成具韌性的圖像：磁碟或紙本。"
+    "message": "把您的檔案加密成具韌性的圖片、不透明的單一檔案，或誘餌資料庫。"
   },
   "optionsTitle": {
     "message": "StegoShard 設定"
@@ -169,7 +169,7 @@
     }
   },
   "errNoFile": {
-    "message": "請先選擇檔案。"
+    "message": "請至少選擇一個檔案。"
   },
   "errNoImages": {
     "message": "請選擇要還原的圖像檔案。"
@@ -305,9 +305,6 @@
   "statusKeyErased": {
     "message": "已清除保險庫金鑰。"
   },
-  "dropTitle": {
-    "message": "將檔案拖放到這裡"
-  },
   "dropTitleMulti": {
     "message": "將檔案拖放到這裡",
     "description": "Title of the save file drop zone, which accepts several files."
@@ -332,7 +329,7 @@
     "message": "已還原"
   },
   "webIntro": {
-    "message": "免費的開放原始碼網頁版本：無需安裝、無需帳號，任何資料都不會離開您的裝置。可將檔案儲存為圖片或還原。（Google 相簿需要瀏覽器擴充功能。）"
+    "message": "免費的開放原始碼網頁版本。無需安裝、無需帳號，任何資料都不會離開您的裝置。可在此儲存檔案或還原。"
   },
   "btnScanCamera": {
     "message": "使用相機掃描頁面",
@@ -639,7 +636,7 @@
     "description": "Wizard: restore action description."
   },
   "wizFileTitle": {
-    "message": "您想保護哪個檔案？",
+    "message": "您想保護哪些檔案？",
     "description": "Wizard: save file step."
   },
   "wizDestTitle": {
@@ -767,6 +764,15 @@
   "wizTooLarge": {
     "message": "太大（上限 1 MB）",
     "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeGallery": {
+    "message": "對照片來說太大（壓縮後約 $MAX$ KB）",
+    "description": "Wizard/expert: gallery unavailable: past the photo-carrier bucket ceiling, in KB.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "wizTooLargeBinary": {
     "message": "太大（上限 256 MiB）",

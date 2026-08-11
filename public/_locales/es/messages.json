@@ -6,7 +6,7 @@
     "message": "Guarda secretos en imágenes: copia resiliente con corrección de errores, esteganografía con negación plausible, o ambas."
   },
   "popupTagline": {
-    "message": "Cifra un archivo en imágenes resilientes: disco o papel."
+    "message": "Cifra tus archivos en imágenes resilientes, un archivo opaco o una base de datos señuelo."
   },
   "optionsTitle": {
     "message": "Ajustes de StegoShard"
@@ -169,7 +169,7 @@
     }
   },
   "errNoFile": {
-    "message": "Elige primero un archivo."
+    "message": "Elige al menos un archivo."
   },
   "errNoImages": {
     "message": "Elige los archivos de imagen para restaurar."
@@ -305,9 +305,6 @@
   "statusKeyErased": {
     "message": "Clave de la caja fuerte borrada."
   },
-  "dropTitle": {
-    "message": "Suelta tu archivo aquí"
-  },
   "dropTitleMulti": {
     "message": "Suelta tus archivos aquí",
     "description": "Title of the save file drop zone, which accepts several files."
@@ -332,7 +329,7 @@
     "message": "Restaurado"
   },
   "webIntro": {
-    "message": "Una versión web gratuita y de código abierto: sin instalación, sin cuenta y nada sale de tu dispositivo. Guarda un archivo como imágenes o restaura uno. (Google Fotos requiere la extensión del navegador.)"
+    "message": "Una versión web gratuita y de código abierto. Sin instalación, sin cuenta y nada sale de tu dispositivo. Guarda archivos aquí, o restáuralos."
   },
   "btnScanCamera": {
     "message": "Escanear páginas con la cámara",
@@ -639,7 +636,7 @@
     "description": "Wizard: restore action description."
   },
   "wizFileTitle": {
-    "message": "¿Qué archivo quieres proteger?",
+    "message": "¿Qué archivos quieres proteger?",
     "description": "Wizard: save file step."
   },
   "wizDestTitle": {
@@ -679,7 +676,7 @@
     "description": "Wizard: final review step."
   },
   "wizReviewFile": {
-    "message": "Archivo",
+    "message": "Archivos",
     "description": "Wizard: review label for the chosen file."
   },
   "wizRunSave": {
@@ -767,6 +764,15 @@
   "wizTooLarge": {
     "message": "demasiado grande (máx. 1 MB)",
     "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeGallery": {
+    "message": "demasiado grande para fotos (~$MAX$ KB comprimido)",
+    "description": "Wizard/expert: gallery unavailable: past the photo-carrier bucket ceiling, in KB.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "wizTooLargeBinary": {
     "message": "demasiado grande (máx. 256 MiB)",

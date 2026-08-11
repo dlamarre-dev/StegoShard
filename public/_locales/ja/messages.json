@@ -6,7 +6,7 @@
     "message": "秘密を画像に保存：誤り訂正付きの復元性の高いバックアップ、否認可能なステガノグラフィ、またはその両方。"
   },
   "popupTagline": {
-    "message": "ファイルを復元性の高い画像に暗号化：ディスクまたは紙。"
+    "message": "ファイルを、復元性の高い画像・中身の見えない単一ファイル・囮データベースのいずれかに暗号化します。"
   },
   "optionsTitle": {
     "message": "StegoShard の設定"
@@ -169,7 +169,7 @@
     }
   },
   "errNoFile": {
-    "message": "まずファイルを選んでください。"
+    "message": "ファイルを 1 つ以上選んでください。"
   },
   "errNoImages": {
     "message": "復元元の画像ファイルを選んでください。"
@@ -305,9 +305,6 @@
   "statusKeyErased": {
     "message": "金庫の鍵を削除しました。"
   },
-  "dropTitle": {
-    "message": "ここにファイルをドロップ"
-  },
   "dropTitleMulti": {
     "message": "ここにファイルをドロップ",
     "description": "Title of the save file drop zone, which accepts several files."
@@ -332,7 +329,7 @@
     "message": "復元しました"
   },
   "webIntro": {
-    "message": "無料でオープンソースのウェブ版です。インストールも登録も不要で、データが端末の外に出ることはありません。ファイルを画像として保存したり、復元したりできます。（Google フォトはブラウザ拡張機能が必要です。）"
+    "message": "無料でオープンソースのウェブ版です。インストールも登録も不要で、データが端末の外に出ることはありません。ここでファイルを保存したり、復元したりできます。"
   },
   "btnScanCamera": {
     "message": "カメラでページをスキャン",
@@ -767,6 +764,15 @@
   "wizTooLarge": {
     "message": "大きすぎます（最大 1 MB）",
     "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
+  },
+  "wizTooLargeGallery": {
+    "message": "写真には大きすぎます（圧縮後 約 $MAX$ KB まで）",
+    "description": "Wizard/expert: gallery unavailable: past the photo-carrier bucket ceiling, in KB.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "wizTooLargeBinary": {
     "message": "大きすぎます（最大 256 MiB）",

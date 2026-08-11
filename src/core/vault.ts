@@ -392,6 +392,18 @@ export async function buildPlainVaultBlobMulti(
   return { blob, regionIndex, dek };
 }
 
+/**
+ * Whether an envelope of this length still fits a region on `ladder`.
+ *
+ * `multiRegionBlobLen` answers this by throwing `BucketTooLargeError`, which is
+ * right for the save paths (they turn it into a FileTooLarge the user sees) but
+ * wrong for the estimate pass, whose whole job is to *report* that a destination
+ * is out of reach while the others stay usable.
+ */
+export function envelopeFitsLadder(envelopeLen: number, ladder: readonly number[]): boolean {
+  return REGION_LEN_FIELD + envelopeLen <= (ladder[ladder.length - 1] ?? 0);
+}
+
 /** Analytical multi-region blob length for capacity estimates (no crypto run). */
 export function multiRegionBlobLen(
   env0Len: number,

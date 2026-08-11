@@ -26,6 +26,7 @@ import {
   writesOneFile,
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
+import { resolveSaveInput } from './bundle';
 import type { Msg } from './save-controller';
 import { makeProgressUI } from './progress-ui';
 import {
@@ -82,16 +83,23 @@ type Action = 'save' | 'restore';
 interface State {
   action: Action | null;
   // save
-  file: File | null;
+  /** Everything the user picked, in pick order; several are zipped into one bundle. */
+  files: File[];
   dest: SaveDestination;
   keyMode: KeyMode;
   codec: CodecChoice;
   stegoCover: File | null;
   covers: File[];
   savePassword: string;
-  /** Per-destination availability for `file`, and what it was computed from. */
+  /**
+   * What actually gets encrypted: the single file, or the bundle several were
+   * zipped into. The size line and every estimate describe this, not the first
+   * file the user happened to pick.
+   */
+  bundle: File | null;
+  /** Per-destination availability, and the selection it was computed from. */
   estimates: Estimates | null;
-  estimatesFor: File | null;
+  estimatesFor: string | null;
   /** The other inputs the counts depend on, so a change invalidates the cache. */
   estimatesKey: string | null;
   // restore
@@ -107,13 +115,14 @@ interface State {
 function initialState(env: WizardEnv): State {
   return {
     action: null,
-    file: null,
+    files: [],
     dest: env.saveDestinations[0] ?? 'disk',
     keyMode: 'embedded',
     codec: 'color',
     stegoCover: null,
     covers: [],
     savePassword: '',
+    bundle: null,
     estimates: null,
     estimatesFor: null,
     estimatesKey: null,
@@ -225,6 +234,10 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
 
   // --- per-file destination availability + counts (shared with the expert UI) --
 
+  /** Identity of the current selection, for the estimate cache. */
+  const selectionId = (files: readonly File[]): string =>
+    files.map((f) => `${f.name} ${f.size} ${f.lastModified}`).join('|');
+
   /**
    * Compute which destinations fit and their output counts, caching by every
    * input that moves the numbers.
@@ -232,31 +245,40 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
    * Keying the cache on the file alone was wrong: the key mode changes the image
    * count too, and the key-mode step runs *after* the destination step, so the
    * availability shown at the destination step would never be revisited.
+   *
+   * Several files are zipped into one bundle first, because that bundle is what
+   * gets encrypted and therefore what decides the counts and the size.
    */
   async function ensureEstimates(): Promise<void> {
-    const file = state.file;
-    const key = file ? `${state.keyMode}` : null;
-    if (!file || (state.estimatesFor === file && state.estimatesKey === key)) return;
+    const id = selectionId(state.files);
+    const key = state.files.length ? `${state.keyMode}` : null;
+    if (state.files.length === 0 || (state.estimatesFor === id && state.estimatesKey === key)) {
+      return;
+    }
     let est: Estimates;
+    let bundle: File;
     try {
-      est = await computeEstimates(file, env.saveDestinations, msg, {
+      ({ file: bundle } = await resolveSaveInput(state.files));
+      est = await computeEstimates(bundle, env.saveDestinations, msg, {
         keyMode: state.keyMode,
         codec: state.codec,
       });
     } catch {
-      // The file could not be read at all. Callers fire this without awaiting,
-      // so it has to resolve, so record "nothing fits" and let the file step say
-      // so rather than leave the wizard spinning on "computing…".
-      if (state.file !== file) return;
+      // The selection could not be read (or is past a hard input limit). Callers
+      // fire this without awaiting, so it has to resolve: record "nothing fits"
+      // and let the file step say so rather than spin on "computing…".
+      if (selectionId(state.files) !== id) return;
+      state.bundle = null;
       state.estimates = {};
-      state.estimatesFor = file;
+      state.estimatesFor = id;
       state.estimatesKey = key;
       render();
       return;
     }
-    if (state.file !== file) return; // a newer file superseded this computation
+    if (selectionId(state.files) !== id) return; // a newer pick superseded this
+    state.bundle = bundle;
     state.estimates = est;
-    state.estimatesFor = file;
+    state.estimatesFor = id;
     state.estimatesKey = key;
     // If the remembered destination no longer fits, fall back to the first that does.
     if (!est[state.dest]?.available) {
@@ -348,6 +370,16 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       ...(multiple ? { multiple: '' } : {}),
     });
     if (accept) input.setAttribute('accept', accept);
+    // Hand the input the files the wizard already holds. Every step re-renders
+    // from scratch, so without this a zone that accumulates would start empty
+    // after each pick and the next file would replace the set instead of joining
+    // it. `DataTransfer` is the only way to build a FileList; where it is missing
+    // the label below still describes the state.
+    if (current.length && typeof DataTransfer !== 'undefined') {
+      const carrier = new DataTransfer();
+      for (const f of current) carrier.items.add(f);
+      input.files = carrier.files;
+    }
     const zone = h(
       'div',
       { class: 'dropzone dropzone-sm', tabindex: '0', role: 'button' },
@@ -375,8 +407,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       },
       msg('btnClearFiles'),
     );
-    // A FileList can't be rebuilt from File[], so only the label is restored on
-    // re-render; the picked files themselves live in the wizard's state.
+    // The wizard's state stays the source of truth for the label, so it is right
+    // even if the FileList above could not be rebuilt.
     if (current.length) {
       chip.textContent = current.length === 1 ? current[0]!.name : String(current.length);
       zone.classList.add('has-file');
@@ -455,18 +487,23 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         const body = h(
           'div',
           {},
-          filePicker(msg('dropTitle'), false, null, state.file ? [state.file] : [], (f) => {
-            state.file = f[0] ?? null;
-            state.estimates = null; // recompute for the new file
+          filePicker(msg('dropTitleMulti'), true, null, state.files, (f) => {
+            // The zone accumulates, so `f` is everything picked so far.
+            state.files = f;
+            state.estimates = null; // recompute for the new selection
             render();
           }),
         );
-        if (state.file) {
-          if (state.estimatesFor !== state.file) {
+        if (state.files.length) {
+          // Until the bundle is zipped its size is unknown, so the raw total
+          // stands in; it is the only number available and close enough to keep
+          // the line from jumping between "computing" and the final figure.
+          const rawTotal = state.files.reduce((n, f) => n + f.size, 0);
+          if (state.estimatesFor !== selectionId(state.files)) {
             body.append(
               h('p', {
                 class: 'muted wiz-fileinfo',
-                text: `${formatSize(state.file.size)} · ${msg('wizComputing')}`,
+                text: `${formatSize(rawTotal)} · ${msg('wizComputing')}`,
               }),
             );
             void ensureEstimates();
@@ -479,7 +516,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
                 h('p', {
                   class: 'muted wiz-fileinfo',
                   text: msg('wizFileInfo', [
-                    formatSize(state.file.size),
+                    formatSize(state.bundle?.size ?? rawTotal),
                     avail.map((d) => destLabel(d)).join(', '),
                   ]),
                 }),
@@ -497,7 +534,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           sqlite: [msg('destSqlite'), msg('destSqliteDesc')],
           gallery: [msg('destGallery'), msg('destGalleryDesc')],
         };
-        if (state.file) void ensureEstimates();
+        if (state.files.length) void ensureEstimates();
         const est = state.estimates;
         return {
           title: msg('wizDestTitle'),
@@ -526,7 +563,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         };
       }
       case 'covers': {
-        if (state.file) void ensureEstimates();
+        if (state.files.length) void ensureEstimates();
         const needed = state.estimates?.gallery?.needed;
         return {
           title: msg('galleryCoversTitle'),
@@ -712,7 +749,16 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   function reviewBody(): HTMLElement {
     const lines: string[] = [];
     if (state.action === 'save') {
-      lines.push(`${msg('wizReviewFile')}: ${state.file?.name ?? '—'}`);
+      // Name what was picked, but never let a long selection push the rest of the
+      // review off the step.
+      const names = state.files.map((f) => f.name);
+      const shown =
+        names.length === 0
+          ? '—'
+          : names.length <= 3
+            ? names.join(', ')
+            : `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+      lines.push(`${msg('wizReviewFile')}: ${shown}`);
       lines.push(`${msg('destHeading')}: ${destLabel(state.dest)}`);
       if (state.dest === 'gallery')
         lines.push(`${msg('galleryCoversTitle')}: ${state.covers.length}`);
@@ -752,7 +798,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     if (state.dest === 'gallery') {
       return {
         dest: 'gallery',
-        files: [state.file!],
+        files: state.files,
         covers: state.covers,
         galleryPassword: state.savePassword,
         keyMode: state.keyMode,
@@ -762,7 +808,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const key = await env.getSaveKey(state.savePassword);
     return {
       dest: state.dest,
-      files: [state.file!],
+      files: state.files,
       key,
       // The disguised .db path derives its slot KEK from this per-save password.
       password: state.dest === 'sqlite' ? state.savePassword : undefined,
@@ -780,9 +826,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const list = steps();
     const id = list[state.index];
     if (id === 'file') {
-      if (!state.file) return msg('errNoFile');
+      if (state.files.length === 0) return msg('errNoFile');
       // Block only once estimates are in and nothing fits (they compute fast).
-      if (state.estimatesFor === state.file && availableDests().length === 0) {
+      if (state.estimatesFor === selectionId(state.files) && availableDests().length === 0) {
         return msg('wizNoFormat');
       }
     }

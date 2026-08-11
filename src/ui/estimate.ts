@@ -10,13 +10,16 @@
  */
 
 import {
+  DB_LADDER,
   GALLERY_K_MAX,
+  GALLERY_LADDER,
   MAX_FILE_BYTES,
   MAX_FILE_BYTES_BINARY_UI,
   MAX_IMAGES,
   PROFILE_DISK,
   PROFILE_PAPER,
   buildPayload,
+  envelopeFitsLadder,
   galleryCoversForEnvelopeLen,
   imagesForEnvelopeLen,
 } from '@core';
@@ -82,16 +85,31 @@ export function estimateFor(
   ctx: EstimateContext = {},
 ): DestEstimate {
   if (dest === 'binary' || dest === 'sqlite') {
-    return size <= MAX_FILE_BYTES_BINARY_UI
-      ? { available: true, count: 1 }
-      : { available: false, count: 0, reason: msg('wizTooLargeBinary') };
+    const tooBig = size > MAX_FILE_BYTES_BINARY_UI;
+    // The decoy .db pads its two regions to a shared bucket, so its real ceiling
+    // is the top of DB_LADDER, not the browser's input cap. Without this the UI
+    // offered the destination and the save failed at the very end.
+    const pastLadder = dest === 'sqlite' && !envelopeFitsLadder(envelopeLen, DB_LADDER);
+    return tooBig || pastLadder
+      ? { available: false, count: 0, reason: msg('wizTooLargeBinary') }
+      : { available: true, count: 1 };
   }
   if (dest === 'gallery') {
-    if (size > MAX_FILE_BYTES) return { available: false, count: 0, reason: msg('wizTooLarge') };
+    // A photo carrier is bounded by its bucket ladder, not by the 1 MB image cap,
+    // so it says its own (much lower) ceiling rather than "max 1 MB". Checked
+    // before the split arithmetic below, which reaches `pickBucket` and throws
+    // past the top rung instead of reporting that the destination is out.
+    const galleryFull = msg(
+      'wizTooLargeGallery',
+      String(Math.floor(GALLERY_LADDER[GALLERY_LADDER.length - 1]! / 1024)),
+    );
+    if (size > MAX_FILE_BYTES || !envelopeFitsLadder(envelopeLen, GALLERY_LADDER)) {
+      return { available: false, count: 0, reason: galleryFull };
+    }
     const { k, needed } = galleryCoversForEnvelopeLen(envelopeLen, 'embedded');
     return k <= GALLERY_K_MAX
       ? { available: true, count: needed, needed }
-      : { available: false, count: 0, reason: msg('wizTooLarge') };
+      : { available: false, count: 0, reason: galleryFull };
   }
   // disk / paper
   if (size > MAX_FILE_BYTES) return { available: false, count: 0, reason: msg('wizTooLarge') };
