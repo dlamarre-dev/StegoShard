@@ -94,21 +94,24 @@ export function errText(err: unknown): string {
  * the caller because this module is shared by two surfaces with two different
  * i18n backends; the `data-i18n` attribute lets a later locale switch
  * re-translate the button through `localizeDom`.
+ *
+ * The button goes *after* the zone, not inside it: the zone is a `role="button"`,
+ * whose children are presentational, so a focusable control within it is a real
+ * accessibility fault (axe `nested-interactive`) and its Enter/Space would race
+ * the zone's own. The zone must therefore already be in a parent when this runs.
  */
 function addClearButton(zone: HTMLElement, input: HTMLInputElement, label?: string): void {
-  if (zone.querySelector('.dz-clear')) return;
+  if (zone.nextElementSibling?.classList.contains('dz-clear')) return;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'dz-clear';
   btn.dataset.i18n = 'btnClearFiles';
   btn.textContent = label ?? 'Clear';
-  btn.addEventListener('click', (e) => {
-    // The zone itself opens the file picker on click; this must not.
-    e.stopPropagation();
+  btn.addEventListener('click', () => {
     input.value = '';
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  zone.append(btn);
+  zone.insertAdjacentElement('afterend', btn);
 }
 
 /**

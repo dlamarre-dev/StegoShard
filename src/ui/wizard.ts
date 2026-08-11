@@ -361,6 +361,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       chip,
       input,
     );
+    // The clear control is added as the zone's sibling, so the zone needs a
+    // parent before it is wired.
+    const wrap = h('div', {}, zone);
     // Reuse the shared dropzone wiring (click / drag / drop → input.files +
     // change, plus the clear control).
     wireDropzone(
@@ -378,7 +381,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       chip.textContent = current.length === 1 ? current[0]!.name : String(current.length);
       zone.classList.add('has-file');
     }
-    return zone;
+    return wrap;
   }
 
   const STRENGTH_KEYS = ['pwVeryWeak', 'pwWeak', 'pwFair', 'pwGood', 'pwStrong'];
