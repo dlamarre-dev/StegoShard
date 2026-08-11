@@ -1,11 +1,19 @@
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-// Extensionless on purpose: adding `.ts` needs `allowImportingTsExtensions`,
-// which changes module resolution project-wide. Vite warns that its future
-// native config loader will want the extension; that is a forward-compat note,
-// not a current failure, and it is left visible rather than silenced.
-import { buildManifest, type Target } from './src/manifest.config';
+// The explicit `.ts` is deliberate, and this is the only import in the repo that
+// carries one.
+//
+// Node loads this config file directly — Vite 8 is moving to `configLoader:
+// 'native'`, which strips types and hands the result to the ordinary ESM
+// resolver. That resolver needs a complete relative specifier; it will not try
+// `./src/manifest.config.ts` for you. Everything under `src/` is bundled by
+// rolldown instead, which does its own resolution, so those ~270 extensionless
+// imports are unaffected and should stay as they are.
+//
+// `allowImportingTsExtensions` in tsconfig.json is what lets tsc accept this. It
+// only ever *permits* the extension, so it changes nothing else.
+import { buildManifest, type Target } from './src/manifest.config.ts';
 
 const target = (process.env.STEGOSHARD_TARGET ?? 'chrome') as Target;
 
