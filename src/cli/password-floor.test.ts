@@ -6,8 +6,8 @@
  * refusing to try a password the user already has destroys their data to protect
  * them from nothing. This test exists so that stays true.
  *
- * Enforcement lives at the entry points — `main.ts` for the CLI, each surface's
- * accept-gate for the app — rather than in `runSave` here, which is the
+ * Enforcement lives at the entry points (`main.ts` for the CLI, each surface's
+ * accept-gate for the app) rather than in `runSave` here, which is the
  * programmatic API the tests drive directly. That placement is what lets this
  * test build a legacy-shaped vault at all.
  */

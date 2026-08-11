@@ -4,7 +4,7 @@
  * The extension's own core encodes a file into image payloads and renders them
  * to PNGs (exactly the QR-grid codec output), alongside a manifest and the
  * expected content. The Python decoder then reads these back and must recover
- * the original file — proving the two implementations agree on the format.
+ * the original file, proving the two implementations agree on the format.
  *
  * Run with: npm run fixtures -- <output-dir>
  */
@@ -178,7 +178,7 @@ async function generateGallery(
   });
   if (coverJpeg) {
     // A foreign JPEG (not part of the gallery) whose eligible-carrier count sits
-    // just above the slot size but below the 4x margin — the case that used to
+    // just above the slot size but below the 4x margin, the case that used to
     // drain the position keystream. The decoder must skip it, not abort.
     writeFileSync(join(dir, 'foreign.jpg'), makeJpegCover(112, 112, 0x333));
   }
@@ -236,7 +236,7 @@ async function generate(
   if (keyMode === 'stego') {
     // Hide the key block in a deterministic cover photo (a 128×128 gradient) and
     // write it as a PNG. The reference decoder must extract it with the password.
-    // Uses the production Argon2id defaults — the stego cost is not stored, so a
+    // Uses the production Argon2id defaults; the stego cost is not stored, so a
     // decoder assumes the defaults (SPEC §5.3).
     const w = 128;
     const h = 128;
@@ -368,7 +368,7 @@ async function generateDisguisedNpStego(name: string, content: Uint8Array): Prom
   );
   const vaultName = binaryVaultName('disguised');
   writeFileSync(join(dir, vaultName), wrapBinary(blob, 'disguised'));
-  // Raw 38-byte Shamir shares — the Python test parses + recovers S from any k.
+  // Raw 38-byte Shamir shares; the Python test parses + recovers S from any k.
   shares.forEach((s, i) => writeFileSync(join(dir, `share-${i + 1}.bin`), s));
   // The key factor, hidden in a cover photo (SSKF), keyed by the password.
   const w = 256;
@@ -454,7 +454,7 @@ async function generateBundle(name: string, asBinary: boolean): Promise<void> {
  * neither unlock reveals which region it opened.
  *
  * Python must reach both without any hint from the container about which slot
- * is which — the property §10.10 pins on the TypeScript side.
+ * is which, the property §10.10 pins on the TypeScript side.
  */
 async function generateDuress(name: string, content: Uint8Array): Promise<void> {
   const dir = join(outRoot, name);
@@ -530,7 +530,7 @@ async function generateNpShareText(name: string, content: Uint8Array): Promise<v
 
 const content = pseudoRandom(4000, 20260713);
 await generate('embedded', 'embedded', content);
-// The 8-colour grid (SPEC §2.2) — a much larger payload per image, so this also
+// The 8-colour grid (SPEC §2.2), a much larger payload per image, so this also
 // exercises the Python decoder on a multi-image colour set.
 await generate('color-grid', 'embedded', pseudoRandom(20_000, 77), false, CODEC_COLOR_GRID);
 await generate('color-grid-keyfile', 'keyfile', content, false, CODEC_COLOR_GRID);

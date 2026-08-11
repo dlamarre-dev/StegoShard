@@ -51,7 +51,7 @@ export interface PaperOptions {
   locale?: string | undefined;
 }
 
-/** Canvas pixels per PDF point — 3× keeps printed text crisp. */
+/** Canvas pixels per PDF point; 3× keeps printed text crisp. */
 const TEXT_SCALE = 3;
 
 /**
@@ -177,7 +177,7 @@ export async function saveFileToPaper(
   manifest.push({ name: pdfName, purpose: 'document' });
   downloadBlob(new Blob([pdfBytes as BufferSource], { type: 'application/pdf' }), pdfName);
 
-  // For keyfile/stego modes the key block is not on paper — deliver it too:
+  // For keyfile/stego modes the key block is not on paper, so deliver it too:
   // hidden in the cover photo (stego) or as a plain .key file (keyfile).
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');

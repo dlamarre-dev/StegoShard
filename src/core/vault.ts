@@ -167,7 +167,7 @@ export interface ExportResult {
   m: number;
   setId: Uint8Array;
   keyMode: KeyMode;
-  /** The serialized key block — save it separately for keyfile/stego modes. */
+  /** The serialized key block; save it separately for keyfile/stego modes. */
   keyBlock: Uint8Array;
 }
 
@@ -262,7 +262,7 @@ export function imagesForEnvelopeLen(
 }
 
 /**
- * Build the encrypted vault blob — the container shared by every output path.
+ * Build the encrypted vault blob, the container shared by every output path.
  * The image path erasure-codes it; the binary path wraps it in a container file.
  */
 export async function buildVaultBlob(
@@ -311,7 +311,7 @@ export async function decodeVaultBlob(
 // which region is real is invisible. RS erasure coding runs over the WHOLE blob
 // as one stream (upstream, unchanged), so shard boundaries never partition by
 // region. Per SPEC §10 governing decision 3, each region has an INDEPENDENT DEK,
-// carried inside its slot — a shared DEK would let a decoy-slot opener derive the
+// carried inside its slot; a shared DEK would let a decoy-slot opener derive the
 // other region's key.
 
 /** Per-region block overhead: content salt + IV + GCM tag (bucket adds the rest). */
@@ -366,7 +366,7 @@ export async function buildMultiRegionVaultBlob(
 /**
  * Plain single-payload multi-region blob (no decoy, no threshold): one live slot,
  * one real region at a CSPRNG-chosen index, the other region dead. Every gallery
- * vault uses this in Phase 1 — the 2× cost is mandatory, not optional (§10.9).
+ * vault uses this in Phase 1; the 2× cost is mandatory, not optional (§10.9).
  * Returns the blob plus the live region index and DEK for post-save verification.
  */
 export async function buildPlainVaultBlobMulti(
@@ -449,7 +449,7 @@ async function decodeRegion(
 /**
  * Decode a multi-region blob with a password: open the slot array (constant-work,
  * §10.3.1), then decrypt ONLY the one region the credential's slot points at. The
- * return value carries no region index, slot index, or mode — a plain, duress, and
+ * return value carries no region index, slot index, or mode: a plain, duress, and
  * non-possession unlock are indistinguishable to the caller.
  */
 export async function decodeMultiRegionVaultBlob(
@@ -570,7 +570,7 @@ async function reassembleBlob(payloads: Uint8Array[]): Promise<Uint8Array> {
     try {
       decoded.push(decodeImagePayload(payload));
     } catch {
-      // not an StegoShard image / unreadable header — skip it
+      // not an StegoShard image / unreadable header, so skip it
     }
   }
   if (decoded.length === 0) throw new Error('import: no valid StegoShard images found');
@@ -632,7 +632,7 @@ async function reconstructVerified(
     try {
       blob = decodeBlob(trial, k, m, blobLen);
     } catch {
-      continue; // singular matrix for this subset — try another
+      continue; // singular matrix for this subset, so try another
     }
     if (bytesEqual(await sha256Short(blob), expectedHash)) return blob;
   }
@@ -661,7 +661,7 @@ function* kSubsets(items: number[], k: number): Generator<number[]> {
  * there is no image-count ceiling on this path.
  */
 /**
- * Export the vault as a **branded** `.ssbn` container (§8) — an EXCLUDED path, so
+ * Export the vault as a **branded** `.ssbn` container (§8), an EXCLUDED path, so
  * it keeps the single-region v1 geometry with the managed DEK, byte-for-byte
  * unchanged. The disguised `.db` path is supported by §10 and uses the separate
  * multi-region function below (it needs the password, not the managed key).
@@ -680,7 +680,7 @@ export async function exportVaultBinary(
 ): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
   const variant = options.variant ?? 'branded';
   if (variant !== 'branded') {
-    // The disguised path is a §10 multi-region container — use exportVaultBinaryDisguised.
+    // The disguised path is a §10 multi-region container; use exportVaultBinaryDisguised.
     throw new Error('exportVaultBinary handles only the branded (.ssbn) variant');
   }
   const maxBytes = options.maxBytes ?? MAX_FILE_BYTES_BINARY;
@@ -703,7 +703,7 @@ export async function exportVaultBinary(
 /**
  * Export the vault as a **disguised** `.db` container (§8 + §10): the mandatory
  * 4-slot / 2-region geometry inside a valid SQLite database. Needs the PASSWORD
- * (to derive the slot KEK), not the managed DEK — each region gets its own fresh
+ * (to derive the slot KEK), not the managed DEK; each region gets its own fresh
  * DEK. `embedded` mode is password-only; `keyfile`/`stego` return a 32-byte key
  * factor to deliver externally (SPEC §10; keyMode carries no length signal). The
  * returned `regionIndex` + `dek` are for post-save verification only.
@@ -785,7 +785,7 @@ export async function importVaultBinary(
       onProgress,
     );
   }
-  // Branded, or bytes matching neither variant (bare blob — AES-GCM is the final
+  // Branded, or bytes matching neither variant (bare blob, where AES-GCM is the final
   // arbiter): single-region geometry.
   return decodeSegmentedBlob(
     blob,
@@ -804,7 +804,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 // --- Post-save round-trip verification ---------------------------------------
 //
 // Immediately after producing the artifacts, decode them back and confirm the
-// original file returns — BEFORE telling the user the save succeeded. This catches
+// original file returns, BEFORE telling the user the save succeeded. This catches
 // any encoding/carrier fault (erasure, codec, container, a lossy cover) at save
 // time rather than at some future restore when the original is gone.
 
@@ -817,7 +817,7 @@ export class VerificationError extends Error {
 }
 
 /**
- * Decrypt a vault blob's content with an already-unlocked DEK — no password, no
+ * Decrypt a vault blob's content with an already-unlocked DEK: no password, no
  * Argon2 (the content key is derived from the DEK regardless of key mode). Lets
  * verification reuse the managed key in hand instead of re-deriving from a password.
  */
@@ -884,7 +884,7 @@ export async function verifyBinaryExport(
 /**
  * Verify a freshly produced disguised (.db) container round-trips. Uses the
  * authoring region DEK + index directly (no password, no Argon2), decoding just
- * the live region — mirrors `decodeMultiRegionSegmentedBlobWithDek`.
+ * the live region; mirrors `decodeMultiRegionSegmentedBlobWithDek`.
  */
 export async function verifyDisguisedExport(
   container: Uint8Array,

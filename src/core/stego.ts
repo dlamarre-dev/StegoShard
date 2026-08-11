@@ -13,20 +13,20 @@
  *    carry it. Without the password you cannot even locate the ~736 carrier
  *    bits among the millions in the image.
  *  - **Whitened payload.** The key block is XORed with the keystream before
- *    embedding, so the carried bits are uniformly random — statistically
+ *    embedding, so the carried bits are uniformly random, statistically
  *    identical to untouched LSBs.
- *  - **No structure on the wire.** The payload is one of two fixed lengths — the
- *    92-byte key block, or the 37-byte SSKF key-factor envelope (§10.3) — so
+ *  - **No structure on the wire.** The payload is one of two fixed lengths, either the
+ *    92-byte key block, or the 37-byte SSKF key-factor envelope (§10.3), so
  *    nothing about the size or layout is stored in the clear. Extraction with the
  *    wrong password (or the wrong payload length) yields random bytes that fail the
- *    magic check, which is reported the same as "no key here" — the two are
+ *    magic check, which is reported the same as "no key here"; the two are
  *    indistinguishable, which is the point.
  *  - **Argon2-gated.** Locating/de-whitening costs one Argon2id derivation per
  *    password guess, the same cost as unwrapping the key block itself, so the
  *    stego layer is not a cheap password oracle.
  *
  * Honest limits (see docs/CRYPTO-REVIEW.md): LSB steganography survives only
- * lossless storage — the carrier MUST be kept as the emitted PNG; re-encoding
+ * lossless storage: the carrier MUST be kept as the emitted PNG; re-encoding
  * to JPEG, resizing, or re-saving destroys the key. An adversary who holds the
  * *original* cover image can diff it against the carrier. And LSB steganalysis
  * is an arms race; this resists casual/statistical detection, not a dedicated
@@ -63,14 +63,14 @@ const subtle = globalThis.crypto.subtle;
 // keystream that both whitens the payload and selects carrier positions is bound
 // to a fingerprint of the *cover*, so two vaults saved with the same password
 // into different covers (or the same cover reused) never share a whitening pad or
-// a carrier layout — which would otherwise be a two-time-pad / correlation leak.
+// a carrier layout, which would otherwise be a two-time-pad / correlation leak.
 // The fingerprint is taken over exactly the bits embedding never changes (RGB
 // with the LSB masked; JPEG coefficient magnitudes with bit 0 masked), so it is
 // identical at embed and at extract and NOTHING has to be stored in the image
 // ("no structure on the wire" is preserved). Mirrored bit-for-bit by the Python
 // reference decoder. Gallery Mode (§9) does NOT use this: its slots are already
 // per-fragment AES-GCM with random nonces and carry no whitening, so position
-// reuse across covers leaks nothing — the per-cover hash would be pure cost.
+// reuse across covers leaks nothing; the per-cover hash would be pure cost.
 const STEGO_COVER_INFO = new TextEncoder().encode('stegoshard/stego/cover');
 
 /** SHA-256 over an RGBA cover's embedding-invariant bits (RGB, LSB masked; alpha excluded). */
@@ -124,7 +124,7 @@ async function coverKey(baseSeed: Uint8Array, fingerprint: Uint8Array): Promise<
 /**
  * Fixed application salt for the stego key derivation. Unlike the key block's
  * own random salt, this cannot be stored in the image (that would be a
- * detectable structure), so it is a constant — acceptable because the stego
+ * detectable structure), so it is a constant, acceptable because the stego
  * layer is defense-in-depth for hiding, not the vault's confidentiality (that
  * is the password-wrapped key block). ASCII "StegoShard-stego" (exactly 16 bytes).
  */
@@ -157,7 +157,7 @@ export class StegoCapacityError extends Error {
 /**
  * Thrown when a stego cover is not a supported format: only baseline JPEG and
  * PNG can carry the key. Progressive/arithmetic JPEG, HEIC, WebP, etc. are
- * refused (no silent transcode — that would change the file's size/appearance
+ * refused (no silent transcode, which would change the file's size/appearance
  * and defeat the deniability goal).
  */
 export class StegoCoverFormatError extends Error {
@@ -536,10 +536,10 @@ export async function extractKeyFactorStegoJpeg(
 // authenticated slot (a sealed fragment or a random decoy), so these variants:
 //   - take a raw 32-byte position seed (the caller derives it once via Argon2id
 //     + HKDF; there is no per-image Argon2 cost),
-//   - do NOT whiten (the slot bytes are already uniform — GCM output or random),
+//   - do NOT whiten (the slot bytes are already uniform, being GCM output or random),
 //   - do NOT check any magic (the caller authenticates via the AEAD tag).
-// Everything else — keyed position selection, the |coef|≥2 invariant, byte-exact
-// same-size JPEG output — is shared with the key-block paths.
+// Everything else (keyed position selection, the |coef|≥2 invariant, byte-exact
+// same-size JPEG output) is shared with the key-block paths.
 
 /** Fixed application salt for the gallery key derivation. ASCII "StegoShard-gllry" (16 bytes). */
 export const GALLERY_SALT = Uint8Array.from([
@@ -558,7 +558,7 @@ function positionStreamLen(payloadBits: number): number {
 
 /**
  * Embed `data` into an RGBA buffer in place at seed-derived LSBs (no whitening).
- * `margin` requires the carrier count to exceed the payload by that factor — keeps
+ * `margin` requires the carrier count to exceed the payload by that factor, which keeps
  * embedding sparse AND guarantees `pickPositions` never drains the keystream.
  */
 export async function embedBytesStegoRgba(
@@ -585,7 +585,7 @@ export async function embedBytesStegoRgba(
 
 /**
  * Extract `length` bytes from an RGBA buffer at seed-derived LSBs. Returns null if
- * the carrier count is below `length*8*margin` — the same threshold embedding used,
+ * the carrier count is below `length*8*margin`, the same threshold embedding used,
  * so a real carrier always clears it and a too-small image is skipped (never drains
  * the keystream).
  */

@@ -1,5 +1,5 @@
 /**
- * Guided workflow — a step-by-step wizard that walks a beginner through a save
+ * Guided workflow: a step-by-step wizard that walks a beginner through a save
  * or restore by asking one question at a time and collecting the needed files.
  * It drives the same shared `runSave` / `runRestore` controllers as the dense
  * "expert" UI, so the two never diverge. The DOM is built here (not in the HTML
@@ -65,7 +65,7 @@ export interface WizardEnv {
   getSaveKey: (password: string) => Promise<VaultKey>;
   /**
    * Whether the save flow must ask for a password. The web app always does (it
-   * mints the key); the extension does not, since its key is already unlocked —
+   * mints the key); the extension does not, since its key is already unlocked.
    * except for stego, which always needs the vault password (handled separately).
    */
   needsSavePassword: boolean;
@@ -73,7 +73,7 @@ export interface WizardEnv {
   verifyStegoPassword?: (password: string) => Promise<boolean>;
   /** Web restore only: live camera capture. */
   camera?: WizardCamera;
-  /** Leave the wizard — wired to the host's return-to-chooser (Back on step 1). */
+  /** Leave the wizard; wired to the host's return-to-chooser (Back on step 1). */
   onExit?: () => void;
 }
 
@@ -148,7 +148,7 @@ function h<K extends keyof HTMLElementTagNameMap>(
 const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
 
 /**
- * Destinations whose goal is deniability — the artifact blends in as ordinary
+ * Destinations whose goal is deniability: the artifact blends in as ordinary
  * files (photos, or a real SQLite database). The others (disk/paper QR,
  * branded binary) are overt: openly StegoShard by design.
  */
@@ -206,7 +206,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
   function needsPasswordStep(): boolean {
     if (state.dest === 'gallery') return true;
     // The disguised .db path is keyed by a per-save password (§10), not the
-    // managed key — collect it on every surface.
+    // managed key, so collect it on every surface.
     if (state.dest === 'sqlite') return true;
     if (env.needsSavePassword) return true;
     return state.keyMode === 'stego';
@@ -245,7 +245,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       });
     } catch {
       // The file could not be read at all. Callers fire this without awaiting,
-      // so it has to resolve — record "nothing fits" and let the file step say
+      // so it has to resolve, so record "nothing fits" and let the file step say
       // so rather than leave the wizard spinning on "computing…".
       if (state.file !== file) return;
       state.estimates = {};
@@ -727,7 +727,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       const n = state.restoreFiles.length + (env.camera?.capturedCount() ?? 0);
       lines.push(`${msg('labelImagesOrZip')}: ${n}`);
     }
-    // The status line is rendered by render() below the body — none is needed here.
+    // The status line is rendered by render() below the body; none is needed here.
     return h('div', {}, ...lines.map((l) => h('p', { class: 'muted', text: l })));
   }
 
@@ -829,7 +829,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         ) {
           runBtn.disabled = false;
           prog.done();
-          // The "saving…" line above was set before this check — leaving it up
+          // The "saving…" line above was set before this check, so leaving it up
           // would read as a run that silently stalled.
           status.textContent = '';
           return;

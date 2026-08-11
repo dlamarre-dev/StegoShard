@@ -43,13 +43,13 @@ const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
  */
 export function stegoKeyName(coverName: string | undefined, ext: string, setHex: string): string {
   const trimmed = coverName?.trim();
-  // The cover's own filename is the deniable choice — it is an ordinary photo
+  // The cover's own filename is the deniable choice; it is an ordinary photo
   // the user already had. The fallback only runs when the picked file has no
   // usable name, so it must not announce the project either.
   return trimmed ? trimmed : `image-${setHex}.${ext}`;
 }
 
-/** Optional human-readable label band drawn above the QR (cleartext — plan §1). */
+/** Optional human-readable label band drawn above the QR (cleartext; plan §1). */
 export interface LabelBand {
   title?: string | undefined;
   date?: string | undefined;
@@ -80,15 +80,15 @@ export async function imageDataToPngBlob(img: ImageDataLike): Promise<Blob> {
  *
  *  - The brand strip comes from `@core`, so the browser and the CLI stamp the
  *    same pixels. It carries the mark, the wordmark, and a recovery line naming
- *    the format version and codec — an image found years from now says what it
+ *    the format version and codec, so an image found years from now says what it
  *    is and where the spec lives.
  *  - The caption strip, when the user asked for a label, is drawn with canvas
  *    text so a title in any script renders (the core font is ASCII-only).
  *
  * Everything in both strips is cleartext, by design.
  *
- * Callers that must stay unbranded for deniability — gallery covers, stego key
- * covers, disguised binaries — use `imageDataToPngBlob` instead.
+ * Callers that must stay unbranded for deniability (gallery covers, stego key
+ * covers, disguised binaries) use `imageDataToPngBlob` instead.
  */
 export async function imageWithLabelToPngBlob(
   img: ImageDataLike,
@@ -132,7 +132,7 @@ export async function imageWithLabelToPngBlob(
  * them (it never upscales).
  *
  * On the two guards: `assertBlobSize` is what bounds the *decode*, because it
- * runs before `createImageBitmap` — a compressed image above the cap is never
+ * runs before `createImageBitmap`, so a compressed image above the cap is never
  * handed to the decoder. The megapixel check below runs after the decode has
  * already happened, so it bounds only what comes next: the canvas allocation
  * and the `getImageData` copy, both several bytes per pixel. Reading the source
@@ -165,7 +165,7 @@ export async function fileToImageData(
 }
 
 // Sizes to try when decoding an image. Natural size comes first so our own
-// rendered PNGs are read without any resampling — that matters most for the
+// rendered PNGs are read without any resampling, which matters most for the
 // color grid, whose modules are only a few pixels wide at the disk profile.
 // Photos of printed pages need to be downscaled from multiple megapixels before
 // the QR decoder can locate the code.
@@ -191,7 +191,7 @@ export async function decodeImageBytes(bytes: Uint8Array): Promise<Uint8Array | 
  * Hide a serialized key block inside a cover photo (deniable stego key mode),
  * **keeping the cover's format**: a baseline JPEG stays a JPEG of ~the same size
  * (embedded in DCT coefficients); a PNG stays a PNG (spatial LSB). Any other
- * cover (progressive/HEIC/WebP…) is refused with StegoCoverFormatError — we
+ * cover (progressive/HEIC/WebP…) is refused with StegoCoverFormatError; we
  * never transcode, which would change the file's size/appearance.
  */
 export async function embedKeyImage(
@@ -235,7 +235,7 @@ export async function extractKeyImage(file: Blob, password: string): Promise<Uin
 
 /**
  * Hide the 32-byte external key factor (§10.3) in a cover photo, keeping the
- * cover's format — the stego-delivery counterpart of a raw `.key` file on the
+ * cover's format, the stego-delivery counterpart of a raw `.key` file on the
  * multi-region paths (gallery, disguised `.db`). Same format rules as
  * embedKeyImage.
  */
@@ -286,7 +286,7 @@ export async function extractKeyFactorImage(
 /**
  * Turn a picked file into a gallery cover. A baseline JPEG is kept as raw bytes
  * (its DCT coefficients are the carrier and must not be re-encoded); anything
- * else is decoded to full-resolution RGBA (a cover is never downscaled — gallery
+ * else is decoded to full-resolution RGBA (a cover is never downscaled; gallery
  * embedding is position-sensitive).
  */
 export async function fileToGalleryCover(file: File): Promise<GalleryCover> {
@@ -309,7 +309,7 @@ export async function galleryImageToBlob(img: GalleryImage): Promise<{ name: str
 
 /**
  * Trigger a browser download for a blob. When `subdir` is given, the file is
- * placed in that folder under the browser's download directory — Chromium
+ * placed in that folder under the browser's download directory; Chromium
  * honors a relative path in the `download` attribute (Firefox/Safari flatten to
  * the basename, so it degrades gracefully).
  */

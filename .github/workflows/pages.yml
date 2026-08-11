@@ -2,7 +2,7 @@ name: Release and deploy web app
 
 # A tag publishes a full release: the site, the downloadable offline bundle, its
 # provenance attestation, and the GitHub release. A manual run deploys only the
-# site, so `main` can reach users without minting a version — the three
+# site, so `main` can reach users without minting a version; the three
 # release-only steps below are skipped by `github.ref_type`.
 on:
   push:

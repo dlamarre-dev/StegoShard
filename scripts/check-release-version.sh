@@ -4,7 +4,7 @@
 #
 # Shared by the two release workflows and by the release dry run. It lives in a
 # script rather than inline in each workflow so the dry run exercises the real
-# check instead of a copy that can drift — and because the inline version was
+# check instead of a copy that can drift, and because the inline version was
 # previously a shell syntax error that no one could run before a release.
 #
 # Usage: check-release-version.sh [tag]   (defaults to $GITHUB_REF_NAME)

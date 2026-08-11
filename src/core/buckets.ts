@@ -1,12 +1,12 @@
 /**
- * Length buckets (SPEC §10.4) — the padding ladders for the access-structure
+ * Length buckets (SPEC §10.4), the padding ladders for the access-structure
  * paths (Gallery Mode and the .db/SQLite decoy wrapper).
  *
  * On those two paths a container always carries REGION_COUNT payload regions,
  * and both regions are padded to a single shared bucket so that ciphertext
  * length reveals only the bucket, never the true payload length or which region
  * is real. The writer compresses each region first, then picks ONE bucket ≥ the
- * larger of the two compressed lengths and pads both to it — so neither region's
+ * larger of the two compressed lengths and pads both to it, so neither region's
  * compression ratio is recoverable from the container (§10.4 rule 4).
  *
  * The ladders are deliberately capped below what the draft envisioned, to real

@@ -1,4 +1,4 @@
-"""Unit tests for the binary container (SPEC §8) — mirrors the TS suite."""
+"""Unit tests for the binary container (SPEC §8); mirrors the TS suite."""
 
 from __future__ import annotations
 

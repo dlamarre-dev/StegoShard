@@ -1,11 +1,11 @@
 /**
- * Minimal i18n for the web app — reuses the extension's message catalogs
+ * Minimal i18n for the web app; reuses the extension's message catalogs
  * (bundled at build time) with a chrome.i18n-style getMessage.
  *
  * The active locale defaults to the browser language (when supported) and can
  * be changed at runtime from the in-page language selector; the choice is
- * persisted so it survives reloads. Switching re-localizes the DOM live — no
- * page reload — and updates <html lang>.
+ * persisted so it survives reloads. Switching re-localizes the DOM live, with no
+ * page reload, and updates <html lang>.
  */
 
 import en from '../../public/_locales/en/messages.json';

@@ -8,7 +8,7 @@
 # Compresses the *download*, never the executable: the archive is unpacked
 # before anything runs it. Packing the executable in place (UPX) refuses
 # outright on Linux and, worse, silently produces a Windows binary that aborts
-# inside V8 on startup — see the comment in release-cli.yml.
+# inside V8 on startup; see the comment in release-cli.yml.
 #
 # Usage: package-cli-binary.sh <binary> <archive>
 #   The archive extension selects the format: .tar.gz (Linux/macOS) or .zip
@@ -25,7 +25,7 @@ if [ -z "$bin" ] || [ -z "$archive" ]; then
 fi
 
 if [ ! -f "$bin" ]; then
-  echo "::error::$bin not found — did the compile step run?"
+  echo "::error::$bin not found; did the compile step run?"
   exit 1
 fi
 

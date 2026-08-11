@@ -1,4 +1,4 @@
-"""Crypto: Argon2id KEK derivation and AES-256-GCM — mirrors SPEC.md §5."""
+"""Crypto: Argon2id KEK derivation and AES-256-GCM; mirrors SPEC.md §5."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ REGION_INFO_PREFIX = b"stegoshard/vault/region"
 
 
 class WrongPasswordError(Exception):
-    """Raised when the DEK cannot be unwrapped — almost always a wrong password."""
+    """Raised when the DEK cannot be unwrapped; almost always a wrong password."""
 
 
 def normalize_password(password: str) -> str:
@@ -90,7 +90,7 @@ def derive_slot_kek(
 ) -> bytes:
     """Slot-array KEK: Argon2id(password, vault_salt) run once, plus an OPTIONAL
     external key factor (keyfile/stego secret) mixed in via HKDF (SPEC §10.2-3).
-    Argon2 params are NOT stored in the container — the caller supplies the frozen
+    Argon2 params are NOT stored in the container; the caller supplies the frozen
     defaults (or test values)."""
     kek = derive_kek(password, vault_salt, iterations, memory_kib, parallelism)
     if not key_factor:
@@ -118,11 +118,11 @@ def slot_kek_candidates(
     parallelism: int,
 ) -> list[bytes]:
     """Candidate slot KEKs, all from the SAME single Argon2id output (§10.6.2). The
-    password-only KEK, plus — when a key factor is supplied — the factor-mixed KEK;
+    password-only KEK, plus, when a key factor is supplied, the factor-mixed KEK;
     each optionally gated on the recovered Shamir secret. BOTH bases are offered when
     a factor is present because a duress decoy slot (§10.9) is sealed WITHOUT the
     factor while the real slot is sealed WITH it, and restore presents the factor for
-    either credential — so the no-factor base keeps the decoy openable even when the
+    either credential, so the no-factor base keeps the decoy openable even when the
     factor is present. The extra base matches nothing in plain/Mode B, and credential
     independence guarantees the real and decoy KEKs never both match."""
     kek_bytes = derive_kek(password, vault_salt, iterations, memory_kib, parallelism)

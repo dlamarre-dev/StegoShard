@@ -1,7 +1,7 @@
 /**
  * Deniable SQLite container (SPEC §8, disguised variant).
  *
- * The vault blob is stored *inside* a genuine, minimal SQLite 3 database — split
+ * The vault blob is stored *inside* a genuine, minimal SQLite 3 database, split
  * across several rows of a plausible `cache(k TEXT, v BLOB)` table
  * (`page_cache_NNNN`, ~64 KiB each) under an interior b-tree root, one row per
  * leaf page, each spilling into its own overflow-page chain. The file is
@@ -26,7 +26,7 @@ import { concatBytes } from './bytes';
 const PAGE_SIZE = 4096;
 const U = PAGE_SIZE; // usable size (reserved-bytes-per-page = 0)
 const MAGIC = 'SQLite format 3\0';
-/** First 16 bytes — used to recognise the disguised variant on restore. */
+/** First 16 bytes; used to recognise the disguised variant on restore. */
 export const SQLITE_MAGIC = new TextEncoder().encode(MAGIC);
 
 const SQLITE_VERSION_NUMBER = 3045000; // cosmetic; any recent value is fine
@@ -34,7 +34,7 @@ const CACHE_ROOT_PAGE = 2;
 const CREATE_SQL = 'CREATE TABLE cache(k TEXT, v BLOB)';
 /**
  * The vault is stored as several `cache` rows keyed `page_cache_NNNN` (chunk
- * order), reassembled by concatenation — several ordinary-sized rows read less
+ * order), reassembled by concatenation, since several ordinary-sized rows read less
  * like "one giant opaque BLOB" than a single row. Decoy rows use other keys.
  */
 const VAULT_KEY_PREFIX = 'page_cache_';
@@ -216,7 +216,7 @@ function tableLeafCell(rowid: number, record: Uint8Array, firstOverflow: number)
 /**
  * Pack a vault blob into a valid, self-contained SQLite database: a `cache` table
  * whose vault is split across several `page_cache_NNNN` rows (chunk order) plus a
- * couple of decoy rows, under an interior b-tree root — one row per leaf page,
+ * couple of decoy rows, under an interior b-tree root, one row per leaf page,
  * each spilling into its own overflow chain. Several ordinary-sized rows read less
  * like "one giant opaque BLOB". No trailing bytes: file size == page_count × page_size.
  */
@@ -270,7 +270,7 @@ export function packSqlite(blob: Uint8Array): Uint8Array {
   writeHeader(page1, pageCount);
   out.set(page1, 0);
 
-  // Page 2: interior root — one child per leaf, keyed by that leaf's rowid.
+  // Page 2: interior root: one child per leaf, keyed by that leaf's rowid.
   const children = plans.map((p) => ({ page: p.leafPage, key: p.rowid }));
   const rightMost = children[children.length - 1]!.page;
   out.set(buildInteriorPage(children.slice(0, -1), rightMost), PAGE_SIZE);

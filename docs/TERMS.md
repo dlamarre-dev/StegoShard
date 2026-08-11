@@ -22,7 +22,7 @@ for any claim, damages, or loss arising from the use of the software.
 ## Your responsibility
 
 - You are responsible for your password and key. **If you lose your password or key,
-  your data is permanently unrecoverable** — no one can restore it for you.
+  your data is permanently unrecoverable**; no one can restore it for you.
 - Keep multiple copies of your recovery artifacts across independent locations. Do not
   rely on a single medium.
 - Use StegoShard only for lawful purposes and only with data you are entitled to store.

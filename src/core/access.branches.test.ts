@@ -1,5 +1,5 @@
 /**
- * Branch coverage for the §10 primitives' guard/edge paths — the error branches
+ * Branch coverage for the §10 primitives' guard/edge paths: the error branches
  * that the end-to-end round-trips don't naturally exercise. All fast (pure funcs
  * or a raw-imported AES key; no Argon2).
  */

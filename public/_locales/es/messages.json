@@ -548,7 +548,7 @@
   },
   "destGallery": {
     "message": "Galería",
-    "description": "Popup: Gallery Mode destination — hide the secret across ordinary photos."
+    "description": "Popup: Gallery Mode destination: hide the secret across ordinary photos."
   },
   "restoreModeStandard": {
     "message": "Estándar",
@@ -556,7 +556,7 @@
   },
   "restoreModeGallery": {
     "message": "Desde fotos (Galería)",
-    "description": "Restore: Gallery Mode — recover from ordinary photos."
+    "description": "Restore: Gallery Mode, recover from ordinary photos."
   },
   "galleryPasswordHint": {
     "message": "La galería usa la contraseña de arriba: cifra el secreto y decide dónde se esconde en cada foto. No hay ningún archivo de clave que guardar.",
@@ -766,15 +766,15 @@
   },
   "wizTooLarge": {
     "message": "demasiado grande (máx. 1 MB)",
-    "description": "Wizard: destination unavailable — over the 1 MB image/gallery cap."
+    "description": "Wizard: destination unavailable: over the 1 MB image/gallery cap."
   },
   "wizTooLargeBinary": {
     "message": "demasiado grande (máx. 256 MiB)",
-    "description": "Wizard: destination unavailable — over the 100 MB binary cap."
+    "description": "Wizard: destination unavailable: over the 100 MB binary cap."
   },
   "wizTooManyImages": {
     "message": "necesita más de $MAX$ imágenes",
-    "description": "Wizard: destination unavailable — would exceed the image ceiling.",
+    "description": "Wizard: destination unavailable: would exceed the image ceiling.",
     "placeholders": {
       "max": {
         "content": "$1"

@@ -1,5 +1,5 @@
 /**
- * CRC-32 (IEEE 802.3, reflected, polynomial 0xEDB88320) — the same function as
+ * CRC-32 (IEEE 802.3, reflected, polynomial 0xEDB88320), the same function as
  * zlib's `crc32`, so the Python reference decoder gets it from the standard
  * library for free.
  *
@@ -9,7 +9,7 @@
  * itself. The CRC is what turns a corrupt block into a known erasure.
  *
  * This is an integrity check against accidental damage, never a security
- * primitive — authenticity comes from AES-GCM (SPEC §5).
+ * primitive; authenticity comes from AES-GCM (SPEC §5).
  */
 
 const TABLE = /* @__PURE__ */ (() => {

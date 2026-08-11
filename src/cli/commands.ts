@@ -348,7 +348,7 @@ async function runSaveDisguised(
 }
 
 /**
- * Resolve the save inputs — files, directories, or a mix — into the single
+ * Resolve the save inputs (files, directories, or a mix) into the single
  * (name, content) pair the envelope carries.
  *
  * One input stays exactly as it always was: same name, same bytes, no bundle
@@ -381,7 +381,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   const content = input.content;
 
   // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
-  // region gets its own DEK — the managed key is not used on this supported path).
+  // region gets its own DEK; the managed key is not used on this supported path).
   if (opts.binary === 'disguised') {
     return runSaveDisguised(opts, input, onProgress);
   }
@@ -540,7 +540,7 @@ const isKeyFile = (n: string) => /\.key$/i.test(n);
 
 /** Peek a file's first bytes to see whether it is a binary container (SPEC §8). */
 function isBinaryContainerFile(path: string): boolean {
-  // Open once and inspect the descriptor (fstat), never re-resolving the path —
+  // Open once and inspect the descriptor (fstat), never re-resolving the path,
   // avoids a check-then-use (TOCTOU) race between "is it a file?" and the read.
   let fd: number | undefined;
   try {
@@ -619,7 +619,7 @@ export interface GallerySaveOptions {
   covers: string[];
   outDir: string;
   password: string;
-  /** 'embedded' (default), 'keyfile', or 'stego' — how the key is delivered. */
+  /** 'embedded' (default), 'keyfile', or 'stego': how the key is delivered. */
   keyMode?: KeyMode;
   /** Cover photo for --key-mode stego (the key is hidden in it). */
   keyCover?: string | undefined;
@@ -661,7 +661,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
   if (mode === 'nonpossession') {
     // Verify by winnowing + recovering S from the freshly minted shares. A
     // keyfile/stego gallery gates the real region on the key factor AS WELL AS the
-    // shares (§10.3), so the factor must be supplied to the verify too — otherwise
+    // shares (§10.3), so the factor must be supplied to the verify too; otherwise
     // the gated slot can't be opened and the self-check would spuriously fail.
     const s = await shamirRecover(res.shares!);
     await verifyGalleryExport(
@@ -819,7 +819,7 @@ export interface EntropySources {
  * Null when the arguments are fine.
  *
  * Two rules. Combining sources is refused because it would be ambiguous which
- * one won — and silently ignoring the other is exactly the kind of surprise a
+ * one won, and silently ignoring the other is exactly the kind of surprise a
  * user reaching for this option cannot afford. An explicitly *empty* source is
  * refused for the same reason `resolvePassword` refuses an empty password: the
  * flag would have done nothing at all, and the user would never know.

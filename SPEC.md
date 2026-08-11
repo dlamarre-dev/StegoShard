@@ -1,4 +1,4 @@
-# StegoShard format specification — v1
+# StegoShard format specification, v1
 
 This document is the **pre-1.0 versioned candidate** for the StegoShard on-image
 format. It describes everything needed to decode a vault **without the extension**,
@@ -37,7 +37,7 @@ shards survive (§7).
 ## 2. Image codecs
 
 Two codecs turn the per-image payload of §3 into pixels. `CODEC_ID` in the header
-records which one produced an image, but it is **descriptive, not dispatch** —
+records which one produced an image, but it is **descriptive, not dispatch**:
 the header lives inside the payload, so a decoder cannot read it until it has
 already decoded the image. Decoders therefore sniff: mean chroma over a sparse
 sample of the pixels separates a greyscale QR from a saturated color grid, the
@@ -68,15 +68,15 @@ separate and additional.
   (PNG), so rendering is a faithful byte round-trip.
 - **Decoding:** locate and decode the QR symbol; the recovered bytes are the §3
   payload. (The Python reference decoder uses `zxing-cpp`, which returns the raw
-  byte content — important for binary payloads.)
+  byte content, which matters for binary payloads.)
 
 **Paper output always uses this codec.** Print, ink and camera white balance make
 colour a liability, so §2.2 is refused for `PROFILE_PAPER`.
 
 ### 2.2 `color-grid` (`CODEC_ID = 2`)
 
-The digital-output codec. Each module is one of **eight colours** — the corners of
-the RGB cube — and so carries **3 bits**, against QR byte mode's ~0.75 bits per
+The digital-output codec. Each module is one of **eight colours**, the corners of
+the RGB cube, and so carries **3 bits**, against QR byte mode's ~0.75 bits per
 module. In practice that is ~3x the payload per image at Disk and ~2.3x at Cloud.
 
 The eight colours are maximally separated in RGB, which is what lets this survive
@@ -119,14 +119,14 @@ A square grid of `n` modules, with a 4-module white quiet zone.
 #### Error correction
 
 Intra-image protection reuses the same Cauchy Reed-Solomon code as §7. That code
-corrects **erasures**, not errors — it must be told which blocks are bad — so each
+corrects **erasures**, not errors, and it must be told which blocks are bad, so each
 block carries its own checksum:
 
 1. The image payload is prefixed with a `u32` length and padded to `k·64`.
 2. It is split into `k` data blocks of **64 bytes**.
 3. `m` parity blocks are computed with the §7 encoding matrix.
 4. Every block, data and parity alike, is stored as `block ‖ CRC-32(block)`, i.e.
-   68 bytes. The CRC is IEEE 802.3 (reflected, polynomial `0xEDB88320`) — the same
+   68 bytes. The CRC is IEEE 802.3 (reflected, polynomial `0xEDB88320`), the same
    function as zlib's `crc32`.
 
 The decoder verifies each CRC, passes the failures as erasures, and reconstructs.
@@ -145,7 +145,7 @@ byte.
 Encoders should not leave them zeroed. The filler sits _outside_ the encryption,
 so a zeroed run paints a flat black band whose width states how much of the
 capacity the secret actually used. The reference encoder fills it from a small
-PRNG seeded with `CRC-32(payload)` — per-image rather than constant, so the same
+PRNG seeded with `CRC-32(payload)`, per-image rather than constant, so the same
 pattern does not appear in every part-full symbol and give the boundary away when
 two are compared.
 
@@ -171,14 +171,14 @@ Note the Disk symbol is _smaller_ than the QR it replaces (704 px against
 
 1. Threshold the luma at the midpoint of its range and scan rows for the
    `1:1:3:1:1` signature. Confirm each candidate vertically through its centre,
-   requiring the horizontal and vertical module pitches to agree within 25 % —
-   this is what stops caption and brand text from posing as a finder.
+   requiring the horizontal and vertical module pitches to agree within 25 %.
+   This is what stops caption and brand text from posing as a finder.
 2. Cluster the surviving candidates and take the four extremes of `x ± y` as the
    corners.
 3. Map grid coordinates to pixels by **bilinear interpolation** between the four
    finder centres, which sit at module 3 from each edge. Digital images are
    axis-aligned and at most uniformly rescaled, so this absorbs everything they
-   do without a homography solve — and it stays trivial to mirror in the Python
+   do without a homography solve, and it stays trivial to mirror in the Python
    reference decoder.
 4. Sample the central 50 % of each module's area and classify to the nearest
    observed calibration colour.
@@ -193,7 +193,7 @@ Note the Disk symbol is _smaller_ than the QR it replaces (704 px against
 
 Every image contains a **self-describing header** followed by that image's shard
 bytes. Because the header is replicated in every image, any single surviving image
-describes the whole set — there is no separate manifest image.
+describes the whole set; there is no separate manifest image.
 
 ### Header (33 bytes, fixed)
 
@@ -235,8 +235,8 @@ AES-GCM, §5).
 
 **Bundles.** A save of one file never sets bit 1: its envelope is byte-identical
 to what a pre-bundle writer produced. Several files (or a directory) are zipped
-**stored, not deflated** — the envelope gzips the result immediately after, and
-compressing twice buys nothing — and bit 1 is set. A reader that unpacks the zip
+**stored, not deflated**: the envelope gzips the result immediately after, and
+compressing twice buys nothing, and bit 1 is set. A reader that unpacks the zip
 must reduce each entry to a basename before writing: the archive comes out of a
 decrypted vault, but its entry names were chosen by whoever wrote that vault, so
 `../` must not escape the output directory.
@@ -257,14 +257,14 @@ wrong, and is why the bit could be added without a version bump.
 
 The DEK is protected by the password via the key block (§5.1).
 
-> **Non-normative — optional user entropy.** Every random value in this spec is
+> **Non-normative: optional user entropy.** Every random value in this spec is
 > drawn from the platform CSPRNG (`crypto.getRandomValues`). A writer MAY let the
 > user supply extra entropy, which is XORed into each draw as
 > `getRandomValues() XOR HMAC-SHA256(HKDF(user string, session salt), counter)`.
 > The CSPRNG is still consulted for every byte, so the result is uniform whether
 > or not the user's string carries any entropy. This is a **generation-side**
 > choice only: nothing about it is encoded, no field or length changes, and a
-> reader — including the Python reference decoder — cannot tell whether it was
+> reader, including the Python reference decoder, cannot tell whether it was
 > used and never needs it.
 
 ### 5.1 Key block (wrapped DEK)
@@ -302,13 +302,13 @@ Recovery requires **the password _and_ this key block**.
 
 Where the key block travels is chosen per save:
 
-- **embedded** — the key block is stored in the vault blob (§6), i.e. inside the
+- **embedded**: the key block is stored in the vault blob (§6), i.e. inside the
   images. The images plus the password are self-sufficient. `KB_LEN > 0`.
-- **keyfile** — the key block is _not_ in the images (`KB_LEN = 0`); it is saved
+- **keyfile**: the key block is _not_ in the images (`KB_LEN = 0`); it is saved
   separately as a **`.key` file** whose contents are exactly the serialized key
   block bytes of §5.1 (magic `"SSKY"`). Restore needs the images, the password,
   and this `.key` file. A leaked image then reveals nothing without the `.key`.
-- **stego** — like keyfile, but the key block is hidden in an ordinary-looking
+- **stego**: like keyfile, but the key block is hidden in an ordinary-looking
   cover image (§5.3 for a PNG cover, §5.4 for a JPEG cover). At the blob level it
   is identical to keyfile (`KB_LEN = 0`); only the delivery of the key block differs.
 
@@ -318,7 +318,7 @@ embedded; zero means it must be supplied externally.
 ### 5.3 Stego key block (deniable LSB embedding)
 
 The stego mode hides the §5.1 key block in the RGB least-significant bits of a
-cover image, keyed by the password so that — without the password — the carrier
+cover image, keyed by the password so that, without the password, the carrier
 is indistinguishable from a photo's natural LSB noise. There is **no header,
 magic, or length field in the image**: the payload length is fixed at the
 92-byte key block (`KEY_BLOCK_LEN`), and extraction with a wrong password yields
@@ -344,11 +344,11 @@ Derivation (all decoders MUST reproduce it bit-for-bit):
    cost parameters (the extension uses the §5.1 production defaults).
    1a. **Cover fingerprint:** `fp = SHA-256(coverInvariant)`, where `coverInvariant`
    is the concatenation, in pixel order, of each RGB channel byte with its LSB
-   masked off (`byte & 0xFE`; alpha excluded) — i.e. exactly the bits embedding
+   masked off (`byte & 0xFE`; alpha excluded), i.e. exactly the bits embedding
    never changes. `key = HKDF-SHA256(ikm = seed, salt = fp,
 info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    embedding-invariant bits it is identical at embed and extract, so **nothing is
-   stored in the image** — the "no header/magic/length" property is preserved.
+   stored in the image**: the "no header/magic/length" property is preserved.
    This binds the keystream to the specific cover: the same password over two
    different covers (or the same cover reused) never repeats the whitening pad or
    the carrier layout.
@@ -368,17 +368,17 @@ Extraction reverses steps 4→3 and validates the result against §5.1 (magic
 ### 5.4 JPEG stego key block (deniable DCT embedding)
 
 When the cover is a **baseline JPEG**, the key block is hidden in its quantized
-DCT coefficients so the carrier stays a JPEG of the same size and metadata — a
+DCT coefficients so the carrier stays a JPEG of the same size and metadata, a
 `.png` in a phone's photo library would itself be an anomaly. Only baseline
 sequential Huffman (SOF0), 8-bit, is supported; progressive (SOF2), arithmetic
-coding, and other formats (HEIC, WebP) MUST be rejected — never transcoded, which
+coding, and other formats (HEIC, WebP) MUST be rejected, never transcoded, which
 would change the file's size/appearance and defeat deniability.
 
 The keyed selection, whitening pad, MSB-first bit order, per-cover keystream
-binding (step 1a), and §5.1 validation are **identical to §5.3** — only the
+binding (step 1a), and §5.1 validation are **identical to §5.3**; only the
 carrier and the cover fingerprint differ. For a JPEG the fingerprint is
 `fp = SHA-256(concat over eligible carriers, in carrier order, of the signed
-coefficient magnitude with bit 0 masked off, encoded big-endian int32)` — again
+coefficient magnitude with bit 0 masked off, encoded big-endian int32)`, again
 exactly the content embedding leaves unchanged (`|coef| ≥ 2` is preserved and
 only the magnitude LSB is touched), so it is identical at embed and extract and
 nothing is stored. Only the carrier differs:
@@ -445,7 +445,7 @@ Cross-image redundancy so the vault survives lost or corrupt images.
 - `dataPerShard` = `capacity(profile) − HEADER_LEN` (see §2), i.e. the shard bytes
   that fit one image once the 33-byte header is accounted for.
 - `k` = number of data shards = `max(1, ceil(blobLen / dataPerShard))`.
-- `m` = number of parity shards = `max(ceil(k * 0.3), 2)` — a +30% parity ratio
+- `m` = number of parity shards = `max(ceil(k * 0.3), 2)`, a +30% parity ratio
   with an absolute floor of **2** (`MIN_PARITY`), so even a one-shard vault keeps
   two spares. Tolerates the loss/corruption of up to `m` images.
 - Absolute ceiling: `k + m ≤ 256` (field size) and, as a product guard,
@@ -460,7 +460,7 @@ Cross-image redundancy so the vault survives lost or corrupt images.
 
 The systematic generator matrix is `G = [ I_k ; C ]` (size `(k+m) × k`):
 
-- Rows `0 … k-1`: the `k × k` identity — output shards `0 … k-1` are the data
+- Rows `0 … k-1`: the `k × k` identity, so output shards `0 … k-1` are the data
   shards unchanged.
 - Rows `k … k+m-1`: an `m × k` **Cauchy matrix** `C` with
   `C[i][j] = 1 / (x_i ⊕ y_j)` in GF(2^8), where `x_i = i` (`0 … m-1`) and
@@ -490,8 +490,8 @@ If fewer than `k` shards survive, reconstruction is impossible.
 Instead of erasure-coding the vault blob (§6) into QR images, an implementation
 MAY write a **segmented vault blob** (§8.1) to a single **container file**. This
 trades the images' loss tolerance and camera-restore for a compact artifact and a
-much larger size budget (no per-image ceiling). Unlike the image path — which
-encrypts the envelope in one AES-GCM call (§6) — the binary path splits it into
+much larger size budget (no per-image ceiling). Unlike the image path, which
+encrypts the envelope in one AES-GCM call (§6), the binary path splits it into
 chunks so encryption/decryption report byte-level progress and run off the UI
 thread; the container is pure packaging around the already-authenticated bytes,
 so it adds no secrecy.
@@ -505,7 +505,7 @@ so it adds no secrecy.
 The binary path replaces the §6 single-shot vault blob with a **self-describing,
 chunked** blob. The compressed envelope (§4) is split into fixed-size chunks, each
 sealed with AES-256-GCM under a STREAM nonce discipline (Hoang–Reyhanitabar–
-Rogaway–Vizár — the construction `age` uses).
+Rogaway–Vizár, the construction `age` uses).
 
 ```
 [ MAGIC "SSCS" = 53 53 43 53 ][ VERSION u8 = 1 ][ FLAGS u8 (bit0 = key block embedded) ]
@@ -514,8 +514,8 @@ Rogaway–Vizár — the construction `age` uses).
 [ chunk_0 ] … [ chunk_{n-1} ]        chunk_i = ciphertext_i || tag_i(16)
 ```
 
-- **CEK** = `HKDF-SHA256(DEK, salt = contentSalt, info = "stegoshard/vault/content")`
-  — identical to §6.
+- **CEK** = `HKDF-SHA256(DEK, salt = contentSalt, info = "stegoshard/vault/content")`,
+  identical to §6.
 - **Chunks**: `n = ceil(plaintextLen / chunkSize)` (at least one, so an empty
   payload yields one empty final chunk). `chunkSize` is implementation-chosen
   within `[4096, 16·2²⁰]`; the reference encoder uses 1 MiB.
@@ -550,7 +550,7 @@ disguised  a complete SQLite 3 database whose `cache` table holds the segmented 
 page_count × page_size`. So `sqlite3 cache.db "SELECT * FROM cache"` opens
   cleanly, `PRAGMA integrity_check` returns `ok`, and structural triage (size vs.
   page count, header scan) finds nothing amiss. The remaining tell is that the row
-  values are high-entropy — a content-level observation, not a structural one;
+  values are high-entropy, a content-level observation, not a structural one;
   spreading across ordinary-sized rows softens but does not remove it (see
   `docs/CRYPTO-REVIEW.md` §6b). The database is generated deterministically and is
   byte-identical across implementations; the reader walks the b-tree, reassembles
@@ -558,7 +558,7 @@ page_count × page_size`. So `sqlite3 cache.db "SELECT * FROM cache"` opens
 
 The **external key** (keyfile mode, `KB_LEN = 0`) MAY be delivered the same way:
 the 92-byte key block (§5.1) wrapped in a branded or disguised container. Stego
-key delivery (§5.3/§5.4) is unchanged — the key stays a cover image.
+key delivery (§5.3/§5.4) is unchanged; the key stays a cover image.
 
 **Restore.** Detect the variant by its leading signature (the branded magic, or
 the SQLite header). Branded strips its 5-byte prefix; disguised parses the
@@ -594,12 +594,12 @@ decoded blindly by trial-authentication ("winnowing").
 61 72 64 2d 67 6c 6c 72 79`), distinct from the §5 stego salt. HKDF-SHA256 (RFC
 5869, empty salt) splits the seed into two 32-byte subkeys by `info` label:
 
-- `posKey` ← `info = "stegoshard/gallery/pos"` — drives carrier selection.
-- `aeadKey` ← `info = "stegoshard/gallery/aead"` — seals fragments (AES-256-GCM).
+- `posKey` ← `info = "stegoshard/gallery/pos"`, drives carrier selection.
+- `aeadKey` ← `info = "stegoshard/gallery/aead"`, seals fragments (AES-256-GCM).
 
 The gallery Argon2 cost is the format-defined v2-candidate `DEFAULT_ARGON2` and is **not stored**
 anywhere (like the §5.3 stego salt). Because `aeadKey` is password-only,
-extraction is image-independent — a decoder can trial-open every photo blindly.
+extraction is image-independent, so a decoder can trial-open every photo blindly.
 
 ### 9.2 Fragment and slot layout (all lengths fixed)
 
@@ -615,23 +615,23 @@ Embedded slot (SLOT_BYTES, identical for data / parity / decoy):
   [ NONCE 12 (random per fragment) ][ AES-256-GCM(aeadKey, NONCE, P) ]   (= FRAG_LEN + 16 tag)
 ```
 
-The nonce is a fresh random 12 bytes carried in the slot — never derived from the
-shard index — so two galleries under the same password never reuse a `(key,
+The nonce is a fresh random 12 bytes carried in the slot, never derived from the
+shard index, so two galleries under the same password never reuse a `(key,
 nonce)` pair. A decoy image embeds `SLOT_BYTES` of CSPRNG bytes at the same
 `posKey`-selected carriers; without the password it is indistinguishable from a
 sealed fragment (both are uniform).
 
 ### 9.3 Carrier selection
 
-Identical to §5.3/§5.4 — an AES-CTR keystream seeded by `posKey` drives
+Identical to §5.3/§5.4: an AES-CTR keystream seeded by `posKey` drives
 rejection-sampled distinct carrier positions (RGB LSBs for a PNG cover; eligible
 AC coefficients with `|coef| ≥ 2` for a baseline JPEG, keeping size invariance),
-MSB-first bit order — **except** there is no whitening pad (the sealed slot is
+MSB-first bit order, **except** that there is no whitening pad (the sealed slot is
 already uniform) and the length is `SLOT_BYTES·8` bits, not the fixed key-block
 length. Unlike §5.3/§5.4 the keystream is **not** bound to a per-cover fingerprint:
 positions may repeat across same-size covers, but this leaks nothing here because
 each slot is an independent AES-GCM message (fresh random nonce, §9.2) with no
-whitening — there is no two-time-pad to exploit. A cover must have
+whitening, so there is no two-time-pad to exploit. A cover must have
 `≥ SLOT_BYTES·8·4` eligible carriers (a ×4 margin keeps embedding sparse) or it is
 rejected.
 
@@ -641,7 +641,7 @@ rejected.
    (`KB_LEN = 92`), from the gzip-compressed envelope (§4) encrypted under a fresh
    DEK. A gallery may instead use **keyfile** or **stego** key mode (`KB_LEN = 0`),
    in which case the key block is not carried in the fragments but delivered
-   separately — a loose `.key` file, or hidden in an ordinary cover photo (§5).
+   separately: a loose `.key` file, or hidden in an ordinary cover photo (§5).
    This shrinks the blob by 92 bytes; the `blobLen ≤ 389120` bound (step 2) is
    unchanged. Deniability note: a separate key artifact is itself a tell, so this
    is opt-in.
@@ -668,7 +668,7 @@ The `|coef| ≥ 2` magnitude-LSB invariant keeps a JPEG carrier the same size (b
 faithful for `restartInterval = 0`; ≤ 0.5% drift from byte-stuffing otherwise) and
 its Huffman size-category histogram unchanged. Honest limit: Gallery Mode modifies
 **every** selected photo, so an adversary holding the untouched originals can diff
-them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
+them, amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
 
 ---
 
@@ -676,12 +676,12 @@ them — amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
 
 This section generalises the single-payload container into a **fixed array of key
 slots over a fixed array of payload regions**, the mandatory geometry of two output
-paths — **Gallery Mode (§9)** and the **disguised `.db`** binary variant (§8). It is
+paths: **Gallery Mode (§9)** and the **disguised `.db`** binary variant (§8). It is
 the substrate for the duress and non-possession product modes; this section defines
 only the geometry those modes share.
 
 **Folded into `FORMAT_VERSION = 1`, not a new version.** The geometry is intrinsic to
-these two paths — every gallery and every disguised `.db` vault carries it, so no field
+these two paths: every gallery and every disguised `.db` vault carries it, so no field
 distinguishes a plain vault from one with a hidden alternative, and there is no version
 byte to leak the feature. The **excluded** paths (single cover image §5, PDF/paper,
 QR-grid §2, branded `.ssbn` §8) keep the single-slot / single-region geometry of §5.1
@@ -701,7 +701,7 @@ slot_plaintext (48) := dek[32] || region_index[1] || reserved[15]
 - Each live slot AES-GCM-wraps an **independent per-region DEK** and the index of the
   region it unlocks. `region_index` is authenticated by the GCM tag, so a slot cannot be
   redirected to another region by editing the container. **Per-region DEKs are
-  independent** — a shared DEK would let a slot opener derive every region's content key.
+  independent**: a shared DEK would let a slot opener derive every region's content key.
 - **All `SLOT_COUNT` slots are always written.** Slots with no live DEK are filled from
   the CSPRNG (AES-GCM output is pseudorandom, so a random 76-byte block is
   indistinguishable from a live slot). Slot order is randomised by an unbiased CSPRNG
@@ -721,7 +721,7 @@ CEK_r     := HKDF-SHA256(ikm = dek_r, salt = region_contentSalt_r,
 `vault_salt` is a fresh 16-byte per-vault CSPRNG value, shared across all slots (its job
 is to defeat cross-vault precomputation; distinct passwords yield distinct KEKs
 regardless). Unlike the §5.1 key block, the slot KEK's **Argon2 parameters are the format-defined
-`DEFAULT_ARGON2` and are NOT stored** in the container — the geometry carries no cost
+`DEFAULT_ARGON2` and are NOT stored** in the container; the geometry carries no cost
 field (as with the gallery/stego keys, §5.3, §9.1).
 
 ### 10.3 Keyfile / stego as a key factor
@@ -758,28 +758,28 @@ the magic check → reported as "no factor here". The raw `.key` file stays the 
 
 - **Plain** (§10.6): the one live slot needs `password + factor`.
 - **Non-possession** (§10.8): the base KEK is `slot_kek_raw(password, factor)`, then gated on
-  the Shamir secret — so the real region needs `password + factor + a share quorum`. All three
+  the Shamir secret, so the real region needs `password + factor + a share quorum`. All three
   are independent (a cracker who obtains any two learns nothing about the third).
 - **Duress** (§10.9): the factor gates the **real slot only**; the decoy slot takes **no**
   factor. A decoy exists to be surrendered under coercion, so it MUST open on the duress
-  password alone — requiring an extra artifact to reveal the decoy would defeat its purpose.
+  password alone; requiring an extra artifact to reveal the decoy would defeat its purpose.
 
 Because restore presents whatever `.key`/cover sits beside the vault for **either** credential
 (it cannot know which region a credential opens), the decoder's `slot_kek_candidates` offers
-BOTH the password-only KEK and — when a factor is supplied — the factor-mixed KEK (both from the
+BOTH the password-only KEK and, when a factor is supplied, the factor-mixed KEK (both from the
 single Argon2id output, plus their gated variants when a secret is supplied). This keeps a
 no-factor decoy slot openable even when the factor is presented, while the real slot still
 requires it. Credential independence (§10.9) guarantees the real and decoy KEKs never both match,
 so the exactly-one-match rule (§10.4) holds. Every derivation with a null factor is byte-identical
-to the password-only KEK, so `embedded` output — and every committed vector — is unchanged.
+to the password-only KEK, so `embedded` output, and every committed vector, is unchanged.
 
 ### 10.4 Constant-work unlock
 
 Argon2id runs once per candidate KEK, never per slot. Every candidate KEK is then
 attempted against **every** slot with no early exit, so wall-clock time is a function of
-the number of candidate KEKs only — never of which slot matched or whether any did. A
+the number of candidate KEKs only, never of which slot matched or whether any did. A
 well-formed container yields exactly one match; zero (wrong credential) and more than one
-(malformed — fail closed) both surface as one uniform `WrongPasswordError`. Implementations
+(malformed, fail closed) both surface as one uniform `WrongPasswordError`. Implementations
 MUST NOT log, surface, or return which slot index or region matched.
 
 ### 10.5 Payload regions and buckets
@@ -800,7 +800,7 @@ region is chosen, then **both** regions are padded to it, so ciphertext length r
 the bucket and neither region's compression ratio is recoverable. The true length lives in
 the region's encrypted `REGION_LEN`, never in a container header. A region with no live
 payload is filled with CSPRNG bytes to the exact same length. Reed-Solomon (§7), where
-used (gallery), encodes the whole container as one stream — regions are never sharded
+used (gallery), encodes the whole container as one stream; regions are never sharded
 independently.
 
 The ladders are capped to real capacity: gallery to 64 KiB/region (the doubled blob must
@@ -838,7 +838,7 @@ indistinguishable. Chunk nonce = `noncePrefix || u32_be(chunkIndex) || finalByte
 each chunk to the container head, its `region_index`, and its `contentSalt || noncePrefix`.
 This blob is what the disguised `.db` container (§8) carries.
 
-### 10.8 Mode B — Non-possession (threshold gating)
+### 10.8 Mode B: Non-possession (threshold gating)
 
 A product mode over the geometry above: **one live slot whose KEK is gated on threshold
 material the holder does not possess, one real region, and no decoy** (the second region
@@ -856,12 +856,12 @@ slot_kek := HKDF-SHA256(ikm  = base_kek || S,
 `base_kek` is the ordinary slot KEK (§10.2, incl. any keyfile factor); `S` is a 32-byte
 CSPRNG secret. HKDF (not XOR) gives domain separation and no algebraic relation to the
 ungated KEK. At unlock the reader derives Argon2id **once** and tries `[ base_kek,
-gate(base_kek, S) ]` across all slots — so timing depends only on whether threshold
+gate(base_kek, S) ]` across all slots, so timing depends only on whether threshold
 material was supplied, never on the container.
 
 **Shamir secret sharing (GF(2^8), §10.6.1):** `S` is split `k`-of-`n` over the same field
 as Reed-Solomon (§7.1). Any `k` shares recover `S`; any `k-1` yield **zero** information
-(not a partial key), so the container cannot "notice" a sub-threshold set and degrade —
+(not a partial key), so the container cannot "notice" a sub-threshold set and degrade;
 `shamir_recover` has no notion of `k`. Share wire format (38 bytes):
 
 ```
@@ -874,52 +874,52 @@ only; it does **not** authenticate a share against any container and MUST NOT be
 test a candidate share. The writer retains neither `S` nor any share, and nothing about
 `k`, `n`, or a fingerprint enters the container.
 
-### 10.9 Mode A — Duress
+### 10.9 Mode A: Duress
 
 A product mode over the same geometry: **two live slots and two real regions**. One
 credential (real) opens one region; a second, independent credential (duress) opens the
 other, which holds a plausible decoy. Region indices are assigned by CSPRNG, so the decoy
 is as likely to be region 0 as region 1. Because each region has an **independent DEK**
 carried in its own slot (§10 governing decision), the duress credential yields **only** the
-decoy — the real region's key is never derivable from it.
+decoy; the real region's key is never derivable from it.
 
 - **Independent credentials (author-time, normative).** The writer MUST reject a duress
   password that is equal to, a case-variant of, a prefix/suffix of, the reversal of, or a
-  near-edit (small Levenshtein distance) of the real password — a cracker who recovers one
+  near-edit (small Levenshtein distance) of the real password, since a cracker who recovers one
   MUST NOT cheaply recover the other. This check runs only at authoring and its result is
   never stored or encoded (a stored relation would itself be a distinguisher, §10.2).
 - **Silence on unlock.** A duress unlock and a real unlock take the identical code path and
-  return the same shape (`filename`, `content`) with no "duress mode" indicator — anything
+  return the same shape (`filename`, `content`) with no "duress mode" indicator; anything
   else is observable over the user's shoulder.
 - **Mutual exclusivity.** A conforming UI MUST present Mode A and Mode B as a choice, not
   both at once: Mode A works only under silence ("this is all there is"), Mode B only under
   disclosure ("there is more, and here is why I can't reach it"); a decoy poisons a
   non-possession defence.
 - **Path applicability (normative).** Mode A is available on the **`.db` path only**. It is
-  **excluded from Gallery Mode** — an author request for duress on a gallery MUST be refused
+  **excluded from Gallery Mode**: an author request for duress on a gallery MUST be refused
   with no bytes written. Mode B (§10.8) is available on both `.db` and gallery. Plain (§10.6)
   is available on both.
 
 #### 10.9.1 Why Mode A is excluded from Gallery Mode (resolved)
 
 This resolves the draft's open question on gallery duress. Gallery Mode has **two
-independently-keyed layers**: an outer _winnowing_ layer (§9.1 — `posKey`/`aeadKey` from
+independently-keyed layers**: an outer _winnowing_ layer (§9.1, `posKey`/`aeadKey` from
 `Argon2id(password, GALLERY_SALT)`, which locates and authenticates fragments across photos)
 and the inner access-structure blob (§10.6, the 4-slot / 2-region geometry those fragments
 carry). Duress requires **two independent credentials**, but the winnowing key is a pure
 function of _one_ password: only that password's `posKey`/`aeadKey` can be baked into the
 carriers. A second, independent duress password derives a different keystream, reads different
-carrier positions, and fails every fragment's AEAD tag — it cannot even _find_ the fragments,
+carrier positions, and fails every fragment's AEAD tag; it cannot even _find_ the fragments,
 let alone reach a second region. (Mode B escapes this because its second factor is threshold
-_share_ material, not a second password — a single credential still winnows; see §10.8.)
+_share_ material, not a second password; a single credential still winnows; see §10.8.)
 
 The only way to let both credentials winnow the _same_ fragments is a **credential-independent
-winnowing key** — a shared secret wrapped under both passwords at a fixed, credential-
+winnowing key**: a shared secret wrapped under both passwords at a fixed, credential-
 independent carrier location. That necessarily converts gallery's presence-hiding from _"no
 StegoShard structure is locatable without the password"_ (§9.5) to _"a fixed-position wrapped-
 key header exists in these photos,"_ measurably weakening the **one property the photo carrier
-uniquely provides**. Because duress is already available on the `.db` path — which has no
-winnowing layer, so both credentials reach the shared slot array directly (§10.9) — the
+uniquely provides**. Because duress is already available on the `.db` path, which has no
+winnowing layer, so both credentials reach the shared slot array directly (§10.9), the
 resolution is to **keep gallery presence-hiding intact and host duress on `.db`**, rather than
 trade gallery's core guarantee for a mode that already has a stronger home.
 
@@ -963,35 +963,35 @@ trade gallery's core guarantee for a mode that already has a stronger home.
 
 The TypeScript core in `src/core/` is the reference encoder/decoder:
 
-| Concern                         | Module                                                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GF(2^8) arithmetic              | `gf256.ts`                                                                                                    |
-| Reed-Solomon                    | `reed-solomon.ts`, `erasure.ts`                                                                               |
-| Crypto / key block              | `crypto.ts`                                                                                                   |
-| Compression                     | `compress.ts`                                                                                                 |
-| Payload envelope                | `payload.ts`                                                                                                  |
-| Image header                    | `header.ts`                                                                                                   |
-| Vault blob & flow               | `vault.ts`                                                                                                    |
-| qr-grid codec (§2.1)            | `codec/qr-grid.ts`                                                                                            |
-| color-grid codec (§2.2)         | `codec/color-grid.ts`, `crc32.ts`; codec sniffing in `codec/index.ts`                                         |
-| Image branding                  | `brand.ts` (mark + 5x7 ASCII font, shared by the browser and the CLI)                                         |
-| Variable-len stego              | `stego.ts`                                                                                                    |
-| Gallery Mode (§9)               | `gallery.ts`                                                                                                  |
-| Access structures (§10)         | `crypto.ts` (slots + gated KEK), `buckets.ts`, `regions.ts`, `vault.ts` + `segmented.ts` (multi-region blobs) |
-| Mode B — non-possession (§10.8) | `shamir.ts` (k-of-n over `gf256.ts`), `access.ts` (writer)                                                    |
-| Mode A — duress (§10.9)         | `access.ts` (`buildDuress*`, `credentialsIndependent`)                                                        |
+| Concern                        | Module                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| GF(2^8) arithmetic             | `gf256.ts`                                                                                                    |
+| Reed-Solomon                   | `reed-solomon.ts`, `erasure.ts`                                                                               |
+| Crypto / key block             | `crypto.ts`                                                                                                   |
+| Compression                    | `compress.ts`                                                                                                 |
+| Payload envelope               | `payload.ts`                                                                                                  |
+| Image header                   | `header.ts`                                                                                                   |
+| Vault blob & flow              | `vault.ts`                                                                                                    |
+| qr-grid codec (§2.1)           | `codec/qr-grid.ts`                                                                                            |
+| color-grid codec (§2.2)        | `codec/color-grid.ts`, `crc32.ts`; codec sniffing in `codec/index.ts`                                         |
+| Image branding                 | `brand.ts` (mark + 5x7 ASCII font, shared by the browser and the CLI)                                         |
+| Variable-len stego             | `stego.ts`                                                                                                    |
+| Gallery Mode (§9)              | `gallery.ts`                                                                                                  |
+| Access structures (§10)        | `crypto.ts` (slots + gated KEK), `buckets.ts`, `regions.ts`, `vault.ts` + `segmented.ts` (multi-region blobs) |
+| Mode B, non-possession (§10.8) | `shamir.ts` (k-of-n over `gf256.ts`), `access.ts` (writer)                                                    |
+| Mode A, duress (§10.9)         | `access.ts` (`buildDuress*`, `credentialsIndependent`)                                                        |
 
 A standalone **Python reference decoder** in `python/stegoshard/` implements this
 same specification independently (GF(2^8) + Reed-Solomon, header, key block,
 Argon2id + AES-GCM, gzip, QR and color-grid decode, deniable stego + Gallery Mode §9, and the §10
-access structures — 4-slot / 2-region parse, gated + factor-mixed slot KEKs,
+access structures: 4-slot / 2-region parse, gated + factor-mixed slot KEKs,
 per-region DEKs, and the duress + non-possession modes). It restores a vault without
 the extension
 and runs in CI as a cross-implementation conformance test: the extension encodes
 and renders fixtures, the Python decoder reads them back, and the two must agree.
 See `python/README.md`.
 
-> The §10 multi-region geometry is mirrored in the Python decoder — the 4-slot /
+> The §10 multi-region geometry is mirrored in the Python decoder: the 4-slot /
 > 2-region parse (`format.py` `split_multiregion_vault_blob` / `parse_region_plaintext`,
 > `crypto.py` `try_open_slot` / `open_slot_array` / `slot_kek_candidates`, `pipeline.py`
 > `decode_multiregion_vault_blob`, `segmented.py` `decode_multiregion_segmented_blob`),

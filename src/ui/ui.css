@@ -323,7 +323,7 @@ button {
   border-color: var(--accent);
 }
 
-/* Language selector — readable in both themes. The dropdown list is painted
+/* Language selector, readable in both themes. The dropdown list is painted
    by the OS from the control's own colors, so set an explicit surface + text
    (not the faint --muted) and declare color-scheme so the native popup follows
    the app theme instead of defaulting to a white system menu. */
@@ -492,7 +492,7 @@ hr {
   }
 }
 
-/* Lead paragraph under a card heading — one calm sentence, not a wall of text. */
+/* Lead paragraph under a card heading: one calm sentence, not a wall of text. */
 .lead {
   color: var(--muted);
   margin: -2px 0 16px;
@@ -600,7 +600,7 @@ hr {
 
 /* Freeze the page behind an open capture modal (set from camera.ts). The
    native <dialog> backdrop dims the page but does not stop it scrolling,
-   especially on touch — lock both axes and touch gestures. */
+   especially on touch, so lock both axes and touch gestures. */
 .scroll-locked {
   overflow: hidden;
   touch-action: none;
@@ -675,7 +675,7 @@ hr {
    lives in .seg-hint and appears on hover or keyboard focus. Wrapping matters:
    six destinations do not fit one row in the extension popup. */
 .segmented {
-  /* Positioning context for .seg-hint — see the note there. */
+  /* Positioning context for .seg-hint; see the note there. */
   position: relative;
   display: flex;
   flex-wrap: wrap;
@@ -731,7 +731,7 @@ hr {
   color: var(--accent);
   box-shadow: var(--shadow);
 }
-/* The radios are visually hidden, so the ring has to go on the label — without
+/* The radios are visually hidden, so the ring has to go on the label. Without
    this, keyboard users get no focus indication on these pickers at all. */
 .segmented label:has(input:focus-visible) {
   outline: none;
@@ -743,7 +743,7 @@ hr {
 
    Anchored to the `.segmented` container, not to the individual option. Pinning
    it to an 84px option meant a 220px hint had to be centred and then nudged back
-   at the row edges — and the `:first-child`/`:last-child` nudges silently missed
+   at the row edges, and the `:first-child`/`:last-child` nudges silently missed
    the first option of a *wrapped* row, which is neither. That left the hint 22px
    off-screen on the left and gave the whole page 22px of horizontal scroll on the
    right. Anchored to the container it simply cannot overflow, at any width and
@@ -772,7 +772,7 @@ hr {
 }
 
 /* Hover only where hovering is real. On touch, `:hover` sticks after a tap and
-   the hint never leaves — the same complaint in a different costume. Touch gets
+   the hint never leaves, the same complaint in a different costume. Touch gets
    the long-press path in tooltips.ts, which sets `.hint-open`. */
 @media (hover: hover) and (pointer: fine) {
   .seg-item:hover .seg-hint {
@@ -1132,7 +1132,7 @@ details.advanced[open] > summary::before {
 }
 .pw-meter-bar.pw-score-0 {
   /* A typed but very weak password still has to look different from an empty
-     field — that is exactly when the warning matters most. */
+     field, which is exactly when the warning matters most. */
   width: 8%;
 }
 .pw-meter-bar.pw-score-1 {
@@ -1267,7 +1267,7 @@ details.advanced[open] > summary::before {
   display: grid;
 }
 /* The replicated copy is what sizes the grid row, so it is what has to be
-   capped — a max-height on the wrapper alone leaves the row (and the textarea
+   capped; a max-height on the wrapper alone leaves the row (and the textarea
    stretched to it) at full height and simply overflows. */
 .grow-wrap::after {
   content: attr(data-replicated-value) ' ';
@@ -1293,7 +1293,7 @@ details.advanced[open] > summary::before {
 }
 
 /* Threshold picker: n then k, each under its own label. A row of two labelled
-   selects rather than two bare number boxes with a slash between them — the
+   selects rather than two bare number boxes with a slash between them:
    old layout gave no clue which box was which, and let k exceed n. */
 .threshold-row {
   display: flex;

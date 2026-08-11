@@ -65,7 +65,7 @@ jobs:
       # because V8 re-protects pages for JIT and UPX's unpacker leaves them in a
       # state it rejects. The Windows case is the dangerous one: the release
       # would have published, checksummed, and attested an executable that
-      # crashes on first run. Compress the download, never the executable —
+      # crashes on first run. Compress the download, never the executable.
       # `deno compile` output is 215-254 MB raw, too large to serve bare, and
       # the archive is unpacked before anything runs it.
       #
@@ -103,7 +103,7 @@ jobs:
           pattern: stegoshard-*
           path: release
           merge-multiple: true
-      # Checksums and attestation cover the archives — that is what a user
+      # Checksums and attestation cover the archives; that is what a user
       # actually downloads, so that is what they can verify. Shared with the
       # dry run; see scripts/assemble-cli-release.sh.
       - name: Add licenses, SBOM, and checksums

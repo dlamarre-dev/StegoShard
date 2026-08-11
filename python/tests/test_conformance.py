@@ -27,7 +27,7 @@ def _load(name: str):
     manifest = json.loads((d / "manifest.json").read_text())
     payloads = []
     for img in sorted(d.glob("page-*.png")):
-        # decode_any picks the codec from the pixels, exactly as the apps do —
+        # decode_any picks the codec from the pixels, exactly as the apps do.
         # the fixtures carry no out-of-band hint about which one was used.
         payload = decode_any(img.read_bytes())
         assert payload is not None, f"failed to decode {img.name}"
@@ -217,7 +217,7 @@ def test_gallery_keyfile_without_key_fails():
 
 def test_gallery_ignores_foreign_photo():
     """A foreign JPEG whose carrier count is just above the slot size (below the 4x
-    margin) is skipped, not fatal — the capacity-margin guard on extraction."""
+    margin) is skipped, not fatal; the capacity-margin guard on extraction."""
     from stegoshard import decode_gallery
 
     manifest, images, expected = _gallery_photos("gallery-jpeg")
@@ -227,7 +227,7 @@ def test_gallery_ignores_foreign_photo():
 
 
 def test_gallery_wrong_password_is_rejected():
-    """A wrong password authenticates no fragment — indistinguishable from no gallery."""
+    """A wrong password authenticates no fragment; indistinguishable from no gallery."""
     from stegoshard import GalleryRestoreError, decode_gallery
 
     _manifest, images, _expected = _gallery_photos("gallery-png")
@@ -327,7 +327,7 @@ def test_binary_disguised_np_stego_composes():
     # The factor alone (no shares) leaves the gate closed.
     with pytest.raises(WrongPasswordError):
         decode_vault_binary(container, manifest["password"], key_factor=factor)
-    # The shares alone (no factor) also fail — the base KEK is missing the factor.
+    # The shares alone (no factor) also fail; the base KEK is missing the factor.
     with pytest.raises(WrongPasswordError):
         decode_vault_binary(container, manifest["password"], secret=secret)
     # Factor + a share quorum → restore.
@@ -365,7 +365,7 @@ def test_bundle_from_images_restores_every_file():
 
 
 def test_bundle_from_a_binary_container_restores_every_file():
-    """The same bundle in a single .ssbn — the flag rides in the envelope, so it
+    """The same bundle in a single .ssbn; the flag rides in the envelope, so it
     must survive whichever container carries it."""
     from stegoshard import decode_vault_binary
     from stegoshard.format import unpack_bundle
@@ -407,7 +407,7 @@ def test_duress_container_opens_both_ways():
 
 
 def test_non_possession_from_the_share_files_a_user_is_handed():
-    """Mode B (§10.6) restored from `recovery-N.txt` — the dash-grouped Crockford
+    """Mode B (§10.6) restored from `recovery-N.txt`; the dash-grouped Crockford
     base32 the app writes, not the raw 38 bytes the older fixture ships."""
     from stegoshard import decode_vault_binary
     from stegoshard.shamir import decode_share_text, shamir_recover

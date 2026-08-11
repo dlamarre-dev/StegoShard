@@ -122,7 +122,7 @@ describe('color-grid codec', () => {
 
   it('survives a sticker over part of the grid', SLOW, () => {
     // Blocks map to contiguous vertical stripes, so localized damage destroys a
-    // few blocks outright — which the erasure code absorbs — rather than lightly
+    // few blocks outright, which the erasure code absorbs, rather than lightly
     // corrupting all of them, which it could not.
     const payload = pattern(4000, 23, 9);
     const img = colorGridCodec.encode(payload, PROFILE_DISK);
@@ -184,7 +184,7 @@ describe('color-grid codec', () => {
   it('rejects a megapixel photo quickly instead of grinding on it', SLOW, () => {
     // Restore feeds every image through the detector, on the main thread. A
     // noisy photo produces a run every couple of pixels, so an unbounded
-    // candidate cluster search went quadratic here — 12 MP took over a minute.
+    // candidate cluster search went quadratic here: 12 MP took over a minute.
     const w = 2400;
     const h = 1800;
     const data = new Uint8ClampedArray(w * h * 4);

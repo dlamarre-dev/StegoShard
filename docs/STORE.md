@@ -10,7 +10,7 @@ developer accounts and uploading is manual.
 npm run package
 ```
 
-Produces one zip per target under `packages/` —
+Produces one zip per target under `packages/`:
 `stegoshard-chrome-<version>.zip`, `stegoshard-edge-<version>.zip`, and
 `stegoshard-firefox-<version>.zip` (source maps excluded). It also writes the
 identical, unzipped contents to `dist-release/<target>/` so you can load exactly
@@ -63,7 +63,7 @@ the extension requests no host access (see PRIVACY.md).
 
 - Native proofread of the `ja` and `zh_TW` locales (see LOCALIZATION.md), and of
   the repositioned strings (`extName`, `extDesc`, `destSqlite`, `popupTagline`,
-  `onboardingOvert` — incl. the "robust" → "resilient" rewording) across all eight
-  locales — the two-storage-models wording was drafted, not natively reviewed.
+  `onboardingOvert`, incl. the "robust" → "resilient" rewording) across all eight
+  locales; the two-storage-models wording was drafted, not natively reviewed.
 - Close the independent security review and the browser/physical QA checklist.
 - Generate localized store screenshots (pipeline still manual).

@@ -1,13 +1,13 @@
 /**
- * CLI paper-PDF generation — the headless counterpart to `src/ui/paper.ts`.
+ * CLI paper-PDF generation: the headless counterpart to `src/ui/paper.ts`.
  *
  * Reuses the neutral `buildPaperPdf` with a Node text engine. No fonts are
  * bundled: Latin locales (en/fr/de/es/it/pt) render with pdf-lib's built-in
  * Helvetica (WinAnsi), exactly like the browser's vector path. CJK locales
- * (ja/zh) need a real font — resolved from `--font` or the OS's system fonts and
+ * (ja/zh) need a real font, resolved from `--font` or the OS's system fonts and
  * embedded via fontkit as vector text. If no usable CJK font is found, the
  * instruction sheet falls back to English (the QR payload is unaffected). This
- * stays fully offline — nothing is ever downloaded.
+ * stays fully offline; nothing is ever downloaded.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -107,7 +107,7 @@ function resolveCjkFontBytes(fontPath: string | undefined): Uint8Array | null {
       try {
         return new Uint8Array(readFileSync(path));
       } catch {
-        // unreadable — try the next
+        // unreadable, so try the next
       }
     }
   }
@@ -121,7 +121,7 @@ async function embedUnicode(pdf: PDFDocument, bytes: Uint8Array): Promise<PDFFon
 }
 
 /** Validate embeddability up front (a throwaway doc), so the locale decision is
- *  final before the real PDF — some system fonts are .ttc collections pdf-lib
+ *  final before the real PDF; some system fonts are .ttc collections pdf-lib
  *  cannot embed. */
 async function canEmbed(bytes: Uint8Array): Promise<boolean> {
   try {

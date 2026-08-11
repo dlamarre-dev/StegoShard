@@ -19,7 +19,7 @@ Scope: `src/core/crypto.ts` (primitives + key block), `src/core/vault.ts`
 - **KEK** (key encryption key): derived from the password with **Argon2id**
   (hash-wasm, audited WASM build of the reference algorithm), 32-byte output,
   16-byte random salt. Production parameters: `t=4, m=256 MiB, p=1`
-  (`DEFAULT_ARGON2`) — calibrated for a ~1–2 s desktop unlock while remaining
+  (`DEFAULT_ARGON2`), calibrated for a ~1–2 s desktop unlock while remaining
   viable in a browser tab, and several times more costly to brute-force than the
   earlier 64 MiB × t=3 baseline.
 - **Key block:** `AES-256-GCM(KEK, rawDEK)` with a random 12-byte IV, plus the
@@ -51,7 +51,7 @@ key `CEK = HKDF-SHA256(DEK, salt = contentSalt, info = "stegoshard/vault/content
 with a random 16-byte `contentSalt` stored in the blob (SPEC §6, `deriveContentKey`
 in `crypto.ts`). So the AES-GCM random-IV collision bound (NIST SP 800-38D: keep
 invocations per key ≤ 2³² for a collision probability ≤ 2⁻³²) applies **per
-export** — one export is a single content encryption under its own CEK — instead
+export**: one export is a single content encryption under its own CEK, instead
 of accumulating across every export made under the shared DEK. Reviewers should
 note the guarantee now rests on per-export key separation, not merely on the
 low expected export count.
@@ -81,14 +81,14 @@ it failed.**
 
 - A wrong password, a tampered wrapped DEK, a tampered salt/IV, and an empty
   password all surface as the **same typed error** (`WrongPasswordError`,
-  constant message) — enforced by the "failure indistinguishability" tests.
+  constant message), enforced by the "failure indistinguishability" tests.
 - **Exhaustive corruption:** every byte of the 92-byte serialized key block is
   flipped (two masks per byte) and must fail to unlock
   (`crypto.hardening.test.ts`). The Python suite mirrors this over the wrapped
   region and over every ciphertext byte of every AES-GCM vector.
 - **Truncation ladder:** all 92 proper prefixes of the key block fail to parse.
 - **Canonical encoding:** trailing bytes after the wrapped DEK are rejected
-  (both implementations) — exactly one byte sequence parses to a given block.
+  (both implementations): exactly one byte sequence parses to a given block.
 - **Untrusted Argon2id parameters** (memory-exhaustion DoS): bounds are
   enforced _at parse time_, before any derivation (`t ∈ [1,16]`,
   `m ∈ [8 KiB, 1 GiB]`, `p ∈ [1,4]`), with a boundary matrix test (min/max
@@ -97,8 +97,8 @@ it failed.**
   mutations of a valid block; a throw is the only accepted outcome.
 - Related decoder guards outside the crypto layer: bounded gzip inflation
   (1 MiB cap on the image/PDF path, up to 1 GiB CLI / 256 MiB browser on the
-  binary path — the export size limits double as the decompression-bomb ceiling),
-  header `k`/`m`/length validation — see SPEC §3–§4 tests.
+  binary path, where the export size limits double as the decompression-bomb ceiling),
+  header `k`/`m`/length validation; see SPEC §3–§4 tests.
 
 ## 4b. Segmented binary format (STREAM AEAD)
 
@@ -109,8 +109,8 @@ is sealed with AES-256-GCM under a **STREAM** nonce discipline (Hoang–Reyhanit
 Rogaway–Vizár, as used by `age`). Points a reviewer should check
 (`src/core/segmented.ts`, `python/stegoshard/segmented.py`, `segmented.test.ts`):
 
-- **Key**: the per-export CEK is the same `HKDF-SHA256(DEK, contentSalt)` as §6 —
-  no new KDF. A fresh `contentSalt` **and** a fresh 7-byte `noncePrefix` are drawn
+- **Key**: the per-export CEK is the same `HKDF-SHA256(DEK, contentSalt)` as §6,
+  with no new KDF. A fresh `contentSalt` **and** a fresh 7-byte `noncePrefix` are drawn
   per export.
 - **Nonce uniqueness** (GCM's one hard requirement): `nonce_i = noncePrefix ‖
 u32_be(i) ‖ finalByte`. Within an export the counter makes every nonce distinct;
@@ -123,7 +123,7 @@ u32_be(i) ‖ finalByte`. Within an export the counter makes every nonce distinc
   `finalByte = 1`; an exact body-length cross-check fixes the chunk count from the
   header, and each chunk authenticates before its plaintext is retained. Tests
   cover flipped bytes, reordered chunks, dropped tails, appended bytes, and a
-  tampered `chunkSize` — each MUST be rejected.
+  tampered `chunkSize`; each MUST be rejected.
 - **No partial-plaintext exposure**: the decryptor buffers the whole plaintext and
   only hands it back after the final chunk authenticates.
 - **Isolation**: the chunked path lives in its own module and never shares the
@@ -151,11 +151,11 @@ bit-for-bit:
 Vector classes:
 
 - **Argon2id** (8 vectors): ASCII, mixed parameters (including `p=4`), NFC vs
-  NFD spellings of the same password (they MUST derive the **same** KEK — the
+  NFD spellings of the same password (they MUST derive the **same** KEK, the
   password is NFC-normalized before hashing), emoji, an embedded NUL, a 128-char
   password.
 - **AES-256-GCM** (5 vectors): empty plaintext, 1 B, one block, a non-block
-  multiple, 256 B — all asserting the `ciphertext‖tag` layout both directions.
+  multiple, 256 B), all asserting the `ciphertext‖tag` layout both directions.
 - **Full key block** (2 vectors): serialized SPEC §5.1 bytes + password →
   exact raw DEK.
 - **Full vault blob** (3 vectors): embedded/raw, embedded/compressed, and
@@ -164,7 +164,7 @@ Vector classes:
 
 Additionally, both suites check two **authoritative AES-256-GCM vectors** from
 the original GCM specification (McGrew–Viega test cases 13/14, also in NIST
-CAVP), so the platform is validated against a third party — not just the two
+CAVP), so the platform is validated against a third party, not just the two
 implementations agreeing with each other.
 
 Image-level conformance (QR rendering → Python decode) is covered separately
@@ -177,7 +177,7 @@ any produced artifact; in _any_ mode, no raw key material ever does.**
 
 `src/core/vault.isolation.test.ts` rebuilds the exact vault blob from the
 actual image payloads (data shards are verbatim slices of it) and scans every
-artifact — the blob, each image payload, and their concatenation — for every
+artifact (the blob, each image payload, and their concatenation) for every
 8-byte window of each secret (an accidental 8-byte match is a ~2⁻⁶⁴ event per
 position):
 
@@ -205,7 +205,7 @@ fixed salt)` produces a seed, which is combined with a **fingerprint of the cove
   are unknown without the password. The fingerprint is taken over exactly the bits
   embedding never touches (RGB with the LSB masked; JPEG coefficient magnitudes with
   bit 0 masked), so it is identical at embed and extract and **nothing extra is
-  stored** — yet the whitening pad and carrier layout are now unique per cover. This
+  stored**, yet the whitening pad and carrier layout are now unique per cover. This
   closes a reuse gap: without it, the same password over two same-size covers reused
   one pad and one position set (an XOR-of-plaintexts / carrier-correlation leak across
   images); now every cover is independent. Gallery Mode (§6c) deliberately does **not**
@@ -215,20 +215,20 @@ fixed salt)` produces a seed, which is combined with a **fingerprint of the cove
 - **No structure on the wire.** Fixed payload length, no magic/length/header in
   the image. Wrong-password extraction yields random bytes that fail the §5.1
   key-block magic check and is reported identically to "no key here"
-  (`extractKeyBlockStego` → `null`) — proven in `stego.test.ts` (wrong password,
+  (`extractKeyBlockStego` → `null`), proven in `stego.test.ts` (wrong password,
   untouched cover, and cross-password covers all return null).
 - **Two fixed payloads, one path.** The same fixed, self-validating machinery now
   carries either the 92-byte key block (single-region: disk / paper / branded
   `.ssbn`) or the 37-byte **SSKF key-factor envelope** (multi-region: gallery,
-  disguised `.db` — SPEC §10.3). The magic **is** whitened in this case (the factor
+  disguised `.db`, SPEC §10.3). The magic **is** whitened in this case (the factor
   is a raw secret, unlike a `.key` file which stays bare bytes), so it never appears
   in the carrier; a wrong password de-whitens to noise that fails the SSKF magic →
   `null`, the same indistinguishability as the key block. The two envelopes differ in
   length and magic, so an extractor tries block then factor and only the one embedded
-  returns non-null — no ambiguity, and the 92-byte derivation is byte-identical to
+  returns non-null, so there is no ambiguity, and the 92-byte derivation is byte-identical to
   before (proven by the unchanged `stego`/`stego-jpeg` fixtures still decoding).
 - **Argon2-gated, not a fast oracle.** Locating/de-whitening costs one Argon2id
-  derivation per guess — the same cost as unwrapping the key block — so the
+  derivation per guess, the same cost as unwrapping the key block, so the
   stego layer does not cheapen a password search.
 - **Tested properties:** exact round-trip (incl. NFC/NFD password forms), only
   LSBs touched, alpha never touched, sparse changes (≤ 736 bits), whitened
@@ -237,7 +237,7 @@ fixed salt)` produces a seed, which is combined with a **fingerprint of the cove
   (`python/stegoshard/stego.py`) extracts the key from a TS-generated stego PNG
   and restores the vault (`python/tests/test_conformance.py::test_stego_key_image_round_trip`),
   proving the derivation matches bit-for-bit. The SSKF factor path is proven the same
-  way — TS embeds the factor, Python's `extract_key_factor_from_image` recovers it and
+  way: TS embeds the factor, Python's `extract_key_factor_from_image` recovers it and
   decodes the vault (`test_gallery_stego_round_trip`, `test_binary_disguised_stego_round_trip`).
 
 **JPEG covers (§5.4).** A PNG in a phone's photo library is itself an anomaly
@@ -250,7 +250,7 @@ flip never crosses a Huffman size category, so the file size and category
 histogram are unchanged and the eligible set is invariant (bit-exact extraction);
 and every non-scan segment (EXIF, quant/Huffman tables) is copied verbatim, so
 metadata and filename can mimic the original exactly. Non-baseline covers
-(progressive/arithmetic JPEG, HEIC) are **rejected, never transcoded** — a
+(progressive/arithmetic JPEG, HEIC) are **rejected, never transcoded**, a
 re-quantization would change the weight and reintroduce the anomaly.
 
 **In-place embedding (no encoder fingerprint).** The embedder does not
@@ -258,20 +258,20 @@ re-serialize the scan; it toggles the minimal set of magnitude-LSB bits directly
 in the file's _own_ entropy stream (`applyScanToggles`, gated to the common
 `restartInterval === 0` case; restart-marker files fall back to a full re-encode).
 So the output carries the **camera's own Huffman coding** with only the changed
-coefficients' bits flipped — no foreign-encoder signature to fingerprint. Measured
+coefficients' bits flipped, with no foreign-encoder signature to fingerprint. Measured
 on a real 12 MP Pixel 4:2:0 JPEG: exactly **371 coefficients / 371 unstuffed bytes
 changed** (the ~736-bit minimum), identical length, identical pixels to 3 decimal
 places, byte-identical header. (JPEG byte-stuffing can realign downstream bytes in
-the _stuffed_ stream, so a raw byte-diff against the original is larger than 371 —
-immaterial: it exposes no encoder tell, and an adversary holding the exact
+the _stuffed_ stream, so a raw byte-diff against the original is larger than 371.
+This is immaterial: it exposes no encoder tell, and an adversary holding the exact
 original detects any change regardless.) The Python reference decoder ships an
 independent pure-Python baseline reader (`jpeg_coeff.py`) and restores a
 TS-embedded JPEG key end-to-end (`test_stego_jpeg_key_image_round_trip`).
 
 **Honest limits (stated in the module and docs):** the PNG (spatial-LSB) carrier
 survives only lossless storage. Both carriers resist the **cheap heuristics** a
-camera-roll triage uses — wrong format, wrong size, visual diff, first-order
-histogram — but neither is indistinguishable to **dedicated statistical
+camera-roll triage uses (wrong format, wrong size, visual diff, first-order
+histogram), but neither is indistinguishable to **dedicated statistical
 steganalysis** (within-category chi-square, calibration, ML detectors), which JPEG
 coefficient-LSB (JSteg-style) is in fact known to be detectable by. State-of-the-art
 undetectable schemes (J-UNIWARD + Syndrome-Trellis Codes) are out of scope: no
@@ -279,18 +279,18 @@ deterministic cross-implementation build exists, they are float-heavy and
 unauditable, and the gain is marginal at our 736-bit (very low) embedding rate.
 An adversary holding the _original_ cover can diff it against the carrier.
 Deniability is a hiding property layered on top of the password-wrapped key
-block — defense-in-depth, not the vault's confidentiality boundary (that remains
+block: defense-in-depth, not the vault's confidentiality boundary (that remains
 the §5.1 key block).
 
 ## 6b. Disguised binary container (SPEC §8)
 
 **Claim: the disguised binary variant is a structurally valid SQLite database
-with no unreferenced bytes — it survives type triage, a `sqlite3` open, AND a
-size-vs-page-count structural check — leaving only a content-level tell.**
+with no unreferenced bytes. It survives type triage, a `sqlite3` open, AND a
+size-vs-page-count structural check, leaving only a content-level tell.**
 
 The binary output (SPEC §8) wraps the vault blob (§6) in a single file. The blob
 is already an authenticated AES-256-GCM ciphertext, so neither variant changes
-the confidentiality boundary — the container is packaging. The **disguised**
+the confidentiality boundary; the container is packaging. The **disguised**
 variant (`src/core/sqlite-container.ts`, mirrored in
 `python/stegoshard/sqlite_container.py`) is a **complete SQLite 3 database** with
 4096-byte pages and a `cache(k TEXT, v BLOB)` table. The vault blob is split into
@@ -298,8 +298,8 @@ variant (`src/core/sqlite-container.ts`, mirrored in
 concatenation), plus a couple of small decoy rows, under an **interior b-tree
 root** (one row per leaf page, each with its own **overflow-page chain**). The
 header's page-count (28) matches the real page count and its change-counter (24)
-equals version-valid-for (92), and — the key improvement over the earlier
-append-after-the-DB layout — **`file size == page_count × page_size`, with no
+equals version-valid-for (92), and, the key improvement over the earlier
+append-after-the-DB layout, **`file size == page_count × page_size`, with no
 bytes past the database's logical end**. So `sqlite3 cache.db "SELECT * FROM
 cache"` opens and reads the rows, `PRAGMA integrity_check` returns `ok`, and the
 classic forensic tell (a file longer than its page count, or a high-entropy tail
@@ -310,7 +310,7 @@ high-entropy ciphertext. Splitting the vault across several ordinary-sized rows
 softens the "one giant opaque BLOB" tell, but an examiner who inspects _values_
 (not just structure) can still observe that a `cache` full of incompressible
 random bytes is unusual. This is a **content-level** observation, not a structural
-one — the file is a bona-fide database. So the bar is raised from "casual open" to
+one: the file is a bona-fide database. So the bar is raised from "casual open" to
 "content analysis of the row values"; it is still not a claim of
 indistinguishability from a genuine application database to a determined forensic
 adversary. The **branded**
@@ -331,17 +331,17 @@ photo (PNG spatial LSB or baseline-JPEG DCT, reusing the §6a carriers and the
 Three design points carry the security:
 
 1. **Per-fragment AEAD is what makes blind winnowing sound.** Each fragment is
-   its _own_ AES-256-GCM message — `nonce ‖ GCM(header ‖ shard ‖ pad)` — so on
+   its _own_ AES-256-GCM message, `nonce ‖ GCM(header ‖ shard ‖ pad)`, so on
    restore every photo can be trial-opened independently. A failed tag (decoy,
    recompressed/destroyed carrier, foreign image, or wrong password) is dropped
    silently; survivors ≥ K reconstruct. (The user's original "encrypt once, then
-   decrypt each ciphertext shard" is not realizable — an RS shard is not an
-   independent ciphertext — and this per-fragment sealing is the correct reading.)
+   decrypt each ciphertext shard" is not realizable, since an RS shard is not an
+   independent ciphertext, and this per-fragment sealing is the correct reading.)
 
 2. **A fresh random 12-byte nonce is stored in each slot, never derived from the
    shard index.** The gallery AEAD key is password-only (it must be, so decode is
    blind), so an index-derived nonce would reuse a `(key, nonce)` pair across any
-   two galleries sharing a password — catastrophic for GCM. The in-slot random
+   two galleries sharing a password, catastrophic for GCM. The in-slot random
    nonce removes that dependency entirely.
 
 3. **Key separation by HKDF.** One `Argon2id(password, GALLERY_SALT)` seed is
@@ -350,21 +350,21 @@ Three design points carry the security:
    ("StegoShard-gllry") is distinct from the §6a stego salt, so gallery carriers
    never collide with the key-block stego. The gallery Argon2 cost is the format-defined
    default and is not stored (like §6a); the WebCrypto/TS and Python
-   implementations agree bit-for-bit — proven by the `gallery-png` / `gallery-jpeg`
+   implementations agree bit-for-bit, proven by the `gallery-png` / `gallery-jpeg`
    conformance fixtures (TS encodes, Python `decode_gallery` restores).
 
 4. **Duress (Mode A) is excluded from gallery, by design (SPEC §10.9.1).** The
-   password-only winnowing key is what makes presence-hiding work — wrong
+   password-only winnowing key is what makes presence-hiding work: wrong
    password ⇒ zero survivors ⇒ indistinguishable from "no gallery here." Duress
    needs two independent credentials winnowing the same fragments, which is only
    possible with a credential-independent winnowing key; that would place a
    fixed-location wrapped-key header in the photos and make gallery presence
-   _provable_ without any password — surrendering the carrier's defining
+   _provable_ without any password, surrendering the carrier's defining
    property. Duress is therefore hosted on the `.db` path (no winnowing layer),
    and the writer refuses a gallery duress request outright (`errDuressGallery`).
 
 **Honest limit (amplified vs. §6a):** Gallery Mode modifies **every** selected
-photo, so an adversary who holds the untouched originals can diff each one — a
+photo, so an adversary who holds the untouched originals can diff each one, a
 stronger exposure than single-image stego, where only one cover is touched. As
 with all stego here, the deniability is against an adversary _without_ the
 originals; it is not a claim of indistinguishability to a forensic adversary who
@@ -379,14 +379,14 @@ has them.
    `unicodedata.normalize("NFC", …)`). Trade-off: the behavior is tied to the
    host's Unicode normalization tables; these are stable for NFC across Unicode
    versions for assigned characters, so drift is not a practical concern.
-   Normalization is _only_ NFC — it is not case-folding or whitespace trimming,
+   Normalization is _only_ NFC; it is not case-folding or whitespace trimming,
    so those variations still fail (proven in the hardening suite).
 2. **Empty passwords cannot exist.** hash-wasm rejects an empty Argon2id
    password, so no key block can ever be created with one; on the unlock path
    an empty password is normalized to the uniform `WrongPasswordError`.
 3. **No AAD / no binding between key block and content ciphertext.** A
    mix-and-match of key blocks and ciphertexts cannot produce silent wrong
-   plaintext — decryption under the wrong DEK fails the GCM tag — but it is a
+   plaintext, since decryption under the wrong DEK fails the GCM tag, but it is a
    detectable-failure property, not an authenticated-vault property. An
    attacker with write access to the images can always destroy or replace a
    vault wholesale; the format does not claim otherwise.
@@ -415,20 +415,20 @@ being introduced silently.**
 
 The scheme is **entirely symmetric**: `Argon2id` (KDF) → `AES-256-GCM` (AEAD) →
 `HKDF-SHA256` (subkey separation), with `AES-256-CTR` as a keystream PRF in the stego
-layer (§6a). There is **no asymmetric cryptography anywhere** — no RSA, no
-Diffie-Hellman, no elliptic curves (ECDH/ECDSA/Ed25519) — so **Shor's algorithm has
+layer (§6a). There is **no asymmetric cryptography anywhere**: no RSA, no
+Diffie-Hellman, no elliptic curves (ECDH/ECDSA/Ed25519), so **Shor's algorithm has
 nothing to break**. Public builds contain no network integration or asymmetric
 cryptographic protocol; release provenance signatures are outside the vault format.
 
 Against **Grover's algorithm**, the symmetric primitives keep an adequate margin:
 AES-256 retains ~128-bit effective key strength and SHA-256 ~128-bit collision
-resistance post-quantum — both above the 112-bit floor NIST accepts for long-term use.
+resistance post-quantum, both above the 112-bit floor NIST accepts for long-term use.
 No migration to PQC (ML-KEM / ML-DSA) is required, because there is no key-establishment
 or signature step to migrate.
 
 **Continuous verification.** The CI `crypto-scan` job (`.github/workflows/ci.yml`) runs
 the QRAMM scanners on every push/PR and **fails on any new HIGH/CRITICAL algorithm**
-(`.cryptoscan.yaml`, `failOn: high`) — the guard that stops a future contributor from
+(`.cryptoscan.yaml`, `failOn: high`), the guard that stops a future contributor from
 quietly adding MD5, RC4, RSA, DES, etc. A Cryptographic Bill of Materials (CBOM,
 CycloneDX) is emitted as a build artifact.
 
@@ -444,9 +444,9 @@ cryptodeps analyze .              # dependency view (capability-based, informati
 **Reading the results honestly.** These are keyword/dependency scanners, so a raw run
 reports expected noise that `.cryptoscan.yaml` documents and suppresses:
 
-- **"ECC" (flagged VULNERABLE) is a false positive** — it matches the QR _Error
+- **"ECC" (flagged VULNERABLE) is a false positive**: it matches the QR _Error
   Correction Code_ level (`ecc: 'L'|'M'|'Q'|'H'`), not elliptic-curve crypto.
-- **"PBKDF-001 / low iterations" is a false positive** — it matches the Argon2id
+- **"PBKDF-001 / low iterations" is a false positive**: it matches the Argon2id
   _time-cost_ (`t=3`, plus deliberate `0/1/16/17` boundary values in the hardening
   tests), not a weak PBKDF2 iteration count.
 - **cryptodeps flags `hash-wasm` (MD5/SHA-1) and `cryptography` (RSA/ECC)** by library
@@ -454,6 +454,6 @@ reports expected noise that `.cryptoscan.yaml` documents and suppresses:
   Argon2id (hash-wasm) and AES-256-GCM (pyca `cryptography`). npm/pypi reachability
   analysis is not available (it is Go-only in the tool), hence the over-report.
 
-The intentional design choices these tools also surface — the fixed stego/gallery
-salts (§6a, §6c) and the 4-byte truncated SHA-256 header hint (§7.4) — are covered in
+The intentional design choices these tools also surface (the fixed stego/gallery
+salts (§6a, §6c) and the 4-byte truncated SHA-256 header hint (§7.4)) are covered in
 their own sections above.

@@ -35,8 +35,8 @@ jobs:
         run: npm run ci:node
 
       # Prettier cannot parse shell, so scripts/*.sh are invisible to
-      # format:check. They carry real release logic — two of the defects found
-      # during the release-path audit were shell bugs — so lint them properly.
+      # format:check. They carry real release logic (two of the defects found
+      # during the release-path audit were shell bugs) so lint them properly.
       # shellcheck ships on the runner image.
       - name: Shell script lint (shellcheck)
         run: npm run lint:shell
@@ -125,18 +125,18 @@ jobs:
 
       # Source scan. Auto-detects .cryptoscan.yaml (failOn: high + documented false-positive
       # suppressions), so this fails only if a *new* HIGH/CRITICAL algorithm is introduced.
-      - name: cryptoscan — gate on new weak/quantum-vulnerable crypto
+      - name: cryptoscan, gate on new weak/quantum-vulnerable crypto
         run: cryptoscan scan .
 
-      # Cryptographic Bill of Materials, uploaded as a build artifact (not committed —
+      # Cryptographic Bill of Materials, uploaded as a build artifact (not committed,
       # it tracks dependency capabilities and would drift).
-      - name: cryptoscan — generate CBOM
+      - name: cryptoscan, generate CBOM
         run: cryptoscan scan . --format cbom --output crypto-bom.json
 
       # Dependency view. Capability-based for npm/pypi (reachability is Go-only), so it
       # over-reports what libraries *can* do (hash-wasm→MD5/SHA-1, cryptography→RSA) vs
       # what StegoShard actually uses (Argon2id, AES-256-GCM). Informational only.
-      - name: cryptodeps — dependency report (informational)
+      - name: cryptodeps, dependency report (informational)
         run: cryptodeps analyze . --fail-on none
 
       - name: Upload CBOM

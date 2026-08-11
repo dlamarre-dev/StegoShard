@@ -12,7 +12,7 @@
  * Zipping itself is left to the callers: this module reaches only for the
  * platform streams API, which is what lets the Python reference decoder inflate
  * a payload with its standard library. A decoder written before bit1 existed
- * ignores it and hands back the .zip — degraded, never wrong.
+ * ignores it and hands back the .zip: degraded, never wrong.
  */
 
 import { compressOpportunistic, gzipDecompress } from './compress';

@@ -194,7 +194,7 @@ describe('stego per-cover keystream (SPEC §5.3)', () => {
 
     // The set of byte indices whose LSB the embedder touched is derived from the
     // per-cover keystream. Without the per-cover nonce these would be identical
-    // (same password, same size) — a two-time-pad / correlation leak. They must differ.
+    // (same password, same size), a two-time-pad / correlation leak. They must differ.
     const changedIdx = (orig: Uint8Array, now: Uint8Array): string => {
       const idx: number[] = [];
       for (let i = 0; i < orig.length; i++) if (orig[i] !== now[i]) idx.push(i);

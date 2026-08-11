@@ -1,4 +1,4 @@
-"""Shamir secret sharing over GF(2^8) (SPEC §10.6.1) — mirrors src/core/shamir.ts.
+"""Shamir secret sharing over GF(2^8) (SPEC §10.6.1); mirrors src/core/shamir.ts.
 
 The reference decoder only needs to RECOVER the 32-byte threshold secret `S` from
 `k` shares in order to open a Mode B (non-possession) slot; `shamir_split` is
@@ -24,7 +24,7 @@ _SHARE_BODY_LEN = 1 + 1 + SECRET_LEN
 
 
 class ShareChecksumError(Exception):
-    """Raised when a share's checksum fails — a transcription error, not auth."""
+    """Raised when a share's checksum fails; a transcription error, not auth."""
 
 
 # --- Transcribable share text (Crockford base32) ------------------------------
@@ -34,7 +34,7 @@ class ShareChecksumError(Exception):
 # token surrounded by instruction prose, so a reader has to pick the token out
 # rather than decode the whole file.
 
-#: Crockford base32 — no I, L, O or U, so a handwritten share cannot be
+#: Crockford base32: no I, L, O or U, so a handwritten share cannot be
 #: mistranscribed into a different valid one.
 BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -63,7 +63,7 @@ def decode_share_text(text: str) -> bytes:
     """Read one share out of the text of a `recovery-N.txt` file.
 
     The file also holds a heading and instructions; the token is located by
-    pattern so that prose — in any of the eight shipped languages — is ignored.
+    pattern so that prose, in any of the eight shipped languages, is ignored.
     Falls back to decoding the whole text, which is what a user who pasted only
     the token would supply.
     """

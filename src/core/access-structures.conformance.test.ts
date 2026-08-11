@@ -80,7 +80,7 @@ describe('§10.10 excluded paths carry no slot array (regression tripwire)', () 
     const key = await vaultKey();
     const { container } = await exportVaultBinary('f.txt', small(), key, { variant: 'branded' });
     // Strip the "SSBN" magic+version; the segmented header's KB_LEN (u16 at offset 6)
-    // is the 92-byte embedded key block — the multi-region head has vault_salt there.
+    // is the 92-byte embedded key block; the multi-region head has vault_salt there.
     const payload = container.subarray(5);
     expect(new TextDecoder().decode(payload.subarray(0, 4))).toBe('SSCS');
     expect(readU16(payload, 6)).toBe(KEY_BLOCK_LEN);
@@ -109,7 +109,7 @@ describe('§10.10 per-path indistinguishability at a fixed bucket (§10.2)', () 
     const nonposs = (await buildNonPossessionVaultBlob('r', small(), 'pw', 2, 3, GALLERY_LADDER, P))
       .blob;
 
-    // Byte-length equality — the mode is not readable from the container size.
+    // Byte-length equality: the mode is not readable from the container size.
     expect(duress.length).toBe(plain.length);
     expect(nonposs.length).toBe(plain.length);
     // Identical section layout: vault_salt(16) · slot_array(304) · two equal regions.

@@ -79,7 +79,7 @@ describe('binary vault export/import round-trip', () => {
     const out = await importVaultBinary(container, 'pw');
     expect(out.filename).toBe('seed.txt');
     expect([...out.content]).toEqual([...content]);
-    // No managed key involved on the supported path — each region has its own DEK.
+    // No managed key involved on the supported path; each region has its own DEK.
   }, 20000);
 
   it('rejects a wrong password on a disguised (.db) vault', async () => {

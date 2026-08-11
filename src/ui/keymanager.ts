@@ -1,6 +1,6 @@
 /**
  * Wires the vault-key management UI (create / change password / export / import
- * / erase). The same markup — identical element IDs — is used both by the
+ * / erase). The same markup, with identical element IDs, is used both by the
  * standalone options page and by the settings modal inside the app page, so
  * this logic lives here once and is called from both.
  *

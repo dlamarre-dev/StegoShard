@@ -17,7 +17,7 @@ const commit = process.env.GITHUB_SHA ?? 'development';
  *  - The Pages deploy (default) is served from a fixed project path,
  *    https://<user>.github.io/StegoShard/, so `base` is that absolute path.
  *  - The offline bundle is extracted and served from whatever directory the
- *    user puts it in, so it is built with a relative base — an absolute
+ *    user puts it in, so it is built with a relative base; an absolute
  *    `/StegoShard/` would make every asset 404 anywhere but Pages.
  *
  * They must go to different output directories: `emptyOutDir` is on, so one

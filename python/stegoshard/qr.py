@@ -2,7 +2,7 @@
 
 Uses zxing-cpp, which returns the exact byte content of a byte-mode QR (unlike
 some decoders that mangle binary data). Photos of printed pages are downscaled
-first — full-resolution phone photos often fail to decode (see the extension's
+first; full-resolution phone photos often fail to decode (see the extension's
 image-io.ts for the same reasoning).
 """
 

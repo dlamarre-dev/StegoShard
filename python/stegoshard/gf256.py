@@ -1,4 +1,4 @@
-"""Arithmetic over GF(2^8) — the field used by the Reed-Solomon erasure coding.
+"""Arithmetic over GF(2^8): the field used by the Reed-Solomon erasure coding.
 
 Mirrors src/core/gf256.ts and SPEC.md §7.1:
   reducing polynomial 0x11D (x^8 + x^4 + x^3 + x^2 + 1), generator 0x02.

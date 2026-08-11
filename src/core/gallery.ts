@@ -5,12 +5,12 @@
  * Threat model & shape:
  *  - The secret is encrypted once into the standard self-contained vault blob
  *    (embedded key mode; reuses buildVaultBlob/decodeVaultBlob), then split by
- *    Reed-Solomon into K data + M parity shards — any K of K+M reconstruct it.
+ *    Reed-Solomon into K data + M parity shards; any K of K+M reconstruct it.
  *  - Each shard is packed into the standard 33-byte SSHD header, padded to a
  *    fixed slot, and **sealed as its own AES-256-GCM message** with a fresh
  *    random nonce carried in the slot. That per-fragment AEAD is what enables
  *    *blind winnowing*: on restore we trial-open every image; a failed tag means
- *    a decoy, a recompressed/destroyed carrier, or a foreign image — dropped
+ *    a decoy, a recompressed/destroyed carrier, or a foreign image, is dropped
  *    silently. Survivors ≥ K are reconstructed.
  *  - Extra "decoy" photos (≥ GALLERY_MIN_DECOYS) carry uniform random bytes of
  *    the same slot size at the same seed-derived positions, indistinguishable
@@ -23,7 +23,7 @@
  *
  * Honest limit (see docs/CRYPTO-REVIEW.md): this hides from an adversary without
  * the originals. Gallery Mode modifies *every* selected photo, so an adversary
- * holding the untouched originals can diff them — amplified vs. single-image stego.
+ * holding the untouched originals can diff them, amplified vs. single-image stego.
  */
 
 import { argon2id } from 'hash-wasm';
@@ -123,7 +123,7 @@ export interface GalleryEncodeOptions {
   keyMode?: KeyMode;
   /**
    * §10 access mode. 'plain' (default) or 'nonpossession' (Mode B: the vault is
-   * gated on threshold shares — `threshold` required, shares returned). Duress
+   * gated on threshold shares: `threshold` required, shares returned). Duress
    * (Mode A) is not available on gallery: the winnowing key is password-derived,
    * so two credentials would find different fragment sets (SPEC §10.11).
    */
@@ -138,7 +138,7 @@ export interface GalleryEncodeResult {
   m: number;
   decoys: number;
   setId: Uint8Array;
-  /** The serialized key block — travels in the images when embedded, else delivered externally. */
+  /** The serialized key block; travels in the images when embedded, else delivered externally. */
   keyBlock: Uint8Array;
   /** Mode B only: the n serialized Shamir shares to deliver to holders. */
   shares?: Uint8Array[] | undefined;
@@ -175,7 +175,7 @@ export function galleryCoversForEnvelopeLen(
   _keyMode: KeyMode = 'embedded',
 ): { k: number; m: number; needed: number } {
   // The multi-region blob always carries the 4-slot array and two bucket-padded
-  // regions, so its length is a pure function of the envelope's bucket — the same
+  // regions, so its length is a pure function of the envelope's bucket, the same
   // for every key mode (the slot array is always embedded), and ~2× the old size.
   const blobLen = multiRegionBlobLen(envelopeLen, 0, GALLERY_LADDER);
   const k = Math.max(1, Math.ceil(blobLen / GALLERY_SLOT_DATA));
@@ -229,7 +229,7 @@ export class GalleryCoverCapacityError extends Error {
 }
 
 /**
- * Thrown when no gallery can be restored — either the password is wrong or these
+ * Thrown when no gallery can be restored: either the password is wrong or these
  * photos hold no gallery. The two are deliberately indistinguishable.
  */
 export class GalleryRestoreError extends Error {
@@ -358,7 +358,7 @@ export async function galleryEncode(
   // 4-slot / 2-region geometry, always embedded in the fragments. embedded mode is
   // password-only; keyfile/stego mix an external 32-byte key factor into the slot
   // KEK, returned as keyBlock (a .key file, or hidden in a cover). The winnowing
-  // keys below stay password-derived — that outer deniability layer is unchanged.
+  // keys below stay password-derived; that outer deniability layer is unchanged.
   const mode = options.mode ?? 'plain';
   let blob: Uint8Array;
   let keyBlock: Uint8Array = new Uint8Array(0);
@@ -485,7 +485,7 @@ async function reconstructGroup(
     keyFactor: keyFactor ?? null,
     secret: secret ?? null,
     params,
-    // The decompressed content ceiling — the compressed blob is bounded
+    // The decompressed content ceiling; the compressed blob is bounded
     // separately by the gallery bucket ladder at encode time (see galleryEncode).
     maxContentBytes: MAX_FILE_BYTES,
   });
@@ -518,7 +518,7 @@ export async function galleryDecode(
     try {
       frags.push(decodeImagePayload(frag));
     } catch {
-      continue; // authenticated but malformed (should not happen) — skip
+      continue; // authenticated but malformed (should not happen), so skip
     }
   }
   posKey.fill(0);
@@ -537,7 +537,7 @@ export async function galleryDecode(
     try {
       return await reconstructGroup(members, password, options.keyBlock, params, options.secret);
     } catch {
-      // this set is incomplete or failed integrity — try the next
+      // this set is incomplete or failed integrity, so try the next
     }
   }
   throw new GalleryRestoreError();
@@ -546,7 +546,7 @@ export async function galleryDecode(
 /**
  * Post-save verification for Gallery Mode: blind-winnow the freshly produced
  * photos and confirm they restore to (filename, content). Runs the full decode
- * (one gallery Argon2 + key-block unwrap) — acceptable on this deliberately heavy,
+ * (one gallery Argon2 + key-block unwrap), acceptable on this deliberately heavy,
  * opt-in path. Throws VerificationError on any mismatch.
  */
 export async function verifyGalleryExport(

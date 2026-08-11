@@ -50,7 +50,7 @@ describe('Mode B — Non-possession (SPEC §10.6)', () => {
       TEST_PARAMS,
     );
     // Below threshold: shamirRecover yields a wrong S; the container cannot "notice"
-    // and degrade — it simply fails to open, indistinguishable from a wrong password.
+    // and degrade; it simply fails to open, indistinguishable from a wrong password.
     const wrongSecret = await shamirRecover([shares[0]!, shares[1]!]); // only 2 of 3
     await expect(
       decodeMultiRegionVaultBlob(blob, 'pw', {

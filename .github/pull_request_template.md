@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] Code, comments, and commit messages are in English (UI strings excepted — they live in `_locales/`).
+- [ ] Code, comments, and commit messages are in English (UI strings excepted; they live in `_locales/`).
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` pass locally.
 - [ ] New/changed core logic (crypto, codec, erasure coding) comes with tests.
 - [ ] No secrets, keys, tokens, or personal data added to the repo.

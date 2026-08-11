@@ -2,7 +2,7 @@
  * Renders the localized legal pages (Privacy Policy, Terms of Service). The
  * prose for every supported locale lives in the sibling JSON catalogs; this
  * module picks a locale (from `?lang=` or the browser), builds the page as real
- * DOM nodes — never innerHTML — and offers a visible language selector.
+ * DOM nodes, never innerHTML, and offers a visible language selector.
  *
  * The page URLs (privacy.html / terms.html) stay fixed, so links already
  * registered with search engines keep working; only the rendered language
@@ -63,7 +63,7 @@ export const SUPPORTED_LOCALES = LOCALES.map((l) => l.code);
 
 /**
  * Map an explicit `?lang=` override (if any) and the browser language to a
- * supported locale code. Pure — no globals — so it can be unit-tested. Any
+ * supported locale code. Pure, with no globals, so it can be unit-tested. Any
  * `zh-*` tag resolves to Traditional Chinese (the only Chinese variant we
  * ship); everything unrecognized falls back to English.
  */
@@ -143,7 +143,7 @@ export function renderLegal(docKey: DocKey, date: string): void {
     select.appendChild(opt);
   }
 
-  /** Render the document in `locale`, live — no page reload. */
+  /** Render the document in `locale`, live, with no page reload. */
   function paint(locale: string): void {
     const doc = (CATALOGS[locale] ?? CATALOGS.en!)[docKey];
     const active = LOCALES.find((l) => l.code === locale) ?? LOCALES[0]!;
@@ -168,7 +168,7 @@ export function renderLegal(docKey: DocKey, date: string): void {
   }
 
   // Switch live and keep the URL shareable, but with replaceState so toggling
-  // languages never piles up history entries — one Back press returns to the
+  // languages never piles up history entries; one Back press returns to the
   // app the visitor came from.
   select.addEventListener('change', () => {
     const params = new URLSearchParams(location.search);

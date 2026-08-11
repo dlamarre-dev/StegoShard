@@ -9,7 +9,7 @@ import { concatBytes } from './bytes';
 
 /**
  * Pump `data` through a transform stream, streaming the output so it can be
- * bounded — decompression of untrusted input must not be allowed to balloon
+ * bounded: decompression of untrusted input must not be allowed to balloon
  * memory (a gzip bomb). Throws if the output exceeds `maxBytes`.
  */
 async function pipeThrough(

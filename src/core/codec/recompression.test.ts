@@ -3,7 +3,7 @@
  * re-encode uploads as JPEG (luminance-preserving, 4:2:0 chroma). This confirms
  * that profile survives a representative jpeg-js round-trip at typical qualities.
  *
- * It also confirms that a classic LSB does NOT survive JPEG — the reason the
+ * It also confirms that a classic LSB does NOT survive JPEG, the reason the
  * (future) "invisible" stego mode is disk-only.
  */
 
@@ -89,7 +89,7 @@ describe('Cloud-profile recompression', () => {
 
   // The color grid is the risk case: chroma is the first thing JPEG throws away
   // (4:2:0 subsampling, then coarser quantization than luma). These tests are
-  // what gate the Cloud grid parameters in SPEC §2.2 — if they stop passing, the
+  // what gate the Cloud grid parameters in SPEC §2.2; if they stop passing, the
   // fix is to lower the Cloud capacity or fall back to qr-grid, never to relax
   // the assertion.
   const colorPayload = Uint8Array.from(
@@ -107,7 +107,7 @@ describe('Cloud-profile recompression', () => {
 
   it('a part-full color grid survives JPEG, filler and all', SLOW, () => {
     // Unused capacity is pseudo-random rather than zeroed, so those blocks are
-    // now as fragile as data blocks — and they carry CRCs, so a failure eats
+    // now as fragile as data blocks, and they carry CRCs, so a failure eats
     // parity budget. A quarter-full symbol is the case that exercises it.
     const quarter = Uint8Array.from(
       { length: Math.floor(colorGridCodec.capacity(PROFILE_CLOUD) / 4) },

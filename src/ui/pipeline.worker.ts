@@ -1,7 +1,7 @@
 /**
  * Pipeline worker: runs the binary (.ssbn/.db) crypto off the main thread so the
  * UI stays responsive and a progress bar can animate. Only the byte-core runs
- * here — file reading, PNG rasterization, and downloads stay on the page (they
+ * here; file reading, PNG rasterization, and downloads stay on the page (they
  * need the DOM). See src/ui/run-in-worker.ts for the caller-side wrapper.
  *
  * Messages in:  { id, op:'encryptBinary'|'decryptBinary', ... } (see RunReq).
@@ -147,7 +147,7 @@ async function runDecrypt(req: Extract<RunReq, { op: 'decryptBinary' }>): Promis
 }
 
 // Dispatch by operation via a fixed table rather than a branch, so the op is a
-// lookup key into a closed handler set — there is no request-controlled condition
+// lookup key into a closed handler set; there is no request-controlled condition
 // guarding a crypto action.
 const HANDLERS: { [K in RunReq['op']]: (req: Extract<RunReq, { op: K }>) => Promise<Reply> } = {
   encryptBinary: runEncrypt,

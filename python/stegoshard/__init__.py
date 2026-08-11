@@ -1,7 +1,7 @@
-"""StegoShard reference decoder — a standalone implementation of the StegoShard
+"""StegoShard reference decoder: a standalone implementation of the StegoShard
 format (see SPEC.md), so a vault can be restored without the browser extension.
 
-Public API (lazily imported so the pure modules — gf256, reedsolomon, format —
+Public API (lazily imported so the pure modules (gf256, reedsolomon, format)
 can be used without the crypto / QR dependencies installed):
     decode_vault(payloads, password, key_block=None) -> RestoredFile
     decode_any(data) -> bytes | None      # any image codec (SPEC §2)

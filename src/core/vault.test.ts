@@ -110,7 +110,7 @@ describe('import robustness', () => {
     const { imagePayloads } = await exportVault('a.bin', content, key);
     // Corrupt one shard byte past the header. The blob hash catches the bad
     // first-k reconstruction, and the subset retry then rebuilds from the other
-    // shards — a single corruption must not be fatal when parity is available.
+    // shards; a single corruption must not be fatal when parity is available.
     const corrupted = imagePayloads.map((p) => p.slice());
     corrupted[0]![40] = corrupted[0]![40]! ^ 0xff;
     const out = await importVault(corrupted, 'pw');

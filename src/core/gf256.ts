@@ -2,7 +2,7 @@
  * Arithmetic over the Galois field GF(2^8), the field used by the Reed-Solomon
  * erasure coding (see reed-solomon.ts) and specified in SPEC.md.
  *
- * Field parameters (frozen — the Python reference decoder must match):
+ * Field parameters (frozen; the Python reference decoder must match):
  *   - reducing polynomial: 0x11D  (x^8 + x^4 + x^3 + x^2 + 1)
  *   - generator / primitive element: 0x02
  *
@@ -31,7 +31,7 @@ const LOG = new Uint8Array(256);
   }
 })();
 
-/** Carry-less multiply with polynomial reduction — used only to seed tables. */
+/** Carry-less multiply with polynomial reduction; used only to seed tables. */
 function mulNoTable(a: number, b: number): number {
   let result = 0;
   let aa = a;

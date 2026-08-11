@@ -1,5 +1,5 @@
 /**
- * StegoShard CLI — encrypt a file and store it as resilient images, an opaque
+ * StegoShard CLI: encrypt a file and store it as resilient images, an opaque
  * binary file, or a decoy database (and back) from a terminal. Reuses the exact
  * `@core` format as the extension and web app, so vaults are interchangeable
  * across all three (and the Python decoder).
@@ -347,7 +347,7 @@ async function requireStrongOrAcknowledged(
 /**
  * True when an entropy *flag* was typed. The environment variable is deliberately
  * excluded: it is ambient (a user may export it in their shell profile), so it
- * must never turn a restore into an error — while a typed flag on a command that
+ * must never turn a restore into an error, while a typed flag on a command that
  * generates nothing is a mistake worth naming.
  */
 function entropyFlagGiven(values: Record<string, unknown>): boolean {
@@ -360,7 +360,7 @@ function entropyFlagGiven(values: Record<string, unknown>): boolean {
 
 /**
  * Optional extra entropy for this run (expert). Called only by the commands that
- * actually generate key material, and only *after* the password has been read —
+ * actually generate key material, and only *after* the password has been read.
  * two prompts cannot share a piped stdin, and the password must win it.
  */
 async function installEntropy(values: Record<string, unknown>): Promise<void> {
@@ -385,11 +385,11 @@ async function installEntropy(values: Record<string, unknown>): Promise<void> {
       text = readFileSync(path, 'utf8');
     } catch {
       // A missing or unreadable file must name itself, not surface as a raw
-      // ENOENT stack — this runs after the password prompt, deep into the run.
+      // ENOENT stack; this runs after the password prompt, deep into the run.
       fail(`--entropy-file: cannot read "${path}"`);
     }
   } else if (values['entropy-prompt']) {
-    // Without a terminal, a "hidden prompt" would swallow whatever is piped in —
+    // Without a terminal, a "hidden prompt" would swallow whatever is piped in,
     // including a password meant for the password prompt. Refuse instead.
     if (!process.stdin.isTTY) {
       fail('--entropy-prompt needs a terminal; use --entropy-file or STEGOSHARD_ENTROPY');

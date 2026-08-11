@@ -37,7 +37,7 @@ export function codecName(id: number): string {
  * Mean chroma of a sparse sample of the image, on a 0..255 scale.
  *
  * The per-image header lives *inside* the payload, so CODEC_ID cannot tell a
- * decoder which codec to use — it has to guess from the pixels. A qr-grid symbol
+ * decoder which codec to use; it has to guess from the pixels. A qr-grid symbol
  * is pure greyscale; a color-grid symbol is mostly saturated. One cheap number
  * separates them, and `decodeWithAnyCodec` still falls back either way, so a
  * wrong guess only costs a second attempt.

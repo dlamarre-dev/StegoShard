@@ -58,7 +58,7 @@ describe('CLI gallery round-trip', () => {
     expect(save.k + save.m + save.decoys).toBe(COVERS);
     expect(save.decoys).toBeGreaterThanOrEqual(2);
 
-    // Gallery photos must carry no StegoShard branding — the whole point is that
+    // Gallery photos must carry no StegoShard branding; the whole point is that
     // they pass as ordinary pictures. Every output keeps its cover's exact
     // dimensions, so no band was added.
     for (const file of save.files) {
@@ -203,7 +203,7 @@ describe('CLI gallery round-trip', () => {
     writeFileSync(secretPath, secret);
 
     // Exercises the save-time verify that previously passed an undefined key factor
-    // for a keyfile non-possession gallery — the self-check would have thrown.
+    // for a keyfile non-possession gallery; the self-check would have thrown.
     const albumDir = tmp();
     const save = await runGallerySave({
       secretFile: secretPath,

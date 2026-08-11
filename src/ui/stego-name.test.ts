@@ -4,7 +4,7 @@ import { stegoKeyName } from './image-io';
 /**
  * The stego key rides inside a photo the user already had, so reusing that
  * photo's own filename is what makes it blend in. The fallback only runs when
- * the picked file has no usable name — a browser File can carry an empty one —
+ * the picked file has no usable name (a browser File can carry an empty one)
  * and it must not announce the project either.
  */
 describe('stegoKeyName', () => {

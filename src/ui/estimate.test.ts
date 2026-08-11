@@ -1,6 +1,6 @@
 /**
  * Output-count estimates. The counts drive what the user sees before committing
- * to a save, so they have to track the codec and key mode they actually picked —
+ * to a save, so they have to track the codec and key mode they actually picked,
  * a number that never moves is worse than no number at all.
  */
 
@@ -63,7 +63,7 @@ describe('estimates', () => {
 
   it('keeps a destination available when one codec still fits', () => {
     const e = estimateFor('disk', TIPPING, TIPPING, msg, { codec: 'qr' });
-    // The destination stays open — it is the *codec* that does not fit, and
+    // The destination stays open; it is the *codec* that does not fit, and
     // moving the user's destination because they toggled a codec is worse than
     // greying out the codec they toggled to.
     expect(e.available).toBe(true);

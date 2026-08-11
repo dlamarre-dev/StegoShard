@@ -1,5 +1,5 @@
 /**
- * Shared restore orchestration — the mirror of `save-controller.ts`. Every
+ * Shared restore orchestration: the mirror of `save-controller.ts`. Every
  * surface (extension popup, web app, guided wizard) describes a restore as a
  * `RestoreRequest` and calls `runRestore`, so the standard-vs-gallery branch
  * lives in one place. Returns a localized result note via the caller's `msg`.

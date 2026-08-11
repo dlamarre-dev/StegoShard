@@ -1,8 +1,8 @@
 /**
- * Shamir secret sharing over GF(2^8) (SPEC §10.6.1) — the threshold material for
+ * Shamir secret sharing over GF(2^8) (SPEC §10.6.1), the threshold material for
  * Mode B (non-possession). A 32-byte secret `S` is split into `n` shares such that
  * any `k` reconstruct it and any `k-1` reveal **zero** information (not a partial
- * key). Built on the same field as Reed-Solomon (gf256.ts) — no new field math.
+ * key). Built on the same field as Reed-Solomon (gf256.ts), with no new field math.
  *
  * Share wire format (38 bytes):
  *   [ version 1 ][ share_index 1 ][ share_value 32 ][ checksum 4 ]
@@ -11,7 +11,7 @@
  * errors in a share; it does NOT authenticate the share against any container and
  * MUST NOT be usable to test a candidate share (§10.6.1). Below the threshold,
  * `shamirRecover` has no notion of `k` and simply interpolates the supplied shares
- * to a wrong value — the "inability, not fallback" property. The writer keeps
+ * to a wrong value, the "inability, not fallback" property. The writer keeps
  * neither `S` nor any share, and nothing about count/threshold enters a container.
  *
  * Mirrored by the Python reference decoder (python/stegoshard/shamir.py).
@@ -29,7 +29,7 @@ export const SECRET_LEN = 32;
 export const SHARE_LEN = 1 + 1 + SECRET_LEN + 4;
 const SHARE_BODY_LEN = 1 + 1 + SECRET_LEN; // the bytes the checksum covers
 
-/** Thrown when a share's checksum fails — a transcription error, not an auth failure. */
+/** Thrown when a share's checksum fails; a transcription error, not an auth failure. */
 export class ShareChecksumError extends Error {
   constructor() {
     super('share checksum mismatch (likely a transcription error)');
@@ -58,7 +58,7 @@ async function shareChecksum(body: Uint8Array): Promise<Uint8Array> {
 
 // --- Transcribable share text (Crockford base32) -------------------------------
 
-/** Crockford base32 (no I/L/O/U) — the same alphabet the passphrase generator uses. */
+/** Crockford base32 (no I/L/O/U), the same alphabet the passphrase generator uses. */
 const BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 function base32Encode(bytes: Uint8Array): string {
@@ -106,7 +106,7 @@ export function encodeShareText(share: Uint8Array): string {
  * Wording of the share file's first line.
  *
  * The deniable destinations (disguised `.db`, gallery) name nothing after the
- * project — a generically named `.txt` whose first line reads "StegoShard"
+ * project: a generically named `.txt` whose first line reads "StegoShard"
  * would give the whole set away the moment anyone opened it. The overt
  * destinations keep the branded heading, which is a useful self-identifying cue
  * when you find a share years later.

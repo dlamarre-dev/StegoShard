@@ -4,7 +4,7 @@
  *  - Entropy audit: every random value flows through crypto.getRandomValues
  *    (CSPRNG); no Math.random anywhere in the core; IVs and salts never repeat.
  *  - Negative testing: exhaustive single-byte corruption of the key block,
- *    truncation ladders, parameter boundary matrix, seeded fuzzing — nothing
+ *    truncation ladders, parameter boundary matrix, seeded fuzzing; nothing
  *    ever "succeeds wrong", crashes the process, or leaks the failure cause.
  *  - Failure indistinguishability: a wrong password and a tampered block throw
  *    the identical typed error, so an attacker learns nothing from the message.
@@ -40,7 +40,7 @@ import { toHex } from './bytes';
 // Minimal-cost valid params: many tests below run hundreds of derivations.
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
-/** Deterministic PRNG for reproducible fuzzing (NOT crypto — test-only). */
+/** Deterministic PRNG for reproducible fuzzing (NOT crypto; test-only). */
 function makePrng(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
@@ -146,7 +146,7 @@ describe('optional user entropy layer', () => {
       spy.mockClear();
       const out = randomBytes(64);
       expect(out.length).toBe(64);
-      // The CSPRNG must be consulted for the full length — the user layer is a
+      // The CSPRNG must be consulted for the full length; the user layer is a
       // second source, never a substitute.
       expect(spy.mock.calls.map((c) => (c[0] as Uint8Array).length)).toContain(64);
     } finally {
@@ -280,7 +280,7 @@ describe('exhaustive key block corruption', () => {
         const err = await unlockSerialized(mutated, password);
         expect(err, `byte ${i} flipped with ${mask} must not unlock`).toBeInstanceOf(Error);
         // If the mutation survived parsing, the failure must be the uniform
-        // wrong-password error — nothing about *what* broke may leak.
+        // wrong-password error; nothing about *what* broke may leak.
         if (err instanceof WrongPasswordError) {
           expect((err as Error).message).toBe('wrong password');
         }
@@ -456,7 +456,7 @@ describe('seeded fuzzing (reproducible)', () => {
       const len = (rnd() * 256 + rnd()) % 200;
       const buf = Uint8Array.from({ length: len }, () => rnd());
       // Random bytes can't produce the 4-byte magic + valid structure except
-      // with probability ~2^-32 per attempt — a throw is the only sane result.
+      // with probability ~2^-32 per attempt, so a throw is the only sane result.
       expect(() => parseKeyBlock(buf)).toThrow(Error);
     }
   });

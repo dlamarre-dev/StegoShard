@@ -1,10 +1,10 @@
-"""Gallery Mode decode — mirrors src/core/gallery.ts and SPEC §9.
+"""Gallery Mode decode; mirrors src/core/gallery.ts and SPEC §9.
 
 Restores a secret hidden, fragmented, across many ordinary photos. Every image
 is trial-authenticated ("winnowing"): a slot is read at password-derived carrier
 positions and AES-256-GCM-opened; failures (decoys, recompressed carriers,
-foreign images, wrong password) are dropped silently. The surviving fragments —
-each a standard `header || shard || padding` payload — are handed to the normal
+foreign images, wrong password) are dropped silently. The surviving fragments,
+each a standard `header || shard || padding` payload, are handed to the normal
 vault decode, which groups by set id, Reed-Solomon-reconstructs, and decrypts.
 """
 
@@ -102,7 +102,7 @@ def decode_gallery(
             continue
         try:
             # slot = nonce(12) || AES-GCM(header || shard || pad). A failed tag is
-            # a decoy / destroyed carrier / foreign image / wrong password — drop it.
+            # a decoy / destroyed carrier / foreign image / wrong password, so drop it.
             frag = aead.decrypt(slot[:IV_LEN], slot[IV_LEN:], None)
         except Exception:  # noqa: BLE001 - any AEAD failure means "not a fragment"
             continue

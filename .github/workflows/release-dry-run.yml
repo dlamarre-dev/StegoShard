@@ -207,8 +207,8 @@ jobs:
       # Smoke the binary *extracted from the archive*, not the loose one left
       # over from the compile: the archive is what a user downloads, so it is
       # what has to work. CI only ever runs the CLI through `deno run`, and on
-      # the first dry run this step caught the Windows binary — then still
-      # UPX-packed — aborting inside V8 on startup. Each matrix target is native
+      # the first dry run this step caught the Windows binary, then still
+      # UPX-packed, aborting inside V8 on startup. Each matrix target is native
       # to its runner, so all three are exercised.
       - name: Round-trip a file with the binary from the archive
         env:

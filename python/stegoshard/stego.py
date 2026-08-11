@@ -1,4 +1,4 @@
-"""Deniable stego key block extraction — mirrors src/core/stego.ts and SPEC §5.3.
+"""Deniable stego key block extraction; mirrors src/core/stego.ts and SPEC §5.3.
 
 Recovers the 92-byte key block hidden in the RGB least-significant bits of a
 cover image, keyed by the password. Returns None when the password is wrong or
@@ -284,7 +284,7 @@ def extract_key_factor_jpeg(
 #
 # Mirrors src/core/stego.ts extractBytesStego{Rgba,Jpeg}: same keyed carrier
 # selection as the key-block paths, but seeded by a raw 32-byte position key
-# (not a password), with no whitening and no magic — the caller authenticates
+# (not a password), with no whitening and no magic; the caller authenticates
 # each extracted slot via its AEAD tag.
 
 
@@ -297,7 +297,7 @@ def extract_bytes_rgba(
 ) -> bytes | None:
     """Read `length` bytes from an RGBA buffer at seed-derived LSBs.
 
-    Returns None when the carrier count is below `length*8*margin` — the same
+    Returns None when the carrier count is below `length*8*margin`, the same
     threshold embedding used, so a real carrier passes and a too-small image is
     skipped instead of draining the position keystream (raising).
     """

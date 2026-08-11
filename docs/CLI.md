@@ -2,7 +2,7 @@
 
 A headless **CLI** runs the exact same `@core` format as the extension and web app, so
 vaults are interchangeable across all of them (and the [Python decoder](../python/README.md)).
-It can both **create** and **restore** vaults — unlike the decode-only Python reference
+It can both **create** and **restore** vaults, unlike the decode-only Python reference
 decoder.
 
 ```bash
@@ -23,20 +23,20 @@ Key modes and paper output mirror the apps:
 # cover stays a JPEG of the same size, metadata, and filename (the key rides in
 # its DCT coefficients); a PNG cover stays a PNG. The key image is named after
 # the cover, so restore points --key at that file. If the cover photo is later
-# recompressed, only the key is lost — the resilient archive survives.
+# recompressed, only the key is lost; the resilient archive survives.
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
 npm run cli -- restore ./vault --key ./vault/cat.jpg --out ./restored
 
-# Image code: 'color' (default) is an 8-colour grid — about 3x the bytes per
+# Image code: 'color' (default) is an 8-colour grid, about 3x the bytes per
 # image, so roughly a third as many files. 'qr' is a plain QR code any phone can
 # read. Restore reads either automatically; printed pages always use QR.
 npm run cli -- save secret.txt --codec color      # the default
 npm run cli -- save secret.txt --codec qr
 npm run cli -- estimate secret.txt --codec qr    # compare the file counts
 
-# Extra entropy (optional, expert; `save` and `gallery-save` only — they are the
+# Extra entropy (optional, expert; `save` and `gallery-save` only), since they are the
 # commands that generate key material). Whatever you supply is XORed into every
-# random value the save generates, on top of the OS CSPRNG — which is always
+# random value the save generates, on top of the OS CSPRNG, which is always
 # used, so a weak string can only fail to help, never weaken the vault. It
 # affects generation only: nothing about it is stored, and restore never asks
 # for it. --entropy is discouraged (shell history, process list), and
@@ -58,7 +58,7 @@ npm run cli -- restore ./vault/cache.db --out ./restored
 
 # Gallery Mode (SPEC §9): hide a small secret fragmented across a folder of
 # ordinary photos (plus decoys), Reed-Solomon-protected. The output photos look
-# unchanged; restore is blind — any photos that authenticate are used, and any K
+# unchanged; restore is blind: any photos that authenticate are used, and any K
 # fragments rebuild the secret. Needs 5+ photos (at least 2 become decoys).
 npm run cli -- gallery-save note.txt ./photos --out ./album
 npm run cli -- gallery-restore ./album --out ./restored
@@ -67,7 +67,7 @@ npm run cli -- gallery-restore ./album --out ./restored
 # under a 2nd, independent password, while the real payload stays unreachable
 # from that credential. --duress-password-file avoids the 2nd password ever
 # touching shell history. Restore is the plain `restore` command in both
-# cases — whichever password is given opens its own region; nothing about
+# cases: whichever password is given opens its own region; nothing about
 # which one you used is ever revealed.
 npm run cli -- save wallet.dat --binary --disguise --mode duress \
   --decoy vacation-plans.pdf --duress-password-file duress-pw.txt --out ./vault
@@ -75,7 +75,7 @@ npm run cli -- restore ./vault/cache.db --out ./restored                     # r
 npm run cli -- restore ./vault/cache.db --password-file duress-pw.txt --out ./restored  # duress password → decoy
 
 # Non-possession mode (SPEC §10.8, .db and Gallery): gate the real payload on
-# Shamir k-of-n threshold shares that the writer never keeps — "I cannot
+# Shamir k-of-n threshold shares that the writer never keeps. "I cannot
 # decrypt this" is literally true below threshold. --threshold k-of-n writes n
 # share files (recovery-1.txt …); collect any k of them to restore. Both the
 # filenames and the text inside them stay neutral: these are deniable
@@ -84,7 +84,7 @@ npm run cli -- save wallet.dat --binary --disguise --mode nonpossession --thresh
 npm run cli -- restore ./vault/cache.db \
   --share ./vault/recovery-1.txt --share ./vault/recovery-2.txt --out ./restored
 
-# Non-possession also works on Gallery Mode (duress does not — a gallery's
+# Non-possession also works on Gallery Mode (duress does not, since a gallery's
 # password-derived winnowing key can't host two independent credentials).
 npm run cli -- gallery-save note.txt ./photos --mode nonpossession --threshold 2-of-3 --out ./album
 npm run cli -- gallery-restore ./album \
@@ -96,7 +96,7 @@ past 256 KiB); the binary output raises that to 1 GiB. On the binary path a live
 progress indicator prints each phase (compressing / encrypting / verifying …) to
 stderr; pass `--quiet` to suppress it.
 
-The password is taken (in order) from `--password` (which prints a warning — it is
+The password is taken (in order) from `--password` (which prints a warning, since it is
 visible in your shell history and the process list), `--password-file`, the
 `STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
@@ -105,11 +105,11 @@ visible in your shell history and the process list), `--password-file`, the
 Two ways to install, depending on whether you already have Node:
 
 - **npm (small, recommended).** `npm i -g stegoshard` (or `npx stegoshard …`) pulls the
-  minified `dist-cli/stegoshard.js` bundle plus its pure-JS/WASM deps — a few MB. Needs
+  minified `dist-cli/stegoshard.js` bundle plus its pure-JS/WASM deps, a few MB. Needs
   Node ≥ 20. `npm run build:cli` produces that self-contained, shebang-included bundle.
 - **Standalone binary (larger, zero-dependency).** From the same bundle, `deno compile`
   produces per-OS executables (see the `Release CLI binaries` workflow). These embed the
-  Deno/V8 runtime, so they are **large** even though the app code is tiny — roughly
+  Deno/V8 runtime, so they are **large** even though the app code is tiny, roughly
   215-285 MB depending on platform, compressing to roughly 65-85 MB. (Exact figures move
   with the Deno and dependency versions; the `Release dry run` workflow prints the current
   ones for every target, which is the number to trust.) They are therefore published as
@@ -117,8 +117,8 @@ Two ways to install, depending on whether you already have Node:
   `stegoshard-windows-x64.zip` for Windows. Unpack, then run the binary inside.
   `SHA256SUMS.txt` and the build-provenance attestation both cover the **archive**, since
   that is what you download. Note that the executable itself is never compressed in place:
-  UPX is not usable on `deno compile` output — it breaks the macOS
-  Gatekeeper signature, refuses the Linux binary outright, and — worst — packs the Windows
+  UPX is not usable on `deno compile` output: it breaks the macOS
+  Gatekeeper signature, refuses the Linux binary outright, and, worst of all, packs the Windows
   binary successfully but leaves it aborting inside V8 on startup, because V8 re-protects
   pages for JIT and the unpacker leaves them in a state it rejects. They resolve nothing at
   run time and have baked-in
@@ -127,4 +127,4 @@ Two ways to install, depending on whether you already have Node:
 
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
-none is found — nothing is ever downloaded.
+none is found; nothing is ever downloaded.

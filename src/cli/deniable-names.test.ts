@@ -2,8 +2,8 @@
  * The deniability property, asserted rather than assumed.
  *
  * The disguised `.db` and gallery destinations exist so a folder listing raises
- * no flags. That property is easy to erode one filename at a time — a new
- * artifact named after the project, a share heading left branded — and nothing
+ * no flags. That property is easy to erode one filename at a time: a new
+ * artifact named after the project, a share heading left branded, and nothing
  * else in the suite would notice. These tests fail the moment it slips.
  *
  * The overt destinations are checked in the opposite direction: they are
@@ -77,7 +77,7 @@ describe('deniable destinations name nothing after the project', () => {
       expect(body).toMatch(/^Recovery share \d+ of 3/);
     }
 
-    // Nothing stray in the directory either — the manifest must be the whole story.
+    // Nothing stray in the directory either; the manifest must be the whole story.
     for (const entry of readdirSync(outDir)) expect(entry).not.toMatch(/stegoshard/i);
   });
 

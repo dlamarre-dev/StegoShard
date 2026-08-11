@@ -1,14 +1,14 @@
 # Contributing to StegoShard
 
 Thanks for your interest in contributing. StegoShard is a security-sensitive project, so
-the contribution process is a little stricter than average — especially for anything
+the contribution process is a little stricter than average, especially for anything
 touching cryptography, the image codec, or erasure coding.
 
 ## Ground rules
 
 - **Be respectful.** See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - **English only** in code, comments, commit messages, and documentation. UI strings are
-  the exception — they live in `_locales/<code>/messages.json` and are localized.
+  the exception: they live in `_locales/<code>/messages.json` and are localized.
 - **Never invent cryptography.** Use WebCrypto (AES-GCM) and an audited Argon2id
   implementation. Changes to the crypto layer get extra scrutiny.
 - **No secrets in the repo.** No API keys, OAuth client secrets, tokens, or personal
@@ -44,8 +44,8 @@ Dependabot also run on the repository.
 
 The release workflows only fire on a `v*` tag, so their first real execution
 used to be the release itself. `release-dry-run.yml` runs everything they do
-except the publishing steps — the version guard, the offline web bundle, the
-compiled CLI binaries — plus a check that every pinned action SHA still
+except the publishing steps (the version guard, the offline web bundle, the
+compiled CLI binaries) plus a check that every pinned action SHA still
 resolves upstream. It runs weekly, on demand, and on PRs that touch workflows,
 scripts, or the build configs.
 
@@ -53,7 +53,7 @@ It is intentionally **not** a required status check: it is path-filtered, and a
 required check that does not run on most PRs blocks them. Run it by hand
 (`gh workflow run "Release dry run"`) before tagging a release.
 
-The only release step it cannot cover is publishing itself — the attestation and
+The only release step it cannot cover is publishing itself: the attestation and
 the GitHub release upload, which need a real tag and write permissions the dry
 run deliberately does not hold.
 
@@ -61,18 +61,18 @@ run deliberately does not hold.
 
 `scripts/*.sh` carry the release logic shared between the release workflows and
 the dry run. Prettier cannot parse shell, so they are linted with `shellcheck`
-in CI (`npm run lint:shell`). To run it locally, install shellcheck first —
+in CI (`npm run lint:shell`). To run it locally, install shellcheck first:
 `brew install shellcheck` or `apt install shellcheck`.
 
 > **Repository administrators:** enable branch protection on `main` in the GitHub
-> settings — require pull requests, at least one approving review, "up to date before
+> settings: require pull requests, at least one approving review, "up to date before
 > merge", and the CI, typecheck, lint, test, and build checks as required status checks.
 > These cannot be enforced from the codebase alone.
 
 ## Tests
 
 - Written with [Vitest](https://vitest.dev/).
-- The core — crypto, codec, erasure coding — carries a high coverage bar (targeting
+- The core (crypto, codec, erasure coding) carries a high coverage bar (targeting
   ≥ 90% as Phase 1 lands); UI glue is tested pragmatically.
 - Prefer round-trip and property tests for the pipeline (encode → decode identity,
   reconstruct with up to `m` missing shards, reject a wrong password, etc.).
@@ -95,10 +95,10 @@ compatibility review.
 
 Local builds (see `package.json` scripts):
 
-- `npm run build` (Chrome/Edge), `build:firefox`, `build:web` — extension / web app.
-- `npm run build:cli` then `npm run package:cli` — the standalone CLI (`deno compile`).
-- `npm run package` — all store builds + packaging (see [docs/STORE.md](docs/STORE.md)).
-- `npm run vectors` / `npm run fixtures` — regenerate committed crypto vectors /
+- `npm run build` (Chrome/Edge), `build:firefox`, `build:web`: extension / web app.
+- `npm run build:cli` then `npm run package:cli`: the standalone CLI (`deno compile`).
+- `npm run package`: all store builds + packaging (see [docs/STORE.md](docs/STORE.md)).
+- `npm run vectors` / `npm run fixtures`: regenerate committed crypto vectors /
   cross-implementation conformance fixtures (only when the format deliberately changes).
 
 Release flow:
@@ -114,7 +114,7 @@ Release flow:
 ## Reviewers
 
 `main` is protected and every PR needs a review. Cryptographic or on-format changes
-should get a second set of eyes with security experience — **a standing crypto
+should get a second set of eyes with security experience. **A standing crypto
 reviewer is wanted**; open an issue if you can help. Until then, such PRs must cite
 the relevant [SPEC.md](SPEC.md) / [docs/CRYPTO-REVIEW.md](docs/CRYPTO-REVIEW.md)
 section and keep the conformance + hardening tests green.

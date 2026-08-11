@@ -4,11 +4,11 @@
  * decodes the entropy-coded scan into per-block quantized coefficients, and
  * re-encodes those coefficients back into an entropy scan using the file's own
  * Huffman tables. Every non-scan segment (APPn/EXIF, DQT, DHT, SOF, DRI) is kept
- * byte-for-byte, so an embed touches only the scan — the output is the same JPEG
+ * byte-for-byte, so an embed touches only the scan, so the output is the same JPEG
  * (same metadata, ~same size) with a few coefficient LSBs changed.
  *
  * Scope: baseline sequential, 8-bit, Huffman (SOF0) only. Progressive (SOF2),
- * arithmetic coding, and files missing required tables are rejected — we never
+ * arithmetic coding, and files missing required tables are rejected; we never
  * guess, so we never mis-embed. Handles byte-stuffing, restart markers (DRI /
  * RSTn), multiple DHT/DQT segments, and chroma subsampling (per SOF sampling
  * factors). Pure integer work → deterministic across JS and the Python reader.
@@ -188,7 +188,7 @@ export function decode(bytes: Uint8Array): JpegModel {
     const segEnd = o + len;
 
     if (marker === 0xc0) {
-      // SOF0 — baseline
+      // SOF0: baseline
       if (bytes[segStart] !== 8) throw new JpegUnsupportedError('precision != 8');
       const height = u16(bytes, segStart + 1);
       const width = u16(bytes, segStart + 3);
@@ -211,7 +211,7 @@ export function decode(bytes: Uint8Array): JpegModel {
     } else if (marker === 0xc9 || marker === 0xcb) {
       throw new JpegUnsupportedError('arithmetic coding');
     } else if (marker === 0xc4) {
-      // DHT — may hold several tables
+      // DHT: may hold several tables
       let p = segStart;
       while (p < segEnd) {
         const tc = bytes[p]! >> 4; // 0 DC, 1 AC
@@ -234,7 +234,7 @@ export function decode(bytes: Uint8Array): JpegModel {
     } else if (marker === 0xdd) {
       restartInterval = u16(bytes, segStart);
     } else if (marker === 0xda) {
-      // SOS — map scan components to frame components, then decode the scan.
+      // SOS: map scan components to frame components, then decode the scan.
       if (!frame) throw new JpegUnsupportedError('SOS before SOF');
       const ns = bytes[segStart]!;
       for (let i = 0; i < ns; i++) {
@@ -347,7 +347,7 @@ function findScanEnd(bytes: Uint8Array, from: number): number {
     if (bytes[p] === 0xff) {
       const m = bytes[p + 1]!;
       if (m === 0x00 || (m >= 0xd0 && m <= 0xd7)) {
-        p += 2; // stuffed byte or restart marker — still inside the scan
+        p += 2; // stuffed byte or restart marker, still inside the scan
         continue;
       }
       return p; // real marker (EOI or next segment)
@@ -608,7 +608,7 @@ export function eligibleInPlace(model: JpegModel): {
 
 /**
  * Byte-faithful embed: return the original JPEG with **only** the given entropy
- * bits toggled — every other byte is identical, so there is no re-serialization
+ * bits toggled; every other byte is identical, so there is no re-serialization
  * fingerprint and a diff against the original shows the theoretical minimum. Bit
  * indices are logical (unstuffed) positions from `eligibleInPlace`. Toggling a
  * mantissa LSB flips the coefficient's magnitude LSB regardless of sign, and

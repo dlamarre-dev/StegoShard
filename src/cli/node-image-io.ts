@@ -1,5 +1,5 @@
 /**
- * Headless image I/O for the CLI — the Node/Deno counterpart to the browser
+ * Headless image I/O for the CLI: the Node/Deno counterpart to the browser
  * canvas adapters in `src/ui/image-io.ts`.
  *
  * Everything here is pure JS (fast-png + jpeg-js, both pako-based, no `node:zlib`
@@ -238,7 +238,7 @@ export async function extractKeyImage(
 
 /**
  * Hide the 32-byte external key factor (§10.3) in a cover photo, keeping its
- * format — the stego-delivery counterpart of a raw `.key` file on the
+ * format, the stego-delivery counterpart of a raw `.key` file on the
  * multi-region paths (gallery, disguised `.db`).
  */
 export async function embedKeyFactorImage(

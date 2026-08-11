@@ -1,5 +1,5 @@
 /**
- * Segmented binary vault format (SPEC §8) — the container for the non-image
+ * Segmented binary vault format (SPEC §8), the container for the non-image
  * ".ssbn"/".db" delivery paths.
  *
  * Instead of one opaque `AES-GCM(envelope)` (which blocks for seconds on large
@@ -20,7 +20,7 @@
  * Security properties:
  *  - Nonce = noncePrefix(7, random per export) || u32_be(chunkIndex) || finalByte.
  *    The prefix is fresh per export and the counter is unique per chunk, so
- *    (key, nonce) never repeats — the one thing GCM cannot survive.
+ *    (key, nonce) never repeats, the one thing GCM cannot survive.
  *  - AAD = the entire header prefix, binding every chunk to the version, salt,
  *    nonce prefix, chunk size, plaintext length, and key block.
  *  - Only the final chunk carries finalByte = 1; truncation at a chunk boundary
@@ -67,12 +67,12 @@ import type { KeyMode } from './types';
 import type { LiveRegion, VaultKey } from './vault';
 import { MissingKeyError } from './vault';
 
-/** "SSCS" — StegoShard Chunked Segments. Distinct from SSBN/SSKY/SSHD. */
+/** "SSCS": StegoShard Chunked Segments. Distinct from SSBN/SSKY/SSHD. */
 export const SEG_MAGIC = Uint8Array.from([0x53, 0x53, 0x43, 0x53]);
 export const SEG_VERSION = 1;
 /** Random per-export nonce prefix; 7 + 4 (counter) + 1 (final) = 12-byte GCM IV. */
 export const NONCE_PREFIX_LEN = 7;
-/** Default chunk size: 1 MiB — ~0.0015% tag overhead, ~100 updates per 100 MiB. */
+/** Default chunk size: 1 MiB, ~0.0015% tag overhead, ~100 updates per 100 MiB. */
 export const DEFAULT_CHUNK_SIZE = 1024 * 1024;
 const MIN_CHUNK_SIZE = 4096;
 const MAX_CHUNK_SIZE = 16 * 1024 * 1024;
@@ -143,7 +143,7 @@ function parseHeader(blob: Uint8Array): ParsedHeader {
   const version = blob[o]!;
   o += 1;
   if (version !== SEG_VERSION) throw new SegmentedFormatError(`unsupported version ${version}`);
-  o += 1; // flags — informational; the true source is KB_LEN
+  o += 1; // flags: informational; the true source is KB_LEN
   const kbLen = readU16(blob, o);
   o += 2;
   const headerLen = o + kbLen + TAIL_FIXED;
@@ -343,7 +343,7 @@ function buildMultiHead(
   head.set(SEG_MAGIC, o);
   o += SEG_MAGIC.length;
   head[o++] = SEG_VERSION;
-  head[o++] = 0; // FLAGS reserved — geometry is known from the path, not this byte
+  head[o++] = 0; // FLAGS reserved; geometry is known from the path, not this byte
   head.set(vaultSalt, o);
   o += VAULT_SALT_LEN;
   head.set(slotArray, o);
@@ -472,7 +472,7 @@ function parseMultiHead(blob: Uint8Array, maxContentBytes: number): ParsedMultiH
   const version = blob[o]!;
   o += 1;
   if (version !== SEG_VERSION) throw new SegmentedFormatError(`unsupported version ${version}`);
-  o += 1; // FLAGS — reserved on this path
+  o += 1; // FLAGS: reserved on this path
   const vaultSalt = blob.slice(o, o + VAULT_SALT_LEN);
   o += VAULT_SALT_LEN;
   const slotArray = blob.slice(o, o + SLOT_ARRAY_LEN);
@@ -547,7 +547,7 @@ async function decryptRegionStream(
 /**
  * Decode a multi-region segmented blob with a password: open the slot array
  * (constant-work), then decrypt ONLY the one region the credential unlocks. No
- * key-block option — the slot array is always embedded on this path.
+ * key-block option; the slot array is always embedded on this path.
  */
 export async function decodeMultiRegionSegmentedBlob(
   blob: Uint8Array,

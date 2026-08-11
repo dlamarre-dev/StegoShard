@@ -1,7 +1,7 @@
 /**
  * Gallery Mode (SPEC §9 + §10): fragmented, decoy-padded, blind-winnowed
  * round-trips plus the resilience and deniability properties the threat model
- * demands — loss/recompression tolerance, noise rejection, size invariance, an
+ * demands: loss/recompression tolerance, noise rejection, size invariance, an
  * identical Huffman size-category histogram, and high-entropy decoys.
  *
  * Under the §10 access-structure geometry every gallery vault carries the
@@ -63,7 +63,7 @@ function rgbaCover(name: string, seed: number, w = 256, h = 256): GalleryCover {
   return { kind: 'rgba', name, rgba, width: w, height: h };
 }
 
-/** Re-encode a JPEG at a different quality — simulates a cloud service recompressing. */
+/** Re-encode a JPEG at a different quality; simulates a cloud service recompressing. */
 function recompress(jpg: Uint8Array, quality = 70): Uint8Array {
   const d = jpeg.decode(jpg, { useTArray: true });
   return new Uint8Array(

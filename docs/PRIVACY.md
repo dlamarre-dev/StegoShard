@@ -41,4 +41,4 @@ reviewed extension, CLI binary, or checksum/provenance-verified offline web bund
 ## Contact
 
 Questions or concerns: open an issue for general privacy questions or use a private
-security report for sensitive matters — <https://github.com/dlamarre-dev/StegoShard>.
+security report for sensitive matters: <https://github.com/dlamarre-dev/StegoShard>.

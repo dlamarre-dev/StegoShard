@@ -46,8 +46,8 @@ export interface DestEstimate {
   count: number;
   /**
    * Image count per codec, for the destinations that offer the choice. Lets the
-   * UI label both options at once ("Colour — 12 files" / "QR — 34 files"). Always
-   * populated for those destinations, including when a codec does not fit — the
+   * UI label both options at once ("Colour: 12 files" / "QR: 34 files"). Always
+   * populated for those destinations, including when a codec does not fit; the
    * count next to the *other* codec is exactly what tells the user how to fix it.
    */
   counts?: Partial<Record<CodecChoice, number>>;
@@ -136,7 +136,7 @@ export function estimateFor(
  * The user's codec if it fits here, otherwise the first one that does.
  *
  * A codec that would exceed the image limit is disabled in the UI, so the
- * selection has to move off it — the destination stays put.
+ * selection has to move off it; the destination stays put.
  */
 export function firstCodecThatFits(
   estimate: DestEstimate | undefined,
@@ -147,7 +147,7 @@ export function firstCodecThatFits(
 }
 
 /**
- * Compressed envelope length for a file — the one expensive step. Cache it per
+ * Compressed envelope length for a file, the one expensive step. Cache it per
  * file so the counts can be recomputed for free every time the user changes
  * codec or key mode.
  */

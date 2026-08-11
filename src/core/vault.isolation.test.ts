@@ -111,7 +111,7 @@ describe('keyfile mode: the key block is formally absent from every artifact', (
   });
 
   it('scanner sanity check: embedded mode DOES contain the key block', async () => {
-    // Proves leaksAnyWindow actually detects the key block when it is present —
+    // Proves leaksAnyWindow actually detects the key block when it is present,
     // guarding the keyfile assertions above against a vacuous scanner.
     const a = await makeArtifacts('embedded');
     expect(readU16(a.blob, 0)).toBe(KEY_BLOCK_LEN);

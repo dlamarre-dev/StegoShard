@@ -56,7 +56,7 @@ describe('Mode A — Duress (SPEC §10.5)', () => {
       params: TEST_PARAMS,
       maxContentBytes: CAP,
     });
-    // The duress credential yields ONLY the decoy — the real content is never
+    // The duress credential yields ONLY the decoy; the real content is never
     // exposed by it (each region has an independent DEK, §10 governing decision 3).
     expect(dec(duress.content)).toBe(DECOY);
     expect(dec(duress.content)).not.toBe(REAL);
@@ -84,7 +84,7 @@ describe('Mode A — Duress (SPEC §10.5)', () => {
     // No mode / region / slot field leaks to the caller. `bundled` describes the
     // plaintext the writer stored (SPEC §4 FLAGS bit1), not which region opened,
     // so the invariant that matters is that both unlocks expose the *same*
-    // surface — assert that rather than a hardcoded list alone.
+    // surface; assert that rather than a hardcoded list alone.
     expect(Object.keys(real).sort()).toEqual(['bundled', 'content', 'filename']);
     expect(Object.keys(decoy).sort()).toEqual(Object.keys(real).sort());
   });

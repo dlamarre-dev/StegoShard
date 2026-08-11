@@ -134,7 +134,7 @@ def _recover_secret(share_paths: list[str] | None) -> bytes | None:
     Each file holds its share as a dash-grouped Crockford base32 token wrapped in
     instructions, so `decode_share_text` locates the token rather than decoding
     the prose around it. Below the threshold the interpolation simply yields a
-    wrong secret, which the vault then rejects as a wrong password — deliberately
+    wrong secret, which the vault then rejects as a wrong password, deliberately
     indistinguishable.
     """
     if not share_paths:
@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         print("this vault needs a separate key (use --key)", file=sys.stderr)
         return 1
     except (ValueError, struct.error) as exc:
-        # Malformed / truncated input — a clean message, not a stack trace.
+        # Malformed / truncated input: a clean message, not a stack trace.
         print(f"not a valid StegoShard vault: {exc}", file=sys.stderr)
         return 1
 

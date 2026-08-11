@@ -4,7 +4,7 @@
  * else checks that those stay in step, and the failure mode is silent: a missing
  * key renders as an empty button.
  *
- * These are structural assertions over the shipped HTML, not a DOM test — they
+ * These are structural assertions over the shipped HTML, not a DOM test; they
  * run without a browser and still catch the drift that matters.
  */
 

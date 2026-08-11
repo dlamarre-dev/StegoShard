@@ -30,7 +30,7 @@ describe('packBundle / unpackBundle', () => {
   });
 
   // The archive is decrypted from a vault, but its entry names were chosen by
-  // whoever built that vault — a traversal must not reach outside the output dir.
+  // whoever built that vault; a traversal must not reach outside the output dir.
   it('strips path traversal from entry names', () => {
     const back = unpackBundle(
       zipSync({ '../../etc/passwd': enc('nope'), 'sub/dir/ok.txt': enc('yes') }),
@@ -56,7 +56,7 @@ describe('packBundle / unpackBundle', () => {
 
 describe('bundle resource bounds', () => {
   // The .zip comes out of a decrypted vault, but its contents were chosen by
-  // whoever built that vault — the same premise that motivates the traversal
+  // whoever built that vault, the same premise that motivates the traversal
   // guard above, applied to expansion.
   it('refuses an archive that expands past the budget', () => {
     // ~2 MB of zeroes deflates to a few KB: small on the wire, large in memory.
