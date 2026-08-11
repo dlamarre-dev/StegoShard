@@ -719,7 +719,7 @@ hr {
   font-size: 0.72rem;
   /* No fade: at this size the note needs 4.5:1, and dimming the accent on the
      selected option dropped it to 4.2:1. The counts only render once a file is
-     picked, which is why the CSP/axe pass on the empty page never saw it. */
+     picked, which is why the axe pass over the empty page never saw it. */
 }
 .segmented input {
   position: absolute;

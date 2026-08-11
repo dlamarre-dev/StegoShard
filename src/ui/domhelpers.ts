@@ -98,7 +98,7 @@ export function errText(err: unknown): string {
  * The button goes *after* the zone, not inside it: the zone is a `role="button"`,
  * whose children are presentational, so a focusable control within it is a real
  * accessibility fault (axe `nested-interactive`) and its Enter/Space would race
- * the zone's own. The zone must therefore already be in a parent when this runs.
+ * the zone's own handler. The zone must therefore already have a parent here.
  */
 function addClearButton(zone: HTMLElement, input: HTMLInputElement, label?: string): void {
   if (zone.nextElementSibling?.classList.contains('dz-clear')) return;
@@ -131,9 +131,6 @@ export function wireDropzone(
     if (e.target !== input) input.click();
   });
   zone.addEventListener('keydown', (e) => {
-    // Only the zone's own Enter/Space opens the picker: the clear button inside
-    // it handles its keyboard activation itself.
-    if (e.target !== zone) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       input.click();
