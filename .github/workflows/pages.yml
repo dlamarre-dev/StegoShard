@@ -1,8 +1,13 @@
 name: Release and deploy web app
 
+# A tag publishes a full release: the site, the downloadable offline bundle, its
+# provenance attestation, and the GitHub release. A manual run deploys only the
+# site, so `main` can reach users without minting a version — the three
+# release-only steps below are skipped by `github.ref_type`.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,8 +16,10 @@ permissions:
   attestations: write
   artifact-metadata: write
 
+# One group for both triggers: there is a single Pages environment, so a manual
+# deploy must queue behind a release rather than race it.
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages-deploy
   cancel-in-progress: false
 
 jobs:
@@ -29,6 +36,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Require tag and package versions to match
+        if: github.ref_type == 'tag'
         run: bash scripts/check-release-version.sh
       - name: Audit, test, and validate notices
         run: |
@@ -50,7 +58,9 @@ jobs:
       # this before a tag exists. See scripts/package-web-bundle.sh.
       - name: Create offline bundle, SBOM, and checksums
         run: bash scripts/package-web-bundle.sh
+      # Provenance belongs to a released artifact; a manual deploy publishes none.
       - name: Attest offline web bundle
+        if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ env.WEB_ARCHIVE }}
@@ -61,6 +71,7 @@ jobs:
       - id: deploy
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
       - name: Attach web bundle to GitHub release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: |
