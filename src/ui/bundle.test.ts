@@ -53,3 +53,38 @@ describe('packBundle / unpackBundle', () => {
     expect(dec(unzipSync(zip)['a.bin']!)).toBe(dec(body));
   });
 });
+
+describe('bundle resource bounds', () => {
+  // The .zip comes out of a decrypted vault, but its contents were chosen by
+  // whoever built that vault — the same premise that motivates the traversal
+  // guard above, applied to expansion.
+  it('refuses an archive that expands past the budget', () => {
+    // ~2 MB of zeroes deflates to a few KB: small on the wire, large in memory.
+    const bomb = zipSync({ 'big.bin': new Uint8Array(2_000_000) }, { level: 9 });
+    expect(bomb.length).toBeLessThan(100_000);
+    expect(() => unpackBundle(bomb, { maxEntries: 10, maxTotalBytes: 1000 })).toThrow(
+      /expands past/,
+    );
+  });
+
+  it('refuses an archive with too many entries', () => {
+    const entries: Record<string, Uint8Array> = {};
+    for (let i = 0; i < 50; i++) entries[`f-${i}.bin`] = enc('x');
+    expect(() =>
+      unpackBundle(zipSync(entries), { maxEntries: 10, maxTotalBytes: 1 << 20 }),
+    ).toThrow(/more than 10 entries/);
+  });
+
+  it('still accepts an archive inside the budget', () => {
+    const zip = packBundle([{ name: 'a.txt', bytes: enc('small') }]);
+    expect(unpackBundle(zip, { maxEntries: 10, maxTotalBytes: 1 << 20 })).toHaveLength(1);
+  });
+
+  it('bounds the total across entries, not just each one', () => {
+    const entries: Record<string, Uint8Array> = {};
+    for (let i = 0; i < 5; i++) entries[`f-${i}.bin`] = new Uint8Array(400);
+    expect(() => unpackBundle(zipSync(entries), { maxEntries: 100, maxTotalBytes: 1000 })).toThrow(
+      /expands past/,
+    );
+  });
+});

@@ -196,22 +196,45 @@ def is_bundle(envelope: bytes) -> bool:
     return bool(envelope[0] & FLAG_BUNDLE)
 
 
-def unpack_bundle(content: bytes) -> list[tuple[str, bytes]]:
+#: Entries a bundle may hold. A saved directory can legitimately be large.
+MAX_BUNDLE_ENTRIES = 10_000
+
+
+def unpack_bundle(
+    content: bytes,
+    max_entries: int = MAX_BUNDLE_ENTRIES,
+    max_total_bytes: int = MAX_CONTENT_BYTES_BINARY,
+) -> list[tuple[str, bytes]]:
     """Split a bundle's .zip back into (name, bytes) pairs.
 
-    Each entry is reduced to a basename. The archive comes out of a decrypted
-    vault, but its entry names were chosen by whoever wrote that vault, so a
-    `../` entry must not be able to escape the output directory.
+    Two things about the archive are untrusted even though it came out of a
+    vault the caller just decrypted, because its *contents* were chosen by
+    whoever built that vault:
+
+    - Entry names are reduced to a basename, so a `../` entry cannot escape the
+      output directory.
+    - Expansion is bounded. The envelope's gzip guard bounds the .zip's own
+      size; without this, a small archive could still inflate without limit —
+      the classic nested-bomb shape.
     """
     out: list[tuple[str, bytes]] = []
+    total = 0
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
-        for info in zf.infolist():
-            if info.is_dir():
-                continue
+        infos = [i for i in zf.infolist() if not i.is_dir()]
+        if len(infos) > max_entries:
+            raise ValueError(f"bundle: more than {max_entries} entries")
+        for info in infos:
             name = PurePosixPath(info.filename.replace("\\", "/")).name
             if not name or name in (".", ".."):
                 continue
-            out.append((name, zf.read(info)))
+            # Read one byte past the remaining budget rather than trusting the
+            # declared size, which a crafted archive can understate.
+            with zf.open(info) as fh:
+                data = fh.read(max_total_bytes - total + 1)
+            total += len(data)
+            if total > max_total_bytes:
+                raise ValueError(f"bundle: expands past {max_total_bytes} bytes")
+            out.append((name, data))
     if not out:
         raise ValueError("bundle: no readable entries")
     return out
