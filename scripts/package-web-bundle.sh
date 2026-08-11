@@ -34,7 +34,9 @@ fi
 # Fail loudly on anything that is not a plain version token, rather than letting
 # it become a strange path further down.
 case "$version" in
-  '' | *[!0-9A-Za-z.+-]*)
+  # Must also *start* alphanumeric: a mistyped flag reaching this as a
+  # positional argument would otherwise become part of the archive name.
+  '' | [!0-9A-Za-z]* | *[!0-9A-Za-z.+-]*)
     echo "::error::refusing to package version '$version' — expected a plain version such as 1.2.3"
     exit 1
     ;;
