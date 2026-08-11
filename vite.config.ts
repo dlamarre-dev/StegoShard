@@ -1,6 +1,10 @@
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+// Extensionless on purpose: adding `.ts` needs `allowImportingTsExtensions`,
+// which changes module resolution project-wide. Vite warns that its future
+// native config loader will want the extension; that is a forward-compat note,
+// not a current failure, and it is left visible rather than silenced.
 import { buildManifest, type Target } from './src/manifest.config';
 
 const target = (process.env.STEGOSHARD_TARGET ?? 'chrome') as Target;
@@ -26,7 +30,7 @@ function manifestPlugin(): Plugin {
 export default defineConfig(() => {
   return {
     root: 'src',
-    publicDir: resolve(__dirname, 'public'),
+    publicDir: resolve(import.meta.dirname, 'public'),
     resolve: {
       alias: {
         '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
@@ -40,15 +44,15 @@ export default defineConfig(() => {
     build: {
       // One directory per target so the Chrome and Firefox manifests never
       // clobber each other — load dist/chrome or dist/firefox accordingly.
-      outDir: resolve(__dirname, `dist/${target}`),
+      outDir: resolve(import.meta.dirname, `dist/${target}`),
       emptyOutDir: true,
       // Extensions load files by path, not by hashed URL — stable names keep the
       // manifest references valid across builds.
       rollupOptions: {
         input: {
-          background: resolve(__dirname, 'src/background/index.ts'),
-          app: resolve(__dirname, 'src/ui/app.html'),
-          options: resolve(__dirname, 'src/ui/options.html'),
+          background: resolve(import.meta.dirname, 'src/background/index.ts'),
+          app: resolve(import.meta.dirname, 'src/ui/app.html'),
+          options: resolve(import.meta.dirname, 'src/ui/options.html'),
         },
         output: {
           entryFileNames: '[name].js',

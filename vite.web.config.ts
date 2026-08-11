@@ -29,7 +29,7 @@ const outDir = process.env.STEGOSHARD_WEB_OUTDIR ?? 'web-dist';
 export default defineConfig({
   root: 'src/web',
   base,
-  publicDir: resolve(__dirname, 'public'),
+  publicDir: resolve(import.meta.dirname, 'public'),
   resolve: {
     alias: {
       '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
@@ -42,14 +42,14 @@ export default defineConfig({
   // Bundle the pipeline Web Worker as an ES module (see vite.config.ts).
   worker: { format: 'es' },
   build: {
-    outDir: resolve(__dirname, outDir),
+    outDir: resolve(import.meta.dirname, outDir),
     emptyOutDir: true,
     target: 'es2022',
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'src/web/index.html'),
-        privacy: resolve(__dirname, 'src/web/privacy.html'),
-        terms: resolve(__dirname, 'src/web/terms.html'),
+        main: resolve(import.meta.dirname, 'src/web/index.html'),
+        privacy: resolve(import.meta.dirname, 'src/web/privacy.html'),
+        terms: resolve(import.meta.dirname, 'src/web/terms.html'),
       },
     },
   },

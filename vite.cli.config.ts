@@ -20,14 +20,14 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: resolve(__dirname, 'dist-cli'),
+    outDir: resolve(import.meta.dirname, 'dist-cli'),
     emptyOutDir: true,
     target: 'node20',
     // Minify the bundle: the npm/npx path ships this file directly, and a
     // smaller bundle also means a slightly smaller `deno compile` payload.
     minify: 'esbuild',
     lib: {
-      entry: resolve(__dirname, 'src/cli/main.ts'),
+      entry: resolve(import.meta.dirname, 'src/cli/main.ts'),
       formats: ['es'],
       fileName: () => 'stegoshard.js',
     },

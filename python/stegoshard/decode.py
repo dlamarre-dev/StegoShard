@@ -162,28 +162,44 @@ def _restore_gallery(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    return _write_restored(args.out, restored)
+    return _write_restored(args.out, restored, args.force)
 
 
-def _write_restored(out_dir: str, restored) -> int:
+def _write_one(path: str, data: bytes, force: bool) -> None:
+    """Write a restored file, refusing to clobber unless --force.
+
+    Mirrors `writeOut` in the Node CLI. It matters twice over for a bundle:
+    flattening `a/x.txt` and `b/x.txt` to a basename makes them collide, and a
+    restore should never quietly destroy something already on disk.
+    """
+    if not force and os.path.exists(path):
+        raise FileExistsError(f"refusing to overwrite existing file: {path} (use --force)")
+    with open(path, "wb") as fh:
+        fh.write(data)
+
+
+def _write_restored(out_dir: str, restored, force: bool = False) -> int:
     """Write what a restore recovered, unpacking a bundle into its files.
 
-    `unpack_bundle` reduces each entry to a basename, so nothing an archive
-    names can escape `out_dir` (SPEC §4).
+    `unpack_bundle` reduces each entry to a basename and bounds expansion, so
+    nothing an archive names or claims can escape `out_dir` or exhaust it
+    (SPEC §4).
     """
     os.makedirs(out_dir, exist_ok=True)
-    if not restored.bundled:
-        out_path = os.path.join(out_dir, os.path.basename(restored.filename) or "restored.bin")
-        with open(out_path, "wb") as fh:
-            fh.write(restored.content)
-        print(f"restored {restored.filename} -> {out_path}")
-        return 0
-    written = []
-    for name, data in unpack_bundle(restored.content):
-        path = os.path.join(out_dir, name)
-        with open(path, "wb") as fh:
-            fh.write(data)
-        written.append(path)
+    try:
+        if not restored.bundled:
+            out_path = os.path.join(out_dir, os.path.basename(restored.filename) or "restored.bin")
+            _write_one(out_path, restored.content, force)
+            print(f"restored {restored.filename} -> {out_path}")
+            return 0
+        written = []
+        for name, data in unpack_bundle(restored.content):
+            path = os.path.join(out_dir, name)
+            _write_one(path, data, force)
+            written.append(path)
+    except (FileExistsError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     print(f"restored {len(written)} files:")
     for path in written:
         print(f"  {path}")
@@ -198,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--password", help="vault password (prompted if omitted)")
     parser.add_argument("--key", help="a .key file, stego image, or binary key container")
     parser.add_argument("--out", default=".", help="output directory (default: current)")
+    parser.add_argument(
+        "--force", action="store_true", help="overwrite existing output files (default: refuse)"
+    )
     parser.add_argument(
         "--gallery",
         action="store_true",
@@ -257,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"not a valid StegoShard vault: {exc}", file=sys.stderr)
         return 1
 
-    return _write_restored(args.out, restored)
+    return _write_restored(args.out, restored, args.force)
 
 
 if __name__ == "__main__":
