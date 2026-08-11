@@ -79,6 +79,9 @@ format** is versioned separately — see [docs/VERSIONING.md](docs/VERSIONING.md
   the adjacent-card margin applied inside the two-column grid, pushing the
   restore card 20 px down.
 - The duress password field sat flush against the decoy file zone.
+- **The codec file-count note failed AA contrast** (4.2:1 against the 4.5:1 its
+  size needs) because it dimmed the accent colour. It only renders once a file is
+  picked, so the accessibility pass over the empty page never reached it.
 
 - The output estimate ignored the selected key mode, so changing it re-rendered a
   number that never moved.
