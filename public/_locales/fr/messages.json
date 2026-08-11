@@ -8,7 +8,7 @@
     "description": "Store listing description (max 132 chars)."
   },
   "popupTagline": {
-    "message": "Chiffrez un fichier en images résilientes — disque ou papier.",
+    "message": "Chiffrez un fichier en images résilientes : disque ou papier.",
     "description": "Short tagline shown in the popup."
   },
   "optionsTitle": {
@@ -28,7 +28,7 @@
     "description": "Header status pill when the vault is unlocked."
   },
   "webIntro": {
-    "message": "Une version web libre et open source — sans installation, sans compte, et rien ne quitte votre appareil. Sauvegardez un fichier en images ou restaurez-le.",
+    "message": "Une version web libre et open source : sans installation, sans compte, et rien ne quitte votre appareil. Sauvegardez un fichier en images ou restaurez-le.",
     "description": "Intro banner on the web app."
   },
   "unlockHeading": {
@@ -48,7 +48,7 @@
     "description": "Popup: lock button."
   },
   "statusUnlocked": {
-    "message": "Déverrouillé — vous pouvez sauvegarder des fichiers.",
+    "message": "Déverrouillé : vous pouvez sauvegarder des fichiers.",
     "description": "Popup: status when unlocked."
   },
   "noKeyTitle": {
@@ -108,7 +108,7 @@
     "description": "Popup: key location note printed on the instruction sheet."
   },
   "paperCleartextWarn": {
-    "message": "La feuille d'instructions n'est pas chiffrée — écrivez un indice, jamais le mot de passe.",
+    "message": "La feuille d'instructions n'est pas chiffrée : écrivez un indice, jamais le mot de passe.",
     "description": "Popup: cleartext warning for the instruction sheet fields."
   },
   "statusSavedPdf": {
@@ -133,12 +133,20 @@
     "description": "Keyfile key mode (plain language)."
   },
   "keyModeHelp": {
-    "message": "Avec un fichier clé séparé, une image qui fuit ne révèle rien à elle seule — mais vous devez aussi conserver le .key.",
+    "message": "Avec un fichier clé séparé, une image qui fuit ne révèle rien à elle seule, mais vous devez aussi conserver le .key.",
     "description": "Key-mode explanation (shown under a Why? disclosure)."
   },
   "dropTitle": {
     "message": "Déposez votre fichier ici",
     "description": "File drop zone title."
+  },
+  "dropTitleMulti": {
+    "message": "Déposez vos fichiers ici",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "Effacer",
+    "description": "Button that clears the files picked in a drop zone."
   },
   "dropPrompt": {
     "message": "ou cliquez pour choisir",
@@ -169,11 +177,11 @@
     "description": "Popup: readable band title input."
   },
   "titlePlaceholder": {
-    "message": "Nommez ce coffre — ex. « Archive Alpha ». Évitez « Clés Bitcoin ».",
+    "message": "Nommez ce coffre, ex. « Archive Alpha ». Évitez « Clés Bitcoin ».",
     "description": "Popup: pedagogical placeholder for the label title."
   },
   "bandWarning": {
-    "message": "L'étiquette n'est pas chiffrée — n'y mettez jamais de secret.",
+    "message": "L'étiquette n'est pas chiffrée ; n'y mettez jamais de secret.",
     "description": "Popup: cleartext warning for the readable band."
   },
   "labelKeyFile": {
@@ -332,7 +340,7 @@
     "description": "Options: create key button."
   },
   "passwordHint": {
-    "message": "Votre mot de passe est irrécupérable. Si vous l'oubliez, vos coffres sont perdus — pensez à exporter votre clé.",
+    "message": "Votre mot de passe est irrécupérable. Si vous l'oubliez, vos coffres sont perdus ; pensez à exporter votre clé.",
     "description": "Options: password warning."
   },
   "errPasswordMismatch": {
@@ -454,7 +462,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "La clé est cachée dans cette photo. Conservez le fichier enregistré tel quel — le ré-enregistrer, le redimensionner ou le recompresser détruit la clé. Une couverture JPEG reste un JPEG de même taille et nom ; un PNG reste un PNG. Rangez-le séparément des images.",
+    "message": "La clé est cachée dans cette photo. Conservez le fichier enregistré tel quel : le ré-enregistrer, le redimensionner ou le recompresser détruit la clé. Une couverture JPEG reste un JPEG de même taille et nom ; un PNG reste un PNG. Rangez-le séparément des images.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -474,7 +482,7 @@
     "description": "Stego: cover photo too small to hold the key block."
   },
   "statusSavedStego": {
-    "message": "$COUNT$ image(s) enregistrée(s). Votre clé est cachée dans la photo de couverture — conservez ce PNG et votre mot de passe pour restaurer.",
+    "message": "$COUNT$ image(s) enregistrée(s). Votre clé est cachée dans la photo de couverture ; conservez ce PNG et votre mot de passe pour restaurer.",
     "description": "Status after saving with the key hidden in a cover photo.",
     "placeholders": {
       "count": {
@@ -503,11 +511,11 @@
     "description": "Popup: disguised binary variant option."
   },
   "binaryVariantHelpBranded": {
-    "message": "Un seul fichier opaque portant un nom StegoShard — facile à retrouver, sans chercher à se cacher.",
+    "message": "Un seul fichier opaque portant un nom StegoShard : facile à retrouver, sans chercher à se cacher.",
     "description": "Popup: help text for the branded binary variant."
   },
   "binaryVariantHelpDisguised": {
-    "message": "Ajoute un en-tête de base SQLite pour qu'un dossier l'affiche comme une base d'application ordinaire. Une couche de plus contre un coup d'œil — pas contre un outil qui l'ouvre vraiment.",
+    "message": "Ajoute un en-tête de base SQLite pour qu'un dossier l'affiche comme une base d'application ordinaire. Une couche de plus contre un coup d'œil, pas contre un outil qui l'ouvre vraiment.",
     "description": "Popup: help text for the disguised binary variant."
   },
   "sizeWarnImages": {
@@ -541,7 +549,7 @@
     }
   },
   "statusSavedBinaryStego": {
-    "message": "Terminé. $VARIANT$ téléchargé. Votre clé est cachée dans la photo de couverture — conservez cette image et votre mot de passe.",
+    "message": "Terminé. $VARIANT$ téléchargé. Votre clé est cachée dans la photo de couverture ; conservez cette image et votre mot de passe.",
     "description": "Popup: status after saving a binary vault in stego mode.",
     "placeholders": {
       "variant": {
@@ -550,7 +558,7 @@
     }
   },
   "galleryHeading": {
-    "message": "Galerie — cacher dans des photos",
+    "message": "Galerie : cacher dans des photos",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -566,7 +574,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "Galerie — restaurer depuis des photos",
+    "message": "Galerie : restaurer depuis des photos",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -603,7 +611,7 @@
     "description": "Gallery Mode validation: no cover photos chosen."
   },
   "errGalleryTooFew": {
-    "message": "Pas assez de photos — ajoutez-en au moins $COUNT$.",
+    "message": "Pas assez de photos : ajoutez-en au moins $COUNT$.",
     "description": "Gallery Mode error: not enough photos.",
     "placeholders": {
       "count": {
@@ -777,11 +785,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "Un PDF imprimable — un QR par page, résiste à l'impression et au scan.",
+    "message": "Un PDF imprimable : un QR par page, résiste à l'impression et au scan.",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "Un seul fichier opaque au lieu d'images — idéal pour les secrets plus volumineux.",
+    "message": "Un seul fichier opaque au lieu d'images, idéal pour les secrets plus volumineux.",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -789,7 +797,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "La clé voyage à l'intérieur des images. Le plus simple — vous ne gardez qu'un mot de passe.",
+    "message": "La clé voyage à l'intérieur des images. Le plus simple : vous ne gardez qu'un mot de passe.",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -805,7 +813,7 @@
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
-    "message": "Un fichier déguisé en base de données SQLite ordinaire — l'analyse de type le lit comme un .db.",
+    "message": "Un fichier déguisé en base de données SQLite ordinaire ; l'analyse de type le lit comme un .db.",
     "description": "Wizard: disguised-SQLite destination description."
   },
   "statusGallerySavedKeyfile": {
@@ -886,7 +894,7 @@
     }
   },
   "wizGalleryCovers": {
-    "message": "Ajoutez au moins $N$ photos (JPG ou PNG — idéalement toutes du même format).",
+    "message": "Ajoutez au moins $N$ photos (JPG ou PNG, idéalement toutes du même format).",
     "description": "Wizard gallery step: how many cover photos to add.",
     "placeholders": {
       "n": {
@@ -960,7 +968,7 @@
     "message": "Pour restaurer plus tard, conserve :"
   },
   "recoveryPassword": {
-    "message": "Ton mot de passe — aucune récupération possible si tu le perds"
+    "message": "Ton mot de passe : aucune récupération possible si tu le perds"
   },
   "recoveryImages": {
     "message": "Les images enregistrées"
@@ -978,13 +986,13 @@
     "message": "La photo de couverture contenant la clé cachée"
   },
   "recoveryLossless": {
-    "message": "Conserve-les exactement telles quelles — redimensionner, recompresser ou les faire passer par un service qui ré-encode les images les détruit."
+    "message": "Conserve-les exactement telles quelles : redimensionner, recompresser ou les faire passer par un service qui ré-encode les images les détruit."
   },
   "filesCreatedHeading": {
     "message": "Fichiers créés :"
   },
   "filePurposeVault": {
-    "message": "Le coffre — contient votre fichier"
+    "message": "Le coffre : contient votre fichier"
   },
   "filePurposeArchive": {
     "message": "Toutes les images réunies dans un .zip"
@@ -993,16 +1001,16 @@
     "message": "Feuille à imprimer"
   },
   "filePurposePhotos": {
-    "message": "Photos fragments — conservez tout le lot"
+    "message": "Photos fragments : conservez tout le lot"
   },
   "filePurposeKeyfile": {
-    "message": "Clé séparée — requise avec votre mot de passe"
+    "message": "Clé séparée : requise avec votre mot de passe"
   },
   "filePurposeStegoCover": {
     "message": "Photo contenant la clé cachée"
   },
   "filePurposeShare": {
-    "message": "Part de récupération — pour un détenteur"
+    "message": "Part de récupération, pour un détenteur"
   },
   "onboardingTitle": {
     "message": "Bienvenue dans StegoShard"
@@ -1011,13 +1019,13 @@
     "message": "StegoShard chiffre ton fichier, puis l’enregistre sous la forme que tu choisis. Deux familles de sortie :"
   },
   "onboardingDeniable": {
-    "message": "Se fond dans des fichiers ordinaires — un ensemble de photos ou une base de données d’apparence réelle. À choisir quand le but est de cacher l’existence même d’un secret."
+    "message": "Se fond dans des fichiers ordinaires : un ensemble de photos ou une base de données d’apparence réelle. À choisir quand le but est de cacher l’existence même d’un secret."
   },
   "onboardingOvert": {
-    "message": "Ouvertement StegoShard — images QR, PDF imprimable ou fichier simple. À choisir pour une sauvegarde simple et résiliente."
+    "message": "Ouvertement StegoShard : images QR, PDF imprimable ou fichier simple. À choisir pour une sauvegarde simple et résiliente."
   },
   "onboardingKeep": {
-    "message": "Dans tous les cas, conserve ton mot de passe — aucune récupération possible si tu le perds."
+    "message": "Dans tous les cas, conserve ton mot de passe ; aucune récupération possible si tu le perds."
   },
   "onboardingDismiss": {
     "message": "Commencer"
@@ -1065,7 +1073,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "Produire un leurre sous contrainte peut, dans certains pays, constituer une fausse déclaration — un délit. Lisez d'abord le modèle de menace.",
+    "message": "Produire un leurre sous contrainte peut, dans certains pays, constituer une fausse déclaration, un délit. Lisez d'abord le modèle de menace.",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
@@ -1073,7 +1081,7 @@
     "description": "Link to the threat-model duress/legal section, shown under the duress warning."
   },
   "factorDuressHint": {
-    "message": "Avec un fichier-clé ou un leurre stégo, ce facteur supplémentaire protège uniquement votre vrai fichier — le leurre s'ouvre toujours avec le seul mot de passe de contrainte.",
+    "message": "Avec un fichier-clé ou un leurre stégo, ce facteur supplémentaire protège uniquement votre vrai fichier ; le leurre s'ouvre toujours avec le seul mot de passe de contrainte.",
     "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
   },
   "labelThreshold": {
@@ -1081,7 +1089,7 @@
     "description": "Label for the Shamir k-of-n threshold."
   },
   "thresholdHint": {
-    "message": "Vous ne conservez rien qui l'ouvre seul — il faut k des n fichiers de parts.",
+    "message": "Vous ne conservez rien qui l'ouvre seul ; il faut k des n fichiers de parts.",
     "description": "Hint under the threshold inputs."
   },
   "labelExtraEntropy": {
@@ -1131,7 +1139,7 @@
     "message": "Grille couleur"
   },
   "codecColorDesc": {
-    "message": "Huit couleurs par case au lieu du noir et blanc — environ trois fois plus de données, donc environ trois fois moins de fichiers. Idéal pour un stockage local."
+    "message": "Huit couleurs par case au lieu du noir et blanc : environ trois fois plus de données, donc environ trois fois moins de fichiers. Idéal pour un stockage local."
   },
   "codecQr": {
     "message": "Code QR"
@@ -1191,7 +1199,7 @@
     "message": "Un fichier .key distinct, conservé séparément du fichier coffre. Les deux sont nécessaires pour restaurer."
   },
   "keyModeHelpFile": {
-    "message": "Avec un fichier clé distinct, un fichier coffre divulgué ne révèle rien à lui seul — mais vous devez aussi conserver le .key."
+    "message": "Avec un fichier clé distinct, un fichier coffre divulgué ne révèle rien à lui seul, mais vous devez aussi conserver le .key."
   },
   "restoreModeHeading": {
     "message": "À partir de quoi restaurez-vous ?"

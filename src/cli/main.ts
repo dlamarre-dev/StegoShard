@@ -56,13 +56,13 @@ function parseThreshold(spec: string): { k: number; n: number } {
 
 /** Plain-English purpose for each produced file (the app localizes the same set). */
 const PURPOSE_TEXT: Record<FilePurpose, string> = {
-  vault: 'the vault — holds your file',
+  vault: 'the vault: holds your file',
   archive: 'all images bundled in one .zip',
   document: 'printable sheet',
-  photos: 'fragment photos — keep the whole set',
-  keyfile: 'separate key — needed with your password',
+  photos: 'fragment photos: keep the whole set',
+  keyfile: 'separate key: needed with your password',
   stegoCover: 'photo holding the hidden key',
-  share: 'recovery share — for one holder',
+  share: 'recovery share, for one holder',
 };
 
 /**
@@ -96,7 +96,7 @@ function restoredLine(res: { filename: string; outPath: string; files?: string[]
   return `Restored ${files.length} files:\n${files.map((f) => `  ${f}`).join('\n')}\n`;
 }
 
-const USAGE = `StegoShard — encrypt a file into resilient images, an opaque binary
+const USAGE = `StegoShard: encrypt a file into resilient images, an opaque binary
 file, or a decoy database, and restore it.
 
 Usage:
@@ -321,7 +321,7 @@ async function requireStrongOrAcknowledged(
   if (!meetsPasswordFloor(password)) {
     fail(
       `the ${label} is too short: ${password.length} character(s), minimum ${MIN_PASSWORD_LENGTH}. ` +
-        'This floor cannot be waived — an offline attacker holding the vault can grind it at leisure.',
+        'This floor cannot be waived; an offline attacker holding the vault can grind it at leisure.',
     );
   }
   const estimate = passwordStrength(password);

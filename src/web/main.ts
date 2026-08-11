@@ -280,6 +280,9 @@ async function refreshEstimates(): Promise<void> {
   const first = picked[0] ?? null;
   if (!first) {
     estimates = null;
+    // Drop the cached envelope too: the zone can be emptied by its clear button,
+    // and a stale envelope would keep rendering the old file's size.
+    envelope = null;
     for (const r of destRadios()) r.disabled = false;
     renderEstimate();
     return;
@@ -436,26 +439,28 @@ for (const r of document.querySelectorAll('input[name="restore-mode"]')) {
   r.addEventListener('change', reflectRestoreMode);
 }
 
-wireDropzone(fileDrop, saveFile, () => {
-  reflectFile(fileDrop, dzFile, saveFile);
+/** Every zone gets the same localized clear control (see `wireDropzone`). */
+const dropzone = (zone: HTMLElement, input: HTMLInputElement, onChange: () => void): void =>
+  wireDropzone(zone, input, onChange, msg('btnClearFiles'));
+
+dropzone(fileDrop, saveFile, () => {
+  // Several files are zipped into one bundle, so the zone counts them.
+  reflectFiles(fileDrop, dzFile, saveFile);
   show(saveResult, false);
   void refreshEstimates();
 });
-wireDropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
-wireDropzone(galleryCoversDrop, galleryCovers, () =>
+dropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
+dropzone(galleryCoversDrop, galleryCovers, () =>
   reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers),
 );
-wireDropzone(galleryCoverDrop, galleryCover, () =>
+dropzone(galleryCoverDrop, galleryCover, () =>
   reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
 );
-wireDropzone(decoyDrop, decoyFile, () => reflectFile(decoyDrop, decoyName, decoyFile));
-wireDropzone(restoreDrop, restoreFiles, () =>
-  reflectFile(restoreDrop, restoreDzFile, restoreFiles),
-);
-wireDropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
-wireDropzone(sharesDrop, restoreShares, () =>
-  reflectFiles(sharesDrop, sharesDzFile, restoreShares),
-);
+dropzone(decoyDrop, decoyFile, () => reflectFile(decoyDrop, decoyName, decoyFile));
+// The restore zone takes a whole image set, so it counts them the same way.
+dropzone(restoreDrop, restoreFiles, () => reflectFiles(restoreDrop, restoreDzFile, restoreFiles));
+dropzone(keyDrop, restoreKey, () => reflectFile(keyDrop, keyDzFile, restoreKey));
+dropzone(sharesDrop, restoreShares, () => reflectFiles(sharesDrop, sharesDzFile, restoreShares));
 
 // Subscribers notified whenever the capture count changes (e.g. the wizard).
 const cameraCountSubs: ((count: number) => void)[] = [];

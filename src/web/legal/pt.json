@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — Política de Privacidade",
-    "heading": "StegoShard — Política de Privacidade",
+    "title": "StegoShard: Política de Privacidade",
+    "heading": "StegoShard: Política de Privacidade",
     "updatedLabel": "Última atualização",
     "home": "Início",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — guarda localmente a chave protegida e as preferências."
+                ": guarda localmente a chave protegida e as preferências."
               ],
               ["As versões públicas da extensão não pedem permissões de identidade ou anfitrião."]
             ]
@@ -95,8 +95,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — Termos de Serviço",
-    "heading": "StegoShard — Termos de Serviço",
+    "title": "StegoShard: Termos de Serviço",
+    "heading": "StegoShard: Termos de Serviço",
     "updatedLabel": "Última atualização",
     "home": "Início",
     "intro": [
@@ -147,7 +147,7 @@
                 {
                   "b": "Se perder a sua palavra-passe ou a sua chave, os seus dados ficarão permanentemente irrecuperáveis"
                 },
-                " — ninguém os poderá restaurar por si."
+                "; ninguém os poderá restaurar por si."
               ],
               [
                 "Mantenha várias cópias dos artefactos de recuperação em locais independentes. Não dependa de um único meio."

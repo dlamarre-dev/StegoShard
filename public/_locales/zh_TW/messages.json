@@ -6,7 +6,7 @@
     "message": "把機密存於圖像：具錯誤更正、具韌性的備份、可否認的隱寫術，或兩者兼具。"
   },
   "popupTagline": {
-    "message": "把檔案加密成具韌性的圖像 — 磁碟或紙本。"
+    "message": "把檔案加密成具韌性的圖像：磁碟或紙本。"
   },
   "optionsTitle": {
     "message": "StegoShard 設定"
@@ -33,7 +33,7 @@
     "message": "鎖定"
   },
   "statusUnlocked": {
-    "message": "已解鎖 — 可以儲存檔案。"
+    "message": "已解鎖：可以儲存檔案。"
   },
   "noKeyTitle": {
     "message": "尚無保險庫金鑰"
@@ -78,7 +78,7 @@
     "message": "金鑰位置備註（選填）"
   },
   "paperCleartextWarn": {
-    "message": "說明頁不會加密 — 只寫提示，切勿寫下密碼。"
+    "message": "說明頁不會加密：只寫提示，切勿寫下密碼。"
   },
   "statusSavedPdf": {
     "message": "完成。已下載 $COUNT$ 頁的 PDF。請妥善保管密碼。",
@@ -98,7 +98,7 @@
     "message": "金鑰檔"
   },
   "keyModeHelp": {
-    "message": "使用獨立的金鑰檔案時，即使圖片外洩，單靠圖片也無法得知任何內容 — 但您必須同時保管 .key 檔案。"
+    "message": "使用獨立的金鑰檔案時，即使圖片外洩，單靠圖片也無法得知任何內容，但您必須同時保管 .key 檔案。"
   },
   "labelAddBand": {
     "message": "在圖像上加入可讀標籤"
@@ -107,10 +107,10 @@
     "message": "標籤標題"
   },
   "titlePlaceholder": {
-    "message": "為這個保險庫命名 — 例如「封存 Alpha」。避免「比特幣金鑰」之類。"
+    "message": "為這個保險庫命名，例如「封存 Alpha」。避免「比特幣金鑰」之類。"
   },
   "bandWarning": {
-    "message": "標籤不會加密 — 切勿在其中寫入機密。"
+    "message": "標籤不會加密，切勿在其中寫入機密。"
   },
   "labelKeyFile": {
     "message": "金鑰檔案（.key）"
@@ -241,7 +241,7 @@
     "message": "建立金鑰"
   },
   "passwordHint": {
-    "message": "密碼無法找回。若忘記，您的保險庫將遺失 — 建議匯出金鑰。"
+    "message": "密碼無法找回。若忘記，您的保險庫將遺失，建議匯出金鑰。"
   },
   "errPasswordMismatch": {
     "message": "兩次密碼不一致。"
@@ -308,6 +308,14 @@
   "dropTitle": {
     "message": "將檔案拖放到這裡"
   },
+  "dropTitleMulti": {
+    "message": "將檔案拖放到這裡",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "清除",
+    "description": "Button that clears the files picked in a drop zone."
+  },
   "dropPrompt": {
     "message": "或點擊選擇"
   },
@@ -324,7 +332,7 @@
     "message": "已還原"
   },
   "webIntro": {
-    "message": "免費的開放原始碼網頁版本 — 無需安裝、無需帳號，任何資料都不會離開您的裝置。可將檔案儲存為圖片或還原。（Google 相簿需要瀏覽器擴充功能。）"
+    "message": "免費的開放原始碼網頁版本：無需安裝、無需帳號，任何資料都不會離開您的裝置。可將檔案儲存為圖片或還原。（Google 相簿需要瀏覽器擴充功能。）"
   },
   "btnScanCamera": {
     "message": "使用相機掃描頁面",
@@ -364,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "金鑰隱藏在這張照片中。請原封不動地保留儲存的檔案——重新儲存、調整大小或重新壓縮都會破壞金鑰。JPEG 封面維持相同大小與名稱的 JPEG，PNG 維持 PNG。請與圖像分開保存。",
+    "message": "金鑰隱藏在這張照片中。請原封不動地保留儲存的檔案：重新儲存、調整大小或重新壓縮都會破壞金鑰。JPEG 封面維持相同大小與名稱的 JPEG，PNG 維持 PNG。請與圖像分開保存。",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -384,7 +392,7 @@
     "description": "Stego: cover photo too small to hold the key block."
   },
   "statusSavedStego": {
-    "message": "已儲存 $COUNT$ 張圖像。您的金鑰已隱藏在封面照片中——請保留該 PNG 與密碼以便還原。",
+    "message": "已儲存 $COUNT$ 張圖像。您的金鑰已隱藏在封面照片中，請保留該 PNG 與密碼以便還原。",
     "description": "Status after saving with the key hidden in a cover photo.",
     "placeholders": {
       "count": {
@@ -460,7 +468,7 @@
     }
   },
   "galleryHeading": {
-    "message": "相簿 — 藏在照片中",
+    "message": "相簿：藏在照片中",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -476,7 +484,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "相簿 — 從照片還原",
+    "message": "相簿：從照片還原",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -513,7 +521,7 @@
     "description": "Gallery Mode validation: no cover photos chosen."
   },
   "errGalleryTooFew": {
-    "message": "照片不足 — 請至少新增 $COUNT$ 張。",
+    "message": "照片不足：請至少新增 $COUNT$ 張。",
     "description": "Gallery Mode error: not enough photos.",
     "placeholders": {
       "count": {
@@ -687,11 +695,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "可列印的 PDF — 每頁一個 QR，能承受列印與掃描。",
+    "message": "可列印的 PDF：每頁一個 QR，能承受列印與掃描。",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "以單一不透明檔案取代圖片 — 適合較大的秘密。",
+    "message": "以單一不透明檔案取代圖片，適合較大的秘密。",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -699,7 +707,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "金鑰隨圖片一起攜帶。最簡單 — 您只需保管一組密碼。",
+    "message": "金鑰隨圖片一起攜帶。最簡單：您只需保管一組密碼。",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -715,7 +723,7 @@
     "description": "Destination: a binary vault disguised with a real SQLite header."
   },
   "destSqliteDesc": {
-    "message": "偽裝成一般 SQLite 資料庫的單一檔案 — 檔案類型判斷會將它視為 .db。",
+    "message": "偽裝成一般 SQLite 資料庫的單一檔案，檔案類型判斷會將它視為 .db。",
     "description": "Wizard: disguised-SQLite destination description."
   },
   "statusGallerySavedKeyfile": {
@@ -870,7 +878,7 @@
     "message": "日後還原時請保留："
   },
   "recoveryPassword": {
-    "message": "你的密碼——遺失將無法還原"
+    "message": "你的密碼：遺失將無法還原"
   },
   "recoveryImages": {
     "message": "已儲存的影像"
@@ -888,13 +896,13 @@
     "message": "藏有金鑰的封面相片"
   },
   "recoveryLossless": {
-    "message": "請原樣保存——縮放、重新壓縮，或透過會重新編碼影像的服務傳送都會使其損毀。"
+    "message": "請原樣保存：縮放、重新壓縮，或透過會重新編碼影像的服務傳送都會使其損毀。"
   },
   "filesCreatedHeading": {
     "message": "已建立的檔案："
   },
   "filePurposeVault": {
-    "message": "保險庫 — 存放您的檔案"
+    "message": "保險庫：存放您的檔案"
   },
   "filePurposeArchive": {
     "message": "所有影像打包成一個 .zip"
@@ -903,16 +911,16 @@
     "message": "可列印的頁面"
   },
   "filePurposePhotos": {
-    "message": "碎片照片 — 請保留整組"
+    "message": "碎片照片：請保留整組"
   },
   "filePurposeKeyfile": {
-    "message": "獨立金鑰 — 需與密碼一起使用"
+    "message": "獨立金鑰：需與密碼一起使用"
   },
   "filePurposeStegoCover": {
     "message": "藏有金鑰的照片"
   },
   "filePurposeShare": {
-    "message": "復原分片 — 供一位持有者保管"
+    "message": "復原分片，供一位持有者保管"
   },
   "onboardingTitle": {
     "message": "歡迎使用 StegoShard"
@@ -921,13 +929,13 @@
     "message": "StegoShard 會加密你的檔案，並以你選擇的形式儲存。輸出分為兩類："
   },
   "onboardingDeniable": {
-    "message": "偽裝成一般檔案——一組相片，或看似真實的資料庫。當目標是隱藏「機密存在」本身時選用。"
+    "message": "偽裝成一般檔案：一組相片，或看似真實的資料庫。當目標是隱藏「機密存在」本身時選用。"
   },
   "onboardingOvert": {
-    "message": "明確為 StegoShard——QR 影像、可列印 PDF 或純檔案。想要簡單、具韌性的備份時選用。"
+    "message": "明確為 StegoShard：QR 影像、可列印 PDF 或純檔案。想要簡單、具韌性的備份時選用。"
   },
   "onboardingKeep": {
-    "message": "無論如何，請保管好你的密碼——遺失將無法還原。"
+    "message": "無論如何，請保管好你的密碼，遺失將無法還原。"
   },
   "onboardingDismiss": {
     "message": "開始"
@@ -975,7 +983,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "在脅迫下提供誘餌，在某些地區可能構成虛偽陳述——一種犯罪。請先閱讀威脅模型。",
+    "message": "在脅迫下提供誘餌，在某些地區可能構成虛偽陳述，一種犯罪。請先閱讀威脅模型。",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
@@ -983,7 +991,7 @@
     "description": "Link to the threat-model duress/legal section, shown under the duress warning."
   },
   "factorDuressHint": {
-    "message": "使用金鑰檔案或隱寫封面時，此額外因素僅保護您的真實檔案——誘餌仍可僅憑脅迫密碼開啟。",
+    "message": "使用金鑰檔案或隱寫封面時，此額外因素僅保護您的真實檔案，誘餌仍可僅憑脅迫密碼開啟。",
     "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
   },
   "labelThreshold": {
@@ -991,7 +999,7 @@
     "description": "Label for the Shamir k-of-n threshold."
   },
   "thresholdHint": {
-    "message": "您不會保留任何能單獨開啟它的東西——n 個分片檔案中的任意 k 個即可。",
+    "message": "您不會保留任何能單獨開啟它的東西，n 個分片檔案中的任意 k 個即可。",
     "description": "Hint under the threshold inputs."
   },
   "labelExtraEntropy": {

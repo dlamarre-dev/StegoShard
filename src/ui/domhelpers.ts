@@ -85,19 +85,52 @@ export function errText(err: unknown): string {
 }
 
 /**
+ * Add a "clear" control to a dropzone, so a wrong pick can be undone without
+ * reloading the page.
+ *
+ * It only shows once the zone holds a selection (`.has-file`, set by the reflect
+ * helpers), and clearing fires the same `change` event a real pick would, so
+ * every caller's `onChange` runs and the label resets itself. `label` comes from
+ * the caller because this module is shared by two surfaces with two different
+ * i18n backends; the `data-i18n` attribute lets a later locale switch
+ * re-translate the button through `localizeDom`.
+ */
+function addClearButton(zone: HTMLElement, input: HTMLInputElement, label?: string): void {
+  if (zone.querySelector('.dz-clear')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'dz-clear';
+  btn.dataset.i18n = 'btnClearFiles';
+  btn.textContent = label ?? 'Clear';
+  btn.addEventListener('click', (e) => {
+    // The zone itself opens the file picker on click; this must not.
+    e.stopPropagation();
+    input.value = '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  zone.append(btn);
+}
+
+/**
  * Turn a container into a drag-and-drop zone bound to a file `<input>`: clicking
  * the zone opens the picker, dropping files assigns them to the input and fires
  * a `change` event so existing handlers run. `onChange` is called after either.
+ * Every zone also gets a clear button (see `addClearButton`).
  */
 export function wireDropzone(
   zone: HTMLElement,
   input: HTMLInputElement,
   onChange: () => void,
+  clearLabel?: string,
 ): void {
+  addClearButton(zone, input, clearLabel);
   zone.addEventListener('click', (e) => {
     if (e.target !== input) input.click();
   });
   zone.addEventListener('keydown', (e) => {
+    // Only the zone's own Enter/Space opens the picker: the clear button inside
+    // it handles its keyboard activation itself.
+    if (e.target !== zone) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       input.click();

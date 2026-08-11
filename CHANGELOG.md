@@ -64,8 +64,21 @@ format** is versioned separately — see [docs/VERSIONING.md](docs/VERSIONING.md
   hidden there too, instead of always reporting `1`.
 - The CLI's `--title` / `--date` now appear on disk images. They were accepted
   and silently ignored on that path.
+- **Every file drop zone can be emptied again.** Each one (expert forms and the
+  guided wizard, on both surfaces) now carries a clear control, so a wrong pick
+  no longer means reloading the page.
+- **The save zone counts the files it holds** and says "files", matching the
+  other multi-file zones; it used to name the first file and hide the rest. The
+  restore zone counts its image set the same way.
+- **Em dashes are gone from the UI copy**, in all eight locales and on the legal
+  pages, replaced with the punctuation each sentence actually calls for.
 
 ### Fixed
+
+- In expert mode the save and restore cards no longer start on different lines:
+  the adjacent-card margin applied inside the two-column grid, pushing the
+  restore card 20 px down.
+- The duress password field sat flush against the decoy file zone.
 
 - The output estimate ignored the selected key mode, so changing it re-rendered a
   number that never moved.

@@ -91,7 +91,7 @@ export async function setupKey(password: string, overwrite = false): Promise<voi
 /** Unlock the stored key with `password`, caching it for this session. */
 export async function unlock(password: string): Promise<void> {
   const keyBlock = await readStoredBlock();
-  if (!keyBlock) throw new Error('no vault key on this device — set one up first');
+  if (!keyBlock) throw new Error('no vault key on this device; set one up first');
   const dek = await unlockKeyBlock(parseKeyBlock(keyBlock), password); // throws WrongPasswordError
   await writeSession(dek, keyBlock);
 }

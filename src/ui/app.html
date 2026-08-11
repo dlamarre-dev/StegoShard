@@ -118,7 +118,7 @@
               <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
             </svg>
             <span class="dz-prompt">
-              <span class="dz-title" data-i18n="dropTitle"></span><br />
+              <span class="dz-title" data-i18n="dropTitleMulti"></span><br />
               <span class="muted" data-i18n="dropPrompt"></span>
             </span>
             <span id="dz-file" class="dz-file"></span>
@@ -128,7 +128,7 @@
             class="dropzone-input"
             type="file"
             multiple
-            data-i18n-aria-label="dropTitle"
+            data-i18n-aria-label="dropTitleMulti"
           />
           <p id="size-line" class="muted estimate-line">
             <span data-i18n="labelFileSize"></span> <span id="save-size" class="badge">—</span>
@@ -536,7 +536,12 @@
               <div id="duress-fields" hidden>
                 <label class="stack-gap" data-i18n="labelDuressPassword" for="duress-pw"></label>
                 <input id="duress-pw" type="password" autocomplete="new-password" />
-                <div id="decoy-drop" class="dropzone dropzone-sm" tabindex="0" role="button">
+                <div
+                  id="decoy-drop"
+                  class="dropzone dropzone-sm stack-gap"
+                  tabindex="0"
+                  role="button"
+                >
                   <span class="dz-prompt">
                     <span class="dz-title" data-i18n="decoyTitle"></span><br />
                     <span class="muted" data-i18n="dropPrompt"></span>

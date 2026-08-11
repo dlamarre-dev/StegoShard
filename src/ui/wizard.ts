@@ -361,11 +361,17 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       chip,
       input,
     );
-    // Reuse the shared dropzone wiring (click / drag / drop → input.files + change).
-    wireDropzone(zone, input, () => {
-      reflectFiles(zone, chip, input);
-      onPick(input.files ? Array.from(input.files) : []);
-    });
+    // Reuse the shared dropzone wiring (click / drag / drop → input.files +
+    // change, plus the clear control).
+    wireDropzone(
+      zone,
+      input,
+      () => {
+        reflectFiles(zone, chip, input);
+        onPick(input.files ? Array.from(input.files) : []);
+      },
+      msg('btnClearFiles'),
+    );
     // A FileList can't be rebuilt from File[], so only the label is restored on
     // re-render; the picked files themselves live in the wizard's state.
     if (current.length) {

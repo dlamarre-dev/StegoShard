@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — Politique de confidentialité",
-    "heading": "StegoShard — Politique de confidentialité",
+    "title": "StegoShard : Politique de confidentialité",
+    "heading": "StegoShard : Politique de confidentialité",
     "updatedLabel": "Dernière mise à jour",
     "home": "Accueil",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — enregistre localement la clé enveloppée et les préférences."
+                " : enregistre localement la clé enveloppée et les préférences."
               ],
               [
                 "Les versions publiques de l’extension ne demandent aucune autorisation d’identité ou d’hôte."
@@ -97,8 +97,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — Conditions d'utilisation",
-    "heading": "StegoShard — Conditions d'utilisation",
+    "title": "StegoShard : Conditions d'utilisation",
+    "heading": "StegoShard : Conditions d'utilisation",
     "updatedLabel": "Dernière mise à jour",
     "home": "Accueil",
     "intro": [
@@ -149,7 +149,7 @@
                 {
                   "b": "Si vous perdez votre mot de passe ou votre clé, vos données sont définitivement irrécupérables"
                 },
-                " — personne ne peut les restaurer à votre place."
+                " ; personne ne peut les restaurer à votre place."
               ],
               [
                 "Conservez plusieurs copies de vos artefacts de récupération dans des lieux indépendants. Ne dépendez pas d’un seul support."

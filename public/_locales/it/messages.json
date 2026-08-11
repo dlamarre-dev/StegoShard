@@ -6,7 +6,7 @@
     "message": "Conserva i segreti nelle immagini: backup resiliente con correzione d'errore, steganografia negabile, o entrambi."
   },
   "popupTagline": {
-    "message": "Cifra un file in immagini resilienti — disco o carta."
+    "message": "Cifra un file in immagini resilienti: disco o carta."
   },
   "optionsTitle": {
     "message": "Impostazioni di StegoShard"
@@ -33,7 +33,7 @@
     "message": "Blocca"
   },
   "statusUnlocked": {
-    "message": "Sbloccato — puoi salvare file."
+    "message": "Sbloccato: puoi salvare file."
   },
   "noKeyTitle": {
     "message": "Nessuna chiave della cassaforte"
@@ -78,7 +78,7 @@
     "message": "Nota sulla posizione della chiave (opzionale)"
   },
   "paperCleartextWarn": {
-    "message": "Il foglio di istruzioni non è cifrato — scrivi un suggerimento, mai la password."
+    "message": "Il foglio di istruzioni non è cifrato: scrivi un suggerimento, mai la password."
   },
   "statusSavedPdf": {
     "message": "Fatto. Scaricato un PDF di $COUNT$ pagina/e. Conserva la password.",
@@ -107,10 +107,10 @@
     "message": "Titolo dell'etichetta"
   },
   "titlePlaceholder": {
-    "message": "Dai un nome a questa cassaforte — es. «Archivio Alfa». Evita «Chiavi Bitcoin»."
+    "message": "Dai un nome a questa cassaforte, es. «Archivio Alfa». Evita «Chiavi Bitcoin»."
   },
   "bandWarning": {
-    "message": "L'etichetta non è cifrata — non inserirvi mai un segreto."
+    "message": "L'etichetta non è cifrata; non inserirvi mai un segreto."
   },
   "labelKeyFile": {
     "message": "File chiave (.key)"
@@ -241,7 +241,7 @@
     "message": "Crea la chiave"
   },
   "passwordHint": {
-    "message": "La password non è recuperabile. Se la dimentichi, le tue casseforti sono perse — valuta di esportare la chiave."
+    "message": "La password non è recuperabile. Se la dimentichi, le tue casseforti sono perse; valuta di esportare la chiave."
   },
   "errPasswordMismatch": {
     "message": "Le password non corrispondono."
@@ -308,6 +308,14 @@
   "dropTitle": {
     "message": "Trascina qui il tuo file"
   },
+  "dropTitleMulti": {
+    "message": "Trascina qui i tuoi file",
+    "description": "Title of the save file drop zone, which accepts several files."
+  },
+  "btnClearFiles": {
+    "message": "Rimuovi",
+    "description": "Button that clears the files picked in a drop zone."
+  },
   "dropPrompt": {
     "message": "o fai clic per scegliere"
   },
@@ -364,7 +372,7 @@
     "description": "Stego: cover-photo dropzone title."
   },
   "stegoWarning": {
-    "message": "La chiave è nascosta in questa foto. Conserva il file salvato così com'è — risalvarlo, ridimensionarlo o ricomprimerlo distrugge la chiave. Una copertina JPEG resta un JPEG della stessa dimensione e nome; un PNG resta un PNG. Conservalo separato dalle immagini.",
+    "message": "La chiave è nascosta in questa foto. Conserva il file salvato così com'è: risalvarlo, ridimensionarlo o ricomprimerlo distrugge la chiave. Una copertina JPEG resta un JPEG della stessa dimensione e nome; un PNG resta un PNG. Conservalo separato dalle immagini.",
     "description": "Stego: warning to keep the PNG lossless and separate."
   },
   "labelKeyFileOrImage": {
@@ -384,7 +392,7 @@
     "description": "Stego: cover photo too small to hold the key block."
   },
   "statusSavedStego": {
-    "message": "Salvate $COUNT$ immagine/i. La tua chiave è nascosta nella foto di copertina — conserva quel PNG e la password per ripristinare.",
+    "message": "Salvate $COUNT$ immagine/i. La tua chiave è nascosta nella foto di copertina; conserva quel PNG e la password per ripristinare.",
     "description": "Status after saving with the key hidden in a cover photo.",
     "placeholders": {
       "count": {
@@ -413,7 +421,7 @@
     "description": "Popup: disguised binary variant option."
   },
   "binaryVariantHelpBranded": {
-    "message": "Un unico file opaco con nome StegoShard — facile da ritrovare e senza alcun tentativo di nascondersi.",
+    "message": "Un unico file opaco con nome StegoShard: facile da ritrovare e senza alcun tentativo di nascondersi.",
     "description": "Popup: help text for the branded binary variant."
   },
   "binaryVariantHelpDisguised": {
@@ -460,7 +468,7 @@
     }
   },
   "galleryHeading": {
-    "message": "Galleria — nascondere nelle foto",
+    "message": "Galleria: nascondere nelle foto",
     "description": "Gallery Mode: save card heading."
   },
   "galleryIntro": {
@@ -476,7 +484,7 @@
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
-    "message": "Galleria — ripristina dalle foto",
+    "message": "Galleria: ripristina dalle foto",
     "description": "Gallery Mode: restore card heading."
   },
   "galleryPhotosTitle": {
@@ -687,11 +695,11 @@
     "description": "Wizard: disk destination description."
   },
   "destPaperDesc": {
-    "message": "Un PDF stampabile — un QR per pagina, resiste a stampa e scansione.",
+    "message": "Un PDF stampabile: un QR per pagina, resiste a stampa e scansione.",
     "description": "Wizard: paper destination description."
   },
   "destBinaryDesc": {
-    "message": "Un unico file opaco invece delle immagini — ideale per segreti più grandi.",
+    "message": "Un unico file opaco invece delle immagini, ideale per segreti più grandi.",
     "description": "Wizard: binary destination description."
   },
   "destGalleryDesc": {
@@ -699,7 +707,7 @@
     "description": "Wizard: gallery destination description."
   },
   "keyModeEmbeddedDesc": {
-    "message": "La chiave viaggia dentro le immagini. Il più semplice — conservi solo una password.",
+    "message": "La chiave viaggia dentro le immagini. Il più semplice: conservi solo una password.",
     "description": "Wizard: embedded key-mode description."
   },
   "keyModeKeyfileDesc": {
@@ -870,7 +878,7 @@
     "message": "Per ripristinare in seguito, conserva:"
   },
   "recoveryPassword": {
-    "message": "La tua password — nessun recupero se la perdi"
+    "message": "La tua password: nessun recupero se la perdi"
   },
   "recoveryImages": {
     "message": "Le immagini salvate"
@@ -888,13 +896,13 @@
     "message": "La foto di copertina che contiene la chiave nascosta"
   },
   "recoveryLossless": {
-    "message": "Conservale esattamente così — ridimensionarle, ricomprimerle o inviarle tramite un servizio che ricodifica le immagini le distrugge."
+    "message": "Conservale esattamente così: ridimensionarle, ricomprimerle o inviarle tramite un servizio che ricodifica le immagini le distrugge."
   },
   "filesCreatedHeading": {
     "message": "File creati:"
   },
   "filePurposeVault": {
-    "message": "Il caveau — contiene il tuo file"
+    "message": "Il caveau: contiene il tuo file"
   },
   "filePurposeArchive": {
     "message": "Tutte le immagini raccolte in uno .zip"
@@ -903,16 +911,16 @@
     "message": "Foglio stampabile"
   },
   "filePurposePhotos": {
-    "message": "Foto frammento — conserva l'intero set"
+    "message": "Foto frammento: conserva l'intero set"
   },
   "filePurposeKeyfile": {
-    "message": "Chiave separata — serve con la tua password"
+    "message": "Chiave separata: serve con la tua password"
   },
   "filePurposeStegoCover": {
     "message": "Foto che contiene la chiave nascosta"
   },
   "filePurposeShare": {
-    "message": "Quota di recupero — per un detentore"
+    "message": "Quota di recupero, per un detentore"
   },
   "onboardingTitle": {
     "message": "Benvenuto in StegoShard"
@@ -921,13 +929,13 @@
     "message": "StegoShard cifra il tuo file e lo salva nella forma che scegli. Ci sono due famiglie di output:"
   },
   "onboardingDeniable": {
-    "message": "Si mimetizza tra file ordinari — un insieme di foto o un database dall’aspetto reale. Scegli questa quando l’obiettivo è nascondere l’esistenza stessa di un segreto."
+    "message": "Si mimetizza tra file ordinari: un insieme di foto o un database dall’aspetto reale. Scegli questa quando l’obiettivo è nascondere l’esistenza stessa di un segreto."
   },
   "onboardingOvert": {
-    "message": "Apertamente StegoShard — immagini QR, un PDF stampabile o un file semplice. Scegli questa per un backup semplice e resiliente."
+    "message": "Apertamente StegoShard: immagini QR, un PDF stampabile o un file semplice. Scegli questa per un backup semplice e resiliente."
   },
   "onboardingKeep": {
-    "message": "In ogni caso, conserva la password — nessun recupero se la perdi."
+    "message": "In ogni caso, conserva la password; nessun recupero se la perdi."
   },
   "onboardingDismiss": {
     "message": "Inizia"
@@ -975,7 +983,7 @@
     "description": "Dropzone title for the plausible decoy content."
   },
   "duressWarning": {
-    "message": "Produrre un'esca sotto coercizione può, in alcuni luoghi, costituire una falsa dichiarazione — un reato. Leggi prima il modello di minaccia.",
+    "message": "Produrre un'esca sotto coercizione può, in alcuni luoghi, costituire una falsa dichiarazione, un reato. Leggi prima il modello di minaccia.",
     "description": "Warning shown before enabling duress mode."
   },
   "duressLegalLink": {
@@ -983,7 +991,7 @@
     "description": "Link to the threat-model duress/legal section, shown under the duress warning."
   },
   "factorDuressHint": {
-    "message": "Con un file chiave o una copertura stego, il fattore aggiuntivo protegge solo il tuo file reale — l'esca si apre comunque con la sola password di coercizione.",
+    "message": "Con un file chiave o una copertura stego, il fattore aggiuntivo protegge solo il tuo file reale; l'esca si apre comunque con la sola password di coercizione.",
     "description": "Hint: for a duress .db with a key-file/stego factor, the factor protects the real file only."
   },
   "labelThreshold": {
@@ -1101,7 +1109,7 @@
     "message": "Un file .key separato, conservato lontano dal file del caveau. Servono entrambi per il ripristino."
   },
   "keyModeHelpFile": {
-    "message": "Con un file chiave separato, un file del caveau trapelato non rivela nulla da solo — ma devi conservare anche il .key."
+    "message": "Con un file chiave separato, un file del caveau trapelato non rivela nulla da solo, ma devi conservare anche il .key."
   },
   "restoreModeHeading": {
     "message": "Da cosa vuoi ripristinare?"

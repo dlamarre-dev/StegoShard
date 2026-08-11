@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — Informativa sulla privacy",
-    "heading": "StegoShard — Informativa sulla privacy",
+    "title": "StegoShard: Informativa sulla privacy",
+    "heading": "StegoShard: Informativa sulla privacy",
     "updatedLabel": "Ultimo aggiornamento",
     "home": "Home",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — salva localmente la chiave protetta e le preferenze."
+                ": salva localmente la chiave protetta e le preferenze."
               ],
               [
                 "Le build pubbliche dell’estensione non richiedono autorizzazioni di identità o host."
@@ -97,8 +97,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — Termini di servizio",
-    "heading": "StegoShard — Termini di servizio",
+    "title": "StegoShard: Termini di servizio",
+    "heading": "StegoShard: Termini di servizio",
     "updatedLabel": "Ultimo aggiornamento",
     "home": "Home",
     "intro": [
@@ -149,7 +149,7 @@
                 {
                   "b": "Se perdi la password o la chiave, i tuoi dati saranno irrimediabilmente irrecuperabili"
                 },
-                " — nessuno potrà ripristinarli per te."
+                "; nessuno potrà ripristinarli per te."
               ],
               [
                 "Conserva più copie degli artefatti di recupero in luoghi indipendenti. Non affidarti a un solo supporto."

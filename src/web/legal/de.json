@@ -1,7 +1,7 @@
 {
   "privacy": {
-    "title": "StegoShard — Datenschutzerklärung",
-    "heading": "StegoShard — Datenschutzerklärung",
+    "title": "StegoShard: Datenschutzerklärung",
+    "heading": "StegoShard: Datenschutzerklärung",
     "updatedLabel": "Zuletzt aktualisiert",
     "home": "Startseite",
     "intro": [
@@ -60,7 +60,7 @@
                 {
                   "code": "storage"
                 },
-                " — speichert den geschützten Schlüssel und Einstellungen lokal."
+                ": speichert den geschützten Schlüssel und Einstellungen lokal."
               ],
               ["Öffentliche Erweiterungen fordern keine Identitäts- oder Hostberechtigungen an."]
             ]
@@ -95,8 +95,8 @@
     ]
   },
   "terms": {
-    "title": "StegoShard — Nutzungsbedingungen",
-    "heading": "StegoShard — Nutzungsbedingungen",
+    "title": "StegoShard: Nutzungsbedingungen",
+    "heading": "StegoShard: Nutzungsbedingungen",
     "updatedLabel": "Zuletzt aktualisiert",
     "home": "Startseite",
     "intro": [
@@ -147,7 +147,7 @@
                 {
                   "b": "Wenn Sie Ihr Passwort oder Ihren Schlüssel verlieren, sind Ihre Daten unwiderruflich nicht wiederherstellbar"
                 },
-                " — niemand kann sie für Sie wiederherstellen."
+                "; niemand kann sie für Sie wiederherstellen."
               ],
               [
                 "Bewahren Sie mehrere Kopien Ihrer Wiederherstellungsartefakte an unabhängigen Orten auf. Verlassen Sie sich nicht auf ein einzelnes Medium."

@@ -1,4 +1,4 @@
-# StegoShard
+# <img src="public/icons/icon-128.png" alt="" width="30" height="30" align="top" /> StegoShard
 
 > **Store secrets in images — choose resilience, plausible deniability, or combine
 > both.** A cross-browser WebExtension (Chrome, Edge, Firefox) for **small,

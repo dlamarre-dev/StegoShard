@@ -170,6 +170,13 @@ body {
   margin-top: 20px;
 }
 
+/* Inside the grid, `gap` already separates the cards. Leaving the adjacent-card
+   margin on would push the second column down by 20px, so the save and restore
+   cards would no longer start on the same line. */
+.grid > .card + .card {
+  margin-top: 0;
+}
+
 .banner {
   margin-bottom: 20px;
 }
@@ -551,6 +558,29 @@ hr {
 }
 .dropzone.has-file .dz-prompt {
   display: none;
+}
+
+/* Undo a wrong pick without reloading the page. Injected by `wireDropzone`, so
+   every zone on both surfaces has one; it appears only once the zone holds a
+   selection. Kept in the zone's flex column rather than floated into a corner so
+   it can never sit on top of a long file name in the narrow popup. */
+.dz-clear {
+  display: none;
+  width: auto;
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-decoration: underline;
+}
+.dropzone.has-file .dz-clear {
+  display: inline-block;
+}
+.dz-clear:hover,
+.dz-clear:focus-visible {
+  color: var(--text);
 }
 
 /* Compact dropzone variant (e.g. the optional .key file). */
