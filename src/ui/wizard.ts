@@ -852,6 +852,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       // Guided uses friendly defaults for the advanced knobs the expert UI exposes.
       asZip: state.dest === 'disk' ? true : undefined,
       includeInstructions: state.dest === 'paper',
+      // No title is asked for here, but the date is stamped with the sequence
+      // number on every image, exactly as in the expert form.
+      label: { date: new Date().toISOString().slice(0, 10) },
       stego,
       locale: env.locale(),
     };

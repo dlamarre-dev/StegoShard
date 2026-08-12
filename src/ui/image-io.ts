@@ -17,6 +17,7 @@ import {
   embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
   extractKeyBlockStegoJpeg,
+  brandCaption,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
   isJpeg,
@@ -57,8 +58,11 @@ export interface LabelBand {
   total: number;
 }
 
-/** Height of the optional user-caption strip, above the brand strip. */
-const BAND_HEIGHT = 70;
+/**
+ * Height of the fallback title strip, used only for a title the brand font
+ * cannot draw (see `imageWithLabelToPngBlob`). One line of 22px bold text.
+ */
+const FALLBACK_TITLE_HEIGHT = 40;
 
 /** Render an ImageDataLike to a lossless PNG blob. */
 export async function imageDataToPngBlob(img: ImageDataLike): Promise<Blob> {
@@ -72,53 +76,55 @@ export async function imageDataToPngBlob(img: ImageDataLike): Promise<Blob> {
 }
 
 /**
- * Render a generated symbol as a PNG, stamped with the StegoShard mark and an
- * optional readable caption.
+ * Render a generated symbol as a PNG, stamped with the StegoShard mark and the
+ * readable caption.
  *
- * Two strips sit above the symbol, both *outside* its area, so the quiet zone is
- * untouched and decoding is unaffected:
+ * The caption (an optional title, then the date and "3 / 12") is part of the
+ * brand strip that `@core` draws, in the same 5x7 font, under the recovery lines.
+ * That is what makes an image saved here identical to one the CLI writes and to
+ * the samples in the README; the browser used to draw its own sans-serif strip
+ * *above* the mark instead, which looked like a different product.
  *
- *  - The brand strip comes from `@core`, so the browser and the CLI stamp the
- *    same pixels. It carries the mark, the wordmark, and a recovery line naming
- *    the format version and codec, so an image found years from now says what it
- *    is and where the spec lives.
- *  - The caption strip, when the user asked for a label, is drawn with canvas
- *    text so a title in any script renders (the core font is ASCII-only).
+ * The date and the sequence number are always stamped. They used to appear only
+ * when a title had been asked for, so an unlabelled set said nothing about when
+ * it was made or how many pieces it had, which is exactly what someone holding
+ * one printed page needs to know.
  *
- * Everything in both strips is cleartext, by design.
+ * The one thing the shared font cannot do is a script with no ASCII form, so a
+ * title in Japanese or Cyrillic still gets a canvas-drawn strip of its own rather
+ * than being dropped. Latin diacritics are folded (see `foldToBrandText`), so
+ * European titles take the shared path.
  *
- * Callers that must stay unbranded for deniability (gallery covers, stego key
- * covers, disguised binaries) use `imageDataToPngBlob` instead.
+ * Everything here is cleartext, by design. Callers that must stay unbranded for
+ * deniability (gallery covers, stego key covers, disguised binaries) use
+ * `imageDataToPngBlob` instead.
  */
 export async function imageWithLabelToPngBlob(
   img: ImageDataLike,
   band: LabelBand | undefined,
   codecId: number,
 ): Promise<Blob> {
-  const branded = drawBrandBand(img, { recovery: recoveryLines(codecName(codecId)) });
-  if (!band) return imageDataToPngBlob(branded);
+  const { lines, unstampableTitle } = brandCaption(band ?? {});
+  const branded = drawBrandBand(img, {
+    recovery: recoveryLines(codecName(codecId)),
+    lines,
+  });
+  // The common case: one strip, drawn entirely by the shared renderer.
+  if (!unstampableTitle) return imageDataToPngBlob(branded);
 
-  const canvas = new OffscreenCanvas(branded.width, branded.height + BAND_HEIGHT);
+  const canvas = new OffscreenCanvas(branded.width, branded.height + FALLBACK_TITLE_HEIGHT);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('image-io: 2D canvas context unavailable');
-
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
   ctx.fillStyle = '#000000';
   ctx.textBaseline = 'top';
   const pad = 12;
-  const maxW = branded.width - pad * 2;
-  if (band.title) {
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(band.title, pad, 10, maxW);
-  }
-  const sub = [band.date, `${band.index} / ${band.total}`].filter(Boolean).join('    ');
-  ctx.font = '16px sans-serif';
-  ctx.fillText(sub, pad, 42, maxW);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(unstampableTitle, pad, 9, branded.width - pad * 2);
 
   const pixels = new Uint8ClampedArray(branded.data);
-  ctx.putImageData(new ImageData(pixels, branded.width, branded.height), 0, BAND_HEIGHT);
+  ctx.putImageData(new ImageData(pixels, branded.width, branded.height), 0, FALLBACK_TITLE_HEIGHT);
   return canvas.convertToBlob({ type: 'image/png' });
 }
 

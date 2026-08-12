@@ -146,6 +146,32 @@ function glyphFor(ch: string): readonly [number, number, number, number, number]
   return GLYPHS[i] ?? GLYPHS[0]!;
 }
 
+/**
+ * Fold text into what this font can draw, rather than losing it.
+ *
+ * The glyph set is ASCII 32..90, so a caption is otherwise dropped whole for the
+ * sake of one character. Latin diacritics are stripped ("Sauvegarde clé" stamps
+ * as "SAUVEGARDE CLE"), and the curly quotes, en/em dashes and non-breaking
+ * spaces that word processors insert become their ASCII equivalents. Scripts with
+ * no ASCII form (CJK, Cyrillic, Greek) are left alone: the caller checks with
+ * `isRenderableAscii` and decides what to do about them.
+ */
+export function foldToBrandText(text: string): string {
+  return (
+    text
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/[‘’‚‛′‹›]/g, "'")
+      .replace(/[“”„‟″«»]/g, '"')
+      .replace(/[‐-―−]/g, '-')
+      // Escaped rather than literal: an invisible character is unreviewable in
+      // source (no-break, figure, thin, narrow no-break and ideographic spaces).
+      .replace(/[\u00a0\u2007\u2009\u202f\u3000]/g, ' ')
+      .replace(/…/g, '...')
+      .toUpperCase()
+  );
+}
+
 /** True when every character can be drawn (after folding case). */
 export function isRenderableAscii(text: string): boolean {
   for (const ch of text) {
@@ -280,6 +306,52 @@ export const RECOVERY_HOST = 'GITHUB.COM/DLAMARRE-DEV/STEGOSHARD';
  */
 export function recoveryLines(codecName: string): string[] {
   return [`FORMAT V1 ${codecName.toUpperCase()}`, RECOVERY_HOST];
+}
+
+/** What a caller knows about an image, before it becomes caption lines. */
+export interface BrandCaptionInput {
+  /** Optional user label. */
+  title?: string | undefined;
+  /** ISO date the set was written. */
+  date?: string | undefined;
+  /** 1-based position in the set, and its size. */
+  index?: number | undefined;
+  total?: number | undefined;
+}
+
+/**
+ * The caption lines that go under the recovery lines, in order.
+ *
+ * Shared by the browser and the CLI because they used to compose this separately
+ * and drifted: the browser drew its own sans-serif strip *above* the mark and
+ * left the date and sequence out entirely unless a title had been asked for. The
+ * date and the sequence are unconditional here, which is the point of them: a
+ * page found on its own should say when it was made and how many others belong
+ * with it.
+ *
+ * A title the font cannot draw even after folding is *returned* rather than
+ * silently dropped, so a caller with a real text renderer (the browser has a
+ * canvas) can still show it.
+ */
+export function brandCaption(input: BrandCaptionInput): {
+  lines: string[];
+  unstampableTitle: string | null;
+} {
+  const lines: string[] = [];
+  let unstampableTitle: string | null = null;
+  if (input.title) {
+    const folded = foldToBrandText(input.title);
+    if (isRenderableAscii(folded)) lines.push(folded);
+    else unstampableTitle = input.title;
+  }
+  if (input.date) {
+    const folded = foldToBrandText(input.date);
+    if (isRenderableAscii(folded)) lines.push(folded);
+  }
+  if (input.index !== undefined && input.total !== undefined) {
+    lines.push(`${input.index} / ${input.total}`);
+  }
+  return { lines, unstampableTitle };
 }
 
 export interface BrandBandInput {

@@ -77,7 +77,7 @@ export interface SaveOptions {
   /** Image codec (SPEC §2). Defaults to qr-grid when unset. */
   codecId?: number | undefined;
   /** When set, a readable title band is drawn above each image. */
-  label?: { title?: string; date?: string } | undefined;
+  label?: { title?: string | undefined; date?: string | undefined } | undefined;
   /** Bundle all images (+ .key) into a single .zip instead of many files. */
   asZip?: boolean;
   /**
@@ -196,9 +196,10 @@ export async function saveFileToDisk(
   const pngs: { name: string; bytes: Uint8Array }[] = [];
   for (let i = 0; i < total; i++) {
     const img = codec.encode(imagePayloads[i]!, PROFILE_DISK);
-    const band: LabelBand | undefined = options.label
-      ? { ...options.label, index: i + 1, total }
-      : undefined;
+    // Always a band: the date and "3 / 12" are stamped whether or not a title
+    // was asked for, so a page found on its own says when it was made and how
+    // many others belong with it.
+    const band: LabelBand = { ...options.label, index: i + 1, total };
     const index = String(i + 1).padStart(2, '0');
     pngs.push({
       name: `stegoshard-${setHex}-${index}.png`,
