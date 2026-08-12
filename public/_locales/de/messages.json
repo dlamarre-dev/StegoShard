@@ -45,10 +45,10 @@
     "message": "Einstellungen öffnen"
   },
   "saveHeading": {
-    "message": "Datei speichern"
+    "message": "Ein Geheimnis speichern"
   },
   "restoreHeading": {
-    "message": "Datei wiederherstellen"
+    "message": "Ein Geheimnis wiederherstellen"
   },
   "labelFile": {
     "message": "Datei"

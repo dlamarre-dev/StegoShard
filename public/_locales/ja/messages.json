@@ -45,10 +45,10 @@
     "message": "設定を開く"
   },
   "saveHeading": {
-    "message": "ファイルを保存"
+    "message": "秘密を保存"
   },
   "restoreHeading": {
-    "message": "ファイルを復元"
+    "message": "秘密を復元"
   },
   "labelFile": {
     "message": "ファイル"

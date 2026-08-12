@@ -82,6 +82,17 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   file and the decoy database rather than just "disk or paper", and the stale
   "Google Photos requires the browser extension" note is gone from the locales
   that still carried it.
+- **The two surfaces describe the same choices the same way.** The expert cards
+  are "Save a secret" / "Restore a secret", reusing the guided flow's own wording;
+  the guided option cards carry the expert pickers' icons (destinations, key
+  delivery, image code), now defined once in `icons.ts` and held to the pages'
+  inline copies by a test; and the three overt destinations show the **Overt**
+  badge in expert mode, as they already did in the guided flow.
+- **The guided flow checks a new password where you type it.** The 12-character
+  minimum and the "this looks weak" confirmation were only applied at the final
+  step, so a password typed at step 5 was refused at step 7 and had to be fixed by
+  walking back. Accepting the weak-password warning is remembered for that exact
+  password, so the run never asks twice.
 
 ### Fixed
 

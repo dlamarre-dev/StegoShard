@@ -943,8 +943,16 @@ details.advanced[open] > summary::before {
   accent-color: var(--accent);
 }
 .wiz-option-label {
+  display: flex;
+  align-items: center;
+  /* The icon, the name and any badge sit on one line, as in the expert picker. */
+  gap: 8px;
   font-weight: 600;
   color: var(--text);
+}
+.wiz-option-label .mode-badge {
+  /* The flex gap already spaces it; the inline-layout margin would double up. */
+  margin-left: 0;
 }
 .wiz-option-desc {
   grid-column: 2;
