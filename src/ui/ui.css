@@ -950,10 +950,6 @@ details.advanced[open] > summary::before {
   font-weight: 600;
   color: var(--text);
 }
-.wiz-option-label .mode-badge {
-  /* The flex gap already spaces it; the inline-layout margin would double up. */
-  margin-left: 0;
-}
 .wiz-option-desc {
   grid-column: 2;
   font-size: 0.88rem;
@@ -1175,9 +1171,12 @@ details.advanced[open] > summary::before {
 }
 
 /* Deniable / overt mode badges (UI clarity for save destinations) */
+/* Every badge sits in a flex container that spaces it with `gap`: the segmented
+   option (a centred column), an onboarding row, a wizard card. A margin here is
+   therefore not spacing, it is displacement, and in the centred column it pushed
+   the badge 6px right of the glyph and label above it. */
 .mode-badge {
   display: inline-block;
-  margin-left: 6px;
   padding: 0 6px;
   border-radius: 8px;
   font-size: 0.7em;
