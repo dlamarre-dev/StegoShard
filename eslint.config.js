@@ -15,6 +15,12 @@ export default [
       'coverage/**',
       'node_modules/**',
       'local/**',
+      // Playwright's own output. Both hold third-party bundles it copies in for
+      // the HTML viewer, which lint every one of their minified globals as
+      // errors, so `npm run lint` failed for anyone who had ever opened a report.
+      // CI never noticed: it lints before it runs a browser.
+      'playwright-report/**',
+      'test-results/**',
     ],
   },
   js.configs.recommended,

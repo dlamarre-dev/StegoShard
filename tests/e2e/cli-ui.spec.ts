@@ -25,6 +25,28 @@ const ENTRY_POINTS = [
   { name: 'offline serve.mjs', args: ['web-dist-offline/serve.mjs'], needs: 'web-dist-offline' },
 ] as const;
 
+/**
+ * The offline build output must *be* the bundle, not a preview of it.
+ *
+ * It was a preview: the build emitted `serve.mjs` while the release script added
+ * `serve.cmd`, `serve.sh` and `README.txt` on the way into the zip, and since the
+ * web build empties this directory first, a copy from an earlier packaging run
+ * vanished on the next build. Anyone inspecting or testing the folder, including
+ * the Windows user told to double-click `serve.cmd`, found it missing.
+ *
+ * `scripts/package-web-bundle.sh` checks the same four, but only on the release
+ * path; this runs on every PR.
+ */
+test('the offline bundle carries everything needed to run it', async () => {
+  const dir = resolve(ROOT, 'web-dist-offline');
+  const built = existsSync(resolve(dir, 'index.html'));
+  if (process.env.CI) expect(built, 'web-dist-offline must be built in CI').toBe(true);
+  test.skip(!built, 'web-dist-offline not built');
+  for (const name of ['serve.mjs', 'serve.cmd', 'serve.sh', 'README.txt']) {
+    expect(existsSync(resolve(dir, name)), `${name} is missing from the bundle`).toBe(true);
+  }
+});
+
 /** Start one of them and wait for the URL it prints. */
 async function start(args: readonly string[]): Promise<{ url: string; stop: () => void }> {
   // `['ignore', 'pipe', 'pipe']` types stdout/stderr as non-null, which is what

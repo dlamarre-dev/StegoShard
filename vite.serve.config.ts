@@ -1,21 +1,53 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { chmodSync, copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { builtinModules } from 'node:module';
 
 /**
  * Build `serve.mjs`, the launcher shipped inside the downloadable offline web
- * bundle. Same shape as `vite.cli.config.ts` (single ESM file, Node target, only
- * builtins external) because it has the same job: run under whatever Node the
- * user has, with nothing to install.
+ * bundle, and put its wrappers beside it. Same shape as `vite.cli.config.ts`
+ * (single ESM file, Node target, only builtins external) because it has the same
+ * job: run under whatever Node the user has, with nothing to install.
  *
  * It emits *into* `web-dist-offline`, which `vite.web.config.ts` empties, so this
  * must run after that build and must not empty the directory itself.
  */
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((m) => `node:${m}`)];
 
+const OUT = resolve(import.meta.dirname, 'web-dist-offline');
+
+/**
+ * Copy the hand-written launchers next to the built one.
+ *
+ * Here rather than in `scripts/package-web-bundle.sh`, which used to own them:
+ * that made `web-dist-offline/` an incomplete preview of the bundle, carrying
+ * `serve.mjs` but not the `serve.cmd` a Windows user is told to double-click,
+ * because the release script only assembles them on the way into the zip. Worse,
+ * the web build empties this directory, so a copy from an earlier packaging run
+ * silently disappeared on the next build. The build now owns the whole bundle and
+ * the release script only checks it.
+ */
+function offlineLaunchers(): Plugin {
+  const files = ['serve.cmd', 'serve.sh', 'README.txt'];
+  return {
+    name: 'stegoshard-offline-launchers',
+    // `writeBundle`, not `closeBundle`: it runs once the emitted files are on
+    // disk, which is when the directory is complete enough to add to.
+    writeBundle() {
+      for (const name of files) {
+        copyFileSync(resolve(import.meta.dirname, 'src/web/offline', name), resolve(OUT, name));
+      }
+      // The zip stores the mode, so this is what makes `./serve.sh` runnable for
+      // whoever unpacks it. A no-op on Windows, where the release is not built.
+      chmodSync(resolve(OUT, 'serve.sh'), 0o755);
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [offlineLaunchers()],
   build: {
-    outDir: resolve(import.meta.dirname, 'web-dist-offline'),
+    outDir: OUT,
     emptyOutDir: false,
     target: 'node20',
     minify: false, // shipped in the open beside the app it serves; keep it readable
