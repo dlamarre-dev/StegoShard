@@ -112,6 +112,11 @@ npx stegoshard ui --port 8137     # pin the port instead of taking a free one
 npx stegoshard ui --open          # and launch the browser
 ```
 
+The notice it prints follows the system language, in the same eight locales as the
+app (Windows regional settings, `LC_ALL`/`LANG` elsewhere), and falls back to
+English for anything else. `STEGOSHARD_LANG=ja` overrides it. The address itself is
+never translated, so a script can still read it out of the output.
+
 Running `stegoshard` with no arguments still prints usage: a browser opening itself out
 of an SSH session or a cron job is the wrong kind of surprise, so this is asked for
 explicitly.

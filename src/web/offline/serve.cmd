@@ -4,6 +4,11 @@ rem
 rem index.html cannot be opened directly: browsers block ES modules and module
 rem workers over file://. This serves the folder on 127.0.0.1 instead. See
 rem README.txt.
+rem
+rem serve.mjs prints its notice in the system language. The message below stays
+rem English on purpose: it appears only when Node is missing, so nothing is
+rem available to translate it, and `echo` output is rendered through the console
+rem code page (850 on a French Windows), which would mangle accents anyway.
 setlocal
 cd /d "%~dp0"
 

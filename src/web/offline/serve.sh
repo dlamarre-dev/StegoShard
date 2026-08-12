@@ -4,6 +4,9 @@
 # index.html cannot be opened directly: browsers block ES modules and module
 # workers over file://. This serves the folder on 127.0.0.1 instead. See
 # README.txt.
+#
+# serve.mjs prints its notice in the system language; the message below stays
+# English, since it appears only when there is no Node to translate it.
 set -eu
 cd "$(dirname "$0")"
 
