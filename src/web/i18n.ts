@@ -17,24 +17,16 @@ import pt from '../../public/_locales/pt/messages.json';
 import ja from '../../public/_locales/ja/messages.json';
 import zhTW from '../../public/_locales/zh_TW/messages.json';
 import { friendlyError as friendlyErrorWith } from '../ui/domhelpers';
+// One definition, shared with the legal pages and the offline launcher.
+import { LOCALES, resolveLocale } from '../ui/locales';
+
+export { LOCALES, resolveLocale };
 
 interface Entry {
   message: string;
   placeholders?: Record<string, { content: string }>;
 }
 type Catalog = Record<string, Entry>;
-
-/** Supported UI locales, in presentation order, with their native names. */
-export const LOCALES: Array<{ code: string; name: string; htmlLang: string }> = [
-  { code: 'en', name: 'English', htmlLang: 'en' },
-  { code: 'fr', name: 'Français', htmlLang: 'fr' },
-  { code: 'de', name: 'Deutsch', htmlLang: 'de' },
-  { code: 'es', name: 'Español', htmlLang: 'es' },
-  { code: 'it', name: 'Italiano', htmlLang: 'it' },
-  { code: 'pt', name: 'Português', htmlLang: 'pt' },
-  { code: 'ja', name: '日本語', htmlLang: 'ja' },
-  { code: 'zh_TW', name: '繁體中文', htmlLang: 'zh-Hant' },
-];
 
 const CATALOGS: Record<string, Catalog> = {
   en: en as Catalog,
@@ -48,24 +40,6 @@ const CATALOGS: Record<string, Catalog> = {
 };
 
 const STORAGE_KEY = 'stegoshard.lang';
-
-/**
- * Resolve a locale code from an explicit choice and the browser language. Any
- * `zh-*` tag maps to Traditional Chinese (the only Chinese UI we ship); other
- * tags key off their two-letter prefix; anything unknown falls back to English.
- */
-export function resolveLocale(requested: string | null, navLang: string): string {
-  for (const raw of [requested, navLang]) {
-    if (!raw) continue;
-    const norm = raw.toLowerCase().replace('-', '_');
-    if (CATALOGS[norm]) return norm;
-    if (norm.startsWith('zh')) return 'zh_TW';
-    const prefix = norm.split('_')[0] ?? '';
-    const byPrefix = LOCALES.find((l) => l.code === prefix);
-    if (byPrefix) return byPrefix.code;
-  }
-  return 'en';
-}
 
 function stored(): string | null {
   try {

@@ -17,6 +17,8 @@ import it from './it.json';
 import pt from './pt.json';
 import ja from './ja.json';
 import zhTW from './zh_TW.json';
+// One definition, shared with the web app's i18n and the offline launcher.
+import { LOCALES, LOCALE_CODES, resolveLocale } from '../../ui/locales';
 
 type Run = string | { b: string } | { code: string } | { a: string; href: string };
 type Block = { p: Run[] } | { ul: Run[][] };
@@ -35,18 +37,6 @@ interface LegalDoc {
 export type DocKey = 'privacy' | 'terms';
 type Pages = Record<DocKey, LegalDoc>;
 
-// Native language names for the selector, in the order we present them.
-const LOCALES: Array<{ code: string; name: string; htmlLang: string }> = [
-  { code: 'en', name: 'English', htmlLang: 'en' },
-  { code: 'fr', name: 'Français', htmlLang: 'fr' },
-  { code: 'de', name: 'Deutsch', htmlLang: 'de' },
-  { code: 'es', name: 'Español', htmlLang: 'es' },
-  { code: 'it', name: 'Italiano', htmlLang: 'it' },
-  { code: 'pt', name: 'Português', htmlLang: 'pt' },
-  { code: 'ja', name: '日本語', htmlLang: 'ja' },
-  { code: 'zh_TW', name: '繁體中文', htmlLang: 'zh-Hant' },
-];
-
 const CATALOGS: Record<string, Pages> = {
   en: en as unknown as Pages,
   fr: fr as unknown as Pages,
@@ -59,27 +49,9 @@ const CATALOGS: Record<string, Pages> = {
 };
 
 /** Codes we can render, in presentation order. */
-export const SUPPORTED_LOCALES = LOCALES.map((l) => l.code);
+export const SUPPORTED_LOCALES = LOCALE_CODES;
 
-/**
- * Map an explicit `?lang=` override (if any) and the browser language to a
- * supported locale code. Pure, with no globals, so it can be unit-tested. Any
- * `zh-*` tag resolves to Traditional Chinese (the only Chinese variant we
- * ship); everything unrecognized falls back to English.
- */
-export function resolveLocale(requested: string | null, navLang: string): string {
-  if (requested) {
-    if (CATALOGS[requested]) return requested;
-    const norm = requested.toLowerCase();
-    if (norm.startsWith('zh')) return 'zh_TW';
-    const byPrefix = SUPPORTED_LOCALES.find((c) => c === norm.split('-')[0]);
-    if (byPrefix) return byPrefix;
-  }
-  const nav = (navLang || 'en').toLowerCase();
-  if (nav.startsWith('zh')) return 'zh_TW';
-  const prefix = nav.split('-')[0] ?? 'en';
-  return SUPPORTED_LOCALES.find((c) => c === prefix) ?? 'en';
-}
+export { resolveLocale };
 
 function pickLocale(): string {
   return resolveLocale(new URLSearchParams(location.search).get('lang'), navigator.language);

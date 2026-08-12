@@ -51,7 +51,16 @@ test('the offline bundle carries everything needed to run it', async () => {
 async function start(args: readonly string[]): Promise<{ url: string; stop: () => void }> {
   // `['ignore', 'pipe', 'pipe']` types stdout/stderr as non-null, which is what
   // the URL is read from; nothing is written to the process.
-  const child = spawn('node', [...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  //
+  // Started in Japanese on purpose. The notice follows the system language, and
+  // the address has to stay findable in output nobody can read: a locale that
+  // moves it mid-sentence, in a script with no ASCII, is the case that would
+  // break anything scraping this (including the line below).
+  const child = spawn('node', [...args], {
+    cwd: ROOT,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, STEGOSHARD_LANG: 'ja' },
+  });
   const stop = (): void => void child.kill();
   const url = await new Promise<string>((ok, no) => {
     let out = '';

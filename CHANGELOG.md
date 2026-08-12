@@ -21,6 +21,13 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   - **It is not the private path.** A browser records what the command line does
     not (cache, history, downloads, a preference entry); the startup notice and
     [THREAT-MODEL.md](docs/THREAT-MODEL.md#the-local-web-ui) say so plainly.
+- **The launcher speaks the system language.** `stegoshard ui` and the offline
+  bundle's `serve.mjs` print their startup notice in whichever of the eight app
+  locales the system reports (regional settings on Windows, which sets no `LANG`;
+  `LC_ALL`/`LANG` elsewhere), falling back to English. `STEGOSHARD_LANG` overrides
+  it. The address is never translated, so anything reading the output still finds
+  it. Locale resolution, which had been copied twice already, now lives once in
+  `src/ui/locales.ts`.
 - **The downloadable offline web bundle now ships `serve.mjs`** plus `serve.cmd` /
   `serve.sh` wrappers and a `README.txt`. Until now the zip could not be run at all
   without knowing to bring your own HTTP server: `index.html` cannot be opened

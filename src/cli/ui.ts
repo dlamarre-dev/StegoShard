@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { resolveLocale } from '../ui/locales';
 
 /** Content types for what a Vite web build actually emits. */
 const MIME: Record<string, string> = {
@@ -217,14 +218,95 @@ export function openInBrowser(url: string): void {
   }
 }
 
-/** What the user is told when the server comes up. */
-export function startupNotice(url: string): string {
-  return [
-    `StegoShard UI at ${url}`,
+/**
+ * The startup notice, per locale.
+ *
+ * Held here rather than in `public/_locales`, which is the home for *UI* strings:
+ * those catalogs are ~40KB each and importing eight of them would put 320KB of
+ * JSON into a 7KB launcher, for four lines of terminal output. The keys are the
+ * codes from `locales.ts`, so the same eight languages as the app.
+ *
+ * `$URL$` is substituted rather than concatenated: the address does not come last
+ * in every language.
+ */
+const NOTICE: Record<string, readonly string[]> = {
+  en: [
+    'StegoShard UI at $URL$',
     'Serving on this machine only; nothing is sent anywhere.',
-    "Your browser's cache, history and download folder will hold traces of this",
-    'session, which the command line on its own does not. See docs/THREAT-MODEL.md.',
+    "Your browser's cache, history and download folder will hold traces of this session, which the command line on its own does not. See docs/THREAT-MODEL.md.",
     'Leave this running while the tab is open. Ctrl+C to stop.',
-    '',
-  ].join('\n');
+  ],
+  fr: [
+    "Interface StegoShard à l'adresse $URL$",
+    "Servie sur cette machine uniquement ; rien n'est envoyé ailleurs.",
+    "Le cache, l'historique et le dossier de téléchargement de votre navigateur garderont des traces de cette session, ce que la ligne de commande seule ne fait pas. Voir docs/THREAT-MODEL.md.",
+    "Laissez ceci en marche pendant que l'onglet est ouvert. Ctrl+C pour arrêter.",
+  ],
+  de: [
+    'StegoShard-Oberfläche unter $URL$',
+    'Wird nur auf diesem Rechner bereitgestellt; nichts wird irgendwohin gesendet.',
+    'Cache, Verlauf und Download-Ordner Ihres Browsers behalten Spuren dieser Sitzung, was die Kommandozeile allein nicht tut. Siehe docs/THREAT-MODEL.md.',
+    'Lassen Sie dies laufen, solange der Tab offen ist. Ctrl+C zum Beenden.',
+  ],
+  es: [
+    'Interfaz de StegoShard en $URL$',
+    'Se sirve solo en este equipo; no se envía nada a ninguna parte.',
+    'La caché, el historial y la carpeta de descargas de tu navegador guardarán rastros de esta sesión, algo que la línea de comandos por sí sola no hace. Consulta docs/THREAT-MODEL.md.',
+    'Deja esto en ejecución mientras la pestaña esté abierta. Ctrl+C para detener.',
+  ],
+  it: [
+    'Interfaccia StegoShard su $URL$',
+    'Servita solo su questa macchina; nulla viene inviato altrove.',
+    'La cache, la cronologia e la cartella dei download del browser conserveranno tracce di questa sessione, cosa che la riga di comando da sola non fa. Vedi docs/THREAT-MODEL.md.',
+    'Lascia questo in esecuzione mentre la scheda è aperta. Ctrl+C per fermare.',
+  ],
+  pt: [
+    'Interface StegoShard em $URL$',
+    'Servida apenas nesta máquina; nada é enviado para fora.',
+    'A cache, o histórico e a pasta de transferências do seu navegador guardarão vestígios desta sessão, o que a linha de comandos por si só não faz. Consulte docs/THREAT-MODEL.md.',
+    'Deixe isto em execução enquanto o separador estiver aberto. Ctrl+C para parar.',
+  ],
+  ja: [
+    'StegoShard の画面: $URL$',
+    'このマシン上でのみ提供されます。どこにも送信されません。',
+    'ブラウザーのキャッシュ、履歴、ダウンロードフォルダーにこのセッションの痕跡が残ります。コマンドラインだけでは残りません。docs/THREAT-MODEL.md を参照してください。',
+    'タブを開いている間は実行したままにしてください。停止するには Ctrl+C。',
+  ],
+  zh_TW: [
+    'StegoShard 介面：$URL$',
+    '僅在這台電腦上提供服務；不會傳送到任何地方。',
+    '瀏覽器的快取、瀏覽記錄與下載資料夾會留下這次工作階段的痕跡，只用命令列則不會。請參閱 docs/THREAT-MODEL.md。',
+    '請在分頁開啟期間保持執行。按 Ctrl+C 停止。',
+  ],
+};
+
+/**
+ * The language to speak in the terminal.
+ *
+ * `Intl`'s default locale is the only portable view of this: on Windows it
+ * follows the user's regional settings (there is no `LANG` there), and elsewhere
+ * it follows `LC_ALL`/`LANG`. `STEGOSHARD_LANG` overrides it, for a user whose
+ * system language is not the one they read, and for tests.
+ */
+export function noticeLocale(env: NodeJS.ProcessEnv = process.env): string {
+  let ambient = 'en';
+  try {
+    ambient = Intl.DateTimeFormat().resolvedOptions().locale;
+  } catch {
+    // No ICU data: English it is.
+  }
+  return resolveLocale(env.STEGOSHARD_LANG, ambient);
+}
+
+/**
+ * What the user is told when the server comes up, in the system language.
+ *
+ * Only Node prints this, and Node writes to a Windows console through
+ * `WriteConsoleW`, so accented and CJK text is not at the mercy of the console's
+ * code page (cp850 here). The `.cmd` wrapper's own `echo` output *is*, which is
+ * one reason its "install Node" message stays ASCII.
+ */
+export function startupNotice(url: string, locale = noticeLocale()): string {
+  const lines = NOTICE[locale] ?? NOTICE.en!;
+  return [...lines.map((line) => line.replace('$URL$', url)), ''].join('\n');
 }

@@ -9,7 +9,15 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectAssets, findWebRoot, startUiServer, startupNotice, type UiServer } from './ui';
+import {
+  collectAssets,
+  findWebRoot,
+  noticeLocale,
+  startUiServer,
+  startupNotice,
+  type UiServer,
+} from './ui';
+import { LOCALE_CODES, resolveLocale } from '../ui/locales';
 
 function fixtureTree(): string {
   const root = mkdtempSync(join(tmpdir(), 'stegoshard-ui-'));
@@ -138,11 +146,52 @@ describe('serving', () => {
 });
 
 describe('startup notice', () => {
+  const URL_ = 'http://127.0.0.1:1234/s/x/';
+
   it('says where it is and what it costs', () => {
-    const notice = startupNotice('http://127.0.0.1:1234/s/x/');
-    expect(notice).toContain('http://127.0.0.1:1234/s/x/');
+    const notice = startupNotice(URL_, 'en');
+    expect(notice).toContain(URL_);
     // The trade-off is the whole reason a CLI user needs telling.
     expect(notice).toMatch(/cache, history and download folder/);
     expect(notice).toContain('Ctrl+C');
+  });
+
+  it('speaks every language the app does', () => {
+    // A ninth locale added to the list without a notice would otherwise show up
+    // as silent English for those users.
+    for (const code of LOCALE_CODES) {
+      const notice = startupNotice(URL_, code);
+      expect(notice, code).toContain(URL_);
+      expect(notice, code).toContain('Ctrl+C');
+      if (code !== 'en') {
+        expect(notice, `${code} is still the English text`).not.toContain(
+          'Serving on this machine',
+        );
+      }
+    }
+    // The address is placed, not appended: it comes mid-sentence in some.
+    expect(startupNotice(URL_, 'ja').split('\n')[0]).toBe(`StegoShard の画面: ${URL_}`);
+    expect(startupNotice(URL_, 'fr')).toContain("à l'adresse " + URL_);
+    // Substituted exactly once, and no placeholder survives.
+    for (const code of LOCALE_CODES) {
+      expect(startupNotice(URL_, code).split(URL_).length - 1, code).toBe(1);
+      expect(startupNotice(URL_, code), code).not.toContain('$URL$');
+    }
+  });
+
+  it('falls back to English for a locale it does not carry', () => {
+    expect(startupNotice(URL_, 'sv')).toContain('Serving on this machine');
+  });
+});
+
+describe('notice language', () => {
+  it('follows the system, and lets the environment override it', () => {
+    // `Intl`'s default is the only portable source: Windows sets no LANG.
+    const ambient = Intl.DateTimeFormat().resolvedOptions().locale;
+    expect(noticeLocale({})).toBe(resolveLocale(null, ambient));
+    expect(noticeLocale({ STEGOSHARD_LANG: 'ja' })).toBe('ja');
+    expect(noticeLocale({ STEGOSHARD_LANG: 'pt-BR' })).toBe('pt');
+    // An unsupported override is ignored rather than fatal.
+    expect(noticeLocale({ STEGOSHARD_LANG: 'sv' })).toBe(resolveLocale(null, ambient));
   });
 });
