@@ -149,6 +149,13 @@ offline core (Disk + Paper) runs entirely in your browser.
 
 > ▶️ **[dlamarre-dev.github.io/StegoShard](https://dlamarre-dev.github.io/StegoShard/)**
 
+Or run the same app from your own machine, with no site involved: `npx stegoshard ui`
+prints a `http://127.0.0.1/…` address to open. The downloadable offline bundle carries a
+`serve.mjs` that does the same for the folder it sits in. Both are needed rather than just
+opening `index.html`, which no browser will run: ES modules and module workers are blocked
+over `file://`. See [CLI.md](docs/CLI.md#the-same-app-in-a-browser-from-your-own-machine),
+including what a browser records that the command line does not.
+
 **2. Browser extension.** During beta, build it and load it unpacked (store listings are
 pending, see [Status](#status)):
 
@@ -166,6 +173,7 @@ Then `chrome://extensions` → Developer mode → **Load unpacked** → pick `di
 npm install
 npm run cli -- save secret.txt --out ./vault      # → PNG images
 npm run cli -- restore ./vault --out ./restored    # ← images / folder / .zip / .pdf
+npm run cli -- ui                                  # or drive it from a browser, locally
 ```
 
 See the [command-line reference](docs/CLI.md) for key modes, paper, binary, and Gallery Mode.

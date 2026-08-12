@@ -93,6 +93,12 @@ jobs:
           path: dist-release
       - name: Build production web app
         run: npm run build:web
+      # For the cli-ui specs: this produces both dist-cli/web-ui (what
+      # `stegoshard ui` serves) and web-dist-offline/serve.mjs (the launcher the
+      # download ships). Without it those specs have nothing to start, and they
+      # fail rather than skip, so this step cannot be dropped unnoticed.
+      - name: Build CLI and offline web app
+        run: npm run build:cli
       - name: Install pinned browsers
         run: npx playwright install --with-deps chromium firefox
       - name: Run browser E2E suite

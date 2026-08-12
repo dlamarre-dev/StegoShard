@@ -100,6 +100,43 @@ The password is taken (in order) from `--password` (which prints a warning, sinc
 visible in your shell history and the process list), `--password-file`, the
 `STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
+## The same app, in a browser, from your own machine
+
+`stegoshard ui` serves the web build locally and prints an address to open. It is the
+same guided and expert flows as [the hosted app](https://dlamarre-dev.github.io/StegoShard/),
+running from your disk, with no request leaving the machine.
+
+```bash
+npx stegoshard ui                 # prints http://127.0.0.1:<free port>/s/<token>/
+npx stegoshard ui --port 8137     # pin the port instead of taking a free one
+npx stegoshard ui --open          # and launch the browser
+```
+
+Running `stegoshard` with no arguments still prints usage: a browser opening itself out
+of an SSH session or a cron job is the wrong kind of surprise, so this is asked for
+explicitly.
+
+What it does and does not do:
+
+- it binds **127.0.0.1 only**, never a wildcard, and there is no `--host`;
+- the app lives under a **random path token**, so nothing else on a shared machine finds
+  it by scanning loopback ports, and a page that resolves a name to 127.0.0.1 gets a 404;
+- it serves a fixed set of files read at startup. No request path is ever joined onto a
+  directory, so there is nothing outside the build to reach;
+- it holds no state and reads no request body. The page's CSP (`connect-src 'none'`)
+  forbids it from calling back, so your secrets stay in the tab.
+
+**It is not the private path.** The command line leaves nothing behind but the files you
+ask for; a browser adds its cache, its history, its download folder and a small
+preference entry. If that matters for what you are storing, use the commands above
+instead. See [THREAT-MODEL.md](THREAT-MODEL.md#the-local-web-ui).
+
+**Not in the standalone binaries.** They are compiled without network access (see
+[Packaging](#packaging)), so they cannot listen at all; `ui` there explains where to get
+it. Use `npx stegoshard ui`, or the offline web bundle from the releases page, which
+ships a `serve.mjs` for exactly this (its `index.html` cannot be opened directly: ES
+modules and module workers are both blocked over `file://`).
+
 ## Packaging
 
 Two ways to install, depending on whether you already have Node:
@@ -124,6 +161,10 @@ Two ways to install, depending on whether you already have Node:
   run time and have baked-in
   `--allow-read --allow-write` permissions with **no network access**, so "nothing leaves
   your device" is enforced by the runtime.
+  That is why `stegoshard ui` is not available in them: serving the app locally needs a
+  listening socket, and a permission this claim rests on is not worth spending on a
+  convenience. The npm/`npx` CLI has it instead, and the offline web bundle carries its
+  own launcher.
 
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
