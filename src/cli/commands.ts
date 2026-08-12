@@ -38,12 +38,12 @@ import {
   exportVault,
   exportVaultBinary,
   exportVaultBinaryDisguised,
+  brandCaption,
   galleryDecode,
   galleryEncode,
   getCodec,
   importVault,
   importVaultBinary,
-  isRenderableAscii,
   looksLikeBinaryContainer,
   recoveryLines,
   serializeKeyBlock,
@@ -464,14 +464,20 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
 
   // Disk: one PNG per image, or a single .zip. Each carries the same brand strip
   // the browser stamps (shared renderer in @core), so the two agree pixel for
-  // pixel. --title/--date land here too; the core font is ASCII-only, so a title
-  // it cannot render is dropped rather than mangled.
+  // pixel. --title/--date land here too.
   const recovery = recoveryLines(codecName(codecId));
   const pngs = imagePayloads.map((payload, i) => {
-    const caption = [opts.title, opts.date, `${i + 1} / ${imagePayloads.length}`]
-      .filter((s): s is string => Boolean(s))
-      .filter(isRenderableAscii);
-    const img = drawBrandBand(codec.encode(payload, PROFILE_DISK), { recovery, lines: caption });
+    // Composed in @core, so the CLI and the browser stamp the same lines. A
+    // title the ASCII font cannot draw is folded first (`--title "Sauvegarde
+    // clé"` used to be dropped whole over the accent) and skipped if it still
+    // cannot be drawn; the browser has a canvas and shows it another way.
+    const { lines } = brandCaption({
+      title: opts.title,
+      date: opts.date,
+      index: i + 1,
+      total: imagePayloads.length,
+    });
+    const img = drawBrandBand(codec.encode(payload, PROFILE_DISK), { recovery, lines });
     return {
       name: `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
       bytes: imageDataToPng(img),

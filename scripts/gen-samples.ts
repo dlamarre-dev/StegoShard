@@ -21,6 +21,7 @@ import {
   DEFAULT_ARGON2,
   PROFILE_DISK,
   PROFILE_PAPER,
+  brandCaption,
   codecName,
   createKeyBlock,
   drawBrandBand,
@@ -63,9 +64,12 @@ async function sampleImage(name: string, codecId: number, content: Uint8Array): 
   });
   const codec = getCodec(codecId);
   const total = imagePayloads.length;
+  // Composed by the same helper the apps use, so a sample cannot end up
+  // advertising a layout the apps do not produce (which is exactly what happened).
+  const { lines } = brandCaption({ title: TITLE, date: DATE, index: 1, total });
   const img = drawBrandBand(codec.encode(imagePayloads[0]!, PROFILE_DISK), {
     recovery: recoveryLines(codecName(codecId)),
-    lines: [TITLE, DATE, `1 / ${total}`],
+    lines,
   });
   writeFileSync(resolve(OUT, `${name}.png`), imageDataToPng(img));
   console.log(`${name}.png — ${img.width}x${img.height} px, image 1 of ${total}`);

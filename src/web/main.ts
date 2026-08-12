@@ -631,8 +631,12 @@ saveBtn.addEventListener('click', async () => {
   const stego: StegoInput | undefined =
     keyMode === 'stego' && cover ? { cover, password: savePw.value } : undefined;
   const date = new Date().toISOString().slice(0, 10);
-  const useLabel = addBand.checked;
-  const title = useLabel ? bandTitle.value.trim() : '';
+  // The title field is on screen for paper always, and for disk once the label
+  // box is ticked; the checkbox itself is disk-only, so keying the title off it
+  // alone silently dropped what a paper user had typed. The date always goes,
+  // with the sequence number: a page found on its own should say when it was
+  // made and how many others belong with it.
+  const title = dest === 'paper' || addBand.checked ? bandTitle.value.trim() : '';
 
   await doSave(async () => ({
     dest,
@@ -646,7 +650,7 @@ saveBtn.addEventListener('click', async () => {
     duressPassword,
     decoy,
     threshold,
-    label: useLabel ? { title, date } : undefined,
+    label: { title: title || undefined, date },
     asZip: asZip.checked,
     includeInstructions: addInstructions.checked,
     passwordHint: pwHint.value.trim() || undefined,

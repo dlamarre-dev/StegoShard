@@ -93,8 +93,13 @@ export interface SaveRequest {
   keyMode?: KeyMode;
   /** Image codec for the disk destination. Ignored elsewhere. */
   codec?: CodecChoice | undefined;
-  /** Readable title band drawn above disk images. */
-  label?: { title?: string; date?: string } | undefined;
+  /**
+   * Readable caption stamped into the brand strip on disk images, and used for
+   * the paper PDF's heading. The date is expected on every save (it is stamped
+   * with the sequence number whether or not a title was asked for); the title is
+   * the optional part.
+   */
+  label?: { title?: string | undefined; date?: string | undefined } | undefined;
   asZip?: boolean | undefined;
   includeInstructions?: boolean;
   passwordHint?: string | undefined;

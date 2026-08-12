@@ -114,6 +114,26 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **Saved images stamp their caption where the samples show it.** The browser drew
+  the label, date and sequence number in its own sans-serif strip _above_ the
+  mark, while the CLI and the README samples put them in the brand strip's 5x7
+  font under the recovery lines. Two products, one format. The caption is now
+  composed in `@core` (`brandCaption`) for every surface, so a saved image matches
+  the samples and the CLI byte for byte.
+- **The date and the sequence number are always stamped.** They appeared only when
+  a title had been asked for, so an unlabelled set said nothing about when it was
+  made or how many pieces it had, which is precisely what someone holding one
+  printed page needs. The guided flow stamps them too.
+- **A title with an accent reached the image as nothing at all.** The strip's font
+  is ASCII, and a caption it could not draw was dropped whole, so `--title
+"Sauvegarde clé"` printed no title. Latin diacritics and typographic punctuation
+  are now folded first ("SAUVEGARDE CLE"); a script with no ASCII form (Japanese,
+  Cyrillic) still gets a canvas-drawn strip of its own in the browser rather than
+  being discarded.
+- **A title typed for the Paper destination was discarded.** The title field shows
+  for paper, but whether it was used keyed off the disk-only "add a readable
+  label" checkbox, so it only reached the PDF if that hidden box happened to be
+  ticked.
 - **A file between ~64 KB and 1 MB broke the estimate pass.** Photo-carrier
   capacity is bounded by its bucket ladder, and the arithmetic _throws_ past the
   top rung; nothing caught it, so in expert mode the update was abandoned (the

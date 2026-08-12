@@ -805,8 +805,12 @@ saveBtn.addEventListener('click', async () => {
     threshold = t;
   }
   const date = new Date().toISOString().slice(0, 10);
-  const useLabel = addBand.checked;
-  const title = useLabel ? bandTitle.value.trim() : '';
+  // The title field is on screen for paper always, and for disk once the label
+  // box is ticked; the checkbox itself is disk-only, so keying the title off it
+  // alone silently dropped what a paper user had typed. The date always goes,
+  // with the sequence number: a page found on its own should say when it was
+  // made and how many others belong with it.
+  const title = dest === 'paper' || addBand.checked ? bandTitle.value.trim() : '';
 
   // Stego hides the external key artifact in a cover photo, keyed by the vault
   // password so restore uses one password for both the stego extraction and the
@@ -843,7 +847,7 @@ saveBtn.addEventListener('click', async () => {
     duressPassword,
     decoy,
     threshold,
-    label: useLabel ? { title, date } : undefined,
+    label: { title: title || undefined, date },
     asZip: asZip.checked,
     includeInstructions: addInstructions.checked,
     passwordHint: pwHint.value.trim() || undefined,
