@@ -80,6 +80,7 @@ import {
 import { gatherImageFiles, gatherInputs, walk } from './inputs';
 import { buildCliPaperPdf } from './paper';
 import { BUNDLE_NAME, packBundle, unpackBundle } from '../ui/bundle';
+import { t } from './i18n';
 
 export { WrongPasswordError, MissingKeyError };
 
@@ -95,7 +96,7 @@ function writeOut(dir: string, name: string, bytes: Uint8Array): string {
   mkdirSync(dir, { recursive: true });
   const path = join(dir, name);
   if (!allowOverwrite && existsSync(path)) {
-    throw new Error(`refusing to overwrite existing file: ${path} (use --force to overwrite)`);
+    throw new Error(t('errOverwrite', { path }));
   }
   writeFileSync(path, bytes);
   return path;
@@ -222,7 +223,7 @@ async function externalKey(
   variant: 'block' | 'factor' = 'block',
 ): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
   if (keyMode === 'stego') {
-    if (!cover) throw new Error('stego mode requires a --cover image');
+    if (!cover) throw new Error(t('errStegoNeedsCover'));
     const key =
       variant === 'factor'
         ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password)
@@ -269,8 +270,8 @@ async function runSaveDisguised(
   }
 
   if (mode === 'duress') {
-    if (!opts.decoyFile) throw new Error('save: --mode duress requires --decoy <file>');
-    if (!opts.duressPassword) throw new Error('save: --mode duress requires a duress password');
+    if (!opts.decoyFile) throw new Error(t('errSaveDuressDecoy'));
+    if (!opts.duressPassword) throw new Error(t('errDuressNeedsPassword'));
     const decoyContent = read(opts.decoyFile);
     const decoyName = basename(opts.decoyFile);
     // Core builds + self-verifies both regions and wraps the container.
@@ -292,7 +293,7 @@ async function runSaveDisguised(
   }
 
   if (mode === 'nonpossession') {
-    if (!opts.threshold) throw new Error('save: --mode nonpossession requires --threshold k-of-n');
+    if (!opts.threshold) throw new Error(t('errSaveThreshold'));
     const { k, n } = opts.threshold;
     const { container, shares } = await buildNonPossessionDbContainer(
       name,
@@ -366,7 +367,7 @@ function readSaveInputs(paths: string[]): {
     if (statSync(path).isDirectory()) files.push(...walk(path));
     else files.push(path);
   }
-  if (files.length === 0) throw new Error('save: no input files found');
+  if (files.length === 0) throw new Error(t('errNoInputFiles'));
   if (files.length === 1) {
     const only = files[0]!;
     return { name: basename(only), content: read(only), bundle: false, count: 1 };
@@ -387,7 +388,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   }
   // A non-plain access mode is only meaningful on the supported .db path.
   if (opts.mode && opts.mode !== 'plain') {
-    throw new Error(`save: --mode ${opts.mode} is only supported with --binary --disguise`);
+    throw new Error(t('errModeNeedsDisguise', { mode: String(opts.mode) }));
   }
 
   const key = await makeKey(opts.password);
@@ -606,7 +607,7 @@ export async function runRestore(
   if (opts.keyPath) keyBlock = await resolveKeyBlock(opts.keyPath, opts.password);
 
   if (gathered.payloads.length === 0) {
-    throw new Error('no readable StegoShard images found in the inputs');
+    throw new Error(t('errNoReadableImages'));
   }
 
   const { filename, content, bundled } = await importVault(gathered.payloads, opts.password, {
@@ -654,7 +655,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
   const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
-  if (coverPaths.length === 0) throw new Error('gallery: no cover images found in the given paths');
+  if (coverPaths.length === 0) throw new Error(t('errNoCoversFound'));
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
   const mode = opts.mode ?? 'plain';
@@ -739,7 +740,7 @@ export interface GalleryRestoreResult {
 export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
   allowOverwrite = Boolean(opts.force);
   const coverPaths = gatherImageFiles(opts.inputs);
-  if (coverPaths.length === 0) throw new Error('gallery: no images found in the inputs');
+  if (coverPaths.length === 0) throw new Error(t('errNoGalleryImages'));
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
   // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
@@ -799,10 +800,10 @@ export function codecIdForSave(paper: boolean, codec: CodecChoice | undefined): 
  */
 export function codecArgError(requested: string | undefined, paper: boolean): string | null {
   if (requested !== undefined && !CODEC_CHOICES.includes(requested as CodecChoice)) {
-    return `invalid --codec "${requested}"`;
+    return t('errCodecInvalid', { value: String(requested) });
   }
   if (requested === 'color' && paper) {
-    return '--codec color cannot be used with --paper (printed pages use QR)';
+    return t('errCodecColorPaper');
   }
   return null;
 }
@@ -837,10 +838,10 @@ export function entropyArgError(src: EntropySources): string | null {
     src.prompt === true && '--entropy-prompt',
   ].filter((s): s is string => typeof s === 'string');
   if (given.length > 1) {
-    return `${given.join(' and ')} are mutually exclusive (pick one entropy source)`;
+    return t('errEntropyExclusive', { flags: given.join(' and ') });
   }
   if (src.text !== undefined && src.text === '') {
-    return '--entropy was empty (omit the flag if you do not want extra entropy)';
+    return t('errEntropyFlagEmpty');
   }
   return null;
 }

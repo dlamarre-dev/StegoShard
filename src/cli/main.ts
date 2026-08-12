@@ -42,29 +42,31 @@ import {
   passwordStrength,
 } from '../ui/password';
 import { collectAssets, findWebRoot, openInBrowser, startUiServer, startupNotice } from './ui';
+import { t, type CliKey } from './i18n';
+import { usage } from './i18n/usage';
 
 const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
 
 /** Parse a `k-of-n` threshold spec. */
 function parseThreshold(spec: string): { k: number; n: number } {
   const m = /^(\d+)-of-(\d+)$/.exec(spec.trim());
-  if (!m) fail(`--threshold must look like "2-of-3" (got "${spec}")`);
+  if (!m) fail(t('errThresholdShape', { spec }));
   const k = Number(m[1]);
   const n = Number(m[2]);
-  if (k < 1 || n < k || n > 255) fail(`--threshold out of range: ${spec} (need 1 ≤ k ≤ n ≤ 255)`);
+  if (k < 1 || n < k || n > 255) fail(t('errThresholdRange', { spec }));
   return { k, n };
 }
 
 /** Plain-English purpose for each produced file (the app localizes the same set). */
-const PURPOSE_TEXT: Record<FilePurpose, string> = {
-  vault: 'the vault: holds your file',
-  archive: 'all images bundled in one .zip',
-  document: 'printable sheet',
-  photos: 'fragment photos: keep the whole set',
-  keyfile: 'separate key: needed with your password',
-  stegoCover: 'photo holding the hidden key',
-  share: 'recovery share, for one holder',
-};
+const PURPOSE_KEYS = {
+  vault: 'purposeVault',
+  archive: 'purposeArchive',
+  document: 'purposeDocument',
+  photos: 'purposePhotos',
+  keyfile: 'purposeKeyfile',
+  stegoCover: 'purposeStegoCover',
+  share: 'purposeShare',
+} as const satisfies Record<FilePurpose, CliKey>;
 
 /**
  * "Files created" block for the end of a save.
@@ -79,10 +81,10 @@ function manifestLines(manifest: readonly ManifestEntry[]): string {
   const groups = collapseManifest(manifest);
   const rendered = groups.map((g) => ({
     name: g.count > 1 ? `${g.first} … ${g.last}` : g.first,
-    text: g.count > 1 ? `${PURPOSE_TEXT[g.purpose]} (${g.count})` : PURPOSE_TEXT[g.purpose],
+    text: g.count > 1 ? `${t(PURPOSE_KEYS[g.purpose])} (${g.count})` : t(PURPOSE_KEYS[g.purpose]),
   }));
   const width = Math.max(...rendered.map((r) => r.name.length));
-  return `Files created:\n${rendered
+  return `${t('outFilesCreated')}\n${rendered
     .map((r) => `  ${r.name.padEnd(width)}  ${r.text}`)
     .join('\n')}\n`;
 }
@@ -93,115 +95,27 @@ function manifestLines(manifest: readonly ManifestEntry[]): string {
  */
 function restoredLine(res: { filename: string; outPath: string; files?: string[] }): string {
   const files = res.files ?? [res.outPath];
-  if (files.length === 1) return `Restored ${res.filename} -> ${files[0]}\n`;
-  return `Restored ${files.length} files:\n${files.map((f) => `  ${f}`).join('\n')}\n`;
+  if (files.length === 1) {
+    return `${t('outRestoredOne', { name: res.filename, path: files[0]! })}\n`;
+  }
+  return `${t('outRestoredMany', { count: files.length })}\n${files
+    .map((f) => `  ${f}`)
+    .join('\n')}\n`;
 }
-
-const USAGE = `StegoShard: encrypt a file into resilient images, an opaque binary
-file, or a decoy database, and restore it.
-
-Usage:
-  stegoshard save <file|dir ...> [options]
-  stegoshard restore <images|folder|zip|pdf ...> [options]
-  stegoshard estimate <file> [--paper] [--codec color|qr]
-  stegoshard gallery-save <file> <cover-photos|folder ...> [options]
-  stegoshard gallery-restore <photos|folder ...> [options]
-  stegoshard ui [--port <n>] [--open]
-                         Same app as the browser version, served on this machine
-                         only. Not available in the standalone binaries, which
-                         are compiled without network access.
-
-Save options:
-  Several inputs (or a directory) are zipped into one bundle inside the vault;
-  restore unpacks them back to the original files. One input is stored as-is.
-  --out <dir>            Output directory (default: current directory)
-  --paper                Produce a printable PDF (high-ECC) instead of PNGs
-  --zip                  Bundle the PNG set into a single .zip (disk mode)
-  --binary               Output one opaque file instead of images (up to 1 GiB)
-  --disguise             With --binary: give it a SQLite-database header (.db)
-  --mode <mode>          plain | duress | nonpossession   (.db only; default: plain)
-                         duress:        a decoy that opens under a 2nd password
-                         nonpossession: gate the vault on threshold shares you can't reach
-  --decoy <file>         --mode duress: the plausible decoy file
-  --duress-password-file <path>  --mode duress: the 2nd (duress) password
-  --threshold <k-of-n>   --mode nonpossession: e.g. 2-of-3 (writes n share files)
-  --codec <codec>        color | qr   (default: color; images only, not --paper)
-                         color: 8-colour grid, ~3x the bytes per image
-                         qr:    plain QR, readable by any phone
-  --key-mode <mode>      embedded | keyfile | stego   (default: embedded)
-  --cover <image>        Cover photo for --key-mode stego (key hidden in it)
-  --title <text>         Human-readable label / PDF title
-  --date <text>          Date shown on the pages (default: today)
-  --locale <code>        Instruction-sheet language, e.g. fr, ja, zh_TW
-  --instructions         Include the restore instruction sheet (paper)
-  --password-hint <t>    Password hint printed on the instruction sheet
-  --key-location <t>     Where the key is kept, printed on the sheet
-  --font <path>          A .ttf/.otf for CJK instruction text (paper)
-  --allow-weak-password  Acknowledge a weak (but >= 12 character) password for a
-                         new vault. The 12-character minimum itself cannot be
-                         waived by this or any other flag.
-
-Restore options:
-  --out <dir>            Output directory (default: current directory)
-  --key <file|image>     A .key file, a stego image, or a binary key container
-  --share <file>         A threshold share file (repeatable) for a nonpossession vault
-
-Common:
-  --force                Overwrite existing output files (default: refuse)
-  --quiet                Suppress the progress indicator on stderr
-
-Password (any command that needs one), in order of precedence:
-  --password <pw>        Discouraged: visible in shell history / process list
-  --password-file <path> Read the password from a file (first line)
-  STEGOSHARD_PASSWORD    Environment variable
-  interactive prompt     Asked (hidden) when none of the above is set
-
-Extra entropy for save / gallery-save (optional, expert; affects generation
-only — nothing to re-enter on restore, and the OS CSPRNG is always used
-regardless), in order of precedence:
-  --entropy <text>       Discouraged: visible in shell history / process list
-  --entropy-file <path>  Read it from a file (whole contents, e.g. dice rolls)
-  --entropy-prompt       Ask for it (hidden) at the terminal (needs a TTY)
-  STEGOSHARD_ENTROPY     Environment variable
-  Your text is XORed in as a second source: it can only add uncertainty, never
-  replace the CSPRNG, so a weak string cannot weaken the vault.
-
-Gallery Mode (a secret hidden, fragmented, across many ordinary photos):
-  --out <dir>            Output directory for the modified photos
-  --key-mode <mode>      embedded (default) | keyfile | stego   (gallery-save)
-  --cover <image>        Cover photo for --key-mode stego (gallery-save)
-  --key <file|image>     External key for a keyfile/stego gallery (gallery-restore)
-  --mode nonpossession   Gate the gallery on threshold shares (with --threshold k-of-n)
-  --share <file>         A threshold share file (repeatable) for gallery-restore
-  (duress is not available on gallery — use --binary --disguise --mode duress)
-  Every photo is modified; the best K+M carry Reed-Solomon fragments and the
-  rest become decoys (min 5 photos total, at least 2 decoys). Restore is blind:
-  any photos that authenticate are used, and any K fragments reconstruct.
-
-Examples:
-  stegoshard save secret.txt --out ./vault
-  stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
-  stegoshard save notes.txt --paper --instructions --locale fr --out ./print
-  stegoshard save archive.zip --binary --disguise --out ./vault
-  stegoshard save secret.txt --entropy-file dice.txt --out ./vault
-  stegoshard restore ./vault --out ./restored
-  stegoshard gallery-save note.txt ./photos --out ./album
-  stegoshard gallery-restore ./album --out ./restored
-`;
 
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`);
   process.exit(code);
 }
 
-const PHASE_LABELS: Record<Progress['phase'], string> = {
-  compress: 'Compressing',
-  encrypt: 'Encrypting',
-  decrypt: 'Decrypting',
-  verify: 'Verifying',
-  unlock: 'Unlocking',
-  render: 'Rendering',
-};
+const PHASE_KEYS = {
+  compress: 'phaseCompress',
+  encrypt: 'phaseEncrypt',
+  decrypt: 'phaseDecrypt',
+  verify: 'phaseVerify',
+  unlock: 'phaseUnlock',
+  render: 'phaseRender',
+} as const satisfies Record<Progress['phase'], CliKey>;
 
 /**
  * A progress reporter on stderr (results stay on stdout, so piping is unaffected).
@@ -215,7 +129,8 @@ function makeProgress(quiet: boolean): { onProgress?: OnProgress; done: () => vo
   let lastLabel = '';
   let wroteTty = false;
   const onProgress: OnProgress = (p) => {
-    const label = PHASE_LABELS[p.phase] ?? p.phase;
+    const key = PHASE_KEYS[p.phase];
+    const label = key ? t(key) : p.phase;
     if (tty) {
       const suffix = p.total > 0 ? `… ${Math.floor((p.done / p.total) * 100)}%` : '…';
       process.stderr.write(`\r\x1b[2K${label}${suffix}`);
@@ -282,21 +197,18 @@ function promptHidden(question: string): Promise<string> {
 async function resolvePassword(values: Record<string, unknown>): Promise<string> {
   let pw: string;
   if (typeof values.password === 'string') {
-    process.stderr.write(
-      'Warning: --password is visible in your shell history and the process list; ' +
-        'prefer STEGOSHARD_PASSWORD, --password-file, or the interactive prompt.\n',
-    );
+    process.stderr.write(`${t('warnPasswordFlag')}\n`);
     pw = values.password;
   } else if (typeof values['password-file'] === 'string') {
     pw = readFileSync(values['password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
   } else if (process.env.STEGOSHARD_PASSWORD) {
     pw = process.env.STEGOSHARD_PASSWORD;
   } else {
-    pw = await promptHidden('Password: ');
+    pw = await promptHidden(t('promptPassword'));
   }
   // Reject an empty password from every source, not just the interactive prompt
   // (an empty --password/--password-file/env var would silently gut the KDF).
-  if (!pw) fail('no password provided (an empty password is not allowed)');
+  if (!pw) fail(t('errNoPassword'));
   return pw;
 }
 
@@ -308,16 +220,16 @@ async function resolveDuressPassword(values: Record<string, unknown>): Promise<s
   } else if (process.env.STEGOSHARD_DURESS_PASSWORD) {
     pw = process.env.STEGOSHARD_DURESS_PASSWORD;
   } else {
-    pw = await promptHidden('Duress password: ');
+    pw = await promptHidden(t('promptDuressPassword'));
   }
-  if (!pw) fail('no duress password provided (an empty password is not allowed)');
+  if (!pw) fail(t('errNoDuressPassword'));
   return pw;
 }
 
 async function requireStrongOrAcknowledged(
   password: string,
   values: Record<string, unknown>,
-  label = 'password',
+  label = t('labelPassword'),
 ): Promise<void> {
   if (isStrongNewPassword(password)) return;
   // The hard floor is checked before --allow-weak-password is even consulted: a
@@ -325,25 +237,26 @@ async function requireStrongOrAcknowledged(
   // this need a longer password, not another flag.
   if (!meetsPasswordFloor(password)) {
     fail(
-      `the ${label} is too short: ${password.length} character(s), minimum ${MIN_PASSWORD_LENGTH}. ` +
-        'This floor cannot be waived; an offline attacker holding the vault can grind it at leisure.',
+      t('errPasswordShort', {
+        label,
+        length: password.length,
+        min: MIN_PASSWORD_LENGTH,
+      }),
     );
   }
   const estimate = passwordStrength(password);
-  const warning =
-    `Warning: the ${label} is weak (estimated ${estimate.bits} bits). ` +
-    'Offline vaults can be guessed without contacting you.';
+  const warning = t('warnWeakPassword', { label, bits: estimate.bits });
   if (values['allow-weak-password'] === true) {
     process.stderr.write(`${warning}\n`);
     return;
   }
   if (!process.stdin.isTTY || !process.stderr.isTTY) {
-    fail(`${warning} Re-run with --allow-weak-password to acknowledge this risk.`);
+    fail(t('errWeakAcknowledge', { warning }));
   }
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    const answer = await rl.question(`${warning}\nType ALLOW to continue: `);
-    if (answer !== 'ALLOW') fail('cancelled: weak password was not acknowledged');
+    const answer = await rl.question(`${warning}\n${t('promptAllow')}`);
+    if (answer !== 'ALLOW') fail(t('errWeakCancelled'));
   } finally {
     rl.close();
   }
@@ -378,10 +291,7 @@ async function installEntropy(values: Record<string, unknown>): Promise<void> {
 
   let text: string;
   if (typeof values.entropy === 'string') {
-    process.stderr.write(
-      'Warning: --entropy is visible in your shell history and the process list; ' +
-        'prefer STEGOSHARD_ENTROPY, --entropy-file, or --entropy-prompt.\n',
-    );
+    process.stderr.write(`${t('warnEntropyFlag')}\n`);
     text = values.entropy;
   } else if (typeof values['entropy-file'] === 'string') {
     // Whole file, not just the first line: a page of dice rolls is the point.
@@ -391,22 +301,22 @@ async function installEntropy(values: Record<string, unknown>): Promise<void> {
     } catch {
       // A missing or unreadable file must name itself, not surface as a raw
       // ENOENT stack; this runs after the password prompt, deep into the run.
-      fail(`--entropy-file: cannot read "${path}"`);
+      fail(t('errEntropyFile', { path }));
     }
   } else if (values['entropy-prompt']) {
     // Without a terminal, a "hidden prompt" would swallow whatever is piped in,
     // including a password meant for the password prompt. Refuse instead.
     if (!process.stdin.isTTY) {
-      fail('--entropy-prompt needs a terminal; use --entropy-file or STEGOSHARD_ENTROPY');
+      fail(t('errEntropyPromptTty'));
     }
-    text = await promptHidden('Extra entropy (type randomly, or paste dice rolls): ');
-    if (!text) fail('--entropy-prompt: nothing entered');
+    text = await promptHidden(t('promptEntropy'));
+    if (!text) fail(t('errEntropyPromptEmpty'));
   } else if (process.env.STEGOSHARD_ENTROPY) {
     text = process.env.STEGOSHARD_ENTROPY;
   } else {
     return; // no extra layer: plain CSPRNG, exactly as before
   }
-  if (!text.trim()) fail('extra entropy was empty (omit it if you do not want the extra layer)');
+  if (!text.trim()) fail(t('errEntropyEmpty'));
   await installUserEntropy(text);
 }
 
@@ -428,7 +338,7 @@ async function runUi(args: string[]): Promise<number> {
   });
   const port = values.port === undefined ? 0 : Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    fail(`ui: --port must be a port number (got "${values.port}")`);
+    fail(t('errUiPort', { value: String(values.port) }));
   }
 
   const root = findWebRoot(import.meta.url);
@@ -436,12 +346,7 @@ async function runUi(args: string[]): Promise<number> {
   // --allow-net so they could not listen anyway. One check covers both: say where
   // the UI does live rather than failing on a missing directory.
   if (!root) {
-    process.stderr.write(
-      'ui: this build does not carry the web app.\n' +
-        'The standalone binaries are compiled without network access, so they cannot\n' +
-        'serve it. Use `npx stegoshard ui`, or download the offline web bundle from\n' +
-        'the releases page and run its serve script.\n',
-    );
+    process.stderr.write(`${t('errUiNoWebApp')}\n`);
     return 1;
   }
 
@@ -459,7 +364,7 @@ async function runUi(args: string[]): Promise<number> {
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h' || command === 'help') {
-    process.stdout.write(USAGE);
+    process.stdout.write(usage());
     return 0;
   }
   if (command === 'ui') return runUi(argv.slice(1));
@@ -503,7 +408,7 @@ async function main(argv: string[]): Promise<number> {
   // Only `save` and `gallery-save` generate key material. Say so rather than
   // accepting the flags and quietly doing nothing with them.
   if (command !== 'save' && command !== 'gallery-save' && entropyFlagGiven(values)) {
-    fail(`${command}: the --entropy options apply to save and gallery-save only`);
+    fail(t('errEntropyWrongCommand', { command }));
   }
 
   const force = Boolean(values.force);
@@ -512,30 +417,29 @@ async function main(argv: string[]): Promise<number> {
 
   if (command === 'save') {
     const inputs = positionals;
-    if (inputs.length === 0) fail('save: missing <file|dir ...>');
+    if (inputs.length === 0) fail(t('errSaveMissingInputs'));
     const keyMode = ((values['key-mode'] as string) ?? 'embedded') as KeyMode;
-    if (!KEY_MODES.includes(keyMode)) fail(`save: invalid --key-mode "${keyMode}"`);
-    if (keyMode === 'stego' && !values.cover)
-      fail('save: --key-mode stego requires --cover <image>');
+    if (!KEY_MODES.includes(keyMode)) fail(t('errSaveKeyMode', { value: keyMode }));
+    if (keyMode === 'stego' && !values.cover) fail(t('errSaveStegoCover'));
     const requestedCodec = values.codec as string | undefined;
     const codecProblem = codecArgError(requestedCodec, Boolean(values.paper));
     if (codecProblem) fail(`save: ${codecProblem}`);
     const codec = (requestedCodec ?? 'color') as CodecChoice;
-    if (values.binary && values.paper) fail('save: --binary and --paper are mutually exclusive');
-    if (values.disguise && !values.binary) fail('save: --disguise requires --binary');
+    if (values.binary && values.paper) fail(t('errSaveBinaryPaper'));
+    if (values.disguise && !values.binary) fail(t('errSaveDisguise'));
     const binary = values.binary ? (values.disguise ? 'disguised' : 'branded') : undefined;
 
     // §10 access mode (supported only on the disguised .db path for now).
     const mode = ((values.mode as string | undefined) ?? 'plain') as AccessMode;
-    if (!ACCESS_MODES.includes(mode)) fail(`save: invalid --mode "${mode}"`);
+    if (!ACCESS_MODES.includes(mode)) fail(t('errSaveMode', { value: mode }));
     if (mode !== 'plain' && binary !== 'disguised') {
-      fail(`save: --mode ${mode} requires --binary --disguise`);
+      fail(t('errSaveModeNeedsDisguise', { mode }));
     }
     let duressPassword: string | undefined;
     let threshold: { k: number; n: number } | undefined;
-    if (mode === 'duress' && !values.decoy) fail('save: --mode duress requires --decoy <file>');
+    if (mode === 'duress' && !values.decoy) fail(t('errSaveDuressDecoy'));
     if (mode === 'nonpossession') {
-      if (!values.threshold) fail('save: --mode nonpossession requires --threshold k-of-n');
+      if (!values.threshold) fail(t('errSaveThreshold'));
       threshold = parseThreshold(values.threshold as string);
     }
 
@@ -578,19 +482,21 @@ async function main(argv: string[]): Promise<number> {
     const res = await runSave(opts, progress.onProgress);
     progress.done();
     if (res.fontWarning) process.stderr.write(`${res.fontWarning}\n`);
-    if (res.sizeWarning) process.stderr.write(`Warning: ${res.sizeWarning}\n`);
+    if (res.sizeWarning) {
+      process.stderr.write(`${t('warnPrefix', { message: res.sizeWarning })}\n`);
+    }
     const what = res.binary
-      ? `binary vault (${res.binary}) [${res.keyMode}]`
-      : `${res.imageCount} image(s) [${res.keyMode}]`;
-    process.stdout.write(`Saved ${what}.\n${manifestLines(res.manifest)}`);
+      ? t('outSavedBinary', { variant: res.binary, keyMode: res.keyMode })
+      : t('outSavedImages', { count: res.imageCount, keyMode: res.keyMode });
+    process.stdout.write(`${t('outSaved', { what })}\n${manifestLines(res.manifest)}`);
     if (res.keyMode !== 'embedded') {
-      process.stdout.write('Keep the separate key artifact AND your password to restore.\n');
+      process.stdout.write(`${t('outKeepKeyArtifact')}\n`);
     }
     return 0;
   }
 
   if (command === 'restore') {
-    if (positionals.length === 0) fail('restore: missing input images/folder/zip/pdf');
+    if (positionals.length === 0) fail(t('errRestoreMissing'));
     const password = await resolvePassword(values);
     const progress = makeProgress(Boolean(values.quiet));
     const res = await runRestore(
@@ -605,31 +511,28 @@ async function main(argv: string[]): Promise<number> {
       progress.onProgress,
     );
     progress.done();
-    process.stderr.write(`decoded ${res.decoded} of ${res.seen} image(s)\n`);
+    process.stderr.write(`${t('outDecoded', { decoded: res.decoded, seen: res.seen })}\n`);
     process.stdout.write(restoredLine(res));
     return 0;
   }
 
   if (command === 'gallery-save') {
     const secretFile = positionals[0];
-    if (!secretFile) fail('gallery-save: missing <file>');
+    if (!secretFile) fail(t('errGalleryMissingFile'));
     const covers = positionals.slice(1);
-    if (covers.length === 0) fail('gallery-save: give cover photos or a folder');
+    if (covers.length === 0) fail(t('errGalleryNoCovers'));
     const keyMode = ((values['key-mode'] as string) ?? 'embedded') as KeyMode;
-    if (!KEY_MODES.includes(keyMode)) fail(`gallery-save: invalid --key-mode "${keyMode}"`);
-    if (keyMode === 'stego' && !values.cover)
-      fail('gallery-save: --key-mode stego requires --cover <image>');
+    if (!KEY_MODES.includes(keyMode)) fail(t('errGalleryKeyMode', { value: keyMode }));
+    if (keyMode === 'stego' && !values.cover) fail(t('errGalleryStegoCover'));
     // §10 mode: gallery supports plain + nonpossession; duress is blocked (§10.11).
     const gMode = ((values.mode as string | undefined) ?? 'plain') as AccessMode;
     if (gMode === 'duress') {
-      fail(
-        'gallery-save: duress mode is not available on gallery; use --binary --disguise --mode duress',
-      );
+      fail(t('errGalleryDuress'));
     }
-    if (!ACCESS_MODES.includes(gMode)) fail(`gallery-save: invalid --mode "${gMode}"`);
+    if (!ACCESS_MODES.includes(gMode)) fail(t('errGalleryMode', { value: gMode }));
     let gThreshold: { k: number; n: number } | undefined;
     if (gMode === 'nonpossession') {
-      if (!values.threshold) fail('gallery-save: --mode nonpossession requires --threshold k-of-n');
+      if (!values.threshold) fail(t('errGalleryThreshold'));
       gThreshold = parseThreshold(values.threshold as string);
     }
     const password = await resolvePassword(values);
@@ -647,19 +550,23 @@ async function main(argv: string[]): Promise<number> {
       force,
     });
     process.stdout.write(
-      `Saved gallery across ${res.files.length} file(s) ` +
-        `(${res.k} data + ${res.m} parity + ${res.decoys} decoy) [${res.keyMode}].\n` +
-        manifestLines(res.manifest),
+      `${t('outSavedGallery', {
+        files: res.files.length,
+        k: res.k,
+        m: res.m,
+        decoys: res.decoys,
+        keyMode: res.keyMode,
+      })}\n${manifestLines(res.manifest)}`,
     );
-    process.stdout.write(`Keep your password; any ${res.k} of the fragment photos restore it.\n`);
+    process.stdout.write(`${t('outGalleryKeep', { k: res.k })}\n`);
     if (res.keyMode !== 'embedded') {
-      process.stdout.write('Keep the separate key artifact too (restore with --key).\n');
+      process.stdout.write(`${t('outGalleryKeepKey')}\n`);
     }
     return 0;
   }
 
   if (command === 'gallery-restore') {
-    if (positionals.length === 0) fail('gallery-restore: missing photos/folder');
+    if (positionals.length === 0) fail(t('errGalleryRestoreMissing'));
     const password = await resolvePassword(values);
     const res = await runGalleryRestore({
       inputs: positionals,
@@ -669,40 +576,37 @@ async function main(argv: string[]): Promise<number> {
       sharePaths: values.share as string[] | undefined,
       force,
     });
-    process.stderr.write(`scanned ${res.seen} photo(s)\n`);
+    process.stderr.write(`${t('outScanned', { seen: res.seen })}\n`);
     process.stdout.write(restoredLine(res));
     return 0;
   }
 
   if (command === 'estimate') {
     const inputFile = positionals[0];
-    if (!inputFile) fail('estimate: missing <file>');
+    if (!inputFile) fail(t('errEstimateMissing'));
     const estProblem = codecArgError(values.codec as string | undefined, Boolean(values.paper));
     if (estProblem) fail(`estimate: ${estProblem}`);
     const estCodec = ((values.codec as string | undefined) ?? 'color') as CodecChoice;
     const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper), estCodec);
-    process.stdout.write(`${images} image(s)  (k=${k} data + m=${m} parity)\n`);
+    process.stdout.write(`${t('outEstimate', { images, k, m })}\n`);
     return 0;
   }
 
-  fail(`unknown command "${command}" (try: stegoshard --help)`, 2);
+  fail(t('errUnknownCommand', { command }), 2);
 }
 
 main(process.argv.slice(2))
   .then((code) => process.exit(code))
   .catch((err: unknown) => {
-    if (err instanceof WrongPasswordError) fail('wrong password');
+    if (err instanceof WrongPasswordError) fail(t('errWrongPassword'));
     if (err instanceof GalleryRestoreError) {
-      fail('no restorable gallery found (wrong password or these are not gallery photos)');
+      fail(t('errNoGallery'));
     }
     if (err instanceof MissingKeyError) {
-      fail('this image set needs a separate key (use --key <file|image>)');
+      fail(t('errNeedsKey'));
     }
     if (err instanceof CredentialsNotIndependentError) {
-      fail(
-        `the duress password is too similar to the real one (${err.reason}); ` +
-          'choose an unrelated duress password',
-      );
+      fail(t('errDuressTooSimilar', { reason: err.reason }));
     }
     fail(err instanceof Error ? err.message : String(err));
   });

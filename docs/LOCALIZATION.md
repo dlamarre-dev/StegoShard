@@ -11,7 +11,7 @@ catalogs at build time and selects one from `navigator.language` (see
 ## Target locales (8)
 
 Default **English (`en`)**, plus EFIGS (fr, it, de, es), generic Portuguese
-(`pt`), Japanese (`ja`), and Traditional Chinese (`zh_TW`). All 274 message keys
+(`pt`), Japanese (`ja`), and Traditional Chinese (`zh_TW`). All 274 UI message keys
 are present in every locale.
 
 ## Review status
@@ -47,6 +47,39 @@ English structure exactly and preserve each `href` and `code` literal verbatim
 (URLs and permission names are never translated). The **ja and zh_TW** legal
 translations, like the UI strings, **need native review** before store
 submission.
+
+## Command-line tool
+
+The CLI has its own catalogs in `src/cli/i18n/<code>.ts`: its strings share nothing
+with the UI's (`--threshold must look like "2-of-3"` has no place in a browser), and
+importing eight ~40KB `messages.json` files would have put 320KB of JSON into a
+7KB launcher for a handful of terminal lines.
+
+They are TypeScript, not JSON, so **`en.ts` is the type**: every other locale is
+declared `CliCatalog`, which makes a missing or misnamed key a build error. What the
+type cannot see, `i18n.test.ts` checks: that `{placeholders}` survived translation,
+that nothing was left in English by accident (with a short, justified list of values
+a language legitimately spells the English way), and that flag names and
+`STEGOSHARD_*` variables were not translated.
+
+`--help` is **data**, not prose. `usage.ts` renders the flag columns from the
+descriptions, so alignment is computed once instead of being hand-kept in eight
+languages, and no locale can drift out of structure. Adding an option means adding
+a row and a description key.
+
+Detection is ICU's default locale, overridable with `STEGOSHARD_LANG`; the test
+suite pins `STEGOSHARD_LANG=en` (`vitest.config.ts`) so assertions on CLI text do
+not depend on whose machine they run on. See
+[CLI.md → Language](CLI.md#language).
+
+The offline web bundle's notes ship in all eight languages too
+(`src/web/offline/README.<code>.txt`), since someone who cannot read the English one
+is exactly who needs them. The launcher wrappers' "Node.js was not found" message
+stays English on purpose: it only appears when there is no Node to translate it.
+
+**Review status:** the CLI catalogs and the bundle READMEs were written the same way
+as the UI strings, so the same caveat applies. `ja` and `zh_TW` need a native review
+before 1.0; the EFIGS set deserves a light proofread.
 
 ## Store screenshots (not yet automated)
 

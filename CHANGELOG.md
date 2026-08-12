@@ -21,6 +21,19 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   - **It is not the private path.** A browser records what the command line does
     not (cache, history, downloads, a preference entry); the startup notice and
     [THREAT-MODEL.md](docs/THREAT-MODEL.md#the-local-web-ui) say so plainly.
+- **The whole CLI speaks the system language.** `--help`, every error, the progress
+  phases and the result lines, in the same eight locales as the app, falling back to
+  English. Detection is ICU's default locale (Windows sets no `LANG`); pin or change
+  it with `STEGOSHARD_LANG`. Flag names, environment variables, subcommands, the
+  example commands and the `ui` address are never translated, so anything scraping
+  the output keeps working, and the test suite pins `STEGOSHARD_LANG=en`.
+  - `--help` is now rendered from data (`src/cli/i18n/usage.ts`): the flag columns
+    are aligned by code rather than hand-kept in eight copies of a 90-line text.
+  - The catalogs are typed against the English one, so a missing key cannot
+    compile, and a test checks that placeholders survived translation and that flag
+    names did not get translated.
+- **The offline bundle's notes ship in all eight languages** (`README.fr.txt` and
+  friends), since someone who cannot read the English one is exactly who needs them.
 - **The launcher speaks the system language.** `stegoshard ui` and the offline
   bundle's `serve.mjs` print their startup notice in whichever of the eight app
   locales the system reports (regional settings on Windows, which sets no `LANG`;

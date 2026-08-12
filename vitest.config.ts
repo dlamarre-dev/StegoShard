@@ -10,6 +10,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    // The CLI now answers in the system language, and several tests assert its
+    // English text. Without this they pass or fail by whose machine they run on
+    // (this was written on a fr-CA one).
+    env: { STEGOSHARD_LANG: 'en' },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

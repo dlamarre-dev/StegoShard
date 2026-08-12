@@ -50,11 +50,11 @@ for dir in web-dist web-dist-offline; do
 done
 
 # The bundle is unusable without its launchers: browsers refuse to load ES modules
-# and module workers over file://, so index.html cannot simply be opened. All four
-# are placed by `build:web:offline` (see vite.serve.config.ts), which is also what
+# and module workers over file://, so index.html cannot simply be opened. They are
+# placed by `build:web:offline` (see vite.serve.config.ts), which is also what
 # makes web-dist-offline/ a complete, runnable copy of what ships. Verified rather
 # than assembled here, so a zip can never go out without them.
-for f in serve.mjs serve.cmd serve.sh README.txt; do
+for f in serve.mjs serve.cmd serve.sh README.txt README.fr.txt README.ja.txt; do
   if [ ! -f "web-dist-offline/$f" ]; then
     echo "::error::web-dist-offline/$f is missing; run 'npm run build:web:offline'"
     exit 1

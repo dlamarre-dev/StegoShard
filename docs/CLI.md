@@ -112,10 +112,8 @@ npx stegoshard ui --port 8137     # pin the port instead of taking a free one
 npx stegoshard ui --open          # and launch the browser
 ```
 
-The notice it prints follows the system language, in the same eight locales as the
-app (Windows regional settings, `LC_ALL`/`LANG` elsewhere), and falls back to
-English for anything else. `STEGOSHARD_LANG=ja` overrides it. The address itself is
-never translated, so a script can still read it out of the output.
+Its notice, like everything else the CLI prints, follows the system language (see
+[Language](#language)).
 
 Running `stegoshard` with no arguments still prints usage: a browser opening itself out
 of an SSH session or a cron job is the wrong kind of surprise, so this is asked for
@@ -141,6 +139,32 @@ instead. See [THREAT-MODEL.md](THREAT-MODEL.md#the-local-web-ui).
 it. Use `npx stegoshard ui`, or the offline web bundle from the releases page, which
 ships a `serve.mjs` for exactly this (its `index.html` cannot be opened directly: ES
 modules and module workers are both blocked over `file://`).
+
+## Language
+
+The CLI speaks the system language: `--help`, every error, the progress phases and
+the result lines, in the same eight locales as the app (`en`, `fr`, `de`, `es`,
+`it`, `pt`, `ja`, `zh_TW`), falling back to English for anything else.
+
+Detection is ICU's default locale, which is the only portable source: Windows sets
+no `LANG`, and ICU there follows the regional settings, while on Unix it follows
+`LC_ALL`/`LANG`.
+
+```bash
+STEGOSHARD_LANG=en stegoshard --help    # pin the language, whatever the system says
+STEGOSHARD_LANG=ja stegoshard save      # or ask for another one
+```
+
+**What is never translated**, so scripts and docs keep working: flag names,
+environment variable names, subcommands, the example commands in `--help`, and the
+`http://127.0.0.1:…` address the `ui` command prints. Pin `STEGOSHARD_LANG=en` in
+anything that greps the output; the test suite does exactly that.
+
+The messages live in `src/cli/i18n/`, one file per locale, typed against the
+English catalog so a missing key cannot compile. `--help` is rendered from those
+descriptions rather than written out per language, so the flag columns are aligned
+by code and no translation can drift out of structure. See
+[LOCALIZATION.md](LOCALIZATION.md).
 
 ## Packaging
 

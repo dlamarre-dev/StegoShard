@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { chmodSync, copyFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { builtinModules } from 'node:module';
 
@@ -28,14 +28,16 @@ const OUT = resolve(import.meta.dirname, 'web-dist-offline');
  * the release script only checks it.
  */
 function offlineLaunchers(): Plugin {
-  const files = ['serve.cmd', 'serve.sh', 'README.txt'];
+  const from = resolve(import.meta.dirname, 'src/web/offline');
   return {
     name: 'stegoshard-offline-launchers',
     // `writeBundle`, not `closeBundle`: it runs once the emitted files are on
     // disk, which is when the directory is complete enough to add to.
     writeBundle() {
-      for (const name of files) {
-        copyFileSync(resolve(import.meta.dirname, 'src/web/offline', name), resolve(OUT, name));
+      // Everything in the directory, rather than a list to keep in step: the
+      // README exists in eight languages, and a ninth should need no edit here.
+      for (const name of readdirSync(from)) {
+        copyFileSync(resolve(from, name), resolve(OUT, name));
       }
       // The zip stores the mode, so this is what makes `./serve.sh` runnable for
       // whoever unpacks it. A no-op on Windows, where the release is not built.
