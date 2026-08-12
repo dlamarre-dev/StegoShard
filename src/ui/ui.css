@@ -1193,8 +1193,11 @@ details.advanced[open] > summary::before {
 }
 .mode-badge--overt {
   background: var(--border);
-  color: inherit;
-  opacity: 0.85;
+  /* Explicit, and at full opacity. Inheriting meant picking up the accent on a
+     selected picker option, and the 0.85 fade then composited that to 3.51:1 on
+     the pill: below the 4.5:1 this size needs. It also made the badge look like
+     two different things depending on where it sat. */
+  color: var(--text);
 }
 .mode-legend {
   font-size: 0.85em;

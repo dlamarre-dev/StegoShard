@@ -39,6 +39,83 @@ test('no horizontal overflow at phone widths, hints included', async ({ page }) 
   }
 });
 
+/**
+ * The Overt / Deniable badges label every save destination, at ~9px, and they are
+ * the smallest text on the page. Two rounds of contrast bugs landed here: a faded
+ * accent inherited from a selected option (3.51:1) and, next door, a faded note.
+ *
+ * The axe pass in `web.spec.ts` does not reliably catch either, because a badge
+ * overlapping its neighbour makes axe give up on resolving the background and
+ * file the result as *incomplete* rather than a violation, which differs with
+ * fractions of a pixel between machines. The ratio is arithmetic, so compute it
+ * instead of hoping the scan resolves it, and check both colour schemes: the two
+ * palettes are independent, so passing in one says nothing about the other.
+ */
+for (const scheme of ['light', 'dark'] as const) {
+  test(`the mode badges meet AA contrast in the ${scheme} palette`, async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: scheme });
+    const page = await context.newPage();
+    await page.goto('./');
+    await page.locator('#choose-expert').click();
+
+    const results = await page.evaluate(() => {
+      const rgb = (value: string): [number, number, number, number] => {
+        const [r = 0, g = 0, b = 0, a = 1] = value.match(/[\d.]+/g)?.map(Number) ?? [];
+        return [r, g, b, a];
+      };
+      const luminance = ([r, g, b]: number[]): number => {
+        const lin = [r!, g!, b!].map((c) => {
+          const s = c / 255;
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
+      };
+      const over = (
+        top: [number, number, number, number],
+        bottom: number[],
+        alpha: number,
+      ): number[] => top.slice(0, 3).map((c, i) => c * alpha + bottom[i]! * (1 - alpha));
+
+      const out: { label: string; ratio: number; size: number }[] = [];
+      for (const badge of Array.from(document.querySelectorAll<HTMLElement>('.mode-badge'))) {
+        if (!badge.offsetParent) continue; // hidden with its destination group
+        // Nearest ancestor that actually paints a background.
+        let base: number[] = [255, 255, 255];
+        let opacity = Number(getComputedStyle(badge).opacity);
+        for (let node = badge.parentElement; node; node = node.parentElement) {
+          const s = getComputedStyle(node);
+          opacity *= Number(s.opacity);
+          const [r, g, b, a] = rgb(s.backgroundColor);
+          if (a > 0) {
+            base = [r, g, b];
+            break;
+          }
+        }
+        const style = getComputedStyle(badge);
+        // The badge's own opacity fades its background *and* its text onto that
+        // ancestor, which is exactly how the 3.51:1 regression came about.
+        const bg = over(rgb(style.backgroundColor), base, opacity * rgb(style.backgroundColor)[3]);
+        const fg = over(rgb(style.color), bg, opacity * rgb(style.color)[3]);
+        const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+        out.push({
+          label: `${badge.className} "${badge.textContent}"`,
+          ratio: (l1! + 0.05) / (l2! + 0.05),
+          size: parseFloat(style.fontSize),
+        });
+      }
+      return out;
+    });
+
+    expect(results.length, 'badges on screen').toBeGreaterThan(1);
+    for (const { label, ratio, size } of results) {
+      // Small text: AA wants 4.5:1. None of these is anywhere near large-text size.
+      expect(size).toBeLessThan(18);
+      expect(Number(ratio.toFixed(2)), `${scheme}: ${label}`).toBeGreaterThanOrEqual(4.5);
+    }
+    await context.close();
+  });
+}
+
 test('at most one hint at a time, and a click pins none', async ({ page }) => {
   await page.goto('./');
   await page.locator('#choose-expert').click();
