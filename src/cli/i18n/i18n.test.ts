@@ -15,6 +15,7 @@ import { CATALOGS, cliLocale, t, useCatalog, type CliKey } from './index';
 import { en } from './en';
 import { LOCALE_CODES } from '../../ui/locales';
 import { usage } from './usage';
+import { displayWidth } from './width';
 
 const KEYS = Object.keys(en) as CliKey[];
 const PLACEHOLDER = /\{(\w+)\}/g;
@@ -130,8 +131,12 @@ describe('help text', () => {
       // The examples are commands, so they are identical everywhere.
       expect(text, code).toContain('stegoshard gallery-restore ./album --out ./restored');
       // Nothing runs off a terminal: the renderer wraps to a fixed width.
+      //
+      // Measured in cells, not characters. Asserting `.length` here is what let
+      // the Japanese help reach 152 cells while this test passed: every character
+      // counted as one, but a terminal gives CJK two.
       for (const line of text.split('\n'))
-        expect(line.length, `${code}: ${line}`).toBeLessThan(100);
+        expect(displayWidth(line), `${code}: ${line}`).toBeLessThanOrEqual(88);
     }
   });
 

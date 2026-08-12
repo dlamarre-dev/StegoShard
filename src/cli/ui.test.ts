@@ -6,6 +6,7 @@
 
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -119,6 +120,37 @@ describe('serving', () => {
     expect(await withHost('evil.example')).toBe(404);
     expect(await withHost('127.0.0.1')).toBe(200);
     expect(await withHost('localhost')).toBe(200);
+  });
+
+  /**
+   * A raw socket, because no HTTP client will send this: `fetch` and
+   * `node:http` both reject or normalise a malformed path client-side, so a test
+   * written with either would pass while the server still died.
+   */
+  const rawRequest = (port: number, line: string): Promise<string> =>
+    new Promise((ok, no) => {
+      const socket = connect(port, '127.0.0.1', () => {
+        socket.write(`${line} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n`);
+      });
+      let out = '';
+      socket.setTimeout(4000, () => no(new Error(`no response to ${line}`)));
+      socket.on('data', (chunk: Buffer) => (out += chunk.toString()));
+      socket.on('close', () => ok(out.split('\r\n')[0] ?? ''));
+      socket.on('error', no);
+    });
+
+  it('survives a malformed URL instead of dying on it', async () => {
+    server = await startUiServer(collectAssets(fixtureTree()), 0, 'g'.repeat(24));
+    // `GET /%` used to throw URIError out of the request callback, which is an
+    // uncaught exception: the process exited, ending the user's session. Anything
+    // on the machine could send it.
+    expect(await rawRequest(server.port, 'GET /%')).toContain('400');
+    expect(await rawRequest(server.port, 'GET /%zz/index.html')).toContain('400');
+    expect(await rawRequest(server.port, `GET ${new URL(server.url).pathname}%e0%a4%a`)).toContain(
+      '400',
+    );
+    // Still serving, which is the whole point.
+    expect((await fetch(server.url)).status).toBe(200);
   });
 
   it('accepts no method that could carry a body', async () => {

@@ -105,7 +105,18 @@ export function startUiServer(
   token = randomBytes(12).toString('hex'),
 ): Promise<UiServer> {
   const base = mount(token);
-  const server = createServer((req, res) => handle(req, res, assets, base));
+  const server = createServer((req, res) => {
+    // A throw in this callback is an uncaught exception, and Node's default for
+    // that is to exit: any bug in request handling would take the whole session
+    // down with it, mid-save. One malformed-URL case did exactly that (see
+    // `handle`); this is the backstop for the next one.
+    try {
+      handle(req, res, assets, base);
+    } catch {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    }
+  });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     // Explicit host: `listen(port)` alone binds every interface, which would put
@@ -147,7 +158,16 @@ function handle(
     return;
   }
 
-  const path = decodeURIComponent((req.url ?? '/').split('?')[0]!.split('#')[0]!);
+  // `decodeURIComponent` throws `URIError` on malformed percent-encoding, and a
+  // throw from this callback is an uncaught exception, which ends the process:
+  // `GET /%` from anything on the machine would have closed the user's session.
+  let path: string;
+  try {
+    path = decodeURIComponent((req.url ?? '/').split('?')[0]!.split('#')[0]!);
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
   // The build uses relative asset URLs, which resolve against the *page* URL, so
   // the mount point has to end in a slash or every `./assets/…` lands a level up.
   if (`${path}/` === base) {

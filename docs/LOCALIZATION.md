@@ -67,6 +67,15 @@ descriptions, so alignment is computed once instead of being hand-kept in eight
 languages, and no locale can drift out of structure. Adding an option means adding
 a row and a description key.
 
+Its wrapping measures **terminal cells, not characters** (`width.ts`). A Japanese or
+Chinese character occupies two cells, so wrapping by `String.length` put the
+Japanese help 152 columns wide against a promised 88, and CJK text carries no spaces
+to break a line on at all: a run wider than the column is broken by character, one
+step earlier when that would strand a `。` or a closing bracket at the head of a
+line. Anything outside the East Asian ranges counts as one cell, which is what a
+terminal does for Latin, Greek and Cyrillic. Written in the repo rather than taken
+from `string-width`, because this is a runtime dependency of a CLI that adds none.
+
 Detection is ICU's default locale, overridable with `STEGOSHARD_LANG`; the test
 suite pins `STEGOSHARD_LANG=en` (`vitest.config.ts`) so assertions on CLI text do
 not depend on whose machine they run on. See

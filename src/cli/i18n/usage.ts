@@ -9,6 +9,7 @@
  */
 
 import { t, type CliKey } from './index';
+import { displayWidth, wrapToWidth } from './width';
 
 /** Column where descriptions start, matching the width the flags need. */
 const COL = 25;
@@ -18,20 +19,20 @@ const WIDTH = 88;
 /** A row of the help: a flag (or nothing, for a continuation) and its description. */
 type Row = [flag: string, description: CliKey | ''];
 
-function wrap(text: string, width: number): string[] {
-  const out: string[] = [];
-  let line = '';
-  for (const word of text.split(/\s+/)) {
-    if (!line) line = word;
-    else if (`${line} ${word}`.length <= width) line += ` ${word}`;
-    else {
-      out.push(line);
-      line = word;
-    }
-  }
-  if (line) out.push(line);
-  return out;
-}
+/**
+ * Wrap to terminal *cells*, not characters: `.length` counts UTF-16 units, which
+ * made Japanese help lines 152 cells wide against the 88 promised here, and CJK
+ * text has no spaces to break on at all. See `width.ts`.
+ */
+const wrap = (text: string, width: number): string[] => wrapToWidth(text, width);
+
+/**
+ * Pad to a cell count. The flag labels are ASCII literals today, so `padEnd`
+ * would agree; this keeps the file measuring in one unit rather than leaving a
+ * `.length` for the next person to reason about.
+ */
+const padTo = (text: string, cells: number): string =>
+  text + ' '.repeat(Math.max(0, cells - displayWidth(text)));
 
 /** `  --flag <x>   description`, wrapped to the description column. */
 function row([flag, key]: Row): string {
@@ -41,9 +42,9 @@ function row([flag, key]: Row): string {
   const lines = wrap(text, WIDTH - COL);
   // A flag wider than the column keeps its own line rather than being truncated.
   const head =
-    label.length + 1 > COL
+    displayWidth(label) + 1 > COL
       ? `${label}\n${' '.repeat(COL)}${lines[0]}`
-      : `${label.padEnd(COL)}${lines[0]}`;
+      : `${padTo(label, COL)}${lines[0]}`;
   return [head, ...lines.slice(1).map((l) => `${' '.repeat(COL)}${l}`)].join('\n');
 }
 
