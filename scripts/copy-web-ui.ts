@@ -21,7 +21,8 @@ const DEST = resolve(ROOT, 'dist-cli', 'web-ui');
  * The zip's own launcher and its notes: useful in the download, pointless inside
  * the CLI, which has the `ui` command instead.
  */
-const SKIP = new Set(['serve.mjs', 'serve.cmd', 'serve.sh', 'README.txt']);
+const SKIP = (name: string): boolean =>
+  name.startsWith('serve.') || /^README(\.[\w-]+)?\.txt$/.test(name);
 
 if (!existsSync(join(SOURCE, 'index.html'))) {
   throw new Error(`missing ${SOURCE}/index.html (run 'npm run build:web:offline' first)`);
@@ -33,7 +34,7 @@ let bytes = 0;
 for (const name of readdirSync(SOURCE, { recursive: true }) as string[]) {
   const rel = name.split('\\').join('/');
   // Source maps are for whoever built this, not for whoever runs it.
-  if (rel.endsWith('.map') || SKIP.has(rel)) continue;
+  if (rel.endsWith('.map') || SKIP(rel)) continue;
   let data;
   try {
     // Reading is the check: a `statSync` first would leave a window in which the
