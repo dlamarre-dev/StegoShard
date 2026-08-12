@@ -14,7 +14,9 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   guided and expert flows are available without a hosted site or an extension. It
   binds `127.0.0.1` only, mounts the app under a random path token, checks the
   `Host` header, and serves a fixed table of files read at startup, so there is no
-  path outside the build to reach. Bare `stegoshard` still prints usage.
+  path outside the build to reach. Bare `stegoshard` still prints usage. A
+  malformed request answers `400` and leaves the server running: nothing another
+  process on the machine can send should end a session mid-save.
   - **The standalone binaries do not have it**, and gain no permission: they are
     compiled without network access, which is a stronger guarantee than the
     convenience is worth. `ui` there says where to get it.
@@ -29,6 +31,9 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   the output keeps working, and the test suite pins `STEGOSHARD_LANG=en`.
   - `--help` is now rendered from data (`src/cli/i18n/usage.ts`): the flag columns
     are aligned by code rather than hand-kept in eight copies of a 90-line text.
+    Wrapping counts terminal _cells_, not characters, so the Japanese and Chinese
+    help stays inside the same 88 columns as the English (a Japanese character
+    takes two cells, and CJK has no spaces to break a line on).
   - The catalogs are typed against the English one, so a missing key cannot
     compile, and a test checks that placeholders survived translation and that flag
     names did not get translated.
