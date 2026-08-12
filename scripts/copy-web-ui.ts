@@ -10,15 +10,7 @@
  * Run with: npm run build:cli  (after the offline web build)
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 const ROOT = process.cwd();
@@ -42,11 +34,19 @@ for (const name of readdirSync(SOURCE, { recursive: true }) as string[]) {
   const rel = name.split('\\').join('/');
   // Source maps are for whoever built this, not for whoever runs it.
   if (rel.endsWith('.map') || SKIP.has(rel)) continue;
-  const from = join(SOURCE, name);
-  if (!statSync(from).isFile()) continue;
+  let data;
+  try {
+    // Reading is the check: a `statSync` first would leave a window in which the
+    // path could change (CodeQL js/file-system-race).
+    data = readFileSync(join(SOURCE, name));
+  } catch (err) {
+    // Directory entries are what a recursive listing adds and all that may be
+    // skipped; a real read failure must not quietly produce a partial copy.
+    if ((err as NodeJS.ErrnoException).code !== 'EISDIR') throw err;
+    continue;
+  }
   const to = join(DEST, rel);
   mkdirSync(dirname(to), { recursive: true });
-  const data = readFileSync(from);
   writeFileSync(to, data);
   files++;
   bytes += data.byteLength;

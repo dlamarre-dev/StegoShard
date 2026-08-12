@@ -69,9 +69,17 @@ export function collectAssets(root: string): Map<string, Uint8Array> {
   for (const name of readdirSync(root, { recursive: true }) as string[]) {
     const rel = name.split('\\').join('/');
     if (rel.endsWith('.map')) continue;
-    const full = join(root, name);
-    if (!statSync(full).isFile()) continue;
-    assets.set(rel, new Uint8Array(readFileSync(full)));
+    try {
+      // The read *is* the file check. Asking `statSync` first leaves a window in
+      // which the path could become something else (CodeQL js/file-system-race),
+      // and `scripts/package.ts` reads its build output the same way.
+      assets.set(rel, new Uint8Array(readFileSync(join(root, name))));
+    } catch (err) {
+      // A recursive listing yields directories too, and those are all this is
+      // allowed to skip: anything else would silently drop an asset the app
+      // needs, and 404 at run time instead.
+      if ((err as NodeJS.ErrnoException).code !== 'EISDIR') throw err;
+    }
   }
   return assets;
 }
