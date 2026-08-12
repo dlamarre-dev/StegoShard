@@ -49,9 +49,20 @@ for dir in web-dist web-dist-offline; do
   fi
 done
 
+# The bundle is unusable without its launcher: browsers refuse to load ES modules
+# and module workers over file://, so index.html cannot simply be opened. It is
+# built by the second half of `build:web:offline`.
+if [ ! -f web-dist-offline/serve.mjs ]; then
+  echo "::error::web-dist-offline/serve.mjs is missing; run 'npm run build:web:offline'"
+  exit 1
+fi
+
 npm sbom --omit=dev --sbom-format=cyclonedx > stegoshard-npm.cdx.json
 cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist/
 cp LICENSE THIRD_PARTY_NOTICES.txt stegoshard-npm.cdx.json web-dist-offline/
+# Only the offline copy: web-dist is served by Pages, which needs no launcher.
+cp src/web/offline/serve.cmd src/web/offline/serve.sh src/web/offline/README.txt web-dist-offline/
+chmod +x web-dist-offline/serve.sh
 
 archive="stegoshard-web-$version.zip"
 rm -f "$archive"

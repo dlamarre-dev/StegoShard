@@ -114,6 +114,36 @@ capabilities of whoever might compel you. If in doubt, do not use Mode A: an ope
 vault you _can_ decrypt, or a small deniable secret you never mention, may leave you in a better
 position than a decoy that can be exposed.
 
+## The local web UI
+
+`stegoshard ui`, and the `serve.mjs` inside the downloadable offline bundle, serve the
+browser app from your own machine. A server is the only way to run it at all: the app is
+ES modules plus a module worker, and browsers block both over `file://`.
+
+**What it costs you.** The command line is the path that leaves nothing behind but the
+files you asked for. Putting the same flows in a browser reintroduces the browser: its
+disk cache, its history, its download folder, and a `localStorage` entry for the language
+and image format you picked. None of that is StegoShard's to clean up, and none of it is
+visible to the tool. **If a session must leave no local trace, use the commands, not the
+UI.** A private window and clearing the download afterwards narrow it; they do not close
+it.
+
+**What it does not cost you.** Nothing is exposed off-machine:
+
+- the socket binds `127.0.0.1` only, never a wildcard, and no flag changes that;
+- the app is mounted under a random path token, so another account on a shared machine
+  cannot reach it by scanning loopback ports, and a remote page that resolves a hostname
+  to 127.0.0.1 (DNS rebinding) is refused by both the token and a `Host` check;
+- the server serves a fixed table of files read at startup, holds no state, reads no
+  request body, and exposes no endpoint. The page's own CSP (`connect-src 'none'`) means
+  it cannot call back even if one existed;
+- responses are `no-store`, so nothing is invited into a disk cache (the browser may still
+  keep its own copies, per above).
+
+**The standalone binaries do not have it.** They are compiled with no network permission
+at all, which is a guarantee worth more than the convenience; see
+[CLI.md](CLI.md#the-same-app-in-a-browser-from-your-own-machine).
+
 ## Deliberate non-goals
 
 StegoShard does **not** claim, and you should not rely on:

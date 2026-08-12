@@ -41,6 +41,7 @@ import {
   meetsPasswordFloor,
   passwordStrength,
 } from '../ui/password';
+import { collectAssets, findWebRoot, openInBrowser, startUiServer, startupNotice } from './ui';
 
 const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
 
@@ -105,6 +106,10 @@ Usage:
   stegoshard estimate <file> [--paper] [--codec color|qr]
   stegoshard gallery-save <file> <cover-photos|folder ...> [options]
   stegoshard gallery-restore <photos|folder ...> [options]
+  stegoshard ui [--port <n>] [--open]
+                         Same app as the browser version, served on this machine
+                         only. Not available in the standalone binaries, which
+                         are compiled without network access.
 
 Save options:
   Several inputs (or a directory) are zipped into one bundle inside the vault;
@@ -407,12 +412,57 @@ async function installEntropy(values: Record<string, unknown>): Promise<void> {
 
 const KEY_MODES: KeyMode[] = ['embedded', 'keyfile', 'stego'];
 
+/**
+ * Serve the browser UI locally.
+ *
+ * Handled before the shared option parsing, because it takes none of the save or
+ * restore flags and would otherwise have to declare them all to be rejected.
+ * Bare `stegoshard` still prints usage: a browser opening itself out of an SSH
+ * session or a cron job is the wrong surprise, so this is asked for explicitly.
+ */
+async function runUi(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    allowPositionals: false,
+    options: { port: { type: 'string' }, open: { type: 'boolean' } },
+  });
+  const port = values.port === undefined ? 0 : Number(values.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    fail(`ui: --port must be a port number (got "${values.port}")`);
+  }
+
+  const root = findWebRoot(import.meta.url);
+  // The standalone binaries embed only this bundle, and are compiled without
+  // --allow-net so they could not listen anyway. One check covers both: say where
+  // the UI does live rather than failing on a missing directory.
+  if (!root) {
+    process.stderr.write(
+      'ui: this build does not carry the web app.\n' +
+        'The standalone binaries are compiled without network access, so they cannot\n' +
+        'serve it. Use `npx stegoshard ui`, or download the offline web bundle from\n' +
+        'the releases page and run its serve script.\n',
+    );
+    return 1;
+  }
+
+  const server = await startUiServer(collectAssets(root), port);
+  process.stdout.write(startupNotice(server.url));
+  if (values.open) openInBrowser(server.url);
+  await new Promise<void>((resolve) => {
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+      process.on(signal, () => void server.close().then(resolve));
+    }
+  });
+  return 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h' || command === 'help') {
     process.stdout.write(USAGE);
     return 0;
   }
+  if (command === 'ui') return runUi(argv.slice(1));
 
   const { values, positionals } = parseArgs({
     args: argv.slice(1),

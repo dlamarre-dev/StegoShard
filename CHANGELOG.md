@@ -9,6 +9,24 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **`stegoshard ui`: the browser app, served from your own machine.** The npm/`npx`
+  CLI can now serve the web build on loopback and print an address to open, so the
+  guided and expert flows are available without a hosted site or an extension. It
+  binds `127.0.0.1` only, mounts the app under a random path token, checks the
+  `Host` header, and serves a fixed table of files read at startup, so there is no
+  path outside the build to reach. Bare `stegoshard` still prints usage.
+  - **The standalone binaries do not have it**, and gain no permission: they are
+    compiled without network access, which is a stronger guarantee than the
+    convenience is worth. `ui` there says where to get it.
+  - **It is not the private path.** A browser records what the command line does
+    not (cache, history, downloads, a preference entry); the startup notice and
+    [THREAT-MODEL.md](docs/THREAT-MODEL.md#the-local-web-ui) say so plainly.
+- **The downloadable offline web bundle now ships `serve.mjs`** plus `serve.cmd` /
+  `serve.sh` wrappers and a `README.txt`. Until now the zip could not be run at all
+  without knowing to bring your own HTTP server: `index.html` cannot be opened
+  directly, because browsers block ES modules and module workers over `file://`, and
+  nothing said so. Same server as `stegoshard ui`, no dependencies beyond Node, with
+  a documented `python3 -m http.server` fallback.
 - **Optional user-supplied entropy (expert).** Users who would rather not trust
   the platform CSPRNG alone can now type their own: mashed keys, dice rolls,
   in the expert save options or via `--entropy` / `--entropy-file` /

@@ -34,6 +34,13 @@ export default defineConfig({
       name: 'extension',
       testMatch: /extension\.spec\.ts/,
     },
+    {
+      // No baseURL: these specs start their own server and are told its address,
+      // which includes a free port and a random path token (see the spec).
+      name: 'cli-ui',
+      testMatch: /cli-ui\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'npm run preview:web -- --host 127.0.0.1 --port 4173',
