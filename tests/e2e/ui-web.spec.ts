@@ -40,6 +40,37 @@ test('no horizontal overflow at phone widths, hints included', async ({ page }) 
 });
 
 /**
+ * Each option in the segmented pickers is a centred column: glyph, label, badge.
+ * `.mode-badge` carried a `margin-left` from an era when it followed text inline,
+ * which in a centred column is not spacing but displacement, and left every badge
+ * sitting 6px right of the label above it. Visible by eye, invisible to every
+ * other check we have.
+ */
+test('each option badge is centred under its label', async ({ page }) => {
+  await page.goto('./');
+  await page.locator('#choose-expert').click();
+  const offsets = await page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('.seg-item'))
+      .filter((item) => item.offsetParent && item.querySelector('.mode-badge'))
+      .map((item) => {
+        const centre = (sel: string): number => {
+          const r = item.querySelector(sel)!.getBoundingClientRect();
+          return r.left + r.width / 2;
+        };
+        return {
+          label: item.querySelector('.seg-label')!.textContent ?? '',
+          off: centre('.mode-badge') - centre('.seg-label'),
+        };
+      }),
+  );
+  expect(offsets.length, 'badged options on screen').toBeGreaterThan(1);
+  for (const { label, off } of offsets) {
+    // Sub-pixel rounding of two odd widths is fine; anything more is a margin.
+    expect(Math.abs(off), `${label}: badge is ${off.toFixed(1)}px off centre`).toBeLessThan(1);
+  }
+});
+
+/**
  * The Overt / Deniable badges label every save destination, at ~9px, and they are
  * the smallest text on the page. Two rounds of contrast bugs landed here: a faded
  * accent inherited from a selected option (3.51:1) and, next door, a faded note.
