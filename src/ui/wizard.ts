@@ -27,6 +27,7 @@ import {
 } from './save-controller';
 import { runRestore, type RestoreMode } from './restore-controller';
 import { resolveSaveInput } from './bundle';
+import { type IconName, iconSvg } from './icons';
 import type { Msg } from './save-controller';
 import { makeProgressUI } from './progress-ui';
 import {
@@ -92,6 +93,11 @@ interface State {
   covers: File[];
   savePassword: string;
   /**
+   * The exact password whose "this looks weak" warning the user already accepted,
+   * so the run does not ask a second time (and a later edit asks again).
+   */
+  weakAcceptedFor: string | null;
+  /**
    * What actually gets encrypted: the single file, or the bundle several were
    * zipped into. The size line and every estimate describe this, not the first
    * file the user happened to pick.
@@ -122,6 +128,7 @@ function initialState(env: WizardEnv): State {
     stegoCover: null,
     covers: [],
     savePassword: '',
+    weakAcceptedFor: null,
     bundle: null,
     estimates: null,
     estimatesFor: null,
@@ -221,6 +228,28 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     return state.keyMode === 'stego';
   }
 
+  /**
+   * Whether the typed password is a *new* credential this save creates, and so
+   * subject to the strength rules. The extension's stego flow asks for the
+   * password of the managed key it already holds, which is verified instead.
+   */
+  function createsNewPassword(): boolean {
+    return env.needsSavePassword || state.dest === 'gallery' || state.dest === 'sqlite';
+  }
+
+  /**
+   * The advisory "this password looks weak" confirmation, asked at the step that
+   * collects it rather than at the end of the flow. Returns false when the user
+   * declines, which leaves them on the step with the field they were asked about.
+   */
+  function acceptsWeakPassword(): boolean {
+    if (!createsNewPassword() || isStrongNewPassword(state.savePassword)) return true;
+    if (state.weakAcceptedFor === state.savePassword) return true;
+    if (!confirm(msg('confirmWeakPassword'))) return false;
+    state.weakAcceptedFor = state.savePassword;
+    return true;
+  }
+
   function go(delta: number): void {
     const list = steps();
     state.index = Math.max(0, Math.min(list.length - 1, state.index + delta));
@@ -316,6 +345,8 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       disabled?: boolean | undefined;
       note?: string | undefined;
       badge?: { text: string; deniable: boolean } | undefined;
+      /** Same glyph the expert form shows for this option (see `icons.ts`). */
+      icon?: IconName | undefined;
     }[],
     current: string,
     onPick: (value: string) => void,
@@ -338,6 +369,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           h(
             'span',
             { class: 'wiz-option-label' },
+            opt.icon ? iconSvg(opt.icon) : null,
             opt.label,
             opt.badge
               ? h('span', {
@@ -549,6 +581,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
                 desc: labels[d][1],
                 disabled: e ? !e.available : false,
                 note: e ? (e.available ? countNote(d, e) : e.reason) : '…',
+                icon: d,
                 badge: {
                   text: msg(deniable ? 'badgeDeniable' : 'badgeOvert'),
                   deniable,
@@ -603,6 +636,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
               // so put it on the card rather than making the user infer it.
               note: codecNote(c),
               disabled: here?.codecFits?.[c] === false,
+              icon: c,
             })),
             state.codec,
             (v) => {
@@ -620,6 +654,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
               value: k,
               label: msg(`keyMode${k[0]!.toUpperCase()}${k.slice(1)}`),
               desc: msg(`keyMode${k[0]!.toUpperCase()}${k.slice(1)}Desc`),
+              icon: k,
             })),
             state.keyMode,
             (v) => {
@@ -838,7 +873,14 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
       if (needed && state.covers.length < needed) return msg('wizGalleryNeed', String(needed));
     }
     if (id === 'stego' && !state.stegoCover) return msg('errNoCover');
-    if (id === 'password' && !state.savePassword) return msg('errNoPassword');
+    if (id === 'password') {
+      if (!state.savePassword) return msg('errNoPassword');
+      // Enforced here, not at the run: being told at the last step that the
+      // password is too short means walking the whole flow back to fix it.
+      if (createsNewPassword() && !meetsPasswordFloor(state.savePassword)) {
+        return msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH));
+      }
+    }
     if (id === 'restore-files') {
       const n = state.restoreFiles.length + (env.camera?.capturedCount() ?? 0);
       if (n === 0) return msg('errNoImages');
@@ -857,8 +899,7 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
     const prog = makeProgressUI(bar, fill, status, msg);
     try {
       if (state.action === 'save') {
-        const createsPassword =
-          env.needsSavePassword || state.dest === 'gallery' || state.dest === 'sqlite';
+        const createsPassword = createsNewPassword();
         // The hard floor first: it is not waivable, so it must not be routed
         // through the confirm dialog that waives the advisory tier below.
         if (createsPassword && !meetsPasswordFloor(state.savePassword)) {
@@ -868,9 +909,12 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           status.textContent = msg('errPasswordTooShort', String(MIN_PASSWORD_LENGTH));
           return;
         }
+        // Normally settled at the password step (`acceptsWeakPassword`); this
+        // stands for the flows that reach the run without passing through it.
         if (
           createsPassword &&
           !isStrongNewPassword(state.savePassword) &&
+          state.weakAcceptedFor !== state.savePassword &&
           !confirm(msg('confirmWeakPassword'))
         ) {
           runBtn.disabled = false;
@@ -1027,6 +1071,11 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
             status.classList.add('error');
             return;
           }
+          // Declining leaves the user on this step, with no error to explain:
+          // they just chose to go back to the field themselves.
+          if (steps()[state.index] === 'password' && !acceptsWeakPassword()) return;
+          status.textContent = '';
+          status.classList.remove('error');
           go(1);
         },
       });

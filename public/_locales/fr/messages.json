@@ -64,11 +64,11 @@
     "description": "Popup: opens the options page."
   },
   "saveHeading": {
-    "message": "Sauvegarder un fichier",
+    "message": "Sauvegarder un secret",
     "description": "Popup: save section heading."
   },
   "restoreHeading": {
-    "message": "Restaurer un fichier",
+    "message": "Restaurer un secret",
     "description": "Popup: restore section heading."
   },
   "labelFile": {

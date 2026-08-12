@@ -45,10 +45,10 @@
     "message": "開啟設定"
   },
   "saveHeading": {
-    "message": "儲存檔案"
+    "message": "儲存秘密"
   },
   "restoreHeading": {
-    "message": "還原檔案"
+    "message": "還原秘密"
   },
   "labelFile": {
     "message": "檔案"
