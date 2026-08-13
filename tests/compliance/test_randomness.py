@@ -8,14 +8,18 @@ Everything else delegates to a vetted primitive; this does not::
     output = getRandomValues() XOR HMAC-SHA256(K, counter)
     K      = HKDF(user string, session salt from the CSPRNG)
 
-The documentation makes a specific promise about it: the CSPRNG is consulted for
-every byte, so a worthless user string ("aaaa", or none at all) leaves the output
-exactly as good as the platform's, and a worthless CSPRNG still leaves the output
-unpredictable to anyone who does not know the string. The three cases below are
-that promise, measured.
+The three cases below are smoke tests for **detectable distribution defects** in
+that construction: a stuck bit, a keystream that overwrites instead of XORing, a
+degenerate user string that somehow degrades the tap.
 
 What this does NOT show
 -----------------------
+**It does not establish unpredictability.** A statistical battery cannot: a counter
+encrypted under a fixed key passes every test in it. Nor do these cases simulate a
+failed CSPRNG, so the documented claim that a worthless CSPRNG still leaves the
+output unpredictable to anyone who does not know the user string is *not* under
+test here. That property follows from the construction, not from these numbers.
+
 **Nothing here says anything about steganographic detectability.** Passing a
 statistical battery means the byte stream carries no first-order structure. That
 is necessary and nowhere near sufficient for deniability: steganalysis compares a

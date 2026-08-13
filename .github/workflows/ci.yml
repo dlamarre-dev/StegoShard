@@ -190,6 +190,24 @@ jobs:
       - name: Install Python dependencies
         run: pip install --require-hashes -r python/requirements-compliance.lock
 
+      # This lockfile is dev-only and never shipped, but it still gets audited.
+      # The cryptography advisories below cannot be resolved here: crypto-condor
+      # 2025.9.8 pins `cffi<2`, and every fixed cryptography release needs
+      # `cffi>=2`. Overriding both upstream bounds would put the tool that supplies
+      # our assurance on untested dependencies, which is a worse trade than
+      # carrying advisories in a CI-only environment that processes nothing but
+      # published test vectors. Drop these ignores when crypto-condor relaxes the
+      # bound; `click` was pinned forward instead, since that one was ours to fix.
+      - name: Audit compliance dependencies
+        run: >-
+          pip-audit -r python/requirements-compliance.lock --require-hashes
+          --ignore-vuln PYSEC-2026-35
+          --ignore-vuln PYSEC-2026-1284
+          --ignore-vuln PYSEC-2026-2141
+          --ignore-vuln PYSEC-2026-3553
+          --ignore-vuln PYSEC-2026-3554
+          --ignore-vuln GHSA-537c-gmf6-5ccf
+
       # CI=true turns a missing TestU01 into a hard failure instead of a skip, so
       # the randomness group can never quietly stop running.
       - name: Primitive compliance suite
