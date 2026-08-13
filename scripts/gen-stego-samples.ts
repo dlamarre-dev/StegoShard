@@ -30,8 +30,15 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
-import { KEY_BLOCK_LEN, randomBytes } from '../src/core/crypto';
-import { embedKeyBlockStego } from '../src/core/stego';
+import {
+  KEY_BLOCK_LEN,
+  deriveKEK,
+  generateDEK,
+  randomBytes,
+  serializeKeyBlock,
+  wrapDEK,
+} from '../src/core/crypto';
+import { embedKeyBlockStego, embedKeyBlockStegoJpeg } from '../src/core/stego';
 
 const coversDir = process.argv[2] ?? 'tests/steganalysis/covers';
 const outDir = process.argv[3] ?? '';
@@ -52,6 +59,24 @@ const CONTROL_RATES = [0.05, 0.1, 0.2, 0.4, 0.6];
 const FAST_ARGON2 = { iterations: 1, memoryKiB: 8, parallelism: 1 } as const;
 
 const PASSWORD = 'steganalysis-fixture-password';
+
+/**
+ * A genuine serialized key block, not random bytes.
+ *
+ * Statistically the two are identical once the whitening keystream is applied, so
+ * the detectors cannot tell them apart. The difference matters for a different
+ * reason: only a real block survives `extractKeyBlockStego*`, which is how the
+ * generator proves the carrier actually carries a recoverable payload. An embed
+ * that silently did nothing would otherwise produce a set of "clean" verdicts that
+ * measure nothing at all.
+ */
+async function realKeyBlock(): Promise<Uint8Array> {
+  const salt = randomBytes(16);
+  const kek = await deriveKEK(PASSWORD, salt, FAST_ARGON2);
+  const dek = await generateDEK();
+  const { iv, wrapped } = await wrapDEK(dek, kek);
+  return serializeKeyBlock({ salt, params: FAST_ARGON2, iv, wrapped });
+}
 
 /** Deterministic LCG, so every control image is reproducible. */
 function lcg(seed: number) {
@@ -119,7 +144,7 @@ for (const file of covers) {
 
   // The real thing: a 92-byte key block through StegoShard's own embedder.
   const stego = Buffer.from(clean);
-  const keyBlock = randomBytes(KEY_BLOCK_LEN);
+  const keyBlock = await realKeyBlock();
   await embedKeyBlockStego(stego, width, height, keyBlock, PASSWORD, FAST_ARGON2);
   writePng(join(outDir, `${name}-stego.png`), stego, width, height);
 
@@ -133,6 +158,26 @@ for (const file of covers) {
       width,
       height,
     );
+  }
+
+  // The JPEG DCT path. Written alongside the PNGs because Aletheia reads JPEG and
+  // the two PNG detectors do not: this carrier is the one neither zsteg nor
+  // StegExpose can see, and the one the store listings lean on ("a JPEG stays a
+  // JPEG"). The cover is copied through untouched as the baseline.
+  const coverJpeg = readFileSync(join(coversDir, file));
+  writeFileSync(join(outDir, `${name}-clean.jpg`), coverJpeg);
+  try {
+    const carrier = await embedKeyBlockStegoJpeg(
+      coverJpeg,
+      await realKeyBlock(),
+      PASSWORD,
+      FAST_ARGON2,
+    );
+    writeFileSync(join(outDir, `${name}-stego.jpg`), carrier);
+  } catch (err) {
+    // A progressive or otherwise unsupported cover is refused by design; say so
+    // rather than silently producing a set with a hole in it.
+    console.error(`  ${name}: JPEG carrier skipped (${(err as Error).message})`);
   }
 
   const capacity = width * height * 3;
