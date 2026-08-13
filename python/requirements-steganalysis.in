@@ -1,0 +1,11 @@
+# Dependencies for the steganalysis suite (tests/steganalysis).
+#
+# Deliberately minimal and separate from the other two lockfiles. The detectors
+# themselves are not Python: zsteg is a Ruby gem and StegExpose is a Java jar, both
+# installed by the CI job. All this environment needs is a test runner.
+#
+# It must stay separate from requirements-compliance.lock, whose crypto-condor
+# bounds (cryptography<44, cffi<2) have nothing to do with this suite, and from
+# requirements.in, which is the decoder's four runtime dependencies.
+pytest>=8.0.0
+pip-audit>=2.9.0
