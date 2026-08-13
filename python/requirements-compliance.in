@@ -1,0 +1,12 @@
+# Dependencies for the primitive-compliance suite (tests/compliance).
+#
+# Deliberately a separate file from requirements-dev.in. crypto-condor pins
+# `cryptography<44` and `cffi<2`, and folding it into the dev set would drag the
+# decoder's own test run down to those versions too. The decoder should be tested
+# against the libraries users actually have, so the two environments stay apart.
+#
+# Nothing here may ever reach requirements.in: the runtime decoder keeps its four
+# dependencies, which python/README.md presents as a feature.
+-r requirements.in
+crypto-condor>=2025.9.8
+pytest>=8.0.0

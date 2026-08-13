@@ -164,11 +164,76 @@ Vector classes:
 
 Additionally, both suites check two **authoritative AES-256-GCM vectors** from
 the original GCM specification (McGrew–Viega test cases 13/14, also in NIST
-CAVP), so the platform is validated against a third party, not just the two
-implementations agreeing with each other.
+CAVP).
 
 Image-level conformance (QR rendering → Python decode) is covered separately
 by the generated fixtures (`npm run fixtures`, `python/tests/test_conformance.py`).
+
+### 5.1 Third-party primitive compliance
+
+Frozen vectors prove the two stacks agree with **each other**. That is weaker
+evidence than it looks: both were written from one specification by similar means,
+so they can share a misreading of it. `tests/compliance/` closes that gap by
+testing each stack against vectors neither of them produced, using
+[crypto-condor](https://github.com/quarkslab/crypto-condor) (Quarkslab,
+Apache-2.0). Run with `npm run test:compliance`; a dedicated CI job runs it on
+every pull request.
+
+Four AES-256-GCM targets, two per stack:
+
+| Target        | What it exercises                   | CAVP vectors reached |
+| ------------- | ----------------------------------- | -------------------- |
+| `ts-platform` | WebCrypto as Node exposes it        | 5,250 of 7,875       |
+| `ts-framing`  | our `aeadSeal` / `aeadOpen`         | 375                  |
+| `py-platform` | OpenSSL through `cryptography`      | 5,250 (encrypt)      |
+| `py-framing`  | the decoder's own `decrypt_content` | 42                   |
+
+The _framing_ targets are small on purpose: `aeadSeal` pins the nonce at 12 bytes
+and the tag at 128 bits, and `decrypt_content` additionally hard-codes `aad=None`,
+so most of CAVP falls outside what they can express. The counts are asserted, not
+estimated, so a filter that silently swallowed the set would fail the build.
+
+The vectors those targets cannot reach are refused by the binding, not wrong:
+8-bit IVs (2,625 of CAVP), one very long IV from Wycheproof, and truncated tags on
+the Python side, since `cryptography`'s `AESGCM` has no tag-length parameter. Short
+GCM nonces are a known weakness that every mainstream binding declines by policy,
+and StegoShard pins `IV_LEN = 12` everywhere, so none of these classes is reachable
+in the product.
+
+**The load-bearing assertion is that no vector marked "must be rejected" was ever
+accepted** (3,919 of them per decrypt target). That is checked unconditionally and
+is never frozen into an expectation; a forged tag verifying is a security defect,
+not a drift.
+
+Also covered: **SHA-256** (130 NIST vectors) and **HMAC-SHA256** (225 NIST CAVP +
+66 Wycheproof) against `hash-wasm`, which carries the entropy pool's keystream and
+the §7.4 header hint.
+
+**Not covered by this tool.** crypto-condor has no module for **Argon2id** or
+**HKDF**, and Reed–Solomon, GF(2⁸) and Shamir are outside its scope entirely. Those
+keep exactly the coverage described above: agreement between `hash-wasm` and
+`argon2-cffi`/OpenSSL on the frozen vectors, and nothing more.
+
+### 5.2 Statistical testing of the entropy tap
+
+`randomBytes` is the one hand-composed construction in the project: when the expert
+user-entropy option is installed, `output = getRandomValues() XOR HMAC-SHA256(K,
+counter)`. `tests/compliance/test_randomness.py` runs the NIST battery (TestU01,
+bundled with crypto-condor) over 8 MiB drawn three ways: with the layer off, with a
+high-entropy string, and with a degenerate string (`"aaaa"`). The third is the
+documented promise that a worthless string cannot make the output worse.
+
+Calibration: twelve consecutive healthy samples produced 29 passing sub-tests and
+zero failures every time, so the tolerance is zero. Deliberately weak sources are
+caught comfortably (a 32-bit LCG fails 18 of 29; forcing the low bit to zero fails
+28 of 29).
+
+> **This says nothing about steganographic detectability.** Passing a statistical
+> battery means the byte stream carries no first-order structure. Steganalysis
+> compares a carrier against a model of natural images, and a uniformly random
+> bit-plane inside a photograph is itself a tell. The deniability boundary in
+> [THREAT-MODEL.md](THREAT-MODEL.md) is unchanged, and this suite must never be
+> cited as evidence for it.
 
 ## 6. Keyfile-mode isolation
 

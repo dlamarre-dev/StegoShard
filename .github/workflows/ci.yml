@@ -151,6 +151,50 @@ jobs:
           name: crypto-bom
           path: crypto-bom.json
 
+  crypto-compliance:
+    name: Primitive compliance (crypto-condor)
+    runs-on: ubuntu-latest
+    env:
+      # TestU01 still uses K&R function definitions, which a C23-default compiler
+      # rejects outright. Pinning the dialect keeps the build working regardless of
+      # which gcc the runner image ships.
+      CFLAGS: '-std=gnu89 -w'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements-compliance.lock
+
+      # crypto-condor compiles its internal AES and TestU01 on first use, into a
+      # per-user cache directory. Without this the C build is repaid every run.
+      - name: Cache crypto-condor build artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/crypto-condor
+          key: crypto-condor-${{ runner.os }}-${{ hashFiles('python/requirements-compliance.lock') }}
+
+      - name: Install build tools for TestU01
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r python/requirements-compliance.lock
+
+      # CI=true turns a missing TestU01 into a hard failure instead of a skip, so
+      # the randomness group can never quietly stop running.
+      - name: Primitive compliance suite
+        run: npm run test:compliance -- -q
+
   conformance:
     name: Python decoder conformance
     runs-on: ubuntu-latest
