@@ -58,4 +58,4 @@ jobs:
       # CI=true turns a missing docker or an unparseable result into a hard failure
       # rather than a skip, so this job cannot quietly stop measuring anything.
       - name: JPEG steganalysis
-        run: pytest tests/steganalysis/test_aletheia_jpeg.py -q -s
+        run: npm run test:steganalysis:nightly -- -q -s

@@ -64,6 +64,10 @@ from pathlib import Path
 
 import pytest
 
+#: Nightly only. The per-PR job deselects this marker: the image is 7 GB and a full
+#: sweep takes about half an hour, which does not belong on a pull request.
+pytestmark = pytest.mark.nightly
+
 IMAGE_TAG = "stegoshard-aletheia"
 DOCKERFILE = Path(__file__).resolve().parent / "aletheia.Dockerfile"
 COVERS_JPEG = Path(__file__).resolve().parent / "covers-jpeg"
@@ -87,6 +91,11 @@ CONTROL_COVERS = ("lake", "night", "beach")
 
 #: A control must land at or above this, a clean cover below it.
 CONTROL_FLOOR = 0.5
+
+#: How many working controls the run needs before its clean verdicts mean anything.
+#: outguess declines covers it cannot fit the message into, and which ones vary by
+#: build: `night` succeeded locally and was declined on a CI runner.
+MIN_CONTROLS = 2
 
 #: Aletheia reports to one decimal, so this permits the reporting granularity and
 #: nothing more.
@@ -169,16 +178,30 @@ def test_outguess_control_is_flagged(scores: dict[str, dict[str, float]]) -> Non
     checked; `park` and `mountain` are excluded with the reasons recorded in
     covers-jpeg/PROVENANCE.md rather than silently dropped.
     """
+    built = 0
     for cover in CONTROL_COVERS:
         clean = scores[f"{cover}-clean.jpg"][DISCRIMINATOR]
         control = scores.get(f"{cover}-outguess.jpg")
-        assert control is not None, f"{cover}: outguess control missing from the results"
+        if control is None:
+            # outguess refuses a cover whose usable coefficients cannot hold the
+            # message, and whether it does so varies with its build. That is not a
+            # failure by itself, but it does mean this cover proves nothing today.
+            print(f"\n  {cover}: outguess declined this cover, no control available")
+            continue
+        built += 1
         print(f"\n  {cover}: clean={clean:.1f} control={control[DISCRIMINATOR]:.1f}")
         assert control[DISCRIMINATOR] >= CONTROL_FLOOR > clean, (
             f"{cover}: the {DISCRIMINATOR} detector no longer separates an outguess "
             f"carrier ({control[DISCRIMINATOR]:.1f}) from a clean cover ({clean:.1f}). "
             "Until it does, every clean verdict in this module is meaningless."
         )
+
+    assert built >= MIN_CONTROLS, (
+        f"only {built} of {len(CONTROL_COVERS)} covers produced an outguess control, "
+        f"below the minimum of {MIN_CONTROLS}. Without enough working controls the "
+        "differential below cannot be trusted, because nothing shows the detector is "
+        "awake."
+    )
 
 
 def test_carrier_matches_its_cover(scores: dict[str, dict[str, float]]) -> None:
