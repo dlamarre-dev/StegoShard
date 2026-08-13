@@ -191,13 +191,20 @@ jobs:
         run: pip install --require-hashes -r python/requirements-compliance.lock
 
       # This lockfile is dev-only and never shipped, but it still gets audited.
-      # The cryptography advisories below cannot be resolved here: crypto-condor
-      # 2025.9.8 pins `cffi<2`, and every fixed cryptography release needs
-      # `cffi>=2`. Overriding both upstream bounds would put the tool that supplies
-      # our assurance on untested dependencies, which is a worse trade than
-      # carrying advisories in a CI-only environment that processes nothing but
-      # published test vectors. Drop these ignores when crypto-condor relaxes the
-      # bound; `click` was pinned forward instead, since that one was ours to fix.
+      # Two separate crypto-condor 2025.9.8 bounds hold cryptography at 43.0.3:
+      #   - a direct `cryptography<44`, which alone blocks 44.0.1 (that release
+      #     needs only `cffi>=1.12`, so cffi is not the obstacle there);
+      #   - `cffi<2`, which additionally blocks 46.0.5 and newer, since those
+      #     require `cffi>=2.0.0` on Python 3.9+.
+      # Overriding the first alone resolves to cryptography 45.0.7 with cffi
+      # untouched and clears exactly one advisory (PYSEC-2026-1284); the other six
+      # need 46.0.6 or later and therefore the cffi bump too. Carrying six ignores
+      # instead of seven does not justify running the tool that supplies our
+      # assurance on dependencies its author has not tested, in an environment
+      # whose entire input is published test vectors. crypto-condor itself does run
+      # correctly under cryptography 50 (identical CAVP results), so the bounds look
+      # conservative rather than load-bearing: revisit when upstream relaxes them.
+      # `click` was pinned forward instead, since that one was ours to fix.
       - name: Audit compliance dependencies
         run: >-
           pip-audit -r python/requirements-compliance.lock --require-hashes
