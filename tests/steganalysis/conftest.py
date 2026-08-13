@@ -49,6 +49,10 @@ def require(tool: str, path: str | None, hint: str) -> str:
     if IN_CI:
         pytest.fail(message)
     pytest.skip(message)
+    # Unreachable: both calls above raise. Stated explicitly because a static
+    # analyser cannot prove it, and a function annotated `-> str` that can fall
+    # through returns None instead, which is the bug this line rules out.
+    raise AssertionError("unreachable")
 
 
 @pytest.fixture(scope="session")
