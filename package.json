@@ -44,6 +44,7 @@
     "test:e2e:web": "playwright test --project=web",
     "test:e2e:extension": "playwright test --project=extension",
     "test:compliance": "pytest tests/compliance",
+    "test:steganalysis": "pytest tests/steganalysis",
     "fixtures": "tsx scripts/gen-fixtures.ts",
     "samples": "tsx scripts/gen-samples.ts",
     "vectors": "tsx scripts/gen-vectors.ts",

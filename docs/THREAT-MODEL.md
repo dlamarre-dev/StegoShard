@@ -149,7 +149,10 @@ at all, which is a guarantee worth more than the convenience; see
 StegoShard does **not** claim, and you should not rely on:
 
 - **Steganographic indistinguishability against a dedicated forensic adversary.** Deniable
-  Storage defeats triage and casual inspection, not targeted steganalysis. The content-tell
+  Storage defeats triage and casual inspection, not targeted steganalysis. The triage half
+  is now measured rather than asserted (`tests/steganalysis`, and
+  [CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.3); the steganalysis half is not, and the JPEG
+  carrier is not measured at all. The content-tell
   of the decoy database is a known, documented limitation (see
   [ROADMAP.md](ROADMAP.md) → _Later / exploratory_).
 - **Protection once you are compelled and the resilient vault is found.** Resilient Storage

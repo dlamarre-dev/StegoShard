@@ -151,6 +151,60 @@ jobs:
           name: crypto-bom
           path: crypto-bom.json
 
+  steganalysis:
+    name: Steganalysis (zsteg, StegExpose)
+    runs-on: ubuntu-latest
+    env:
+      # Archived since 2018 and unlicensed, so it is fetched rather than vendored,
+      # and never executed unless the bytes match. Same rule as the SHA-pinned
+      # actions above: nothing runs on trust.
+      STEGEXPOSE_SHA256: abef6be0216aae9a2c938342df632727af80bcaac867da6d7c46cb0a1d4a6ade
+      MATH3_SHA256: a07e39d31c46032879f0a48ae1bd0142b17dd67664c008b50216e9891f346c54
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements-steganalysis.lock
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: false
+
+      - name: Install detectors
+        run: |
+          gem install zsteg --no-document
+          mkdir -p "$RUNNER_TEMP/stegexpose"
+          cd "$RUNNER_TEMP/stegexpose"
+          for f in StegExpose.jar commons-math3-3.1.1.jar; do
+            curl -fsSL -o "$f" "https://github.com/b3dk7/StegExpose/raw/master/$f"
+          done
+          echo "$STEGEXPOSE_SHA256  StegExpose.jar" | sha256sum -c -
+          echo "$MATH3_SHA256  commons-math3-3.1.1.jar" | sha256sum -c -
+          echo "STEGEXPOSE_JAR=$RUNNER_TEMP/stegexpose/StegExpose.jar" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r python/requirements-steganalysis.lock
+
+      - name: Audit steganalysis dependencies
+        run: pip-audit -r python/requirements-steganalysis.lock --require-hashes
+
+      # CI=true turns a missing detector into a hard failure instead of a skip, so
+      # this suite can never quietly stop running.
+      - name: Steganalysis suite
+        run: npm run test:steganalysis -- -q
+
   crypto-compliance:
     name: Primitive compliance (crypto-condor)
     runs-on: ubuntu-latest

@@ -256,6 +256,60 @@ key passes every one of them. Nor do they simulate a failed CSPRNG.
 > [THREAT-MODEL.md](THREAT-MODEL.md) is unchanged, and this suite must never be
 > cited as evidence for it.
 
+### 5.3 Steganographic detectability, measured
+
+[THREAT-MODEL.md](THREAT-MODEL.md) claims Deniable Storage "defeats triage and
+casual inspection, not targeted steganalysis". `tests/steganalysis/` measures both
+halves on four CC0 photographs, with `npm run test:steganalysis` and a CI job on
+every pull request.
+
+**Real photographs are mandatory, and this was measured rather than assumed.** The
+covers `scripts/gen-fixtures.ts` builds are LCG noise, whose low-bit plane is
+already uniformly random, which is what a saturated carrier looks like. StegExpose
+scores those fixtures **0.667 before anything is embedded** and 0.977 at 60%: a
+constant false positive. Nothing measured on them would mean anything. See
+`tests/steganalysis/covers/PROVENANCE.md`.
+
+**Triage (zsteg).** The claimed half. zsteg walks every bit plane, channel order and
+bit ordering, reporting text, zlib, file magic and known tool signatures. The test is
+differential, because an untouched photograph is not quiet: `zsteg -a` finds 13 to 36
+structural items and several hundred text fragments on pristine covers, announcing
+"OpenPGP Public Key" among them. The property asserted is that **the carrier presents
+the same surface as the cover it came from**: identical structural findings, identical
+text-fragment counts, on all four covers. A plaintext control image is scanned first;
+if that is not detected the harness is broken and no clean verdict counts.
+
+**Statistics (StegExpose).** The half explicitly not claimed. Fusion of RS analysis,
+Sample Pairs, chi-square and Primary Sets, threshold 0.2:
+
+| cover   | clean | **StegoShard** | 5%    | 10%   | 20%   | 40%   |
+| ------- | ----- | -------------- | ----- | ----- | ----- | ----- |
+| car     | 0.096 | **0.096**      | 0.130 | 0.177 | 0.200 | 0.320 |
+| ceiling | 0.031 | **0.031**      | 0.069 | 0.109 | 0.196 | 0.334 |
+| church  | 0.042 | **0.042**      | 0.078 | 0.114 | 0.188 | 0.289 |
+| square  | 0.034 | **0.034**      | 0.071 | 0.106 | 0.181 | 0.290 |
+
+The carrier scores identically to the untouched cover, to three decimals. Detection
+becomes reliable only at 40%; at 20% one cover of four reaches the threshold, and
+exactly. The control is therefore 40%.
+
+**What that number does not mean.** StegExpose was validated by its authors on
+embedding rates of 2.5% to 25.3%. StegoShard's key block is 736 bits in 2,073,600
+low bits, **0.035%**, two orders of magnitude below that band. The result says the
+payload is far too small for these detectors to see, which is a fact about payload
+size rather than about carrier design. It is not evidence of resistance to
+steganalysis, and must not be quoted as such.
+
+Also measured: at 100% embedding the fusion score falls back to 0.25-0.28 with RS
+analysis collapsing to 0.000. Saturation degenerates the estimator, so "more payload
+scores higher" is untrue past the calibrated band.
+
+**Not covered.** Both tools read PNG and BMP only. The **JPEG DCT carrier is entirely
+unmeasured**, and it is the one carrying the "a JPEG stays a JPEG" argument in the
+store listings. The `.db` container is not an image and is out of scope for both. The
+independent audit request keeps steganographic detectability as its second item for
+exactly these reasons.
+
 ## 6. Keyfile-mode isolation
 
 **Claim: with `keyMode: 'keyfile'`, no fragment of the key block appears in
