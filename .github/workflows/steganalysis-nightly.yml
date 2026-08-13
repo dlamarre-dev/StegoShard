@@ -1,0 +1,61 @@
+# JPEG steganalysis, nightly.
+#
+# Split from the per-PR `steganalysis` job in ci.yml because this one builds a 7 GB
+# container (Octave, TensorFlow, two steganography binaries) and a full Aletheia
+# sweep takes about half an hour on CPU. The PNG suite stays on every pull request;
+# only the JPEG path lives here.
+#
+# A red nightly job is easy to ignore, so this one is built to fail rarely and
+# legibly: the outguess instrument check runs first, and every score is printed
+# whether or not the run passes.
+#
+# LICENCE: this workflow accepts, at run time, the JPEG TOOLBOX licence (Regents of
+# the University of California) and the NSF5_COLOR / J_UNIWARD_COLOR licences
+# (Binghamton DDE). All three are research licences limited to educational,
+# research and non-profit use. Accepted on the basis that StegoShard is a
+# non-profit project; **if that changes, this workflow and its image must go.**
+# Nothing in the shipped product depends on them, and the per-PR PNG suite is
+# unaffected.
+name: Steganalysis (JPEG, nightly)
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: steganalysis-nightly
+  cancel-in-progress: true
+
+jobs:
+  aletheia:
+    name: JPEG detectability (Aletheia)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements-steganalysis.lock
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r python/requirements-steganalysis.lock
+
+      # CI=true turns a missing docker or an unparseable result into a hard failure
+      # rather than a skip, so this job cannot quietly stop measuring anything.
+      - name: JPEG steganalysis
+        run: pytest tests/steganalysis/test_aletheia_jpeg.py -q -s
