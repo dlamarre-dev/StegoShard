@@ -31,6 +31,13 @@ from pathlib import Path
 
 import pytest
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "nightly: heavy container-based suites, deselected on pull requests"
+    )
+
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COVERS = Path(__file__).resolve().parent / "covers"
 GENERATOR = REPO_ROOT / "scripts" / "gen-stego-samples.ts"

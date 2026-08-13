@@ -304,9 +304,52 @@ Also measured: at 100% embedding the fusion score falls back to 0.25-0.28 with R
 analysis collapsing to 0.000. Saturation degenerates the estimator, so "more payload
 scores higher" is untrue past the calibrated band.
 
-**Not covered.** Both tools read PNG and BMP only. The **JPEG DCT carrier is entirely
-unmeasured**, and it is the one carrying the "a JPEG stays a JPEG" argument in the
-store listings. The `.db` container is not an image and is out of scope for both. The
+### 5.4 The JPEG DCT carrier
+
+Measured separately, nightly, because it needs a different tool and a different
+cover set. `tests/steganalysis/test_aletheia_jpeg.py` runs
+[Aletheia](https://github.com/daniellerch/aletheia) in a container over five camera
+originals (`covers-jpeg/`, CC0). The Wikimedia photographs used for PNG are
+double-compressed thumbnails, which JPEG steganalysis handles badly.
+
+Like the zsteg module this is a **differential**, and for the same reason: three of
+Aletheia's four JPEG detectors saturate on this set, reporting 0.6 to 1.0 on
+_untouched_ photographs with confidence near 0.5. Only the Steghide detector
+discriminates.
+
+| cover      | clean (SH) | **carrier (SH)** | outguess control | instrument check            |
+| ---------- | ---------- | ---------------- | ---------------- | --------------------------- |
+| `lake`     | 0.0        | **0.0**          | 1.0              | valid                       |
+| `night`    | 0.0        | **0.0**          | 0.8              | valid                       |
+| `beach`    | 0.1        | **0.2**          | 0.6              | valid                       |
+| `park`     | 0.1        | **0.1**          | 0.2              | control not detected        |
+| `mountain` | 0.7        | **0.7**          | n/a              | clean cover already flagged |
+
+Across all four detectors, saturated ones included, the carrier scores what its own
+cover scores: `park` and `mountain` are identical on every column, and nothing else
+moves by more than the 0.1 reporting granularity.
+
+**What this establishes, precisely.** On the three covers where the detector is
+demonstrably awake, StegoShard's JPEG carrier is indistinguishable from the cover it
+was made from, while an outguess carrier in the same cover is flagged at 0.6 to 1.0.
+
+**What it does not.** Three detectors of four carry no information here, so the
+result rests on one working detector over three covers plus the differential. The
+detectors are also _learned_, so a low score may mean undetectable or merely outside
+the training distribution. This is not a general claim of resistance to JPEG
+steganalysis.
+
+**Licensing.** Any JPEG analysis through Aletheia pulls in the JPEG TOOLBOX (Regents
+of the University of California) and the nsF5 / J-UNIWARD reference code (Binghamton
+DDE), all research licences limited to educational, research and non-profit use.
+They are accepted for CI on the basis that this project is non-profit, and nothing
+shipped depends on them. **If that ever changes, the nightly workflow and its image
+must be removed.** Worth noting for its own sake: state-of-the-art steganalysis
+tooling is almost entirely academic and non-commercially licensed, which is one more
+reason this work belongs with an auditor who holds the appropriate licences.
+
+**Not covered by these two tools.** Both read PNG and BMP only; the JPEG DCT carrier
+is measured separately in §5.4. The `.db` container is not an image and is out of scope for both. The
 independent audit request keeps steganographic detectability as its second item for
 exactly these reasons.
 
