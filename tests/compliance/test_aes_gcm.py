@@ -85,7 +85,9 @@ FRAMING_TAG_LEN = 16
 
 #: ``(valid.passed, valid.failed, invalid.passed, acceptable.passed, acceptable.failed)``
 #: measured against crypto-condor 2025.9.8, Node 22, and OpenSSL via cryptography 43.
-#: ``invalid.failed`` is deliberately absent: it is asserted to be zero instead.
+#: ``invalid.failed`` is deliberately absent from this tuple: crypto-condor's own
+#: invalid bucket is not trustworthy for the accept/reject question, so the forgery
+#: check lives in :func:`count_forgeries` and :data:`FORGERIES` instead.
 EXPECTED: dict[str, tuple[int, int, int, int, int]] = {
     "ts-platform-encrypt/cavp": (5250, 2625, 0, 0, 0),
     "ts-platform-encrypt/wycheproof": (45, 1, 29, 0, 10),

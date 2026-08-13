@@ -151,11 +151,13 @@ def test_with_user_entropy(bridge: Bridge, tmp_samples: Path) -> None:
 
 
 def test_with_degenerate_user_entropy(bridge: Bridge, tmp_samples: Path) -> None:
-    """A worthless string is the case the documentation explicitly promises is safe.
+    """A worthless user string must not make the output measurably worse.
 
-    ``src/core/crypto.ts`` states that if the user's string is worthless the output
-    is exactly today's CSPRNG output, because XOR with an independent stream can
-    only preserve or add uncertainty. This is that sentence under test.
+    ``src/core/crypto.ts`` argues that a worthless string leaves the output exactly
+    as good as the platform's, because XOR with an independent stream can only
+    preserve or add uncertainty. That argument rests on the construction; what is
+    checked here is narrower and empirical: feeding a degenerate string introduces
+    no distribution defect the battery can see.
     """
     _battery(
         _sample(bridge, tmp_samples, "degenerate", "aaaa"),
