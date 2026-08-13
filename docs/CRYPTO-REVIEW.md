@@ -200,10 +200,25 @@ GCM nonces are a known weakness that every mainstream binding declines by policy
 and StegoShard pins `IV_LEN = 12` everywhere, so none of these classes is reachable
 in the product.
 
-**The load-bearing assertion is that no vector marked "must be rejected" was ever
-accepted** (3,919 of them per decrypt target). That is checked unconditionally and
-is never frozen into an expectation; a forged tag verifying is a security defect,
-not a drift.
+**The load-bearing assertion is that no forged tag was ever accepted.** It is
+checked by reading back what each implementation returned for every vector marked
+"must be rejected", not by trusting crypto-condor's own `invalid` bucket: that
+bucket carries two `# FIXME: overly permissive` branches upstream, and a decryptor
+that accepts every forgery still passes through it. The suite additionally asserts
+**how many forgeries each target actually authenticated**, because "declined before
+authenticating" is not the same result:
+
+| Target        | Forgeries authenticated and rejected (CAVP) |
+| ------------- | ------------------------------------------- |
+| `ts-platform` | 2,601                                       |
+| `ts-framing`  | 191                                         |
+| `py-platform` | 378                                         |
+| `py-framing`  | 33                                          |
+
+3,919 CAVP vectors are marked invalid, but most never reach the crypto: they are
+declined earlier for a short IV, a truncated tag, or an envelope mismatch. A drop
+in the numbers above would weaken the test while leaving it green, so they are
+asserted rather than reported.
 
 Also covered: **SHA-256** (130 NIST vectors) and **HMAC-SHA256** (225 NIST CAVP +
 66 Wycheproof) against `hash-wasm`, which carries the entropy pool's keystream and
@@ -223,10 +238,16 @@ bundled with crypto-condor) over 8 MiB drawn three ways: with the layer off, wit
 high-entropy string, and with a degenerate string (`"aaaa"`). The third is the
 documented promise that a worthless string cannot make the output worse.
 
-Calibration: twelve consecutive healthy samples produced 29 passing sub-tests and
-zero failures every time, so the tolerance is zero. Deliberately weak sources are
-caught comfortably (a 32-bit LCG fails 18 of 29; forcing the low bit to zero fails
-28 of 29).
+Calibration: forty consecutive healthy 8 MiB samples gave 38 runs with no failing
+sub-test and 2 runs with one, never two, for a mean of 0.05. The tolerance is
+therefore **2 failing sub-tests of 29**, not zero: a battery reports p-values, and
+demanding a perfect sweep produces a job that fails at random, which gets switched
+off. Deliberately weak sources sit an order of magnitude away (a 32-bit LCG fails
+18 of 29; forcing the low bit to zero fails 28 of 29).
+
+These are smoke tests for detectable distribution defects. A statistical battery
+cannot establish adversarial unpredictability: a counter encrypted under a fixed
+key passes every one of them. Nor do they simulate a failed CSPRNG.
 
 > **This says nothing about steganographic detectability.** Passing a statistical
 > battery means the byte stream carries no first-order structure. Steganalysis

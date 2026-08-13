@@ -44,13 +44,23 @@ binding refuses outright:
 StegoShard pins ``IV_LEN = 12`` and uses WebCrypto's default 128-bit tag
 everywhere, so none of the refused classes is reachable in the product.
 
-The two assertions
-------------------
-1. ``invalid.failed == 0``, unconditionally, for every target. A non-zero value
-   means a vector that should have been rejected was **accepted**: a forged tag
-   that verified. This is the security-critical direction and it is never frozen
-   into an expectation table.
-2. The full bucket table matches :data:`EXPECTED`. Freezing the counts follows the
+The assertions
+--------------
+1. **No forged tag was accepted**, for every decrypt target. This is the
+   security-critical direction and it is checked by reading ``ret_valid_tag`` back
+   out of each vector's debug record, not by trusting crypto-condor's ``invalid``
+   bucket. See :func:`count_forgeries`: that bucket carries two
+   ``# FIXME: overly permissive`` branches upstream, and a decryptor that accepts
+   every forgery still reports ``invalid.failed == 0`` through it. The first
+   version of this file asserted exactly that and would have passed a decryptor
+   which verified all 3,919 CAVP forgeries.
+2. **How many forgeries each target actually authenticated**, frozen in
+   :data:`FORGERIES`. Distinguishing "rejected after authenticating" from "declined
+   before authenticating" matters: 3,919 CAVP vectors are marked invalid, but only
+   2,601 reach WebCrypto and only 33 reach the decoder's ``decrypt_content``. A
+   drop in that first number weakens the test while leaving it green, so it is
+   asserted rather than reported.
+3. The full bucket table matches :data:`EXPECTED`. Freezing the counts follows the
    same philosophy as ``tests/vectors/crypto-vectors.json``: the committed numbers
    are the contract, and any drift - in crypto-condor's vectors, in Node, or in
    OpenSSL - fails loudly so a human looks at it.
@@ -93,11 +103,59 @@ EXPECTED: dict[str, tuple[int, int, int, int, int]] = {
     "py-framing-decrypt/wycheproof": (12, 34, 29, 0, 10),
 }
 
+#: Forgery accounting for the decrypt targets, as
+#: ``(authenticated_and_rejected, structurally_refused)``. See
+#: :func:`count_forgeries` for why crypto-condor's own ``invalid`` bucket cannot
+#: supply these numbers.
+FORGERIES: dict[str, tuple[int, int]] = {
+    "ts-platform-decrypt/cavp": (2601, 1318),
+    "ts-platform-decrypt/wycheproof": (27, 2),
+    "ts-framing-decrypt/cavp": (191, 3728),
+    "ts-framing-decrypt/wycheproof": (27, 2),
+    "py-platform-decrypt/cavp": (378, 3541),
+    "py-platform-decrypt/wycheproof": (27, 2),
+    "py-framing-decrypt/cavp": (33, 3886),
+    "py-framing-decrypt/wycheproof": (27, 2),
+}
+
 SOURCES = (("cavp", True, False), ("wycheproof", False, True))
 
 
+def count_forgeries(res) -> tuple[int, int, int]:
+    """Classify every "must be rejected" vector by what the target actually said.
+
+    crypto-condor's ``invalid`` bucket cannot be used for this. Its runner carries
+    two ``# FIXME: overly permissive`` branches: an exception on an invalid vector
+    is booked as a pass, and the accept/reject decision is folded into
+    ``is_same_pt and is_valid_tag``, so a decryptor that returns the *wrong*
+    plaintext while claiming ``valid_tag=True`` also lands in the pass column. A
+    deliberately broken decryptor that accepts every forgery therefore reports
+    ``invalid.failed == 0``, which is what the first version of this file asserted.
+
+    Reading ``ret_valid_tag`` back out of the per-vector debug record avoids all of
+    that: it is what the implementation itself returned.
+
+    Returns:
+        ``(accepted, rejected, refused)``: forgeries wrongly accepted, forgeries
+        authenticated and correctly rejected, and vectors the target declined
+        before any authentication happened.
+    """
+    accepted = rejected = refused = 0
+    for info in res.data.values():
+        if str(info.type) != "invalid":
+            continue
+        tag = getattr(info.data, "ret_valid_tag", None) if info.data is not None else None
+        if tag is True:
+            accepted += 1
+        elif tag is False:
+            rejected += 1
+        else:
+            refused += 1
+    return accepted, rejected, refused
+
+
 def run(label: str, fn: Callable, direction: str) -> None:
-    """Drive one target over both vector sources and check both invariants."""
+    """Drive one target over both vector sources and check every invariant."""
     runner = AES.test_encrypt if direction == "encrypt" else AES.test_decrypt
     for source, compliance, resilience in SOURCES:
         key = f"{label}/{source}"
@@ -105,10 +163,21 @@ def run(label: str, fn: Callable, direction: str) -> None:
         assert len(results) == 1, f"{key}: expected one result set, got {len(results)}"
         res = next(iter(results.values()))
 
-        assert res.invalid.failed == 0, (
-            f"{key}: {res.invalid.failed} vector(s) that MUST be rejected were accepted. "
-            "A forged tag verified; treat this as a security defect, not a drift."
-        )
+        if direction == "decrypt":
+            accepted, rejected, refused = count_forgeries(res)
+            assert accepted == 0, (
+                f"{key}: {accepted} forged tag(s) were ACCEPTED. The implementation "
+                "returned valid_tag=True for a vector that must be rejected. Treat this "
+                "as a security defect, not a drift."
+            )
+            print(f"\n  {key}: forgeries rejected={rejected} refused={refused}")
+            assert (rejected, refused) == FORGERIES[key], (
+                f"{key}: forgery accounting moved.\n"
+                f"  expected (rejected, refused) = {FORGERIES[key]}\n"
+                f"  got                          = {(rejected, refused)}\n"
+                "A drop in `rejected` means fewer forgeries are actually being "
+                "authenticated, which weakens this test even when it stays green."
+            )
 
         got = (
             res.valid.passed,
@@ -117,7 +186,7 @@ def run(label: str, fn: Callable, direction: str) -> None:
             res.acceptable.passed,
             res.acceptable.failed,
         )
-        print(f"\n  {key}: valid={got[0]}/{got[0] + got[1]} invalid_rejected={got[2]}")
+        print(f"  {key}: valid={got[0]}/{got[0] + got[1]}")
         assert got == EXPECTED[key], (
             f"{key}: bucket counts moved.\n"
             f"  expected (valid.passed, valid.failed, invalid.passed, acc.passed, acc.failed)\n"

@@ -7,6 +7,15 @@
 #
 # Nothing here may ever reach requirements.in: the runtime decoder keeps its four
 # dependencies, which python/README.md presents as a feature.
+#
+# This file is audited in CI. crypto-condor pins `cffi<2`, which forces
+# `cryptography==43.0.3` and its open advisories; the CI job carries the specific
+# ignore list and the reasoning. Revisit whenever crypto-condor relaxes that bound.
 -r requirements.in
 crypto-condor>=2025.9.8
 pytest>=8.0.0
+pip-audit>=2.9.0
+
+# Transitive, pinned forward past PYSEC-2026-2132. crypto-condor pulls click via
+# typer and does not constrain it, so this one is ours to fix.
+click>=8.3.3
