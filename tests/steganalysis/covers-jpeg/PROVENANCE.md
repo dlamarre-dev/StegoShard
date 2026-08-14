@@ -46,13 +46,13 @@ unusable, and knowing which is part of the measurement.
 A cover only earns a verdict if the detector can be shown to work on it. Measured
 with Aletheia's Steghide detector, the only one that discriminates on this set:
 
-| cover      | clean | outguess control | usable                              |
-| ---------- | ----- | ---------------- | ----------------------------------- |
-| `lake`     | 0.0   | 1.0              | yes                                 |
-| `night`    | 0.0   | 0.8              | yes                                 |
-| `beach`    | 0.1   | 0.6              | yes                                 |
-| `park`     | 0.1   | 0.2              | **no**, control not detected        |
-| `mountain` | 0.7   | n/a              | **no**, clean cover already flagged |
+| cover      | clean | outguess control | carries the instrument check         |
+| ---------- | ----- | ---------------- | ------------------------------------ |
+| `lake`     | 0.0   | 1.0              | yes                                  |
+| `beach`    | 0.1   | 0.6              | yes                                  |
+| `night`    | 0.0   | 0.8              | **no**, control arrives only locally |
+| `park`     | 0.1   | 0.2              | **no**, control not detected         |
+| `mountain` | 0.7   | n/a              | **no**, clean cover already flagged  |
 
 `night` needs a further note. The table above was measured locally, where outguess
 accepted it. On GitHub runners outguess has **declined it twice**, refusing to fit
