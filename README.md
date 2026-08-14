@@ -336,6 +336,7 @@ tool.
 
 | Doc                                                                                                    | What's in it                                                                                    |
 | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| [How it works, from scratch](docs/ELI15.md)                                                            | Every concept explained for a reader who has never studied cryptography. Start here.            |
 | [Why StegoShard?](docs/WHY.md)                                                                         | The problem, and the reasoning behind the two-model design.                                     |
 | [Where it fits](docs/COMPARISON.md)                                                                    | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
 | [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                      |
