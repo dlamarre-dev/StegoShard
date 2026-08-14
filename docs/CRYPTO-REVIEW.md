@@ -664,8 +664,15 @@ pytest python -q                          # Python conformance + cross-impl vect
 
 ## 9. Post-quantum readiness
 
-**Claim: StegoShard has no quantum-vulnerable cryptography, and none is at risk of
-being introduced silently.**
+**Claim: StegoShard contains no public-key cryptography vulnerable to Shor's
+algorithm, its symmetric primitives use 256-bit keys and retain substantial margins
+against known quantum attacks, and none of that can change silently.**
+
+Worded as three specific statements rather than as "no quantum-vulnerable
+cryptography", which is the shorter sentence and the wrong one. For a
+password-based system the practical ceiling is the entropy of the password, not the
+key length, and a blanket claim invites the reader to forget that. The parameters in
+§1 exist because a 256-bit key does not help against a password someone can guess.
 
 The scheme is **entirely symmetric**: `Argon2id` (KDF) → `AES-256-GCM` (AEAD) →
 `HKDF-SHA256` (subkey separation), with `AES-256-CTR` as a keystream PRF in the stego

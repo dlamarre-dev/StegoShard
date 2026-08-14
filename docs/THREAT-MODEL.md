@@ -85,8 +85,15 @@ the honest limits above. Read this before using them.
   coercion without producing anything extra.
 - **Non-possession (Mode B, Gallery + `.db`).** The real payload is gated on Shamir threshold
   material (_k_ of _n_ shares) that the holder does **not** possess. Without a quorum of shares,
-  "I cannot decrypt this" is literally true: the container carries no _k_, no _n_, no share
-  count, and no fingerprint, so a sub-threshold set is indistinguishable from a wrong password.
+  the holder does not possess the cryptographic material required to derive the real region's
+  key: the container carries no _k_, no _n_, no share count, and no fingerprint, so a
+  sub-threshold set is indistinguishable from a wrong password.
+
+  Stated that way on purpose. "I cannot decrypt this" is true under this system's
+  assumptions, but it reads as a legal assertion to the readers most likely to need this
+  mode, and `docs/CLAIMS.md` offers no legal guarantee. What is technically true is the
+  statement about possession; what happens when someone says it out loud is not something
+  this project can promise anything about. See the legal-exposure warning below.
 
 **What these modes do _not_ give you:**
 
