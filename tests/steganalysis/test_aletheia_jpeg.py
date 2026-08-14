@@ -57,6 +57,7 @@ the second item of the independent audit request.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -102,11 +103,22 @@ MIN_CONTROLS = 2
 MAX_DRIFT = 0.11
 
 
+#: Mirrors conftest.require(): locally a missing tool is a skip, in CI it is a
+#: failure. Without this the nightly job would go green with both tests skipped if a
+#: runner image ever dropped Docker, which is the same silent-pass the rest of this
+#: suite is built to refuse.
+IN_CI = os.environ.get("CI") == "true"
+
+
 def _docker() -> str:
     found = shutil.which("docker")
-    if not found:
-        pytest.skip("docker not found; this suite runs in a container (see the nightly workflow)")
-    return found
+    if found:
+        return found
+    message = "docker not found; this suite runs in a container (see the nightly workflow)"
+    if IN_CI:
+        pytest.fail(message)
+    pytest.skip(message)
+    raise AssertionError("unreachable")
 
 
 def _parse(out: str) -> dict[str, dict[str, float]]:
