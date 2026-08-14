@@ -6,7 +6,8 @@ verified part of the project; this module measures it.
 
 Runs in a container (`aletheia.Dockerfile`) because Aletheia needs Octave, three
 toolboxes, TensorFlow and two steganography binaries. Nightly rather than per pull
-request: the image is 7 GB and a full sweep takes about half an hour on CPU.
+request: the image is 7 GB and a full sweep took **47 minutes** on a GitHub runner
+(measured, first green run). The workflow allows 120.
 
 What is measured
 ----------------
@@ -86,17 +87,22 @@ DETECTORS = ("outguess", "steghide", "nsf5", "juniward")
 #: The only detector that discriminates on this cover set.
 DISCRIMINATOR = "steghide"
 
-#: Covers whose instrument check is valid. The other two are measured but cannot
-#: demonstrate a positive; see covers-jpeg/PROVENANCE.md.
-CONTROL_COVERS = ("lake", "night", "beach")
+#: Covers that can carry the instrument check. `night` is deliberately absent: it
+#: works locally but outguess has declined it on every runner, so listing it would
+#: mean tolerating a control that never arrives. `mountain` is absent because its
+#: clean cover is already flagged. Both still feed the differential below, which is
+#: the measurement; what they cannot do is show the detector was awake.
+CONTROL_COVERS = ("lake", "beach")
 
 #: A control must land at or above this, a clean cover below it.
 CONTROL_FLOOR = 0.5
 
-#: How many working controls the run needs before its clean verdicts mean anything.
-#: outguess declines covers it cannot fit the message into, and which ones vary by
-#: build: `night` succeeded locally and was declined on a CI runner.
-MIN_CONTROLS = 2
+#: Every listed control must work. Deliberately equal to len(CONTROL_COVERS) rather
+#: than lower: slack there would let a control quietly stop arriving while the suite
+#: stayed green on the remainder, which is the failure mode this module exists to
+#: refuse. A decline is still reported rather than raising a KeyError, but it is
+#: fatal.
+MIN_CONTROLS = len(CONTROL_COVERS)
 
 #: Aletheia reports to one decimal, so this permits the reporting granularity and
 #: nothing more.
