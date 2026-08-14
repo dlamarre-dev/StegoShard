@@ -7,7 +7,29 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Restart markers were written as data, not as markers.** `encode` in
+  `jpeg-coeff.ts` emitted them through the bit writer, whose byte-stuffing turns a
+  `0xFF` into `FF 00`, so the file received `FF 00 D0` instead of `FF D0`: a literal
+  0xFF followed by a stray byte read as coefficient data. Every decoder desynchronises
+  on that. It is reachable by users, not only in tests: `stego.ts` re-encodes the scan
+  whenever `restartInterval > 0`, which is the fallback for exactly these files, so
+  embedding a key into a camera or scanner JPEG that uses restart intervals produced a
+  carrier nothing could read. Markers now bypass stuffing.
+
+  The path had never executed in CI. Every JPEG the suite saw came from `jpeg-js`,
+  which emits 4:4:4 baseline with no DRI segment, and none of the 23 `.jpg` files in
+  the repository carries one.
+
 ### Added
+
+- **JPEG restart intervals are tested**, unlocking four decoder paths and the
+  `stego.ts` re-encode fallback that existed solely for them. Eleven tests build the
+  fixture rather than committing one: markers written first by this project's encoder,
+  the DRI segment spliced in afterwards, since a header claiming restarts that the
+  scan does not contain is inconsistent and rightly refused. Branch coverage moves from
+  82.84% to 92.54% on `jpeg-coeff.ts` and 83.78% to 86.49% on `stego.ts`.
 
 - **A committed golden corpus, so the encoder and the decoders cannot drift together.**
   Everything the suite decoded was produced by the TypeScript encoder moments earlier in

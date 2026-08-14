@@ -421,6 +421,21 @@ class BitWriter {
     this.nbits = 0;
   }
 
+  /**
+   * Write a marker verbatim, bypassing byte-stuffing.
+   *
+   * A restart marker is `FF D0`..`FF D7` in the stream, not stuffed data.
+   * Writing it through `writeBits` sends the 0xFF through `flushByte`, whose
+   * stuffing rule turns it into `FF 00`, so the file gets `FF 00 D0`: a literal
+   * 0xFF byte followed by a stray 0xD0 read as coefficient data. Every decoder,
+   * including this one, then desynchronises.
+   *
+   * The caller must `align()` first: a marker is byte-aligned by definition.
+   */
+  writeMarker(marker: number): void {
+    this.out.push(0xff, marker);
+  }
+
   /** Pad the final partial byte with 1-bits (JPEG convention) and stuff if 0xFF. */
   align(): void {
     if (this.nbits > 0) {
@@ -450,8 +465,11 @@ export function encode(model: JpegModel): Uint8Array {
     for (let mx = 0; mx < model.mcusPerLine; mx++) {
       if (rst > 0 && mcu > 0 && mcu % rst === 0) {
         bw.align();
-        bw.writeBits(0xff, 8);
-        bw.writeBits(0xd0 + rstn, 8);
+        // Verbatim, not through writeBits: the bit writer stuffs a 0xFF into
+        // `FF 00`, which would turn this marker into data. This path had never
+        // run in CI, since every test JPEG had restartInterval === 0, and it was
+        // wrong. See writeMarker.
+        bw.writeMarker(0xd0 + rstn);
         rstn = (rstn + 1) & 7;
         pred.fill(0);
       }
