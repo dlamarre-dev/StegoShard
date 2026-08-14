@@ -320,7 +320,7 @@ discriminates.
 | cover      | clean (SH) | **carrier (SH)** | outguess control | instrument check            |
 | ---------- | ---------- | ---------------- | ---------------- | --------------------------- |
 | `lake`     | 0.0        | **0.0**          | 1.0              | valid                       |
-| `night`    | 0.0        | **0.0**          | 0.8              | valid                       |
+| `night`    | 0.0        | **0.0**          | 0.8 (local only) | not enforced, see below     |
 | `beach`    | 0.1        | **0.2**          | 0.6              | valid                       |
 | `park`     | 0.1        | **0.1**          | 0.2              | control not detected        |
 | `mountain` | 0.7        | **0.7**          | n/a              | clean cover already flagged |
@@ -329,12 +329,18 @@ Across all four detectors, saturated ones included, the carrier scores what its 
 cover scores: `park` and `mountain` are identical on every column, and nothing else
 moves by more than the 0.1 reporting granularity.
 
-**What this establishes, precisely.** On the three covers where the detector is
-demonstrably awake, StegoShard's JPEG carrier is indistinguishable from the cover it
+The `night` control is measured but not counted. Locally outguess accepts that cover;
+on GitHub runners it has declined it reproducibly, refusing to fit the message into the
+smallest and darkest image of the set. CI therefore requires **two** controls, `lake` and
+`beach`, and requires both: tolerating a control that sometimes fails to arrive would let
+the instrument check quietly stop running while the suite stayed green.
+
+**What this establishes, precisely.** On the two covers where the detector is
+demonstrably awake in CI, StegoShard's JPEG carrier is indistinguishable from the cover it
 was made from, while an outguess carrier in the same cover is flagged at 0.6 to 1.0.
 
 **What it does not.** Three detectors of four carry no information here, so the
-result rests on one working detector over three covers plus the differential. The
+result rests on one working detector over two enforced covers plus the differential. The
 detectors are also _learned_, so a low score may mean undetectable or merely outside
 the training distribution. This is not a general claim of resistance to JPEG
 steganalysis.
