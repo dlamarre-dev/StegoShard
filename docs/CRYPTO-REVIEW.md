@@ -345,6 +345,22 @@ detectors are also _learned_, so a low score may mean undetectable or merely out
 the training distribution. This is not a general claim of resistance to JPEG
 steganalysis.
 
+**How often this actually runs, and why it matters.** The workflow is scheduled nightly
+but skips the sweep when nothing feeding the measurement has changed: the steganalysis
+tests, the sample generator, the lockfile, the workflow itself, and the runner image
+version. A seven-day bucket in the cache key sets the floor, aligned with GitHub's cache
+eviction so the two mechanisms agree rather than one silently overriding the other.
+
+That is a trade, not a free optimisation, and it belongs in the record. The test is not
+deterministic: the embedded key block draws a fresh salt, DEK and IV every run, so only
+the embedding positions are fixed and each run is an independent draw. Nightly execution
+would give roughly thirty samples a month of a measurement resting on one working
+detector over two covers; gating brings that to four or five. The table above therefore
+describes fewer draws than the schedule suggests. Seeding the payload to make the skip
+rigorous was rejected: it would freeze the measurement onto a single draw, and this suite
+has already shown the draw matters, since outguess declines `night` on runners while
+accepting it locally.
+
 **Licensing.** Any JPEG analysis through Aletheia pulls in the JPEG TOOLBOX (Regents
 of the University of California) and the nsF5 / J-UNIWARD reference code (Binghamton
 DDE), all research licences limited to educational, research and non-profit use.

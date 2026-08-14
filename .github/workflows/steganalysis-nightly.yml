@@ -10,6 +10,30 @@
 # legibly: the outguess instrument check runs first, and every score is printed
 # whether or not the run passes.
 #
+# WHY THIS DOES NOT RUN EVERY NIGHT
+# The `guard` job below skips the sweep when nothing that feeds the measurement has
+# changed. Read what that does and does not mean, because the obvious reading is
+# wrong.
+#
+# This test is NOT deterministic. `realKeyBlock()` draws a fresh salt, DEK and IV on
+# every run (scripts/gen-stego-samples.ts), so the payload differs each time. Only the
+# embedding *positions* are fixed, deriving from a constant password and cover
+# fingerprint. Each run is therefore an independent draw, and thirty nights would give
+# thirty samples of a measurement that rests on one working detector over two covers.
+# The container drifts too: aletheia.Dockerfile starts from ubuntu:24.04 with unpinned
+# apt and pip packages, so running it also catches upstream breakage.
+#
+# Gating is thus a deliberate trade of resampling for cost, not an optimisation that
+# costs nothing. The seven-day bucket in the cache key is the floor that keeps both
+# properties alive at a reduced rate. It is aligned with GitHub's cache eviction, which
+# drops a cache unused for seven days, so the two mechanisms agree instead of one
+# silently overriding the other. The real guarantee is "at least weekly", not "nightly".
+#
+# The alternative, seeding the payload so the skip would be rigorous, was considered and
+# rejected: it would freeze the measurement onto a single draw. This suite has already
+# shown that the draw matters, since outguess declines `night` on runners and accepts it
+# locally.
+#
 # LICENCE: this workflow accepts, at run time, the JPEG TOOLBOX licence (Regents of
 # the University of California) and the NSF5_COLOR / J_UNIWARD_COLOR licences
 # (Binghamton DDE). All three are research licences limited to educational,
@@ -32,8 +56,79 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  guard:
+    name: Has anything changed?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      # The heavy job saves under exactly this key. If the two ever diverge the lookup
+      # never hits, the gate never skips, and the only symptom is a bill.
+      key: ${{ steps.fp.outputs.key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Fingerprint everything that can change the measurement. `git ls-files -s` gives
+      # blob hashes, so the binary covers are covered without reading them. Whole
+      # directories rather than a list of filenames: a named list silently stops
+      # covering a file the day someone adds one, and the failure mode is a skip that
+      # looks like a pass.
+      - name: Fingerprint the inputs
+        id: fp
+        run: |
+          set -euo pipefail
+          INPUTS=$(git ls-files -s \
+            tests/steganalysis \
+            scripts/gen-stego-samples.ts \
+            python/requirements-steganalysis.lock \
+            .github/workflows/steganalysis-nightly.yml | sha256sum | cut -c1-16)
+          # ImageVersion is set by GitHub on hosted runners and is the documented way to
+          # read it. Falling back to "unknown" would make every run share a key and hide
+          # a runner upgrade, so an absent value forces a run instead.
+          IMAGE="${ImageVersion:-unpinned-$(date -u +%s)}"
+          BUCKET=$(( $(date -u +%s) / 604800 ))
+          echo "key=stego-nightly-${INPUTS}-${IMAGE}-${BUCKET}" >> "$GITHUB_OUTPUT"
+          echo "inputs=${INPUTS}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Look for a previous run with the same inputs
+        id: seen
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nightly-stamp
+          key: ${{ steps.fp.outputs.key }}
+          lookup-only: true
+
+      # Printed, always. A silent skip reads as a pass, which is the shape of green this
+      # repository keeps removing.
+      - name: Decide
+        id: decide
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN=true; WHY="manual dispatch always runs"
+          elif [ "${{ steps.seen.outputs.cache-hit }}" = "true" ]; then
+            RUN=false; WHY="same inputs, same runner image, already measured this week"
+          else
+            RUN=true; WHY="inputs, runner image, or week changed"
+          fi
+          echo "run=${RUN}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Nightly steganalysis: ${RUN}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| inputs digest | \`${{ steps.fp.outputs.inputs }}\` |"
+            echo "| runner image | \`${{ steps.fp.outputs.image }}\` |"
+            echo "| cache key | \`${{ steps.fp.outputs.key }}\` |"
+            echo "| decision | **${RUN}** |"
+            echo "| reason | ${WHY} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "run=${RUN} (${WHY})"
+
   aletheia:
     name: JPEG detectability (Aletheia)
+    needs: guard
+    if: needs.guard.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -60,3 +155,17 @@ jobs:
       # rather than a skip, so this job cannot quietly stop measuring anything.
       - name: JPEG steganalysis
         run: npm run test:steganalysis:nightly -- -q -s
+
+      # Only after a green sweep. A failed run must not suppress the next one, which is
+      # the whole reason this is a separate step rather than part of the guard.
+      - name: Record that these inputs were measured
+        run: date -u +%FT%TZ > .nightly-stamp
+
+      # Saving under the guard's own key is what closes the loop. A manual dispatch can
+      # land on a key that already exists, which the action reports as a warning rather
+      # than an error; continue-on-error keeps that from failing a green sweep.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        continue-on-error: true
+        with:
+          path: .nightly-stamp
+          key: ${{ needs.guard.outputs.key }}
