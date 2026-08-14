@@ -8,6 +8,7 @@ decoder and the TypeScript encoder disagree on the format.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 
 import pytest
@@ -16,10 +17,35 @@ from stegoshard.pipeline import MissingKeyError
 
 FIXTURES = pathlib.Path(__file__).parent / "_fixtures"
 
-pytestmark = pytest.mark.skipif(
-    not FIXTURES.exists(),
-    reason="fixtures not generated (run: npm run fixtures -- python/tests/_fixtures)",
-)
+#: Set by CI. Locally a missing fixture directory is a skip; in CI it is a hard
+#: failure, so this suite can never quietly stop running. Same rule as
+#: tests/compliance, tests/steganalysis and tests/erasure.
+#:
+#: It matters more here than anywhere else. These are the only cross-implementation
+#: tests in the repository, and there are 25 of them. Under the old plain skipif,
+#: a CI job whose `npm run fixtures` step had silently produced nothing would have
+#: reported green while checking that the Python decoder and the TypeScript encoder
+#: agree on absolutely nothing.
+IN_CI = os.environ.get("CI") == "true"
+
+if not FIXTURES.exists():
+    _message = (
+        "conformance fixtures not generated (run: npm run fixtures -- python/tests/_fixtures)"
+    )
+    pytestmark = (
+        pytest.mark.skip(reason=_message)
+        if not IN_CI
+        else pytest.mark.usefixtures("_fixtures_are_required")
+    )
+
+
+@pytest.fixture
+def _fixtures_are_required() -> None:
+    pytest.fail(
+        "conformance fixtures are missing under CI. This suite is the only "
+        "cross-implementation check in the repository; skipping it would report "
+        "green while verifying nothing."
+    )
 
 
 def _load(name: str):

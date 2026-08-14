@@ -192,6 +192,15 @@ export function decode(bytes: Uint8Array): JpegModel {
       if (bytes[segStart] !== 8) throw new JpegUnsupportedError('precision != 8');
       const height = u16(bytes, segStart + 1);
       const width = u16(bytes, segStart + 3);
+      // A zero dimension is only legal in JPEG when a DNL marker supplies the
+      // real height later, which this decoder does not implement. Accepting it
+      // produced a model with no MCUs at all: the scan loop ran zero times, the
+      // coefficient arrays stayed empty, and the stego layer would have reported
+      // zero capacity on the file rather than refusing it. Found by the parser
+      // fuzzer.
+      if (width === 0 || height === 0) {
+        throw new JpegUnsupportedError(`zero frame dimension (${width}x${height})`);
+      }
       const nf = bytes[segStart + 5]!;
       const comps: Component[] = [];
       let maxH = 1;
@@ -454,6 +463,31 @@ export function encode(model: JpegModel): Uint8Array {
   return out;
 }
 
+/**
+ * Look up a Huffman code, refusing to serialise what the table cannot express.
+ *
+ * These four call sites used `!`, which is a promise that the table always holds
+ * the symbol. It does not. A JPEG whose DHT segments carry a minimal table can
+ * decode into coefficients whose (run, size) pair has no code, and the encoder
+ * then read `.code` off `undefined` and threw a bare `TypeError` from deep in the
+ * bit writer. Found by the parser fuzzer once it started re-encoding what it had
+ * just decoded.
+ *
+ * It matters outside fuzzing: `stego.ts` re-encodes the scan on the
+ * restart-interval fallback path, so a real camera or scanner JPEG with sparse
+ * tables reaches this. A typed refusal is something callers already handle; an
+ * untyped TypeError is an unhandled crash on user-supplied input.
+ */
+function huffCode(table: HuffTable, symbol: number, what: string): { code: number; len: number } {
+  const found = table.enc.get(symbol);
+  if (!found) {
+    throw new JpegUnsupportedError(
+      `no Huffman code for ${what} symbol 0x${symbol.toString(16)} in this file's tables`,
+    );
+  }
+  return found;
+}
+
 function encodeBlock(
   bw: BitWriter,
   block: Int16Array,
@@ -465,7 +499,7 @@ function encodeBlock(
   const diff = block[0]! - pred[ci]!;
   pred[ci] = block[0]!;
   const ds = magBits(diff);
-  const dcode = dc.enc.get(ds)!;
+  const dcode = huffCode(dc, ds, 'DC');
   bw.writeBits(dcode.code, dcode.len);
   if (ds > 0) bw.writeBits(mantissa(diff, ds), ds);
 
@@ -483,19 +517,19 @@ function encodeBlock(
       continue;
     }
     while (run > 15) {
-      const zrl = ac.enc.get(0xf0)!;
+      const zrl = huffCode(ac, 0xf0, 'AC ZRL');
       bw.writeBits(zrl.code, zrl.len);
       run -= 16;
     }
     const s = magBits(block[k]!);
     const rs = (run << 4) | s;
-    const code = ac.enc.get(rs)!;
+    const code = huffCode(ac, rs, 'AC');
     bw.writeBits(code.code, code.len);
     bw.writeBits(mantissa(block[k]!, s), s);
     run = 0;
   }
   if (last < 63) {
-    const eob = ac.enc.get(0x00)!;
+    const eob = huffCode(ac, 0x00, 'AC EOB');
     bw.writeBits(eob.code, eob.len);
   }
 }
