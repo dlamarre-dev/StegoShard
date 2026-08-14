@@ -8,8 +8,10 @@
  * region is CSPRNG to the same bucket). The secret `S` is split into `n` shares
  * (any `k` recover it) and returned for out-of-band delivery to holders; the
  * writer keeps neither `S` nor the shares, and nothing about `k`/`n`/fingerprints
- * enters the container. "I cannot decrypt this" is then literally true for anyone
- * below the threshold.
+ * enters the container. Below the threshold, a holder does not possess the
+ * cryptographic material required to derive the real region's key. Phrased as
+ * possession rather than as "I cannot decrypt this": the latter is true under this
+ * system's assumptions but reads as a legal claim, and this project makes none.
  *
  * Mode A, Duress (§10.5): TWO live slots over TWO real regions, one credential
  * opens the real region, an independent duress credential opens a plausible decoy.

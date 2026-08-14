@@ -26,6 +26,21 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   external library reproduces, and stays unvalidated by any third party. See
   `docs/CRYPTO-REVIEW.md` §5.5.
 
+### Changed
+
+- **Three claims tightened after an external review.** The post-quantum section headline
+  said "no quantum-vulnerable cryptography", which is the shorter sentence and the wrong
+  one: for a password-based system the practical ceiling is password entropy, not key
+  length. It now states three specific things instead. The four places that said "I cannot
+  decrypt this" of non-possession mode now describe what is technically true, that below
+  threshold the holder does not possess the material required to derive the real region's
+  key. The original is accurate under this system's assumptions but reads as a legal
+  assertion to exactly the readers most likely to need that mode, and `docs/CLAIMS.md`
+  offers no legal guarantee.
+- **The claims-register rule reaches the pull-request template.** `docs/CLAIMS.md` already
+  said no claim may be strengthened without evidence. The rule now appears where
+  contributions actually pass.
+
 ### Fixed
 
 - **A GF(2^8) test claimed a known-answer check and performed none.** It was named

@@ -842,8 +842,9 @@ This blob is what the disguised `.db` container (§8) carries.
 
 A product mode over the geometry above: **one live slot whose KEK is gated on threshold
 material the holder does not possess, one real region, and no decoy** (the second region
-is CSPRNG to the same bucket). "I cannot decrypt this" is then literally true below the
-threshold. The container is byte-indistinguishable from a plain vault of the same bucket.
+is CSPRNG to the same bucket). Below the threshold, the holder does not possess the
+cryptographic material required to derive the real region's key. The container is
+byte-indistinguishable from a plain vault of the same bucket.
 
 **Gated slot KEK (§10.6.2 of the design):**
 

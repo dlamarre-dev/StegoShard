@@ -292,8 +292,8 @@ provisional until the external audit and release QA gates close.
   mode**, a plausible decoy payload that opens under a second, independent password
   while the real region stays unreachable from that credential (`.db` only); and
   **non-possession mode**, gating the real payload on Shamir _k_-of-_n_ threshold
-  shares the writer never keeps, so "I cannot decrypt this" is literally true below
-  threshold. Unlock follows a fixed candidate schedule and returns region-blind errors;
+  shares the writer never keeps, so below threshold the holder does not possess the
+  cryptographic material required to derive the real region's key. Unlock follows a fixed candidate schedule and returns region-blind errors;
   this is an equal-control-flow design, not a formal side-channel proof.
 - **Independent recovery.** A standalone **[Python reference decoder](python/README.md)**
   restores a vault without the extension and runs in CI as a cross-implementation
