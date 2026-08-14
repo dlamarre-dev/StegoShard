@@ -22,7 +22,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argon2id } from 'hash-wasm';
 import { toHex, writeU16, writeU32, writeU64, concatBytes } from '../src/core/bytes';
-import { gfAdd, gfMul } from '../src/core/gf256';
+import { gfAdd, gfMul, gfInv, gfDiv, FIELD_POLY, FIELD_GENERATOR } from '../src/core/gf256';
 import {
   CONTENT_SALT_LEN,
   hkdf,
@@ -728,6 +728,80 @@ async function makeDuressVaultVector(
 
 const PARAMS_FAST: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 
+/**
+ * Pairs whose product differs between 0x11D and the polynomials it is most
+ * likely to be confused with, above all the AES field 0x11B. Each one reduces at
+ * least once, so a wrong polynomial cannot slip through: products that never
+ * overflow eight bits are identical in every GF(2^8) and would pin nothing.
+ */
+const GF_PRODUCT_PAIRS: [number, number][] = [
+  // Verified to differ under both 0x11B and 0x12D. A pair whose carry-less
+  // product stays inside eight bits never reduces, so it is identical in every
+  // GF(2^8) and pins nothing; 0x0E * 0x0B was in this list until the check in
+  // tests/erasure caught it.
+  [0x57, 0x13], // the classic worked example: 0xFE under AES 0x11B, 0xE0 here
+  [0x02, 0x87],
+  [0x53, 0xca],
+  [0x80, 0x02],
+  [0xff, 0xff],
+  [0xb6, 0x53],
+  [0x8e, 0x0b],
+  [0x1d, 0xff],
+];
+
+const GF_QUOTIENT_PAIRS: [number, number][] = [
+  [0x01, 0x02],
+  [0xe0, 0x13],
+  [0xff, 0x53],
+  [0x8d, 0xca],
+];
+
+const GF_INVERSE_INPUTS = [0x01, 0x02, 0x53, 0x87, 0xca, 0xff];
+
+/**
+ * Field vectors for GF(2^8), the field under both Reed-Solomon (SPEC.md §7) and
+ * Shamir sharing (§8.4).
+ *
+ * These pin what no other test in this repository pinned. Every existing
+ * assertion about the field is self-referential - inverse round-trips,
+ * encode-then-decode - and all of them hold in any correctly built GF(2^8), not
+ * only in the one the specification names. Measured: moving POLY to 0x12D, which
+ * is also primitive with generator 2, left the TypeScript suite's 620 tests green
+ * and the Python conformance suite's 89 green as well, once its fixtures were
+ * regenerated the way CI regenerates them, while changing 96% of the parity bytes
+ * on a k=4, m=3 shard set.
+ *
+ * The two table digests are not redundant with the products. A different
+ * *primitive* generator leaves every product unchanged, since
+ * log_g(xy) = log_g(x) + log_g(y) whatever the base, so the tables are the only
+ * place where the generator is observable at all.
+ *
+ * tests/erasure checks these values against reedsolo and against a table-free
+ * multiply, which is what stops the file from being a snapshot of our own output.
+ */
+async function makeGf256Vectors() {
+  const exp = new Uint8Array(255);
+  const log = new Uint8Array(256);
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    exp[i] = x;
+    log[x] = i;
+    x = gfMul(x, FIELD_GENERATOR);
+  }
+  const sha256 = async (b: Uint8Array) =>
+    toHex(new Uint8Array(await subtle.digest('SHA-256', b as BufferSource)));
+
+  return {
+    poly: FIELD_POLY,
+    generator: FIELD_GENERATOR,
+    products: GF_PRODUCT_PAIRS.map(([a, b]) => ({ a, b, product: gfMul(a, b) })),
+    quotients: GF_QUOTIENT_PAIRS.map(([a, b]) => ({ a, b, quotient: gfDiv(a, b) })),
+    inverses: GF_INVERSE_INPUTS.map((a) => ({ a, inverse: gfInv(a) })),
+    expSha256: await sha256(exp),
+    logSha256: await sha256(log),
+  };
+}
+
 async function main() {
   const argon2: Argon2Vector[] = [];
   for (const c of ARGON2_CASES) {
@@ -921,6 +995,8 @@ async function main() {
     ),
   ];
 
+  const gf256 = await makeGf256Vectors();
+
   const out = {
     _comment:
       'Frozen cross-implementation vectors. Generated once by scripts/gen-vectors.ts; ' +
@@ -935,6 +1011,7 @@ async function main() {
     multiRegionSegmentedBlob,
     gatedVaultBlob,
     shamir,
+    gf256,
     duressVaultBlob,
   };
 

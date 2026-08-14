@@ -10,8 +10,25 @@
  * O(1) table lookups.
  */
 
-const POLY = 0x11d;
-const GENERATOR = 0x02;
+/**
+ * Reducing polynomial. Exported so tests can pin it: the field still works, and
+ * every self-referential test still passes, if this changes to another primitive
+ * polynomial such as 0x12D. Only a fixed vector or an external implementation
+ * catches that, which is what tests/erasure exists for.
+ */
+export const FIELD_POLY = 0x11d;
+
+/**
+ * Primitive element. Exported for the same reason, though it pins something
+ * weaker: any of the 128 primitive elements of this field yields identical
+ * products, since log_g(xy) = log_g(x) + log_g(y) whatever the base. What a
+ * different generator changes is the exp/log tables, so that is where the
+ * assertion has to live.
+ */
+export const FIELD_GENERATOR = 0x02;
+
+const POLY = FIELD_POLY;
+const GENERATOR = FIELD_GENERATOR;
 
 const EXP = new Uint8Array(512);
 const LOG = new Uint8Array(256);
