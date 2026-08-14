@@ -49,7 +49,24 @@ function arg(name: string): string | undefined {
     ?.split('=')[1];
 }
 
-const ITERS = Number(arg('iters') ?? 5000);
+/**
+ * Iterations per target. Validated, because `--iters=0` used to be accepted and
+ * the run then reported "OK - 7 targets" having fuzzed nothing at all. A fuzzer
+ * that passes without fuzzing is the exact shape of green this file was rewritten
+ * to refuse, and it had it.
+ */
+function iterations(): number {
+  const raw = arg('iters');
+  if (raw === undefined) return 5000;
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) {
+    console.error(`fuzz: --iters must be a positive integer, got ${JSON.stringify(raw)}`);
+    process.exit(2);
+  }
+  return n;
+}
+
+const ITERS = iterations();
 // Truncated to 32 bits here rather than inside makePrng, so the seed printed in
 // the log is the seed that actually drives the stream. A GITHUB_RUN_ID above
 // 2^32 used to be truncated silently, leaving a log line that did not identify
