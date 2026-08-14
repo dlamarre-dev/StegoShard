@@ -18,11 +18,10 @@ last and must pass silently.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import pytest
 from _pytest.outcomes import Failed
-
 from conftest import EXPECTED_POLY
 from test_gf256_field import PRODUCTS, check_products
 
@@ -90,7 +89,7 @@ def table_mul(poly: int, generator: int) -> Callable[[int, int], int]:
 
 
 def count_disagreements(mul: Callable[[int, int], int], reference: object) -> int:
-    ref = getattr(reference, "gf_mul")
+    ref = reference.gf_mul
     return sum(1 for a in range(256) for b in range(256) if mul(a, b) != ref(a, b))
 
 

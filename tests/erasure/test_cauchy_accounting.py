@@ -17,12 +17,11 @@ pass in silence.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pytest
-
-from conftest import EXPECTED_GENERATOR, EXPECTED_POLY
 from test_cauchy_code import cauchy_reference
 
 #: The layouts every probe is measured over. Three sizes, 162 matrix entries in total.
@@ -41,12 +40,6 @@ ISAL_DISAGREEMENTS = 162
 #: whole matrices rather than spot-checking a few cells: a spot check that happened to
 #: land on those two would have reported agreement.
 VANDERMONDE_DISAGREEMENTS = 160
-
-
-@pytest.fixture(scope="module")
-def GF() -> Any:
-    galois = pytest.importorskip("galois", reason="galois missing; see requirements-erasure.lock")
-    return galois.GF(2**8, irreducible_poly=EXPECTED_POLY, primitive_element=EXPECTED_GENERATOR)
 
 
 def ours(k: int, m: int) -> np.ndarray:
@@ -116,4 +109,6 @@ def test_correct_construction_is_accepted(GF: Any) -> None:
     rejects everything, which detects nothing while looking rigorous.
     """
     n = count_disagreements(lambda k, m: np.array(cauchy_reference(GF, k, m), dtype=np.uint8))
-    assert n == 0, f"the specification's own formula disagrees with the implementation in {n} places"
+    assert n == 0, (
+        f"the specification's own formula disagrees with the implementation in {n} places"
+    )

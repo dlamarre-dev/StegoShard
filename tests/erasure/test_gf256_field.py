@@ -51,10 +51,10 @@ believes it still covers something.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import pytest
-
 from conftest import EXPECTED_GENERATOR, EXPECTED_POLY
 
 #: How many disagreements to name before truncating. A field that is wrong is

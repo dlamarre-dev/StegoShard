@@ -22,7 +22,6 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from stegoshard import gf256
-from stegoshard.reedsolomon import reconstruct_data
 from stegoshard.crypto import (
     WrongPasswordError,
     decrypt_content,
@@ -32,6 +31,7 @@ from stegoshard.crypto import (
 )
 from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
 from stegoshard.pipeline import decode_multiregion_vault_blob
+from stegoshard.reedsolomon import reconstruct_data
 from stegoshard.segmented import decode_multiregion_segmented_blob
 from stegoshard.shamir import shamir_recover
 
@@ -400,7 +400,7 @@ def test_reed_solomon_needs_at_least_k_shards():
     present = list(data) + list(parity)
     for i in range(m + 1):
         present[i] = None
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="required shards present"):
         reconstruct_data(present, k, m)
 
 

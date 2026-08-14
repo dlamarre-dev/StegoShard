@@ -41,8 +41,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-
-from conftest import EXPECTED_GENERATOR, EXPECTED_POLY, REPO_ROOT
+from conftest import REPO_ROOT
 
 #: Above this many k-subsets the MDS check samples instead of enumerating. C(154, 135)
 #: has 33 digits, so exhaustive is not a choice at the colour-grid layouts. The number
@@ -56,18 +55,13 @@ MDS_SAMPLE_SEED = 20260814
 #: How many subsets to draw when enumeration is out of reach.
 MDS_SAMPLES = 400
 
+
 #: The (k, m) pairs the encoder really produces. `parityCount` is
 #: max(ceil(k * 0.3), 2) (src/core/erasure.ts:12-18); the last two are the colour-grid
 #: layouts from SPEC.md:155-161, which no other test in this repository touches.
 def real_layouts() -> list[tuple[int, int]]:
     pairs = [(k, max(-(-k * 3 // 10), 2)) for k in range(1, 41)]
     return pairs + [(135, 19), (57, 31)]
-
-
-@pytest.fixture(scope="module")
-def GF() -> Any:
-    galois = pytest.importorskip("galois", reason="galois missing; see requirements-erasure.lock")
-    return galois.GF(2**8, irreducible_poly=EXPECTED_POLY, primitive_element=EXPECTED_GENERATOR)
 
 
 def cauchy_reference(GF: Any, k: int, m: int) -> Any:
@@ -221,9 +215,7 @@ def test_frozen_parity_follows_from_the_formula(GF: Any, rs_vectors: list[dict[s
     for case in rs_vectors:
         k, m = case["k"], case["m"]
         data = GF(np.array([list(bytes.fromhex(h)) for h in case["dataHex"]], dtype=np.uint8))
-        expected = np.array(
-            [list(bytes.fromhex(h)) for h in case["parityHex"]], dtype=np.uint8
-        )
+        expected = np.array([list(bytes.fromhex(h)) for h in case["parityHex"]], dtype=np.uint8)
         got = np.array(cauchy_reference(GF, k, m) @ data, dtype=np.uint8)
         print(f"\n  {case['name']:18} k={k:2} m={m} shardLen={case['shardLen']}")
         assert got.shape == expected.shape and (got == expected).all(), (

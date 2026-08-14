@@ -113,6 +113,26 @@ def reedsolo_field() -> Any:
 
 
 @pytest.fixture(scope="session")
+def GF() -> Any:
+    """galois, configured for this project's field.
+
+    Shared here rather than duplicated per module, and routed through require() rather
+    than pytest.importorskip: importorskip would skip in CI too, and a suite that
+    quietly stops running is the failure this repository keeps removing.
+    """
+    try:
+        import galois
+    except ImportError:  # pragma: no cover - exercised by the CI-vs-local policy
+        require(
+            "galois",
+            None,
+            "pip install --require-hashes -r python/requirements-erasure.lock",
+        )
+        raise
+    return galois.GF(2**8, irreducible_poly=EXPECTED_POLY, primitive_element=EXPECTED_GENERATOR)
+
+
+@pytest.fixture(scope="session")
 def ts_field(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """The TypeScript field, dumped once through its public API."""
     tsx = require("tsx", str(TSX) if TSX.exists() else None, "run `npm ci` first")
