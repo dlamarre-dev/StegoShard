@@ -7,6 +7,43 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The parser fuzzer asserted half of what it claimed, and reached almost none of
+  what it tested.** Its docstring promised that the only outcomes are "a valid
+  structure, or a thrown `Error`"; the success path discarded the parser's return
+  value entirely, so a parser accepting random bytes and returning nonsense was
+  indistinguishable from one correctly rejecting them. Every target now carries its own
+  contract, and `decodeJpeg` additionally re-encodes what it decoded.
+
+  Measured while fixing it, and worse than the missing assertions: over 20,000 random
+  inputs per target, four parsers accepted **zero**, two returned only `null`, and one
+  accepted 61. Random bytes exercise rejection and essentially nothing else, and only two
+  of seven targets had a valid artifact to mutate. The success path of the other five was
+  unreachable, which would have made the new invariants decoration. All seven now
+  mutation-fuzz a valid seed artifact.
+
+- **Two defects the repaired fuzzer found immediately.** `encode` in `jpeg-coeff.ts` used
+  `!` on four Huffman lookups; a file whose tables cannot express its own decoded
+  coefficients made it read `.code` off `undefined` and throw a bare `TypeError` from
+  inside the bit writer. This is reachable in production: `stego.ts` re-encodes the scan
+  on the restart-interval fallback path, so a camera or scanner JPEG with sparse tables
+  hits it. It now refuses with a typed error. Separately, `decode` accepted a zero frame
+  dimension and returned a model with no MCUs, so the stego layer would have reported
+  zero capacity on such a file rather than refusing it.
+
+- **The fuzz smoke test replayed the same 2,000 cases on every pull request**, its seed
+  fixed at 1 since it was written. It now derives from the commit SHA: different cases per
+  commit, still exactly reproducible, and the seed is printed on the first line of the log.
+  The nightly workflow also gains a `timeout-minutes`, since `scripts/fuzz.ts` says a hang
+  is "caught by the CI timeout" and the only timeout was GitHub's implicit six-hour cap.
+
+- **The 25 cross-implementation conformance tests skipped silently without fixtures.**
+  They are the only cross-implementation check in the repository. A CI run whose fixture
+  generation had produced nothing would have reported green while verifying that the two
+  stacks agree on nothing at all. Missing fixtures are now a hard failure under `CI=true`
+  and a skip only locally, the rule already used by the other three Python suites.
+
 ### Added
 
 - **`docs/ELI15.md`, the project explained to someone who has never studied cryptography.**

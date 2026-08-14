@@ -16,6 +16,12 @@ from stegoshard.pipeline import MissingKeyError
 
 FIXTURES = pathlib.Path(__file__).parent / "_fixtures"
 
+# Locally, missing fixtures are a skip: not everyone runs `npm run fixtures`
+# before pytest. Under CI they are a hard failure, enforced in conftest.py rather
+# than here so this stays a plain unconditional mark. These 25 tests are the only
+# cross-implementation check in the repository, and a CI run whose fixture step
+# produced nothing would otherwise report green while verifying that the two
+# stacks agree on nothing at all.
 pytestmark = pytest.mark.skipif(
     not FIXTURES.exists(),
     reason="fixtures not generated (run: npm run fixtures -- python/tests/_fixtures)",

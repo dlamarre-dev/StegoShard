@@ -22,6 +22,11 @@ concurrency:
 jobs:
   fuzz:
     name: Parser fuzzing
+    # scripts/fuzz.ts says a hang is "caught by the CI timeout". Until now the only
+    # timeout was GitHub's implicit 360-minute job cap, so a hang would have burned
+    # six hours before saying anything. The nightly run is 200k iterations per
+    # target; 45 minutes is generous against that and still fails fast.
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

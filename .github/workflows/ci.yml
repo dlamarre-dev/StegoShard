@@ -43,7 +43,13 @@ jobs:
 
       # Quick fixed-seed parser fuzz smoke; the deep nightly run is fuzz.yml.
       - name: Fuzz smoke (parsers)
-        run: npm run fuzz -- --iters=2000 --seed=1
+        # The seed used to be fixed at 1, so this smoke test replayed the same
+        # 2,000 cases on every pull request since it was written. Deriving it from
+        # the commit SHA varies the cases across commits while staying exactly
+        # reproducible: the seed is printed on the first line of the job log.
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run fuzz -- --iters=2000
 
       - name: Build and validate exact extension packages
         run: npm run package
