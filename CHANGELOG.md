@@ -7,6 +7,17 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **The equal-control-flow claims are counted rather than assumed.** `crypto.ts` says
+  Argon2 runs exactly once and every slot is attempted with no early exit; both were
+  carried by comments and by tests checking the value returned or the error thrown.
+  Adding `if (found) break;` to `openSlotArray` was invisible to the entire suite,
+  since both of those remain true under an early exit and only the timing changes.
+  Measured: either placement leaves all 669 other tests green. Five tests now count
+  Argon2 invocations and slot attempts, and `docs/CRYPTO-REVIEW.md` §5.7 records that a
+  fixed operation count is necessary for the claim and nowhere near sufficient.
+
 ### Fixed
 
 - **Restart markers were written as data, not as markers.** `encode` in

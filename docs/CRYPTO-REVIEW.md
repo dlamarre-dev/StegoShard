@@ -506,6 +506,33 @@ uses overlapping index sets and must fail to build at all, since some entry woul
 inverse of zero; that is what the disjointness clause in §7.4 is for. A correct
 construction runs last and must pass in silence.
 
+### 5.7 Equal control flow, counted
+
+`src/core/access.trace.test.ts` counts operations rather than checking outcomes.
+Argon2 invocations are counted by mocking `hash-wasm` and delegating to the real
+implementation; slot attempts through `crypto.subtle.decrypt`, which
+`tryOpenSlot` performs once per slot.
+
+Four properties, on every pull request: Argon2 runs exactly once per unlock
+whatever the outcome; once regardless of how many candidate KEKs the inputs
+produce; every slot is attempted with the same count on success and on failure;
+and the count scales with the candidate list and with nothing else, including the
+position the live slot was shuffled into.
+
+**Why counting rather than asserting.** The three claims in `crypto.ts` (Argon2
+runs exactly once, every slot attempted, no early exit) were carried by comments
+and by tests checking the DEK returned or the error type thrown. Adding
+`if (found) break;` to `openSlotArray` was **invisible** to the whole suite,
+because both of those stay true under an early exit and only the timing changes.
+Measured: an exit inside the slot loop leaves all 669 other tests green, and one
+after the candidate loop does too.
+
+**What it is not.** `docs/CLAIMS.md` describes this as an equal-control-flow
+design rather than a formal side-channel proof, and counting does not change
+that. A fixed operation count is necessary for the claim and nowhere near
+sufficient: it says nothing about cache behaviour, branch prediction, or what the
+operations leak in themselves.
+
 ## 6. Keyfile-mode isolation
 
 **Claim: with `keyMode: 'keyfile'`, no fragment of the key block appears in
