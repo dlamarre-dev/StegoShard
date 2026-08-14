@@ -222,11 +222,11 @@ jobs:
           cache: pip
           cache-dependency-path: python/requirements-erasure.lock
 
-      # No native build and no downloaded jar: both libraries ship universal wheels,
-      # so this job has nothing to compile. 133 seconds measured, up from 41 before
-      # galois joined: it pulls numpy, numba and llvmlite, about 200 MB installed, and
-      # the MDS sweep is the bulk of the runtime. Both figures are measured, never
-      # estimated.
+      # No native build and no downloaded jar: both libraries ship universal wheels, so
+      # this job has nothing to compile. 243 seconds measured, against 133 when galois
+      # covered 42 layouts and 41 before galois existed. The MDS sweep over all 192
+      # layouts is the bulk of it. Every figure here is measured on a real run, never
+      # estimated; if the sweep grows again, re-measure rather than adjust.
       - name: Install dependencies
         run: npm ci
 
