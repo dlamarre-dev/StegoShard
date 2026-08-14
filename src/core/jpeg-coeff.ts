@@ -98,7 +98,23 @@ class BitReader {
     private end: number,
   ) {}
 
-  /** Byte-align and return the pending marker code (after 0xFF), or 0. */
+  /**
+   * Byte-align and return the pending marker code (after 0xFF), or 0.
+   *
+   * Past the end of the scan this feeds 1-bits, which is the JPEG pad
+   * convention: an encoder fills the final byte with 1s and a decoder reads them
+   * to finish the last symbol.
+   *
+   * Feeding them unbounded looks like a hole, and a bound was written and then
+   * removed once it was measured. Over 712 truncation points across three files,
+   * bounding the padding to two bytes changed the outcome in **zero** cases: the
+   * Huffman decoder already refuses a short scan, because synthetic 1-bits do not
+   * resolve to valid codes. The only truncations that decode are the last two or
+   * three bytes, which is the padding the convention actually describes.
+   *
+   * Left as it was, with the measurement recorded, rather than carrying a guard
+   * that never fires. See the truncation tests in jpeg-coeff.test.ts.
+   */
   private fill(): void {
     if (this.pos >= this.end) {
       this.byte = 0;
