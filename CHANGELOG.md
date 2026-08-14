@@ -7,6 +7,28 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **A committed golden corpus, so the encoder and the decoders cannot drift together.**
+  Everything the suite decoded was produced by the TypeScript encoder moments earlier in
+  the same run: `python/tests/_fixtures` is gitignored and regenerated every time. That
+  is how a wrong Galois polynomial left all 620 tests green, and how ISA-L's Cauchy
+  assignment left 48 encoder tests and all 93 Python decoder tests green. Both changed
+  every byte written. `tests/vectors/crypto-vectors.json` was the only committed
+  artifact and it pins the crypto and blob layers only.
+
+  `tests/golden/` now pins seven output paths, 1.1 MiB: QR-grid images, the colour grid,
+  keyfile mode, the PNG and JPEG stego carriers, and both binary containers. The Python
+  decoder reads them, which matters: a corpus checked only by the encoder's own stack
+  would prove much less. Gallery Mode is absent because its smallest fixture is 2.4 MB,
+  and `PROVENANCE.md` says so rather than leaving it to be discovered.
+
+  The rule that gives the corpus its value is `npm run golden:check`: a diff to an
+  existing artifact must come with a format version bump in the same change. Adding a
+  path is free; changing one is a decision. Without that, a contributor whose change
+  broke the format would see the golden tests fail, regenerate, watch them pass, and
+  ship the break.
+
 ### Changed
 
 - **Coverage thresholds are now per file rather than aggregate, and `src/ui` is

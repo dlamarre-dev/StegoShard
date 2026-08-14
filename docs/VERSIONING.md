@@ -48,9 +48,17 @@ replace the candidate in place but must still:
 2. Update [SPEC.md](../SPEC.md), including the §11 constants table, and
    [docs/CRYPTO-REVIEW.md](../CRYPTO-REVIEW.md) where crypto is affected.
 3. Update the **Python reference decoder** (`python/stegoshard/`) in the same
-   change, and regenerate the frozen vectors (`npm run vectors`) and conformance
-   fixtures (`npm run fixtures`). CI's cross-implementation conformance job must
-   stay green.
+   change, and regenerate the frozen vectors (`npm run vectors`), the conformance
+   fixtures (`npm run fixtures`) and the golden corpus (`npm run golden`). CI's
+   cross-implementation conformance job must stay green.
+
+Regeneration belongs to a **deliberate** version change and never happens as a side
+effect. `tests/golden/` holds committed artifacts a current decoder must keep reading,
+and `npm run golden:check` refuses a diff to them that does not come with a constant
+bump in the same change. That pairing is what separates a format change someone
+decided on from one that happened: without it, a contributor whose change broke the
+format would see the golden tests fail, regenerate, watch them pass, and ship the
+break.
 
 Non-breaking, purely internal repackaging (that still decodes byte-for-byte on the
 current reader) does **not** bump a format constant. Example: 0.9.0 rearranged the

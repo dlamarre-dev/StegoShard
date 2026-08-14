@@ -1,0 +1,8 @@
+{
+  "password": "correct horse battery staple",
+  "filename": "secret-notes.txt",
+  "keyMode": "keyfile",
+  "variant": "disguised",
+  "vault": "cache.db",
+  "key": "settings.db"
+}
