@@ -28,6 +28,17 @@ uv pip compile --universal --python-version 3.12 --generate-hashes \
   --output-file python/requirements-dev.lock python/requirements-dev.in
 ```
 
+The test-tool suites carry their own inputs and locks, resolved the same way:
+`requirements-compliance` (crypto-condor), `requirements-steganalysis` (a test
+runner; the detectors are Ruby and Java) and `requirements-erasure` (reedsolo).
+They are kept apart on purpose so one suite's version bounds never constrain
+another's, and none of them may add anything to `requirements.in`.
+
+```bash
+uv pip compile --universal --python-version 3.12 --generate-hashes \
+  --output-file python/requirements-erasure.lock python/requirements-erasure.in
+```
+
 All dependencies are common PyPI packages with prebuilt wheels (no system
 libraries needed): `zxing-cpp`, `Pillow`, `argon2-cffi`, `cryptography`.
 

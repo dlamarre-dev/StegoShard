@@ -1,0 +1,24 @@
+# Dependencies for the erasure-coding field suite (tests/erasure).
+#
+# Deliberately separate from the other three lockfiles. crypto-condor's bounds
+# (cryptography<44, cffi<2) have nothing to do with Galois field arithmetic, and
+# folding reedsolo into the compliance set would tie two unrelated suites to one
+# resolution. Nothing here may ever reach requirements.in: the runtime decoder
+# keeps its four dependencies, which python/README.md presents as a feature, and
+# stegoshard/gf256.py must acquire no import at all.
+#
+# reedsolo is a second independent implementation of GF(2^8) whose defaults are
+# this project's exact field (prim=0x11d, generator=2), plus gf_mult_noLUT, a
+# table-free carry-less multiply. That second function is what the suite really
+# leans on: it computes from the definition of the field rather than from another
+# lookup table.
+#
+# Pinned to the 1.7.0 release rather than a range. Development upstream continues
+# in 2.x pre-releases that are not published to PyPI as stable, and a beta is not
+# something to pull into CI unattended. The field itself does not change, so the
+# usual argument for tracking a moving version does not apply here. Licence is
+# the Unlicense or MIT-0 at the user's choice, both public-domain-equivalent;
+# test-only, never distributed, so THIRD_PARTY_NOTICES.txt is unaffected.
+reedsolo==1.7.0
+pytest>=8.0.0
+pip-audit>=2.9.0

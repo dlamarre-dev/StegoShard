@@ -241,6 +241,102 @@
       ]
     }
   ],
+  "gf256": {
+    "poly": 285,
+    "generator": 2,
+    "products": [
+      {
+        "a": 87,
+        "b": 19,
+        "product": 224
+      },
+      {
+        "a": 2,
+        "b": 135,
+        "product": 19
+      },
+      {
+        "a": 83,
+        "b": 202,
+        "product": 143
+      },
+      {
+        "a": 128,
+        "b": 2,
+        "product": 29
+      },
+      {
+        "a": 255,
+        "b": 255,
+        "product": 226
+      },
+      {
+        "a": 182,
+        "b": 83,
+        "product": 238
+      },
+      {
+        "a": 142,
+        "b": 11,
+        "product": 139
+      },
+      {
+        "a": 29,
+        "b": 255,
+        "product": 196
+      }
+    ],
+    "quotients": [
+      {
+        "a": 1,
+        "b": 2,
+        "quotient": 142
+      },
+      {
+        "a": 224,
+        "b": 19,
+        "quotient": 87
+      },
+      {
+        "a": 255,
+        "b": 83,
+        "quotient": 18
+      },
+      {
+        "a": 141,
+        "b": 202,
+        "quotient": 151
+      }
+    ],
+    "inverses": [
+      {
+        "a": 1,
+        "inverse": 1
+      },
+      {
+        "a": 2,
+        "inverse": 142
+      },
+      {
+        "a": 83,
+        "inverse": 140
+      },
+      {
+        "a": 135,
+        "inverse": 176
+      },
+      {
+        "a": 202,
+        "inverse": 98
+      },
+      {
+        "a": 255,
+        "inverse": 253
+      }
+    ],
+    "expSha256": "bdc336e3f040e4deac02d4ee345234a3aeecd636b8c944c229dd29b0a1852987",
+    "logSha256": "aeaa639586841d2e0434d8198a86c91623e672d9c0012b4f8f6692768fe1bbf4"
+  },
   "duressVaultBlob": [
     {
       "name": "real-region0",

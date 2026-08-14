@@ -205,6 +205,40 @@ jobs:
       - name: Steganalysis suite
         run: npm run test:steganalysis -- -q
 
+  erasure-field:
+    name: Erasure field cross-check (reedsolo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements-erasure.lock
+
+      # No native build and no downloaded jar: reedsolo is pure Python with a
+      # universal wheel, so this job has nothing to compile. 41 seconds on the
+      # first green run, measured rather than estimated.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install --require-hashes -r python/requirements-erasure.lock
+
+      - name: Audit erasure suite dependencies
+        run: pip-audit -r python/requirements-erasure.lock --require-hashes
+
+      # CI=true turns a missing tsx or a missing reedsolo into a hard failure
+      # instead of a skip, so the field comparison can never quietly stop running.
+      - name: GF(2^8) cross-check
+        run: npm run test:erasure -- -q
+
   crypto-compliance:
     name: Primitive compliance (crypto-condor)
     runs-on: ubuntu-latest

@@ -13,6 +13,7 @@ rather than only the two implementations agreeing with each other.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import unicodedata
@@ -20,6 +21,7 @@ import unicodedata
 import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from stegoshard import gf256
 from stegoshard.crypto import (
     WrongPasswordError,
     decrypt_content,
@@ -294,3 +296,60 @@ def test_duress_each_credential_opens_its_own_region(v):
     assert duress.filename == v["decoyFilename"]
     assert duress.content == _hx(v["decoyContentHex"])
     assert duress.content != _hx(v["realContentHex"])
+
+
+# ---- GF(2^8) field (SPEC §7.1) ----------------------------------------------
+#
+# These pin what nothing else in the repository pinned. Every other assertion
+# about the field is self-referential - inverse round-trips, encode-then-decode -
+# and all of them hold in any correctly built GF(2^8), not only the one the
+# specification names. Measured: moving POLY to 0x12D, which is also primitive
+# with generator 2, left the TypeScript suite's 620 tests green and this suite's
+# 89 green as well, once the fixtures were regenerated the way CI regenerates
+# them, while changing 96% of the parity bytes on a k=4, m=3 shard set.
+#
+# tests/erasure checks these same values against reedsolo and against a
+# table-free multiply, which is what keeps the file from being a snapshot of the
+# project's own output.
+
+GF = VECTORS["gf256"]
+
+
+def test_gf256_parameters_match_the_spec():
+    assert gf256.POLY == GF["poly"] == 0x11D
+    assert gf256.GENERATOR == GF["generator"] == 0x02
+
+
+def test_gf256_products_quotients_and_inverses():
+    # Every pair reduces at least once: products that stay inside eight bits are
+    # identical in every GF(2^8) and would pin nothing.
+    for v in GF["products"]:
+        assert gf256.gf_mul(v["a"], v["b"]) == v["product"]
+    for v in GF["quotients"]:
+        assert gf256.gf_div(v["a"], v["b"]) == v["quotient"]
+    for v in GF["inverses"]:
+        assert gf256.gf_inv(v["a"]) == v["inverse"]
+
+
+def test_gf256_table_digests():
+    # The only place the generator is observable. Any of this field's 128
+    # primitive elements yields identical products, since
+    # log_g(xy) = log_g(x) + log_g(y) whatever the base, so the products above
+    # cannot pin it.
+    exp, log = bytearray(255), bytearray(256)
+    x = 1
+    for i in range(255):
+        exp[i] = x
+        log[x] = i
+        x = gf256.gf_mul(x, gf256.GENERATOR)
+    assert hashlib.sha256(exp).hexdigest() == GF["expSha256"]
+    assert hashlib.sha256(log).hexdigest() == GF["logSha256"]
+
+
+def test_gf256_vector_counts():
+    # Same contract as the rest of this file: drift in either direction should
+    # fail loudly rather than pass quietly, and a set that silently emptied would
+    # still report green.
+    assert len(GF["products"]) == 8
+    assert len(GF["quotients"]) == 4
+    assert len(GF["inverses"]) == 6

@@ -16,9 +16,11 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { argon2id } from 'hash-wasm';
 import { toHex, readU16 } from './bytes';
+import { gfMul, gfDiv, gfInv, FIELD_POLY, FIELD_GENERATOR } from './gf256';
 import {
   type Argon2Params,
   CONTENT_SALT_LEN,
@@ -123,6 +125,17 @@ interface Vectors {
   gatedVaultBlob: GatedVaultVector[];
   shamir: ShamirVector[];
   duressVaultBlob: DuressVaultVector[];
+  gf256: Gf256Vectors;
+}
+
+interface Gf256Vectors {
+  poly: number;
+  generator: number;
+  products: { a: number; b: number; product: number }[];
+  quotients: { a: number; b: number; quotient: number }[];
+  inverses: { a: number; inverse: number }[];
+  expSha256: string;
+  logSha256: string;
 }
 
 function vectorParams(v: {
@@ -375,4 +388,55 @@ describe('frozen vectors: duress (Mode A, §10.5)', () => {
       expect(toHex(duress.content)).not.toBe(v.realContentHex);
     });
   }
+});
+
+describe('frozen vectors: GF(2^8) field (§7.1)', () => {
+  const gf = vectors.gf256;
+
+  it('pins the field parameters', () => {
+    // Nothing else in the repository pinned these. Every other assertion about
+    // the field is self-referential and holds in any correctly built GF(2^8):
+    // moving POLY to 0x12D, also primitive with generator 2, left all 620 tests
+    // of the TypeScript suite green, and the Python conformance suite green as
+    // well once its fixtures were regenerated the way CI regenerates them, while
+    // changing 96% of the parity bytes on a k=4, m=3 shard set.
+    expect(gf.poly).toBe(FIELD_POLY);
+    expect(gf.generator).toBe(FIELD_GENERATOR);
+    expect(gf.poly).toBe(0x11d);
+    expect(gf.generator).toBe(0x02);
+  });
+
+  it('reproduces every product, quotient and inverse', () => {
+    // Each pair reduces at least once. Products that stay inside eight bits are
+    // identical in every GF(2^8) and would pin nothing.
+    for (const { a, b, product } of gf.products) expect(gfMul(a, b)).toBe(product);
+    for (const { a, b, quotient } of gf.quotients) expect(gfDiv(a, b)).toBe(quotient);
+    for (const { a, inverse } of gf.inverses) expect(gfInv(a)).toBe(inverse);
+  });
+
+  it('reproduces the exp and log table digests', () => {
+    // The only place the generator is observable. Any of this field's 128
+    // primitive elements yields identical products, since
+    // log_g(xy) = log_g(x) + log_g(y) whatever the base, so the products above
+    // cannot pin it and these digests are not redundant with them.
+    const exp = new Uint8Array(255);
+    const log = new Uint8Array(256);
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+      exp[i] = x;
+      log[x] = i;
+      x = gfMul(x, FIELD_GENERATOR);
+    }
+    const sha256 = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
+    expect(sha256(exp)).toBe(gf.expSha256);
+    expect(sha256(log)).toBe(gf.logSha256);
+  });
+
+  it('counts the vectors, so the set cannot quietly shrink', () => {
+    // Same contract as elsewhere in this file: drift in either direction should
+    // fail loudly. A set that silently emptied would still report green.
+    expect(gf.products.length).toBe(8);
+    expect(gf.quotients.length).toBe(4);
+    expect(gf.inverses.length).toBe(6);
+  });
 });

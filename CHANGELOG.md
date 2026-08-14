@@ -9,6 +9,31 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **The Galois field under Reed-Solomon is now anchored to something outside the
+  project.** `tests/erasure` compares GF(2^8) in both stacks, exhaustively,
+  against [reedsolo](https://github.com/tomerfiliba-org/reedsolomon) and against
+  a table-free carry-less multiply: the 65,536 products against both, the 65,280
+  quotients, 255 inverses and exp/log tables against reedsolo, on every pull
+  request. It was needed. Every assertion the repository made about this field
+  held in _any_ correctly built GF(2^8), not only the specified one: moving
+  `POLY` from `0x11D` to `0x12D`, also primitive with generator 2, left all 620
+  tests of the TypeScript suite green, and the 89 of the Python conformance suite
+  green as well once its fixtures were regenerated the way CI regenerates them,
+  while changing 96% of the parity bytes on a k=4, m=3 shard set.
+  `tests/vectors/crypto-vectors.json` gained fixed field vectors, checked against
+  the same reference so they are not a snapshot of the project's own output. This
+  anchors the field only; Reed-Solomon itself uses a Cauchy construction no
+  external library reproduces, and stays unvalidated by any third party. See
+  `docs/CRYPTO-REVIEW.md` §5.5.
+
+### Fixed
+
+- **A GF(2^8) test claimed a known-answer check and performed none.** It was named
+  `matches a known AES-poly product (0x57 * 0x13 = 0xfe)`, asserted commutativity
+  in its body, and cited a value belonging to the AES field `0x11B`; this project
+  reduces by `0x11D`, where that product is `0xE0`. Replaced with the real vector
+  and with explicit assertions on the field parameters, which nothing pinned.
+
 - **`stegoshard ui`: the browser app, served from your own machine.** The npm/`npx`
   CLI can now serve the web build on loopback and print an address to open, so the
   guided and expert flows are available without a hosted site or an extension. It

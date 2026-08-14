@@ -44,6 +44,7 @@
     "test:e2e:web": "playwright test --project=web",
     "test:e2e:extension": "playwright test --project=extension",
     "test:compliance": "pytest tests/compliance",
+    "test:erasure": "pytest tests/erasure",
     "test:steganalysis": "pytest tests/steganalysis -m \"not nightly\"",
     "test:steganalysis:nightly": "pytest tests/steganalysis -m nightly",
     "fixtures": "tsx scripts/gen-fixtures.ts",

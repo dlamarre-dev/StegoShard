@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gfAdd, gfMul, gfInv, gfDiv } from './gf256';
+import { gfAdd, gfMul, gfInv, gfDiv, FIELD_POLY, FIELD_GENERATOR } from './gf256';
 
 describe('GF(256) arithmetic', () => {
   it('addition is XOR and self-inverse', () => {
@@ -18,10 +18,25 @@ describe('GF(256) arithmetic', () => {
     expect(gfMul(0x57, 0x83)).toBe(gfMul(0x83, 0x57));
   });
 
-  it('matches a known AES-poly product (0x57 * 0x13 = 0xfe)', () => {
-    // Classic worked example for the 0x11B AES field; here we only assert our
-    // own field is internally consistent via inverse round-trips below.
-    expect(gfMul(0x02, 0x87)).toBe(gfMul(0x87, 0x02));
+  it('pins the field parameters', () => {
+    // These two constants decide every byte the erasure coder produces, and
+    // nothing else in this file would notice if they changed: encoding and
+    // decoding with the same wrong field round-trips perfectly. Measured, not
+    // assumed: swapping POLY to 0x12D, which is also primitive with generator 2,
+    // leaves all 620 tests of this suite green, and leaves the Python
+    // conformance suite green too once its fixtures are regenerated, which is
+    // what CI does on every run.
+    expect(FIELD_POLY).toBe(0x11d);
+    expect(FIELD_GENERATOR).toBe(0x02);
+  });
+
+  it('matches a known product of this field, not the AES one', () => {
+    // 0x57 * 0x13 is the classic worked example, but the published answer 0xFE
+    // belongs to the AES field 0x11B. This project reduces by 0x11D, where the
+    // same product is 0xE0. An earlier version of this test carried the AES
+    // value in its name and asserted commutativity in its body, which detected
+    // nothing at all.
+    expect(gfMul(0x57, 0x13)).toBe(0xe0);
   });
 
   it('inverse: a * a^-1 === 1 for every non-zero element', () => {
