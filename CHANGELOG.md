@@ -9,6 +9,21 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **Nightly mutation testing over the security-critical core.** Coverage says a line
+  ran; it does not say anything would have noticed had the line been wrong. This
+  repository has found that difference by hand four times now, most recently the
+  `if (found) break;` that 669 tests could not see. Stryker automates the method.
+
+  **It gates nothing yet, on purpose.** The mutation score for the full scope has never
+  been measured, and turning an unmeasured number into a threshold is the mistake this
+  project keeps correcting: the TestU01 tolerance was calibrated over 40 runs before
+  being fixed at 2. The first nightly runs are the calibration, and the job publishes a
+  per-file table so they say something.
+
+  One local data point so far: `gf256.ts` scores 92%, 50 mutants in 2 minutes 38. Two of
+  its four survivors are **equivalent mutants**, unkillable by any test, so a score
+  below 100 is not by itself a gap and any future threshold has to allow for that.
+
 - **The equal-control-flow claims are counted rather than assumed.** `crypto.ts` says
   Argon2 runs exactly once and every slot is attempted with no early exit; both were
   carried by comments and by tests checking the value returned or the error thrown.

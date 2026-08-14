@@ -49,3 +49,7 @@ Thumbs.db
 # this, keyfile mode was pinned by four PNGs and no key, and the corpus test
 # passed locally on an untracked file while failing in a fresh checkout.
 !tests/golden/**/*.key
+
+# Stryker output and its incremental cache.
+reports/
+.stryker-tmp/

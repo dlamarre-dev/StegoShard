@@ -1,0 +1,94 @@
+# Mutation testing, nightly.
+#
+# Coverage says a line ran. It does not say anything would have noticed had the
+# line been wrong. This repository has found that difference by hand more than
+# once: a GF(256) test whose name promised a known-answer check and whose body
+# asserted commutativity; an invalid-vector count a decryptor accepting all 3,919
+# forgeries still passed; a fuzzer that discarded every parser's return value
+# while claiming to check it; an `if (found) break;` in openSlotArray that 669
+# tests could not see.
+#
+# Every one of those was found the same way: break the code deliberately, watch
+# what stays green. Stryker is that method, automated.
+#
+# THIS JOB DOES NOT GATE ANYTHING YET, ON PURPOSE.
+# `break: null` in stryker.config.mjs means no threshold. The mutation score for
+# the full scope has never been measured, and turning an unmeasured number into a
+# gate is the mistake this project keeps correcting: the TestU01 tolerance was
+# calibrated over 40 runs before being fixed at 2, and the erasure job's duration
+# was taken from a real run rather than estimated. The first nightly runs are the
+# calibration. Set a threshold once the score is known and stable, in a commit
+# that records the numbers it came from.
+#
+# Nightly rather than per pull request because it is slow: gf256.ts alone, 50
+# mutants over a 464-test suite, took 2 minutes 38 locally. The full eight-file
+# scope is a different order of magnitude, which the first run will establish.
+name: Mutation testing
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation
+  cancel-in-progress: true
+
+jobs:
+  stryker:
+    name: Mutation score (core)
+    runs-on: ubuntu-latest
+    # Generous, because the point of the first runs is to find out how long this
+    # takes. Tighten it once that is known.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Stryker
+        run: npm run mutation
+
+      # The report is the deliverable while there is no threshold: without it the
+      # job would run for an hour and tell nobody anything.
+      - name: Upload the mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mutation-report
+          path: reports/mutation
+          if-no-files-found: warn
+
+      - name: Summarise the score
+        if: always()
+        run: |
+          set -euo pipefail
+          f=reports/mutation/mutation.json
+          [ -f "$f" ] || { echo "no report produced" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          node -e '
+            const r = require("./reports/mutation/mutation.json");
+            const rows = Object.entries(r.files).map(([f, v]) => {
+              const c = {};
+              for (const m of v.mutants) c[m.status] = (c[m.status] ?? 0) + 1;
+              const killed = (c.Killed ?? 0) + (c.Timeout ?? 0);
+              const total = v.mutants.filter((m) => m.status !== "Ignored").length;
+              return { f: f.replace(/^.*src\//, "src/"), killed, total,
+                       pct: total ? ((100 * killed) / total).toFixed(1) : "-" };
+            }).sort((a, b) => Number(a.pct) - Number(b.pct));
+            const out = ["| file | score | killed | mutants |", "|---|---|---|---|",
+              ...rows.map((r) => `| \`${r.f}\` | ${r.pct}% | ${r.killed} | ${r.total} |`),
+              "", "No threshold is set. These runs exist to measure the score before",
+              "anything is gated on it. Note that a score below 100% is not by itself a",
+              "gap: some mutants are equivalent and cannot be killed by any test.",
+            ];
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n"));
+          '
