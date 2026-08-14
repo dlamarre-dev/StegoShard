@@ -223,7 +223,8 @@ jobs:
           cache-dependency-path: python/requirements-erasure.lock
 
       # No native build and no downloaded jar: reedsolo is pure Python with a
-      # universal wheel, so this job has nothing to compile and should stay fast.
+      # universal wheel, so this job has nothing to compile. 41 seconds on the
+      # first green run, measured rather than estimated.
       - name: Install dependencies
         run: npm ci
 
