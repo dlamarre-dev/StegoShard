@@ -455,6 +455,10 @@ which is 13 of the 42 layouts; the other 29 are sampled at 400 subsets with a fi
 `C(154, 135)` has 33 digits, so exhaustive is not available at the colour-grid layouts.
 The split is printed on every run rather than left implicit.
 
+**Cost, measured.** The job runs in 133 seconds, up from 41 before `galois` joined it.
+The library pulls `numpy`, `numba` and `llvmlite`, roughly 200 MB installed, and the MDS
+sweep is most of the runtime.
+
 **What this does not establish.** It establishes that three things agree: the
 specification, the two implementations, and an independent algebra engine. It does not
 establish that the formula is a good design choice. Transcribing §7.4 into the reference
