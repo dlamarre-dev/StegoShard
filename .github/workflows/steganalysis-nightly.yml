@@ -72,13 +72,26 @@ jobs:
       # directories rather than a list of filenames: a named list silently stops
       # covering a file the day someone adds one, and the failure mode is a skip that
       # looks like a pass.
+      #
+      # src/core is in here because the generator is not self-contained: it imports the
+      # real embedder and the real key-block code (src/core/stego.ts, src/core/crypto.ts,
+      # and jpeg-coeff.ts underneath them). The first version of this guard listed only
+      # the test tree and the generator, which meant a change to the embedder itself
+      # could reuse the previous cache and postpone measurement until the weekly bucket
+      # rolled over. That is precisely the case the sweep exists to catch, so it is the
+      # one case that must never be skipped. package.json and package-lock.json are
+      # included for the same reason one level out: pngjs and jpeg-js decide what the
+      # carrier bytes look like.
       - name: Fingerprint the inputs
         id: fp
         run: |
           set -euo pipefail
           INPUTS=$(git ls-files -s \
             tests/steganalysis \
+            src/core \
             scripts/gen-stego-samples.ts \
+            package.json \
+            package-lock.json \
             python/requirements-steganalysis.lock \
             .github/workflows/steganalysis-nightly.yml | sha256sum | cut -c1-16)
           # ImageVersion is set by GitHub on hosted runners and is the documented way to

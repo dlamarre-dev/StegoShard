@@ -444,7 +444,7 @@ so the suite cannot pass by rejecting everything.
 
 `tests/erasure/test_cauchy_code.py` compares the construction of §7 against
 [galois](https://github.com/mhostetter/galois), a linear-algebra library over finite
-fields, on every pull request: the Cauchy matrix over all 42 layouts the encoder can
+fields, on every pull request: the Cauchy matrix over all 192 layouts the encoder can
 produce, the Gauss-Jordan inverter against `numpy` on 155 submatrices, the MDS property,
 and the frozen parity bytes.
 
@@ -466,14 +466,25 @@ leaves the 48 tests in `reed-solomon.test.ts`, `erasure.test.ts`, `vault.test.ts
 `gallery.test.ts` green, and leaves all 93 tests of the Python decoder green once its
 fixtures are regenerated the way CI regenerates them.
 
-**MDS coverage, stated exactly.** Every k-subset is enumerated where the count allows,
-which is 13 of the 42 layouts; the other 29 are sampled at 400 subsets with a fixed seed.
-`C(154, 135)` has 33 digits, so exhaustive is not available at the colour-grid layouts.
-The split is printed on every run rather than left implicit.
+**Coverage, stated exactly.** The layout set runs k=1 to 190, which is `GALLERY_K_MAX`,
+plus the two colour-grid layouts: 192 in all. It stopped at k=40 when this suite was first
+written, and the documentation called that "all layouts the encoder produces", which was
+false, since Gallery Mode reaches 190. The matrix comparison over the full range costs
+0.1 seconds, so the old bound bought nothing and cost an overstated claim.
 
-**Cost, measured.** The job runs in 133 seconds, up from 41 before `galois` joined it.
-The library pulls `numpy`, `numba` and `llvmlite`, roughly 200 MB installed, and the MDS
-sweep is most of the runtime.
+MDS is enumerated where the subset count allows, 13 of the 192 layouts; the rest are
+sampled with a fixed seed, 400 draws up to k=40 and 60 above it, for 26,359 submatrices in
+total. A flat 400 everywhere measured at 551 seconds, which does not belong in a
+per-pull-request job. Both budgets and the total print on every run.
+
+Read the MDS sweep as a guard rather than a proof. For a Cauchy matrix the property is a
+theorem: the determinant is non-zero whenever the two index sets are distinct, which §7.4
+guarantees by construction. What a sweep catches is an implementation that stopped building
+the matrix the theorem describes, and the matrix comparison is what pins that.
+
+**Cost, measured.** The suite runs in 102 seconds locally, most of it the MDS sweep.
+`galois` pulls `numpy`, `numba` and `llvmlite`, roughly 200 MB installed. The CI job figure
+is recorded from a real run in `.github/workflows/ci.yml`.
 
 **What this does not establish.** It establishes that three things agree: the
 specification, the two implementations, and an independent algebra engine. It does not
