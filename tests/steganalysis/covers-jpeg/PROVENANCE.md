@@ -54,6 +54,12 @@ with Aletheia's Steghide detector, the only one that discriminates on this set:
 | `park`     | 0.1   | 0.2              | **no**, control not detected        |
 | `mountain` | 0.7   | n/a              | **no**, clean cover already flagged |
 
+`night` needs a further note. The table above was measured locally, where outguess
+accepted it. On GitHub runners outguess has **declined it twice**, refusing to fit
+the message into the smallest and darkest cover of the set. That is reproducible
+rather than incidental, so the suite runs on two controls in CI and requires two.
+`night` stays because it does work on some builds, but nothing depends on it.
+
 `park` cannot demonstrate a positive, so a clean verdict on it means nothing.
 `mountain` is a false positive before anything is embedded, much like the LCG
 fixtures described in `../covers/PROVENANCE.md`. Both are kept in the set because

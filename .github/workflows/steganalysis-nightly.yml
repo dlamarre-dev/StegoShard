@@ -2,8 +2,9 @@
 #
 # Split from the per-PR `steganalysis` job in ci.yml because this one builds a 7 GB
 # container (Octave, TensorFlow, two steganography binaries) and a full Aletheia
-# sweep takes about half an hour on CPU. The PNG suite stays on every pull request;
-# only the JPEG path lives here.
+# sweep took 47 minutes on a runner, measured on the first green run. The PNG suite
+# stays on every pull request; only the JPEG path lives here. The 120-minute timeout
+# leaves room for a slower runner without letting a hung run sit all day.
 #
 # A red nightly job is easy to ignore, so this one is built to fail rarely and
 # legibly: the outguess instrument check runs first, and every score is printed

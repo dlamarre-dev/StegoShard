@@ -6,7 +6,8 @@ verified part of the project; this module measures it.
 
 Runs in a container (`aletheia.Dockerfile`) because Aletheia needs Octave, three
 toolboxes, TensorFlow and two steganography binaries. Nightly rather than per pull
-request: the image is 7 GB and a full sweep takes about half an hour on CPU.
+request: the image is 7 GB and a full sweep took **47 minutes** on a GitHub runner
+(measured, first green run). The workflow allows 120.
 
 What is measured
 ----------------
@@ -94,8 +95,10 @@ CONTROL_COVERS = ("lake", "night", "beach")
 CONTROL_FLOOR = 0.5
 
 #: How many working controls the run needs before its clean verdicts mean anything.
-#: outguess declines covers it cannot fit the message into, and which ones vary by
-#: build: `night` succeeded locally and was declined on a CI runner.
+#: outguess declines covers it cannot fit the message into. `night` is the small,
+#: near-black cover: it succeeded locally and has now been declined on a GitHub
+#: runner twice, so in practice this suite runs on two controls there. It stays in
+#: the list because it does work on some builds, but nothing may depend on it.
 MIN_CONTROLS = 2
 
 #: Aletheia reports to one decimal, so this permits the reporting granularity and
