@@ -1,0 +1,7 @@
+{
+  "password": "correct horse battery staple",
+  "filename": "secret-notes.txt",
+  "keyMode": "embedded",
+  "images": 4,
+  "codec": "qr-grid"
+}

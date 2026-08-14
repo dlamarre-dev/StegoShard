@@ -3,3 +3,8 @@ coverage
 node_modules
 local
 *.wasm
+
+# The golden corpus is data, not source. Reformatting a manifest would change
+# its bytes, break the SHA-256 digests recorded in PROVENANCE.md, and trip
+# golden:check for a reason that has nothing to do with the format.
+tests/golden

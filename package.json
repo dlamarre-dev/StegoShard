@@ -48,6 +48,8 @@
     "test:steganalysis": "pytest tests/steganalysis -m \"not nightly\"",
     "test:steganalysis:nightly": "pytest tests/steganalysis -m nightly",
     "fixtures": "tsx scripts/gen-fixtures.ts",
+    "golden": "tsx scripts/gen-golden.ts",
+    "golden:check": "tsx scripts/check-golden.ts",
     "samples": "tsx scripts/gen-samples.ts",
     "vectors": "tsx scripts/gen-vectors.ts",
     "fuzz": "tsx scripts/fuzz.ts",

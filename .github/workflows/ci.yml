@@ -321,6 +321,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The golden-corpus check diffs against the base branch, and the
+          # default shallow checkout leaves origin/main unreachable. Without this
+          # the check would silently find nothing to compare and pass.
+          fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -362,6 +367,13 @@ jobs:
           name: python-runtime-sbom
           path: python-runtime.cdx.json
           if-no-files-found: error
+
+      # The golden corpus is committed and must not be regenerated to make a test
+      # pass. Needs the full history from the checkout above; under CI the script
+      # fails rather than skipping when it cannot diff, so a shallow checkout
+      # cannot turn this into a silent pass.
+      - name: Golden corpus was not regenerated without a version bump
+        run: npm run golden:check -- --base=origin/${{ github.base_ref || 'main' }}
 
       - name: Conformance test (Python decodes)
         run: pytest python -q
