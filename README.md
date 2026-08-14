@@ -61,13 +61,20 @@ and picking one is a deliberate trade-off:
 
 | Model                   | Primary goal                   | Survives recompression | Plausible deniability |
 | ----------------------- | ------------------------------ | :--------------------: | :-------------------: |
-| 🛡 **Resilient Storage** | Reliable backup                |         ✅ Yes         |         ❌ No         |
-| 🎭 **Deniable Storage** | Hide that the data even exists |         ❌ No          |        ✅ Yes         |
+| 🛡 **Resilient Storage** | Reliable backup                |      ✅ By design      |         ❌ No         |
+| 🎭 **Deniable Storage** | Hide that the data even exists |         ❌ No          |   ✅ Against triage   |
+
+Both ticks are narrower than a tick suggests. The Cloud profile is tested against
+representative recompression and the Disk profile assumes a lossless file, while the
+print-photograph-scan campaign has not closed. And deniability has been measured against
+off-the-shelf detectors, which is a far weaker statement than resisting someone who sets
+out to analyse the carrier. The [claims register](docs/CLAIMS.md) carries both limits, and
+[ELI15.md](docs/ELI15.md) explains them in plain terms.
 
 The more you optimize to survive transformations, the more detectable the carrier
-becomes; the more you optimize for deniability, the more fragile the storage. This
-isn't a bug: the deniable channel is **fragile by nature**, and StegoShard makes the
-choice explicit instead of pretending one setting does both.
+becomes; the more you optimize for deniability, the more fragile the storage. The deniable
+channel is **fragile by nature**, and StegoShard makes the choice explicit instead of
+pretending one setting does both.
 
 **🔗 Hybrid** bridges them. Store the encrypted archive resiliently (openly artificial
 images), and hide **only the recovery key** in an ordinary photo:

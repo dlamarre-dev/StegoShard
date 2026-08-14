@@ -35,6 +35,39 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   external library reproduces, and stays unvalidated by any third party. See
   `docs/CRYPTO-REVIEW.md` §5.5.
 
+### Fixed
+
+- **The nightly steganalysis gate did not fingerprint the embedder it measures.** It
+  covered the test tree, the generator, the lockfile and the workflow, but the generator
+  imports `src/core/stego.ts` and `src/core/crypto.ts`, and the image libraries come from
+  `package.json`. A change to the actual embedding code could therefore reuse the previous
+  cache and postpone measurement until the weekly bucket rolled over, which is exactly the
+  case the sweep exists to catch. `src/core`, `package.json` and `package-lock.json` are
+  now in the fingerprint.
+- **"All 42 layouts the encoder produces" was false.** The Cauchy sweep stopped at k=40,
+  while Gallery Mode reaches k=190 (`GALLERY_K_MAX`). It now runs k=1 to 190 plus the two
+  colour-grid layouts, 192 in all. The matrix comparison over the full range costs 0.1
+  seconds, so the old bound bought nothing and cost an overstated claim. MDS sampling is
+  split by size, 400 draws to k=40 and 60 above, for 26,359 submatrices; a flat 400
+  measured at 551 seconds. `docs/CLAIMS.md` and `docs/CRYPTO-REVIEW.md` §5.6 now also note
+  that MDS is a theorem for a Cauchy matrix, so the sweep guards the implementation rather
+  than proving the property.
+- **The claims register contradicted itself.** The Galois-field row said Reed-Solomon "is
+  not validated by anything external" directly below the row recording that it is. The
+  field row now says only that it covers the field, and points at the row above.
+- **The README mode table gave the same unqualified ticks.** It is where most readers meet
+  the two models, so it now carries the same qualifiers as `docs/ELI15.md`: "by design"
+  rather than yes for surviving recompression, "against triage" rather than yes for
+  deniability, with a paragraph naming both limits and pointing at the claims register.
+- **`docs/ELI15.md` overstated six things.** The mode table said re-compression survival
+  and hiding were plain yes; both now carry the qualifier the claims register requires.
+  Argon2id was said to make "the parallel attack collapse", where it raises cost per guess
+  without stopping the attack. The duress section said watching over your shoulder tells
+  nothing, where the project claims equal control flow rather than a side-channel proof.
+  Domain separation was said to appear in seven places; the core has eight labels. And the
+  password-change explanation now says that previously exported artifacts keep their old
+  key block, so a change is not a revocation.
+
 ### Changed
 
 - **Three claims tightened after an external review.** The post-quantum section headline

@@ -58,8 +58,15 @@ StegoShard offers both and keeps them separate:
 
 | Mode              | Goal                        | Survives re-compression | Hides that data exists |
 | ----------------- | --------------------------- | ----------------------- | ---------------------- |
-| Resilient Storage | reliable long-term backup   | yes                     | no                     |
-| Deniable Storage  | hide that anything is there | no                      | yes                    |
+| Resilient Storage | reliable long-term backup   | designed to             | no                     |
+| Deniable Storage  | hide that anything is there | no                      | against casual looking |
+
+Those two cells deserve their qualifiers. "Designed to" rather than "yes": the Cloud
+profile is tested against representative re-compression, the Disk profile assumes a
+lossless file, and the print-photograph-scan campaign has not finished. "Against casual
+looking" rather than "yes": hiding has been measured against off-the-shelf detectors, which
+is a different and much weaker statement than resisting someone who sets out to analyse
+your photo. Section 11 gives the details.
 
 There is a middle path too. Store the bulk resiliently, and hide only the small recovery
 key inside an everyday photo. If the photo gets mangled you lose the key, not the data,
@@ -82,7 +89,9 @@ The memory figure is the interesting one. A plain hash is fast, and fast is bad 
 someone holding your encrypted file can try billions of guesses per second on a graphics
 card. Argon2id is deliberately _memory-hard_, so every guess needs a quarter gigabyte of
 RAM for the whole computation. A graphics card has thousands of cores and nowhere near
-enough memory to give each one 256 MiB, so the parallel attack collapses.
+enough memory to give each one 256 MiB, so far fewer of them can work at once. The attack
+does not stop, and nothing here makes a weak password safe. It gets a great deal more
+expensive per guess, which is the whole of what a memory-hard function buys.
 
 You pay one to two seconds when unlocking your own vault. That pause is the feature.
 
@@ -110,9 +119,12 @@ The three keys:
 
 The password key could have encrypted the file directly. Two reasons it does not.
 
-First, password changes. Here a change rewrites a 92-byte block and nothing else. Encrypt
-the file directly with the password key and changing it means rewriting every image you
-ever made.
+First, password changes. Here a change rewrites a 92-byte key block and nothing else,
+because the content stays encrypted under the unchanged DEK. Encrypt the file directly with
+the password key and a change would mean re-encrypting everything. One caveat worth being
+clear about: this rewrites the key block you hold now. Images and files exported earlier
+carry their own copy of the old key block, so they keep opening with the old password. A
+password change is not a revocation of what you already handed out.
 
 Second, and less obvious: the DEK is reused across vaults, and encryption uses a
 never-repeat number called a nonce. Reuse a nonce under one key and the encryption breaks
@@ -122,7 +134,8 @@ across everything you have ever exported.
 The derivation uses [HKDF](https://en.wikipedia.org/wiki/HKDF), which turns one key into
 several unrelated ones. Each use carries a label such as `"stegoshard/vault/content"`, and
 different labels give unrelated keys from the same input, so a key meant for one purpose
-cannot serve another. That is called domain separation, and it appears in seven places.
+cannot serve another. That is called domain separation, and the core uses eight distinct
+labels.
 
 ## 5. Locking it so tampering shows
 
@@ -310,8 +323,10 @@ one.**
 **Duress mode.** The container holds two encrypted regions with two independent passwords,
 one opening your real data and one a decoy you prepared. Both regions are always present,
 both padded to the same size, and unlocking runs the same code either way and returns the
-same shape of answer, so watching over your shoulder tells nothing. The tool refuses a
-duress password that is a trivial variation of the real one.
+same shape of answer, so someone watching the screen learns nothing from which password you
+typed. That is an equal-control-flow design rather than a formal side-channel proof, and it
+says nothing about what a person can infer from you. The tool refuses a duress password
+that is a trivial variation of the real one.
 
 **Non-possession mode.** Your data is locked behind material you genuinely do not have.
 That uses [Shamir's secret sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing),

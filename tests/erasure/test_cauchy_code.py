@@ -52,15 +52,28 @@ MDS_EXHAUSTIVE_LIMIT = 5000
 #: Fixed, so a failure is reproducible rather than a story about one unlucky night.
 MDS_SAMPLE_SEED = 20260814
 
-#: How many subsets to draw when enumeration is out of reach.
-MDS_SAMPLES = 400
+#: Subsets drawn when enumeration is out of reach. Two budgets, because rank of a k x k
+#: matrix costs O(k^3) and a flat 400 across every layout measured at 551 seconds, which
+#: does not belong in a per-pull-request job. 400 up to k=40, 60 above it: 101 seconds
+#: for 26,359 submatrices, measured. Both numbers are printed on every run.
+MDS_SAMPLES_SMALL = 400
+MDS_SAMPLES_LARGE = 60
+MDS_LARGE_ABOVE = 40
 
 
-#: The (k, m) pairs the encoder really produces. `parityCount` is
-#: max(ceil(k * 0.3), 2) (src/core/erasure.ts:12-18); the last two are the colour-grid
-#: layouts from SPEC.md:155-161, which no other test in this repository touches.
+#: Every (k, m) the encoder can produce, not a sample of them.
+#:
+#: `parityCount` is max(ceil(k * 0.3), 2) (src/core/erasure.ts:12-18). k runs to 190
+#: because that is GALLERY_K_MAX (src/core/gallery.ts:90); image output is bounded lower
+#: by MAX_IMAGES, so 190 covers both. The last two entries are the colour-grid layouts
+#: from SPEC.md:155-161.
+#:
+#: This used to stop at k=40, and the documentation described that as "all layouts the
+#: encoder produces", which was false: Gallery Mode reaches k=190. The matrix comparison
+#: over the full range costs 0.1 seconds, so the old bound bought nothing and cost an
+#: overstated claim.
 def real_layouts() -> list[tuple[int, int]]:
-    pairs = [(k, max(-(-k * 3 // 10), 2)) for k in range(1, 41)]
+    pairs = [(k, max(-(-k * 3 // 10), 2)) for k in range(1, 191)]
     return pairs + [(135, 19), (57, 31)]
 
 
@@ -105,7 +118,10 @@ def test_cauchy_matrix_matches_the_specification(GF: Any) -> None:
         ours = as_array(rs.build_cauchy(k, m))
         if ours.shape != ref.shape or not (ours == ref).all():
             bad.append(f"k={k} m={m}")
-    print(f"\n  {len(real_layouts())} layouts compared, including 135+19 and 57+31")
+    print(
+        f"\n  {len(real_layouts())} layouts compared, k=1..190 plus the colour-grid "
+        "135+19 and 57+31"
+    )
     assert not bad, (
         "the Cauchy matrix no longer matches SPEC.md §7.4 at: "
         + ", ".join(bad)
@@ -160,14 +176,22 @@ def test_gauss_jordan_matches_numpy(GF: Any) -> None:
 def test_every_k_subset_is_invertible(GF: Any) -> None:
     """MDS: any k of the k+m shards must reconstruct.
 
-    This is the assumption every recovery rests on, and until now nothing checked it
-    beyond one layout (k=4, m=3) in reed-solomon.test.ts. Exhaustive where the subset
-    count allows, sampled with a fixed seed where it does not, and the split is printed
-    rather than left implicit: reporting a sample as if it were a proof is the failure
-    this suite exists to refuse.
+    This is the assumption every recovery rests on, and until this suite existed nothing
+    checked it beyond one layout (k=4, m=3) in reed-solomon.test.ts.
+
+    Read this as a guard on the implementation rather than as a proof of the property.
+    For a Cauchy matrix the MDS property is a theorem: the Cauchy determinant is non-zero
+    whenever the two index sets are distinct, which SPEC.md §7.4 guarantees by
+    construction. So the maths is not in doubt; what a sweep can catch is an
+    implementation that stopped building the matrix the theorem is about. The matrix
+    comparison above is what pins that, and this is the second line of defence.
+
+    Exhaustive where the subset count allows, sampled with a fixed seed where it does not,
+    and both the split and the total are printed rather than left implicit. Reporting a
+    sample as if it were a proof is the failure this suite exists to refuse.
     """
     rng = np.random.default_rng(MDS_SAMPLE_SEED)
-    exhaustive = sampled = 0
+    exhaustive = sampled = checked = 0
     for k, m in real_layouts():
         n = k + m
         total = comb(n, k)
@@ -176,8 +200,10 @@ def test_every_k_subset_is_invertible(GF: Any) -> None:
             subsets = list(itertools.combinations(range(n), k))
             exhaustive += 1
         else:
-            subsets = [tuple(rng.choice(n, size=k, replace=False)) for _ in range(MDS_SAMPLES)]
+            draws = MDS_SAMPLES_SMALL if k <= MDS_LARGE_ABOVE else MDS_SAMPLES_LARGE
+            subsets = [tuple(rng.choice(n, size=k, replace=False)) for _ in range(draws)]
             sampled += 1
+        checked += len(subsets)
         for idx in subsets:
             rank = np.linalg.matrix_rank(g[list(idx), :])
             assert rank == k, (
@@ -186,9 +212,10 @@ def test_every_k_subset_is_invertible(GF: Any) -> None:
                 "the format depends on no longer holds."
             )
     print(
-        f"\n  {exhaustive} layouts checked exhaustively, "
-        f"{sampled} sampled at {MDS_SAMPLES} subsets each "
-        f"(threshold {MDS_EXHAUSTIVE_LIMIT} subsets)"
+        f"\n  {len(real_layouts())} layouts, {checked} submatrices: "
+        f"{exhaustive} exhaustive, {sampled} sampled "
+        f"({MDS_SAMPLES_SMALL} draws to k={MDS_LARGE_ABOVE}, "
+        f"{MDS_SAMPLES_LARGE} above)"
     )
 
 
