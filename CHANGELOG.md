@@ -55,6 +55,10 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 - **The claims register contradicted itself.** The Galois-field row said Reed-Solomon "is
   not validated by anything external" directly below the row recording that it is. The
   field row now says only that it covers the field, and points at the row above.
+- **The README mode table gave the same unqualified ticks.** It is where most readers meet
+  the two models, so it now carries the same qualifiers as `docs/ELI15.md`: "by design"
+  rather than yes for surviving recompression, "against triage" rather than yes for
+  deniability, with a paragraph naming both limits and pointing at the claims register.
 - **`docs/ELI15.md` overstated six things.** The mode table said re-compression survival
   and hiding were plain yes; both now carry the qualifier the claims register requires.
   Argon2id was said to make "the parallel attack collapse", where it raises cost per guess
