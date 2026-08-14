@@ -57,8 +57,14 @@ with Aletheia's Steghide detector, the only one that discriminates on this set:
 `night` needs a further note. The table above was measured locally, where outguess
 accepted it. On GitHub runners outguess has **declined it twice**, refusing to fit
 the message into the smallest and darkest cover of the set. That is reproducible
-rather than incidental, so the suite runs on two controls in CI and requires two.
-`night` stays because it does work on some builds, but nothing depends on it.
+rather than incidental, so `night` was removed from the control list: keeping it
+there would have meant tolerating a control that never arrives, and the suite would
+have run on two of three while reporting three.
+
+It stays in this directory because the instrument check is not its only job. The
+differential runs over every cover, and `night` contributes a texture none of the
+others has: near-black with heavy sensor noise, where detectors behave differently
+from a lit scene. Losing that would narrow the measurement to buy nothing.
 
 `park` cannot demonstrate a positive, so a clean verdict on it means nothing.
 `mountain` is a false positive before anything is embedded, much like the LCG

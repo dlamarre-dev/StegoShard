@@ -87,19 +87,22 @@ DETECTORS = ("outguess", "steghide", "nsf5", "juniward")
 #: The only detector that discriminates on this cover set.
 DISCRIMINATOR = "steghide"
 
-#: Covers whose instrument check is valid. The other two are measured but cannot
-#: demonstrate a positive; see covers-jpeg/PROVENANCE.md.
-CONTROL_COVERS = ("lake", "night", "beach")
+#: Covers that can carry the instrument check. `night` is deliberately absent: it
+#: works locally but outguess has declined it on every runner, so listing it would
+#: mean tolerating a control that never arrives. `mountain` is absent because its
+#: clean cover is already flagged. Both still feed the differential below, which is
+#: the measurement; what they cannot do is show the detector was awake.
+CONTROL_COVERS = ("lake", "beach")
 
 #: A control must land at or above this, a clean cover below it.
 CONTROL_FLOOR = 0.5
 
-#: How many working controls the run needs before its clean verdicts mean anything.
-#: outguess declines covers it cannot fit the message into. `night` is the small,
-#: near-black cover: it succeeded locally and has now been declined on a GitHub
-#: runner twice, so in practice this suite runs on two controls there. It stays in
-#: the list because it does work on some builds, but nothing may depend on it.
-MIN_CONTROLS = 2
+#: Every listed control must work. Deliberately equal to len(CONTROL_COVERS) rather
+#: than lower: slack there would let a control quietly stop arriving while the suite
+#: stayed green on the remainder, which is the failure mode this module exists to
+#: refuse. A decline is still reported rather than raising a KeyError, but it is
+#: fatal.
+MIN_CONTROLS = len(CONTROL_COVERS)
 
 #: Aletheia reports to one decimal, so this permits the reporting granularity and
 #: nothing more.
