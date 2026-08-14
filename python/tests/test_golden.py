@@ -29,17 +29,29 @@ import pathlib
 import re
 
 import pytest
-from stegoshard import decode_any, decode_vault
+from stegoshard import (
+    WrongPasswordError,
+    decode_any,
+    decode_vault,
+    decode_vault_binary,
+)
 from stegoshard.binary_container import unwrap_binary
 
 GOLDEN = pathlib.Path(__file__).parents[2] / "tests" / "golden"
 
 #: The corpus is committed, so unlike the generated fixtures there is no
-#: legitimate reason for it to be missing. A skip here would hide exactly the
-#: drift the corpus exists to catch.
-pytestmark = pytest.mark.skipif(
-    not GOLDEN.exists(), reason="tests/golden is missing from the checkout"
-)
+#: legitimate reason for it to be missing.
+#:
+#: This used to be a `skipif`, directly under a comment saying a skip would hide
+#: the drift the corpus exists to catch. It did exactly that: a deleted directory
+#: reported ten skips and a zero exit. Collection now fails instead, here rather
+#: than in conftest so the message names the corpus.
+if not GOLDEN.exists():
+    raise RuntimeError(
+        f"the golden corpus is missing from {GOLDEN}. It is committed, so this "
+        "means it was deleted rather than not yet generated. Skipping these tests "
+        "would report green while nothing checked the wire format."
+    )
 
 IMAGE_SETS = ["embedded", "color-grid", "keyfile", "stego", "stego-jpeg"]
 BINARY_SETS = ["binary-branded", "binary-disguised"]
@@ -86,14 +98,37 @@ def test_golden_images_still_decode(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", BINARY_SETS)
-def test_golden_containers_still_unwrap(name: str) -> None:
-    """The .ssbn and disguised .db framings, which the frozen crypto vectors do
-    not reach: those pin the vault blob, not the container around it."""
+def test_golden_containers_still_restore(name: str) -> None:
+    """The .ssbn and disguised .db paths, restored end to end.
+
+    Unwrapping and checking the result is non-empty was the first version of this
+    test, and it was too weak: a decoder returning a truncated or shifted payload
+    would have passed while the committed container became unrecoverable, which is
+    the one thing a golden corpus exists to prevent. The plaintext has to come
+    back byte for byte, as it does for the image sets.
+    """
+    d = GOLDEN / name
     manifest = _manifest(name)
-    blob = (GOLDEN / name / manifest["vault"]).read_bytes()
-    payload, variant = unwrap_binary(blob)
+    container = (d / manifest["vault"]).read_bytes()
+
+    payload, variant = unwrap_binary(container)
     assert variant == manifest["variant"]
     assert payload, f"{name} unwrapped to nothing"
+
+    # A disguised .db is a multi-region container keyed by the password plus a
+    # 32-byte factor carried in its companion file (SPEC §8, §10).
+    key_factor = None
+    if "key" in manifest:
+        key_factor = unwrap_binary((d / manifest["key"]).read_bytes())[0]
+        # Without the factor the slot KEK is wrong and nothing opens. Pinned
+        # because a container that opened without it would mean the factor had
+        # stopped gating anything.
+        with pytest.raises(WrongPasswordError):
+            decode_vault_binary(container, manifest["password"])
+
+    restored = decode_vault_binary(container, manifest["password"], key_factor=key_factor)
+    assert restored.filename == manifest["filename"]
+    assert restored.content == _expected(name)
 
 
 def test_corpus_covers_every_pinned_path() -> None:

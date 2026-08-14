@@ -83,15 +83,32 @@ function main(): void {
     return;
   }
 
+  // Read the constant's value on both sides and require it to have gone up.
+  //
+  // The first version looked for a changed diff line mentioning the constant,
+  // which a reformat, a type annotation, or a *decrement* all satisfy. It would
+  // have accepted `FORMAT_VERSION = 0`. Detecting that a line was touched is not
+  // the same as detecting that a decision was made, and this guard exists only to
+  // force the decision.
+  const readVersion = (blob: string, name: string): number | null => {
+    const m = new RegExp(`${name}\\s*=\\s*(\\d+)`).exec(blob);
+    return m ? Number(m[1]) : null;
+  };
+
   const bumped: string[] = [];
   for (const [file, name] of CONSTANTS) {
     if (!changed.includes(file)) continue;
-    const diff = git('diff', `${base}...HEAD`, '--', file);
-    // A changed line mentioning the constant, on either side of the diff.
-    const touched = diff
-      .split('\n')
-      .some((line) => /^[+-][^+-]/.test(line) && line.includes(`${name} =`));
-    if (touched) bumped.push(name);
+    let before: string;
+    try {
+      before = git('show', `${base}:${file}`);
+    } catch {
+      // New file: everything in it is new, so any constant it declares counts.
+      bumped.push(name);
+      continue;
+    }
+    const was = readVersion(before, name);
+    const now = readVersion(git('show', `HEAD:${file}`), name);
+    if (was !== null && now !== null && now > was) bumped.push(`${name} ${was} -> ${now}`);
   }
 
   if (bumped.length > 0) {

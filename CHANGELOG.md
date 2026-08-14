@@ -7,6 +7,27 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Four guards could pass without checking anything**, which is the defect the whole
+  test programme was built to remove, found in the programme's own work by an external
+  review.
+  - The golden binary containers were only unwrapped and checked non-empty. A decoder
+    returning a payload shifted by one byte passed that and was measured doing so; the
+    committed `.ssbn` and `.db` are now restored end to end, plaintext compared byte for
+    byte, with the disguised container's key factor supplied and its absence pinned as a
+    failure.
+  - A missing golden corpus was a `skipif`, sitting directly under a comment saying a
+    skip would hide the drift the corpus exists to catch. It reported ten skips and a
+    zero exit. Collection now fails.
+  - `npm run fuzz -- --iters=0` reported "OK - 7 targets" having fuzzed nothing.
+    Non-positive, fractional and non-finite counts are refused, in the script and in the
+    workflow guard that also accepted zero.
+  - The golden version guard looked for a diff line mentioning a version constant, which
+    a reformat, a type annotation or a _decrement_ all satisfy. It now reads the value on
+    both sides and requires an increase. Verified in three directions: a touched-but-
+    unchanged constant is refused, `1 -> 2` passes, `2 -> 0` is refused.
+
 ### Added
 
 - **Nightly mutation testing over the security-critical core.** Coverage says a line

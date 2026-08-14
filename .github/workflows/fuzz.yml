@@ -49,8 +49,12 @@ jobs:
           ITERS: ${{ inputs.iters }}
           SEED: ${{ github.run_id }}
         run: |
+          # Defence in depth; scripts/fuzz.ts validates this too. The old pattern
+          # accepted "0", which the script then ran happily, reporting success
+          # having fuzzed nothing.
           case "$ITERS" in
             '') ITERS=200000 ;;
-            *[!0-9]*) echo "iters must be a positive integer, got: $ITERS" >&2; exit 1 ;;
+            *[!0-9]*|0|0*[!0-9]*) echo "iters must be a positive integer, got: $ITERS" >&2; exit 1 ;;
           esac
+          [ "$ITERS" -ge 1 ] || { echo "iters must be >= 1, got: $ITERS" >&2; exit 1; }
           npm run fuzz -- --iters="$ITERS" --seed="$SEED"
