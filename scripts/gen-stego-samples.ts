@@ -38,7 +38,12 @@ import {
   serializeKeyBlock,
   wrapDEK,
 } from '../src/core/crypto';
-import { embedKeyBlockStego, embedKeyBlockStegoJpeg } from '../src/core/stego';
+import {
+  embedKeyBlockStego,
+  embedKeyBlockStegoJpeg,
+  extractKeyBlockStego,
+  extractKeyBlockStegoJpeg,
+} from '../src/core/stego';
 
 const coversDir = process.argv[2] ?? 'tests/steganalysis/covers';
 const outDir = process.argv[3] ?? '';
@@ -65,10 +70,13 @@ const PASSWORD = 'steganalysis-fixture-password';
  *
  * Statistically the two are identical once the whitening keystream is applied, so
  * the detectors cannot tell them apart. The difference matters for a different
- * reason: only a real block survives `extractKeyBlockStego*`, which is how the
- * generator proves the carrier actually carries a recoverable payload. An embed
- * that silently did nothing would otherwise produce a set of "clean" verdicts that
- * measure nothing at all.
+ * reason: only a real block survives `extractKeyBlockStego*`, so reading it back
+ * out proves the carrier actually carries a recoverable payload. That read-back is
+ * not decoration. Every detector test in this suite is a *differential*: if an
+ * embedder silently wrote nothing, the carrier would be byte-identical to its
+ * cover, the differential would be perfect, and the independent positive controls
+ * would still pass, because they use naive LSB and outguess rather than this code.
+ * The whole suite would go green while measuring an empty carrier.
  */
 async function realKeyBlock(): Promise<Uint8Array> {
   const salt = randomBytes(16);
@@ -120,6 +128,32 @@ function naiveLsb(rgba: Buffer, rate: number, seed: number): Buffer {
   return out;
 }
 
+/**
+ * Refuse to emit a carrier whose payload cannot be read back.
+ *
+ * The guard the differential cannot provide for itself: a no-op embedder produces
+ * a carrier identical to its cover, which every comparison in this suite reads as
+ * a perfect result.
+ */
+class UnrecoverableCarrier extends Error {}
+
+async function assertRecoverable(
+  label: string,
+  expected: Uint8Array,
+  recovered: Uint8Array | null,
+): Promise<void> {
+  if (recovered === null) {
+    throw new UnrecoverableCarrier(
+      `${label}: the embedded key block could not be read back at all`,
+    );
+  }
+  if (recovered.length !== expected.length || recovered.some((b, i) => b !== expected[i])) {
+    throw new UnrecoverableCarrier(
+      `${label}: the recovered key block does not match the one embedded`,
+    );
+  }
+}
+
 function writePng(path: string, rgba: Buffer, width: number, height: number) {
   const png = new PNG({ width, height });
   rgba.copy(png.data);
@@ -146,6 +180,11 @@ for (const file of covers) {
   const stego = Buffer.from(clean);
   const keyBlock = await realKeyBlock();
   await embedKeyBlockStego(stego, width, height, keyBlock, PASSWORD, FAST_ARGON2);
+  await assertRecoverable(
+    `${name} (PNG)`,
+    keyBlock,
+    await extractKeyBlockStego(stego, width, height, PASSWORD, FAST_ARGON2),
+  );
   writePng(join(outDir, `${name}-stego.png`), stego, width, height);
 
   writePng(join(outDir, `${name}-control.png`), plaintextLsb(clean, CONTROL_TEXT), width, height);
@@ -167,16 +206,20 @@ for (const file of covers) {
   const coverJpeg = readFileSync(join(coversDir, file));
   writeFileSync(join(outDir, `${name}-clean.jpg`), coverJpeg);
   try {
-    const carrier = await embedKeyBlockStegoJpeg(
-      coverJpeg,
-      await realKeyBlock(),
-      PASSWORD,
-      FAST_ARGON2,
+    const jpegKeyBlock = await realKeyBlock();
+    const carrier = await embedKeyBlockStegoJpeg(coverJpeg, jpegKeyBlock, PASSWORD, FAST_ARGON2);
+    await assertRecoverable(
+      `${name} (JPEG)`,
+      jpegKeyBlock,
+      await extractKeyBlockStegoJpeg(carrier, PASSWORD, FAST_ARGON2),
     );
     writeFileSync(join(outDir, `${name}-stego.jpg`), carrier);
   } catch (err) {
-    // A progressive or otherwise unsupported cover is refused by design; say so
-    // rather than silently producing a set with a hole in it.
+    // A progressive or otherwise unsupported cover is refused by design, and
+    // skipping it is correct. A carrier that embedded but cannot be read back is
+    // not the same thing at all, and must never degrade to a skip: that is the
+    // exact failure this verification exists to catch.
+    if (err instanceof UnrecoverableCarrier) throw err;
     console.error(`  ${name}: JPEG carrier skipped (${(err as Error).message})`);
   }
 
