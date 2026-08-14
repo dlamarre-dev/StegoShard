@@ -9,6 +9,15 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **`docs/ELI15.md`, the project explained to someone who has never studied cryptography.**
+  Nothing covered password stretching, the three-key hierarchy, authenticated encryption,
+  Reed-Solomon, the colour grid or QR error-correction levels for a lay reader: `WHY.md`
+  carries the reasoning without a single number, `SPEC.md` carries the bytes. It opens with
+  a two-minute summary and every section leads with a bold sentence, so the shape survives
+  a skim even though the full read is longer. It states the limits alongside the mechanics,
+  including the warning that a duress decoy can worsen legal exposure rather than reduce
+  it.
+
 - **The Galois field under Reed-Solomon is now anchored to something outside the
   project.** `tests/erasure` compares GF(2^8) in both stacks, exhaustively,
   against [reedsolo](https://github.com/tomerfiliba-org/reedsolomon) and against
