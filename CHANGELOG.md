@@ -124,6 +124,16 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Changed
 
+- **The nightly JPEG steganalysis sweep no longer runs every night.** It costs 36 to 47
+  minutes and rebuilds a 7 GB container, so a guard job now skips it unless the tests, the
+  sample generator, the lockfile, the workflow, or the runner image changed, with a
+  seven-day floor. Stated plainly because the obvious reading is wrong: this test is **not**
+  deterministic. The embedded key block draws a fresh salt, DEK and IV each run, so every
+  execution is an independent draw, and gating trades roughly thirty samples a month for
+  four or five. The floor exists to keep both that resampling and upstream-drift detection
+  alive at a reduced rate. `docs/CRYPTO-REVIEW.md` §5.4 records the reduced density so the
+  measurement is not read as denser than it is.
+
 - **Expert-mode destination and key pickers** are now an icon plus a one-to-three
   word label, with the longer explanation on hover and keyboard focus. The
   descriptions were already written for the guided wizard and are reused as-is.
