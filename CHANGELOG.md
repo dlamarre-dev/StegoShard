@@ -7,6 +7,30 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **The reader that parses attacker-supplied bytes now has its rejection paths
+  tested.** `unpackSqlite` runs on restore against a file the user was handed; of its
+  ten paths that return null, three were covered. Branch coverage on that file was the
+  lowest in `src/core` at 71.91% and is now 83.15%. The centrepiece is a corruption
+  sweep asserting the structural invariant: an accepted result is always the stored
+  length, never shorter or longer. Length rather than content, because a byte flipped
+  inside a row's value legitimately changes the blob and its GCM tag catches that one
+  layer up; what a tag cannot catch is misassembly that still produces a plausible
+  length, since the failure would then look like a wrong password rather than a damaged
+  file.
+- **`src/ui/input-limits.ts` had no tests at all**, though its whole job is bounding
+  untrusted input before it reaches the tab's heap, and `src/ui` sits outside the
+  coverage scope so nothing measured it either. Thirteen tests now cover the four limit
+  kinds, the count guard, the cumulative-total guard that fires mid-loop, and above all
+  the guarantee in its own docstring: the size check happens **before** `arrayBuffer()`,
+  so a rejected input is never copied. That one was verified by inverting the order and
+  confirming the test goes red.
+- **Eight structural refusals in the JPEG decoder**, up from two: arithmetic coding,
+  non-8-bit precision, zero dimensions, a scan before any frame, a scan naming an
+  undeclared component, a file that never reaches a scan, a desynchronised segment walk,
+  and a scan with no Huffman tables. Branch coverage there moves from 78.12% to 82.84%.
+
 ### Fixed
 
 - **The parser fuzzer asserted half of what it claimed, and reached almost none of
