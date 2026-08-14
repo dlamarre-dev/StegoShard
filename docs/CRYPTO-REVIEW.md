@@ -482,9 +482,9 @@ theorem: the determinant is non-zero whenever the two index sets are distinct, w
 guarantees by construction. What a sweep catches is an implementation that stopped building
 the matrix the theorem describes, and the matrix comparison is what pins that.
 
-**Cost, measured.** The suite runs in 102 seconds locally, most of it the MDS sweep.
-`galois` pulls `numpy`, `numba` and `llvmlite`, roughly 200 MB installed. The CI job figure
-is recorded from a real run in `.github/workflows/ci.yml`.
+**Cost, measured.** 102 seconds locally and 243 in CI, most of it the MDS sweep. For
+reference: 133 seconds when the sweep covered 42 layouts, and 41 before `galois` existed.
+The library pulls `numpy`, `numba` and `llvmlite`, roughly 200 MB installed.
 
 **What this does not establish.** It establishes that three things agree: the
 specification, the two implementations, and an independent algebra engine. It does not
