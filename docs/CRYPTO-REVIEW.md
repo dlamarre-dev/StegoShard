@@ -424,6 +424,57 @@ each one moves: 63,232 for a `0x12D` field, 62,220 for tables built from a
 generator of order 51. A final probe passes a correct field and must stay silent,
 so the suite cannot pass by rejecting everything.
 
+### 5.6 The Cauchy erasure code
+
+`tests/erasure/test_cauchy_code.py` compares the construction of §7 against
+[galois](https://github.com/mhostetter/galois), a linear-algebra library over finite
+fields, on every pull request: the Cauchy matrix over all 42 layouts the encoder can
+produce, the Gauss-Jordan inverter against `numpy` on 155 submatrices, the MDS property,
+and the frozen parity bytes.
+
+**Why no Reed-Solomon library could do this.** StegoShard uses a systematic Cauchy code
+with `x_i = i, y_j = m + j` (§7.4). reedsolo is a BCH-view codec with syndromes and
+Berlekamp-Massey. Every matrix-based library imposes a different construction: Backblaze,
+klauspost and the Rust `reed-solomon-erasure` crate behind the WASM packages all build a
+Vandermonde reduced to systematic form, and ISA-L uses a Cauchy with a different x/y
+assignment. None of them emits these parity bytes, so none of them can check them.
+
+What works is a tool of a different kind. `galois` imposes no construction; the formula
+from §7.4 goes in and an engine that is not ours computes the matrix, the inverse and the
+product.
+
+**Why it was needed.** Everything above the field was self-referential. Encoding and
+decoding with the same matrix succeeds under _any_ invertible matrix, correct or not.
+Measured: switching both stacks to ISA-L's assignment, a perfectly good erasure code,
+leaves the 48 tests in `reed-solomon.test.ts`, `erasure.test.ts`, `vault.test.ts` and
+`gallery.test.ts` green, and leaves all 93 tests of the Python decoder green once its
+fixtures are regenerated the way CI regenerates them.
+
+**MDS coverage, stated exactly.** Every k-subset is enumerated where the count allows,
+which is 13 of the 42 layouts; the other 29 are sampled at 400 subsets with a fixed seed.
+`C(154, 135)` has 33 digits, so exhaustive is not available at the colour-grid layouts.
+The split is printed on every run rather than left implicit.
+
+**What this does not establish.** It establishes that three things agree: the
+specification, the two implementations, and an independent algebra engine. It does not
+establish that the formula is a good design choice. Transcribing §7.4 into the reference
+is still a human act, and a specification that was wrong in the same way as the code would
+pass. What has been removed is the possibility of the two implementations sharing a
+transcription error, and of the arithmetic being wrong in a way round-trips hide.
+
+Note also which assertions pin what. The inversion and MDS checks validate _properties_,
+and ISA-L's construction satisfies both; only the matrix comparison and the frozen parity
+pin this particular construction. Confirmed by the mutation above, where those two tests
+stayed green while the comparison failed.
+
+**Instrument check.** `tests/erasure/test_cauchy_accounting.py` runs plausible wrong
+constructions through the same comparison and pins the counts: 162 of 162 matrix entries
+for ISA-L's assignment, **160 of 162** for a Vandermonde. Two entries coincide there,
+which is why this compares whole matrices instead of spot-checking cells. A third probe
+uses overlapping index sets and must fail to build at all, since some entry would need the
+inverse of zero; that is what the disjointness clause in §7.4 is for. A correct
+construction runs last and must pass in silence.
+
 ## 6. Keyfile-mode isolation
 
 **Claim: with `keyMode: 'keyfile'`, no fragment of the key block appears in

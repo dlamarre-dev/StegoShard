@@ -31,6 +31,7 @@ import {
   type Argon2Params,
 } from '../src/core/crypto';
 import { buildPayload } from '../src/core/payload';
+import { rsEncode } from '../src/core/reed-solomon';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -802,6 +803,42 @@ async function makeGf256Vectors() {
   };
 }
 
+/**
+ * Reed-Solomon parity, frozen.
+ *
+ * The three configurations are the ones the encoder actually produces at the low end:
+ * the MIN_PARITY floor at k=1, a small multi-shard set, and a wider one. The two
+ * colour-grid layouts (135+19 and 57+31) are deliberately absent: freezing their
+ * parity would add tens of kilobytes to this file, and tests/erasure covers them by
+ * comparing the generator matrix itself, which is where a construction error would
+ * live.
+ *
+ * Verified in tests/erasure against `galois`, which rebuilds the Cauchy matrix from
+ * the formula in SPEC.md §7.4 and recomputes these bytes with an independent linear
+ * algebra engine. Without that, these numbers would be a snapshot of our own encoder
+ * and the TypeScript and Python suites would only be confirming what they already
+ * agreed on.
+ */
+const RS_CASES: { name: string; k: number; m: number; shardLen: number; seed: number }[] = [
+  { name: 'min-parity-floor', k: 1, m: 2, shardLen: 32, seed: 901 },
+  { name: 'small-set', k: 4, m: 3, shardLen: 32, seed: 902 },
+  { name: 'wider-set', k: 10, m: 3, shardLen: 32, seed: 903 },
+];
+
+function makeReedSolomonVectors() {
+  return RS_CASES.map(({ name, k, m, shardLen, seed }) => {
+    const data = Array.from({ length: k }, (_, i) => pattern(shardLen, seed + i));
+    return {
+      name,
+      k,
+      m,
+      shardLen,
+      dataHex: data.map(toHex),
+      parityHex: rsEncode(data, m).map(toHex),
+    };
+  });
+}
+
 async function main() {
   const argon2: Argon2Vector[] = [];
   for (const c of ARGON2_CASES) {
@@ -996,6 +1033,7 @@ async function main() {
   ];
 
   const gf256 = await makeGf256Vectors();
+  const reedSolomon = makeReedSolomonVectors();
 
   const out = {
     _comment:
@@ -1012,6 +1050,7 @@ async function main() {
     gatedVaultBlob,
     shamir,
     gf256,
+    reedSolomon,
     duressVaultBlob,
   };
 

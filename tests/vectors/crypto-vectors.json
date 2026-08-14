@@ -337,6 +337,59 @@
     "expSha256": "bdc336e3f040e4deac02d4ee345234a3aeecd636b8c944c229dd29b0a1852987",
     "logSha256": "aeaa639586841d2e0434d8198a86c91623e672d9c0012b4f8f6692768fe1bbf4"
   },
+  "reedSolomon": [
+    {
+      "name": "min-parity-floor",
+      "k": 1,
+      "m": 2,
+      "shardLen": 32,
+      "dataHex": ["9500bd05de4fb518dc579ac0c479ba77b30168a231a647dbc956fabf2154c6c9"],
+      "parityHex": [
+        "c400d08c6fa9d40c6ea54d6062b25db5d78e34519653ade3ea2b7dd19e2a63ea",
+        "73006b034ace9808bfc67640b7dc9d2d9af4d395e4623d494732569e1fc74247"
+      ]
+    },
+    {
+      "name": "small-set",
+      "k": 4,
+      "m": 3,
+      "shardLen": 32,
+      "dataHex": [
+        "95176d0e890e23025e660e70be6cf5eeda05b485e236f3ede7c79383f0f25cf1",
+        "962f1c1733ce91ede075821fb8602f660109016893c69e0005382d47c091f318",
+        "9646cb21de8d00d76283f6ceb2546add280d4d4b44564a1223a9c60c8f2f8940",
+        "965d7b2a894c6ec2e5926b7eac47a4544f119a2ef5e6f524411a5fd05ecd1f68"
+      ],
+      "parityHex": [
+        "cfe8233bc28c6f661539f36fa71abd19959ff2880092efa4279e9776f4c431f7",
+        "ca5f6cb620c69ea863cb8b36c4686905d9eb49716825337e269507bd95e858d3",
+        "8c2adf66f945f48fed2c166226b804aa1d1a162c5dd536e232328b4caea2684e"
+      ]
+    },
+    {
+      "name": "wider-set",
+      "k": 10,
+      "m": 3,
+      "shardLen": 32,
+      "dataHex": [
+        "962f1c1733ce91ede075821fb8602f660109016893c69e0005382d47c091f318",
+        "9646cb21de8d00d76283f6ceb2546add280d4d4b44564a1223a9c60c8f2f8940",
+        "965d7b2a894c6ec2e5926b7eac47a4544f119a2ef5e6f524411a5fd05ecd1f68",
+        "96742a34330cdcac67a1df2da63bdecc7715e611a676a1375f8bf9952e6bb690",
+        "968cd93ddecb4b97e9b053dca02f19439e1933f457074d497dfc9259fd094cb7",
+        "96a38847898bb9816bbec78c9a2253bac51d7fd70897f85b9c6e2c1dcca7e3df",
+        "96ba3850334a286ceecd3b3b94168e31ec20ccbab927a46ebadfc5e29c457907",
+        "96d1e75ade09965670dcafea8e0ac8a91324189d69b74f80d8505fa66be3102e",
+        "96e8966388c90441f2ea249988fd03203b2864801a47fb93f6c1f86a3a81a656",
+        "9600466d3388732b74f9984982f13d97622cb163cbd7a7a51432912f091f3c7e"
+      ],
+      "parityHex": [
+        "ef73f8f2cbdd48614a8b32aced4a5538206185753b8f9d424f38792a3115d741",
+        "5a54131231001b8e8a0c63403da378faf5753f62318b9100825c6dd6a29c55d0",
+        "526a178deb9bd242364447caca842f8732a9febaa11098ff5f8d20231865b406"
+      ]
+    }
+  ],
   "duressVaultBlob": [
     {
       "name": "real-region0",

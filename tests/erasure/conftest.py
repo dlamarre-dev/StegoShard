@@ -54,6 +54,16 @@ TSX = REPO_ROOT / "node_modules" / ".bin" / "tsx"
 # The decoder package is not installed; import it from the repository.
 sys.path.insert(0, str(REPO_ROOT / "python"))
 
+# Drop the repository root itself. `npm run test:coverage` writes a gitignored
+# `coverage/` directory there, and Python resolves a bare directory as an empty
+# namespace package, so `import coverage` succeeds and returns a module with no
+# attributes. numba probes for coverage at import time and dies on it, which shows up
+# as five errors in this file and no mention of the real cause. Sanitising the path is
+# cheaper than asking every contributor to remember the ordering of two test commands.
+for _stray in (str(REPO_ROOT), "", "."):
+    while _stray in sys.path:
+        sys.path.remove(_stray)
+
 #: Frozen field parameters, from SPEC.md §7.1. Asserted rather than read from the
 #: implementation: a constant compared against itself proves nothing.
 EXPECTED_POLY = 0x11D
