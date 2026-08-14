@@ -54,6 +54,16 @@ TSX = REPO_ROOT / "node_modules" / ".bin" / "tsx"
 # The decoder package is not installed; import it from the repository.
 sys.path.insert(0, str(REPO_ROOT / "python"))
 
+# Drop the repository root itself. `npm run test:coverage` writes a gitignored
+# `coverage/` directory there, and Python resolves a bare directory as an empty
+# namespace package, so `import coverage` succeeds and returns a module with no
+# attributes. numba probes for coverage at import time and dies on it, which shows up
+# as five errors in this file and no mention of the real cause. Sanitising the path is
+# cheaper than asking every contributor to remember the ordering of two test commands.
+for _stray in (str(REPO_ROOT), "", "."):
+    while _stray in sys.path:
+        sys.path.remove(_stray)
+
 #: Frozen field parameters, from SPEC.md §7.1. Asserted rather than read from the
 #: implementation: a constant compared against itself proves nothing.
 EXPECTED_POLY = 0x11D
@@ -100,6 +110,26 @@ def reedsolo_field() -> Any:
         raise
     reedsolo.init_tables(prim=EXPECTED_POLY, generator=EXPECTED_GENERATOR, c_exp=8)
     return reedsolo
+
+
+@pytest.fixture(scope="session")
+def GF() -> Any:
+    """galois, configured for this project's field.
+
+    Shared here rather than duplicated per module, and routed through require() rather
+    than pytest.importorskip: importorskip would skip in CI too, and a suite that
+    quietly stops running is the failure this repository keeps removing.
+    """
+    try:
+        import galois
+    except ImportError:  # pragma: no cover - exercised by the CI-vs-local policy
+        require(
+            "galois",
+            None,
+            "pip install --require-hashes -r python/requirements-erasure.lock",
+        )
+        raise
+    return galois.GF(2**8, irreducible_poly=EXPECTED_POLY, primitive_element=EXPECTED_GENERATOR)
 
 
 @pytest.fixture(scope="session")

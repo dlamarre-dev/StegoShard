@@ -137,6 +137,20 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   Content is unspecified by the format and decoders ignore it, so this changes
   nothing for reading images written either way.
 
+### Added
+
+- **The erasure code itself is now checked against something outside the project.** The
+  field was anchored earlier; everything built on it was not. `tests/erasure` compares the
+  Cauchy matrix over all 42 layouts the encoder produces, the Gauss-Jordan inverter against
+  `numpy`, the MDS property, and frozen parity bytes, against
+  [galois](https://github.com/mhostetter/galois). No Reed-Solomon library could do this:
+  every one imposes its own construction, so none emits these parity bytes. `galois`
+  imposes none, which is why the SPEC §7.4 formula can go in and an independent engine
+  compute the result. Measured need: switching both stacks to ISA-L's assignment, a
+  perfectly good erasure code, left 48 encoder tests green and all 93 Python decoder tests
+  green. `docs/CRYPTO-REVIEW.md` §5.6 records what this does and does not establish, and
+  `docs/CLAIMS.md` §19 loses the limitation it carried.
+
 ### Changed
 
 - **The nightly JPEG steganalysis sweep no longer runs every night.** It costs 36 to 47

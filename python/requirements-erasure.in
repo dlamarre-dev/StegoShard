@@ -20,5 +20,16 @@
 # the Unlicense or MIT-0 at the user's choice, both public-domain-equivalent;
 # test-only, never distributed, so THIRD_PARTY_NOTICES.txt is unaffected.
 reedsolo==1.7.0
+# galois is a linear-algebra library over finite fields, not a codec, which is the
+# whole reason it can do what reedsolo cannot: the Cauchy formula from SPEC.md §7.4
+# goes in and an engine that is not ours computes the matrix, the inverse and the
+# parity. No Reed-Solomon library can reproduce those bytes, since every one of them
+# imposes its own construction (Vandermonde for Backblaze, klauspost and the Rust
+# reed-solomon-erasure crate; a different x/y assignment for ISA-L).
+#
+# It costs about 200 MB installed through numpy, numba and llvmlite, the last of those
+# alone being 125 MB. Accepted because it is the only way found to validate §7 against
+# something outside this project, and because it is test-only.
+galois>=0.4.11
 pytest>=8.0.0
 pip-audit>=2.9.0

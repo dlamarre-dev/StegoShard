@@ -21,6 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { argon2id } from 'hash-wasm';
 import { toHex, readU16 } from './bytes';
 import { gfMul, gfDiv, gfInv, FIELD_POLY, FIELD_GENERATOR } from './gf256';
+import { rsEncode, rsReconstructData } from './reed-solomon';
 import {
   type Argon2Params,
   CONTENT_SALT_LEN,
@@ -126,6 +127,16 @@ interface Vectors {
   shamir: ShamirVector[];
   duressVaultBlob: DuressVaultVector[];
   gf256: Gf256Vectors;
+  reedSolomon: RsVector[];
+}
+
+interface RsVector {
+  name: string;
+  k: number;
+  m: number;
+  shardLen: number;
+  dataHex: string[];
+  parityHex: string[];
 }
 
 interface Gf256Vectors {
@@ -438,5 +449,38 @@ describe('frozen vectors: GF(2^8) field (§7.1)', () => {
     expect(gf.products.length).toBe(8);
     expect(gf.quotients.length).toBe(4);
     expect(gf.inverses.length).toBe(6);
+  });
+});
+
+describe('frozen vectors: Reed-Solomon parity (§7)', () => {
+  const cases = vectors.reedSolomon;
+
+  it('reproduces every parity shard', () => {
+    for (const c of cases) {
+      const data = c.dataHex.map(fromHex);
+      const parity = rsEncode(data, c.m);
+      expect(parity.length).toBe(c.m);
+      parity.forEach((p, i) => expect(toHex(p)).toBe(c.parityHex[i]));
+    }
+  });
+
+  it('reconstructs from any k of the k+m shards', () => {
+    // The MDS property, spot-checked here and swept properly in tests/erasure. What
+    // this adds is that reconstruction works through the public entry point, not only
+    // that the matrix inverts.
+    for (const c of cases) {
+      const data = c.dataHex.map(fromHex);
+      const all = [...data, ...rsEncode(data, c.m)];
+      for (let drop = 0; drop < Math.min(c.m, c.k); drop++) {
+        const present: (Uint8Array | null)[] = all.map((s, i) => (i === drop ? null : s));
+        const out = rsReconstructData(present, c.k, c.m);
+        out.forEach((s, i) => expect(toHex(s)).toBe(c.dataHex[i]));
+      }
+    }
+  });
+
+  it('counts the cases, so the set cannot quietly shrink', () => {
+    expect(cases.length).toBe(3);
+    expect(cases.some((c) => c.k === 1)).toBe(true);
   });
 });

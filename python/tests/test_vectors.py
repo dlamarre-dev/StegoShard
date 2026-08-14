@@ -31,6 +31,7 @@ from stegoshard.crypto import (
 )
 from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
 from stegoshard.pipeline import decode_multiregion_vault_blob
+from stegoshard.reedsolomon import reconstruct_data
 from stegoshard.segmented import decode_multiregion_segmented_blob
 from stegoshard.shamir import shamir_recover
 
@@ -353,3 +354,56 @@ def test_gf256_vector_counts():
     assert len(GF["products"]) == 8
     assert len(GF["quotients"]) == 4
     assert len(GF["inverses"]) == 6
+
+
+# ---- Reed-Solomon parity (SPEC §7) -------------------------------------------
+#
+# The Python decoder has no encoder, by design: it exists to restore, not to write.
+# So it verifies these vectors the way a user's recovery does, by reconstructing the
+# data shards from a subset that omits some of them, using the committed parity.
+#
+# tests/erasure checks the same bytes against `galois`, which rebuilds the Cauchy
+# matrix from the SPEC §7.4 formula with an independent linear algebra engine. Without
+# that, this file and its TypeScript counterpart would only be confirming what the two
+# stacks already agreed on.
+
+RS = VECTORS["reedSolomon"]
+
+
+def _shards(case):
+    return [bytes.fromhex(h) for h in case["dataHex"]], [
+        bytes.fromhex(h) for h in case["parityHex"]
+    ]
+
+
+@pytest.mark.parametrize("case", RS, ids=[c["name"] for c in RS])
+def test_reed_solomon_reconstructs_from_the_frozen_parity(case):
+    data, parity = _shards(case)
+    k, m = case["k"], case["m"]
+    assert len(data) == k and len(parity) == m
+    for drop in range(min(m, k)):
+        present = list(data) + list(parity)
+        present[drop] = None
+        recovered = reconstruct_data(present, k, m)
+        assert [bytes(s) for s in recovered] == data, (
+            f"{case['name']}: dropping data shard {drop} no longer reconstructs"
+        )
+
+
+def test_reed_solomon_needs_at_least_k_shards():
+    # The other half of the claim: below k, reconstruction is impossible rather than
+    # approximate. docs/CLAIMS.md is explicit that recovery holds only within the m
+    # parity budget.
+    case = next(c for c in RS if c["k"] > 1)
+    data, parity = _shards(case)
+    k, m = case["k"], case["m"]
+    present = list(data) + list(parity)
+    for i in range(m + 1):
+        present[i] = None
+    with pytest.raises(ValueError, match="required shards present"):
+        reconstruct_data(present, k, m)
+
+
+def test_reed_solomon_vector_counts():
+    assert len(RS) == 3
+    assert any(c["k"] == 1 for c in RS), "the MIN_PARITY floor case must stay covered"
