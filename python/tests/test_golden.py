@@ -23,8 +23,10 @@ considerably less.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
+import re
 
 import pytest
 from stegoshard import decode_any, decode_vault
@@ -106,6 +108,34 @@ def test_corpus_covers_every_pinned_path() -> None:
         f"golden corpus contents changed: {sorted(present)}. Adding a path is fine; "
         "update this list and PROVENANCE.md. Losing one is not."
     )
+
+
+def test_every_file_in_provenance_is_present_and_unchanged() -> None:
+    """Every digest recorded at generation still resolves.
+
+    This is the guard that catches a missing *file*, which the directory check
+    above does not. It earned its place immediately: `.gitignore` carries a
+    blanket `*.key` rule, so `keyfile/vault.key` was silently left out of the
+    commit. The suite passed locally, on the untracked file still sitting on
+    disk, and failed only in a fresh CI checkout.
+    """
+    digests = []
+    for line in (GOLDEN / "PROVENANCE.md").read_text().splitlines():
+        m = re.match(r"^([0-9a-f]{64})  (.+)$", line)
+        if m:
+            digests.append((m.group(1), m.group(2)))
+    assert len(digests) >= 40, f"PROVENANCE.md lists only {len(digests)} files"
+
+    missing, altered = [], []
+    for want, rel in digests:
+        path = GOLDEN / rel
+        if not path.exists():
+            missing.append(rel)
+            continue
+        if hashlib.sha256(path.read_bytes()).hexdigest() != want:
+            altered.append(rel)
+    assert not missing, f"recorded but absent from the checkout: {missing}"
+    assert not altered, f"present but no longer matching their recorded digest: {altered}"
 
 
 def test_provenance_records_the_version_constants() -> None:
