@@ -7,6 +7,22 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **Coverage thresholds are now per file rather than aggregate, and `src/ui` is
+  measured.** The aggregate gate let seven files sit below the branch threshold behind
+  an average that cleared it, `sqlite-container.ts` among them at 71.91%. Each floor is
+  now the weakest file today, rounded down, and `vitest.config.ts` records which file
+  sets which. Note that the core branch floor of 81 is _lower_ than the old aggregate
+  85 and is nevertheless the stricter gate, for that exact reason.
+
+  `src/ui` was outside coverage entirely, which is how `input-limits.ts` came to have no
+  tests without anything noticing. It is measured now, minus eighteen modules that need
+  a DOM, a Worker or browser storage: those are exercised by the Playwright suite, which
+  collects no coverage, so reporting them at zero would mix "untested" with "tested
+  where this tool cannot see". They are listed individually with the rule for adding to
+  the list.
+
 ### Added
 
 - **The reader that parses attacker-supplied bytes now has its rejection paths

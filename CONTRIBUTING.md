@@ -72,8 +72,13 @@ in CI (`npm run lint:shell`). To run it locally, install shellcheck first:
 ## Tests
 
 - Written with [Vitest](https://vitest.dev/).
-- The core (crypto, codec, erasure coding) carries a high coverage bar (targeting
-  ≥ 90% as Phase 1 lands); UI glue is tested pragmatically.
+- Coverage thresholds are **per file, not aggregate**, and they are a ratchet: raise
+  them as coverage rises, never lower one to make a build pass. The core (crypto,
+  codec, erasure coding) carries the higher floors; the UI modules that can be
+  measured from node carry lower ones, with `vitest.config.ts` naming which file sets
+  each. Modules needing a DOM, a Worker or browser storage are excluded and listed
+  there with the reason, since the Playwright suite exercises them without collecting
+  coverage.
 - Prefer round-trip and property tests for the pipeline (encode → decode identity,
   reconstruct with up to `m` missing shards, reject a wrong password, etc.).
 
