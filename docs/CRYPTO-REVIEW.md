@@ -66,6 +66,15 @@ low expected export count.
   Crypto spec says that buffer is a fresh copy, but a runtime that instead aliases
   it to the live `CryptoKey` (observed under Deno) would otherwise see the
   zeroization corrupt the key. Copying keeps the zeroization safe on every runtime.
+- **Verified, as of the first mutation run.** `src/core/crypto.zeroize.test.ts`
+  asserts each of the wipes above on every pull request, by spying on
+  `Uint8Array.prototype.fill`. This section described the behaviour for months
+  and nothing checked it: mutation testing showed that deleting the `fill(0)`
+  calls outright left the whole suite green. The tests move the claim from
+  documented to verified-as-written, which is a smaller thing than it sounds and
+  the only one available here: they prove the call happens, not that the memory
+  becomes unreachable. The wrap path additionally proves the wipe landed on a
+  copy, by using the key afterwards.
 - **JavaScript caveat, stated plainly:** `fill(0)` is best-effort. The VM may
   have copied buffers (GC compaction, WASM heap in hash-wasm, `postMessage`
   structured clones), and those copies cannot be scrubbed from JS. True memory

@@ -20,6 +20,13 @@ export default [
       // errors, so `npm run lint` failed for anyone who had ever opened a report.
       // CI never noticed: it lints before it runs a browser.
       'playwright-report/**',
+      // Stryker's sandbox and reports, same story one tool over: a mutation run
+      // copies the whole source tree into .stryker-tmp and rewrites it with
+      // `@ts-nocheck` headers, so `npm run lint` reported 181 errors in files
+      // nobody wrote. CI never noticed either, because the mutation job runs in
+      // its own workspace and lints nothing.
+      '.stryker-tmp/**',
+      'reports/**',
       'test-results/**',
     ],
   },

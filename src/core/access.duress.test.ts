@@ -21,12 +21,57 @@ describe('credential independence (SPEC §10.5, author-time)', () => {
   });
 
   it('rejects equal, case-only, prefix/suffix, reversal, and near variants', () => {
-    expect(credentialsIndependent('hunter2', 'hunter2').reason).toBe('equal');
-    expect(credentialsIndependent('Hunter2', 'hunter2').reason).toBe('case');
-    expect(credentialsIndependent('hunter2extra', 'hunter2').reason).toBe('contains'); // prefix
-    expect(credentialsIndependent('xxhunter2', 'hunter2').reason).toBe('contains'); // suffix
-    expect(credentialsIndependent('hunter2', '2retnuh').reason).toBe('reverse');
-    expect(credentialsIndependent('hunter2', 'hunter3').reason).toBe('near'); // one edit
+    // `ok` as well as `reason`, and the reason it matters is not cosmetic.
+    // `buildDuressVaultBlob` gates on `check.ok` (access.ts:246); the reason is
+    // only carried into the error message. Asserting `reason` alone left every
+    // `ok: false` free to become `ok: true` with the suite still green, which
+    // mutation testing showed for the `equal` branch: two identical passwords
+    // would have been accepted and nothing would have said so.
+    const rejected = (real: string, duress: string, reason: string) => {
+      const got = credentialsIndependent(real, duress);
+      expect(got.ok, `${real} vs ${duress} was accepted`).toBe(false);
+      expect(got.reason).toBe(reason);
+    };
+    rejected('hunter2', 'hunter2', 'equal');
+    rejected('Hunter2', 'hunter2', 'case');
+    rejected('hunter2extra', 'hunter2', 'contains'); // prefix
+    rejected('xxhunter2', 'hunter2', 'contains'); // suffix
+    rejected('hunter2', '2retnuh', 'reverse');
+    rejected('hunter2', 'hunter3', 'near'); // one edit
+  });
+
+  it('applies the near threshold at its boundary, on both sides', () => {
+    // nearThreshold = max(2, ceil(0.2 * min(len))). The floor of 2 is what makes
+    // short passwords strict, and the proportional part is what keeps long ones
+    // from being rejected for two coincidental characters.
+    //
+    // 20 characters give a threshold of 4: four edits are still "near", five are
+    // independent. Pinning both sides is what stops the constant drifting
+    // silently; a test that only checked the rejecting side would pass with the
+    // threshold set to infinity.
+    const base = 'abcdefghijklmnopqrst'; // 20 chars → threshold 4
+    expect(credentialsIndependent(base, 'abcdefghijklmnop####').reason).toBe('near'); // 4 edits
+    expect(credentialsIndependent(base, 'abcdefghijklmno#####').ok).toBe(true); // 5 edits
+  });
+
+  it('rejects an empty credential on either side, before measuring distance', () => {
+    // Every string starts with the empty string, so an empty password is caught
+    // by `contains` in both directions and never reaches the edit distance.
+    //
+    // Worth pinning, and worth the note: mutation testing flagged the two early
+    // returns in `levenshtein` (`m === 0`, `n === 0`) as survivors, which reads
+    // like a gap. It is not. They are unreachable through
+    // `credentialsIndependent`, the function's only caller, precisely because of
+    // the behaviour asserted here. They are equivalent mutants for this code
+    // path, and chasing them would mean writing a test for a state the program
+    // cannot enter.
+    expect(credentialsIndependent('', 'zzq-9-plum-tractor').reason).toBe('contains');
+    expect(credentialsIndependent('zzq-9-plum-tractor', '').reason).toBe('contains');
+    // Length alone does not make two credentials independent: a short password
+    // that is a prefix of a long one is caught by `contains`, and one that is
+    // not still has to clear the distance threshold.
+    expect(credentialsIndependent('ab', 'abcdefghijklmnopqrst').reason).toBe('contains');
+    expect(credentialsIndependent('xy', 'abcdefghijklmnopqrst').ok).toBe(true);
   });
 });
 
