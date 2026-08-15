@@ -7,7 +7,29 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **The zeroization of key material is verified, after the first mutation run showed it
+  was not.** `docs/CRYPTO-REVIEW.md` §3 told auditors that the transient KEK, the raw DEK
+  on both wrap and unwrap paths, and the CEK bytes are wiped, and `src/core` makes 46
+  `fill(0)` calls to that end. Deleting them left the entire suite green. Seven tests now
+  assert each wipe, plus the subtle half of the claim: the wrap path wipes a copy, so the
+  key is still usable afterwards. They prove the call happens, not that the memory becomes
+  unreachable, which nothing in JavaScript could.
+
 ### Fixed
+
+- **Four duress rejection branches could have started accepting silently.**
+  `credentialsIndependent` gates duress-password independence (SPEC §10.5) and its six
+  outcomes were tested, but only through `.reason`. Production reads `.ok`, which was
+  asserted for one rejection out of five. Mutation testing flipped `equal` to `ok: true`
+  and 665 tests stayed green while two identical passwords became acceptable. Every
+  rejection now asserts both fields, with the near-threshold pinned on both sides.
+- **Stryker's sandbox broke `npm run lint`.** A mutation run copies the source tree into
+  `.stryker-tmp` and rewrites it with `@ts-nocheck` headers, so linting reported 181
+  errors in files nobody wrote. Same shape as the `playwright-report` entry above it, and
+  as the `coverage/` directory that Python resolves as an empty namespace package: one
+  tool's scratch output poisoning another. Ignored now.
 
 - **Four guards could pass without checking anything**, which is the defect the whole
   test programme was built to remove, found in the programme's own work by an external

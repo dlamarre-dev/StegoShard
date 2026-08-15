@@ -22,7 +22,23 @@
  * deliberate. Set it once the score is known and stable, and record the
  * calibration in the commit that does so.
  *
- * The one data point so far, measured locally: gf256.ts scores 92%, 50 mutants
+ * FIRST NIGHTLY, 15 August 2026: 73.52% over 1,605 mutants in 40 minutes 16
+ * seconds. Read it with three caveats, all measured rather than guessed.
+ *
+ * gf256.ts (92%) and reed-solomon.ts (91%) lead the eight files, and they are
+ * exactly the two anchored against an external implementation earlier. stego.ts
+ * (63.8%), vault.ts (64.7%) and access.ts (64.8%) trail.
+ *
+ * 115 mutants had no coverage. Widening the test config recovered fewer than
+ * expected: access.ts moved 64.8% to 69.14% with its no-coverage count unchanged
+ * at 33. Those 33 are untested code rather than a measurement artefact, chiefly
+ * verifyDbRegion and the two Db container builders, which have no direct tests.
+ *
+ * The StringLiteral mutator looks like noise at 29 survivors and is not: it kills
+ * 81, including `super('wrong password')`, whose uniform text carries the
+ * failure-indistinguishability property. It stays on.
+ *
+ * The earlier local data point, kept for scale: gf256.ts scores 92%, 50 mutants
  * in 2 minutes 38 seconds. Two of its four survivors are *equivalent* mutants,
  * unkillable by any test: `for (let i = 255; i < 512; i++)` relaxed to `<= 512`
  * writes past the end of a 512-byte array, which is silently ignored, and
