@@ -13,19 +13,32 @@ import { fileURLToPath } from 'node:url';
  * test files outside `src/core` that import the core are back in, at a cost of 81
  * tests and about 27 extra seconds of dry run.
  *
- * Measured on `access.ts` before and after: the score moved 64.8% to 69.14%, and
- * the no-coverage count did **not** move at all, staying at 33. So widening buys
- * a few kills, not the 65 the line-coverage comparison suggested. Those two
- * measures are not the same thing: lcov counts a line as covered if any test
- * executed it, while Stryker attributes coverage per test, and code reached only
- * through module setup or through a caller with no test of its own stays
- * unattributed either way.
+ * Measured on `access.ts` at each step, which is the only reason the rule ended
+ * up right:
  *
- * What the remaining no-coverage mutants actually mark is untested code.
- * `verifyDbRegion`, `buildDuressDbContainer` and `buildNonPossessionDbContainer`
- * have no direct tests at all; they are reached only from `src/ui/disk.ts` and
- * `src/cli/commands.ts`. That is a gap to close with tests, not with
- * configuration, and it is the more useful thing this run found.
+ *   core only          64.8%   33 no-coverage
+ *   + the grep list    69.14%  33 no-coverage   1m53
+ *   + all of src/cli   79.01%   7 no-coverage   7m09
+ *
+ * The middle row is what made the grep rule look adequate and was not: the score
+ * moved a little while the no-coverage count did not move at all. Taking the CLI
+ * wholesale drops it from 33 to 7 and lifts the score by fourteen points, because
+ * `modes.test.ts` alone drives both `.db` container builders end to end.
+ *
+ * Cost, measured: 1m53 to 7m09 on that file. Extrapolated over the 1,605 mutants
+ * of the full scope that is roughly 70 to 80 minutes against the first nightly's
+ * 40, which the 180-minute timeout covers. The next nightly measures it for real.
+ *
+ * The selection rule was wrong twice over before landing here. The first was
+ * "only src/core". The second was "files that import '@core' directly", which
+ * misses everything reaching the core one level down: four CLI test files go
+ * through `commands.ts`, and `src/cli/modes.test.ts` exercises both `.db`
+ * container builders and their `verifyDbRegion` calls end to end. A rule that
+ * depends on an import line being spelled a particular way will keep being wrong.
+ *
+ * So the whole of `src/cli` is in, plus the six `src/ui` files that touch the
+ * core. 130 tests, about 40 seconds of dry run against 33 for the previous list,
+ * which is a small price for not having to maintain a grep.
  *
  * Deliberately still excluded: everything that imports no core module, since it
  * can only add dry-run time. `tests/e2e` is Playwright and never ran here.
@@ -41,13 +54,13 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/core/**/*.test.ts',
-      // The nine outside src/core that import it. Keep this list in step with
-      // `grep -l "from '@core'" src/cli/*.test.ts src/ui/*.test.ts`: a file that
-      // starts covering core and is not listed here comes back as a phantom
-      // no-coverage mutant, which is how the first nightly under-reported.
-      'src/cli/node-image-io.test.ts',
-      'src/cli/paper.test.ts',
-      'src/cli/roundtrip.test.ts',
+      // All of the CLI: every one of these drives the core, most of them through
+      // `commands.ts` rather than by importing `@core` themselves. Taking the
+      // directory wholesale is what stops a new file from silently becoming a
+      // phantom no-coverage mutant.
+      'src/cli/**/*.test.ts',
+      // The UI files that reach the core. The rest of src/ui needs a DOM and
+      // cannot kill a core mutant, so it would only add dry-run time.
       'src/ui/estimate.test.ts',
       'src/ui/input-limits.test.ts',
       'src/ui/paper-build.test.ts',

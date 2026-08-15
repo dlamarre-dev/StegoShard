@@ -60,19 +60,29 @@ beforeEach(() => {
 
 afterEach(() => spy.mockRestore());
 
-/** Every wipe is asserted by length, since that is all a spy can see. */
+/**
+ * Wipes of a given length, counted exactly.
+ *
+ * `toBeGreaterThan(0)` was the first form and it was too weak. `deriveContentKey`
+ * wipes two 32-byte buffers, the raw DEK copy and the CEK bytes, so deleting
+ * either one still left a wipe of that length behind and the assertion passed. A
+ * targeted mutation run confirmed the CEK deletion survived. Counts are exact
+ * here for that reason: the number is the assertion.
+ */
 const wiped = (len: number) => wipes.filter((n) => n === len).length;
 
 describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
   it('wipes the transient raw KEK after importing it', async () => {
     await deriveKEK('correct horse battery staple', randomBytes(16), PARAMS);
-    // 32 bytes: the Argon2 output, imported non-extractable and then wiped.
-    expect(wiped(32), 'deriveKEK did not wipe its raw KEK bytes').toBeGreaterThan(0);
+    // Exactly one 32-byte wipe: the Argon2 output, imported non-extractable then
+    // wiped. Argon2 itself allocates through the hash-wasm heap, not through a
+    // Uint8Array this spy can see.
+    expect(wiped(32), 'deriveKEK did not wipe exactly its raw KEK bytes').toBe(1);
   });
 
   it('wipes the transient raw DEK after importing it', async () => {
     await generateDEK();
-    expect(wiped(DEK_LEN), 'generateDEK did not wipe its raw DEK bytes').toBeGreaterThan(0);
+    expect(wiped(DEK_LEN), 'generateDEK did not wipe exactly its raw DEK bytes').toBe(1);
   });
 
   it('wipes the exported DEK copy on the wrap path', async () => {
@@ -80,17 +90,45 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
     const dek = await generateDEK();
     wipes = [];
     await wrapDEK(dek, kek);
-    expect(wiped(DEK_LEN), 'wrapDEK did not wipe the exported key copy').toBeGreaterThan(0);
+    expect(wiped(DEK_LEN), 'wrapDEK did not wipe the exported key copy').toBe(1);
   });
 
-  it('leaves the wrapped key usable, so the wipe hit a copy and not the key', async () => {
-    // The subtle half of the claim. If `wrapDEK` zeroized the buffer `exportKey`
-    // handed back, on a runtime that aliases it to the live CryptoKey the key
-    // itself would be destroyed. Encrypting after wrapping is what shows the
-    // wipe landed on a copy.
+  it('wipes a copy, not the buffer exportKey returned', async () => {
+    // The subtle half of the claim, and the first version of this test did not
+    // check it. It asserted only that the key was still usable afterwards, which
+    // passes on any conforming WebCrypto: the spec already says `exportKey`
+    // returns a fresh ArrayBuffer, so removing `.slice(0)` would have gone
+    // unnoticed on Node. The `.slice()` exists for runtimes that do not conform,
+    // Deno among them per the comment in crypto.ts, where the returned buffer
+    // still aliases the live key.
+    //
+    // So the buffer `exportKey` hands back is captured and inspected directly.
+    // Without the slice, `view.fill(0)` would scribble on exactly this buffer.
     const kek = await deriveKEK('pw', randomBytes(16), PARAMS);
     const dek = await generateDEK();
-    await wrapDEK(dek, kek);
+
+    let exported: ArrayBuffer | null = null;
+    const realExport = globalThis.crypto.subtle.exportKey.bind(globalThis.crypto.subtle);
+    const exportSpy = vi
+      .spyOn(globalThis.crypto.subtle, 'exportKey')
+      .mockImplementation(async (...args: Parameters<typeof realExport>) => {
+        const out = await realExport(...args);
+        if (out instanceof ArrayBuffer && out.byteLength === DEK_LEN) exported = out;
+        return out;
+      });
+    try {
+      await wrapDEK(dek, kek);
+    } finally {
+      exportSpy.mockRestore();
+    }
+
+    expect(exported, 'exportKey was never called with a DEK-sized key').not.toBeNull();
+    expect(
+      new Uint8Array(exported!).some((b) => b !== 0),
+      'wrapDEK zeroized the buffer exportKey returned, so a non-conforming runtime would lose the key',
+    ).toBe(true);
+
+    // And the key still works, which is the consequence that would follow.
     const raw = await exportDekRaw(dek);
     expect(raw.length).toBe(DEK_LEN);
     expect(
@@ -106,14 +144,16 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
     const { iv, wrapped } = await wrapDEK(dek, kek);
     wipes = [];
     await unwrapDEK(wrapped, iv, kek);
-    expect(wiped(DEK_LEN), 'unwrapDEK did not wipe the plaintext DEK').toBeGreaterThan(0);
+    expect(wiped(DEK_LEN), 'unwrapDEK did not wipe the plaintext DEK').toBe(1);
   });
 
   it('wipes the transient CEK bytes after deriving the content key', async () => {
     const dek = await generateDEK();
     wipes = [];
     await deriveContentKey(dek, randomBytes(16));
-    expect(wiped(32), 'deriveContentKey did not wipe its raw CEK bytes').toBeGreaterThan(0);
+    // Two, not one: the raw DEK copy and the CEK bytes, both 32 bytes. Asserting
+    // "at least one" let either deletion pass, which is exactly what happened.
+    expect(wiped(32), 'deriveContentKey wiped the wrong number of 32-byte buffers').toBe(2);
   });
 
   it('the spy would notice a deleted wipe', async () => {

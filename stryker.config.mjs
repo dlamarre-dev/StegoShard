@@ -29,10 +29,12 @@
  * exactly the two anchored against an external implementation earlier. stego.ts
  * (63.8%), vault.ts (64.7%) and access.ts (64.8%) trail.
  *
- * 115 mutants had no coverage. Widening the test config recovered fewer than
- * expected: access.ts moved 64.8% to 69.14% with its no-coverage count unchanged
- * at 33. Those 33 are untested code rather than a measurement artefact, chiefly
- * verifyDbRegion and the two Db container builders, which have no direct tests.
+ * 115 mutants had no coverage, and that number was an artefact of the test
+ * selection after all. Measured on access.ts: core-only gave 64.8% with 33
+ * uncovered; adding all of src/cli gives 79.01% with 7. `modes.test.ts` drives
+ * both `.db` container builders and verifyDbRegion end to end, and an earlier
+ * selection rule based on direct `@core` imports had excluded it. The score the
+ * next nightly reports is the first one worth comparing against anything.
  *
  * The StringLiteral mutator looks like noise at 29 survivors and is not: it kills
  * 81, including `super('wrong password')`, whose uniform text carries the

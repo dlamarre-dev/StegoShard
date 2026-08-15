@@ -25,6 +25,12 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   asserted for one rejection out of five. Mutation testing flipped `equal` to `ok: true`
   and 665 tests stayed green while two identical passwords became acceptable. Every
   rejection now asserts both fields, with the near-threshold pinned on both sides.
+- **The mutation suite selected its tests by grepping for an import line**, which missed
+  four CLI test files reaching the core through `commands.ts`. That understated the score
+  and produced a false conclusion about untested code: `access.ts` reads 64.8% with 33
+  uncovered mutants under the old rule and **79.01% with 7** once all of `src/cli` is
+  included, because `modes.test.ts` drives both `.db` container builders end to end. The
+  directory is taken wholesale now rather than filtered by a grep.
 - **Stryker's sandbox broke `npm run lint`.** A mutation run copies the source tree into
   `.stryker-tmp` and rewrites it with `@ts-nocheck` headers, so linting reported 181
   errors in files nobody wrote. Same shape as the `playwright-report` entry above it, and
