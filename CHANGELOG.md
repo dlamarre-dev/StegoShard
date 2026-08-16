@@ -7,6 +7,25 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **The mutation nightly is sharded and incremental.** It was cancelled at the
+  180-minute timeout having done 86% of the work, about 3h20 end to end: widening the
+  test selection to stop the score under-reporting made every `vault` and `stego` mutant
+  re-run the CLI integration tests. My estimate of 70 to 80 minutes came from
+  extrapolating one file and was wrong by nearly three times, since per-mutant cost
+  varies by an order of magnitude between files.
+
+  Four shards now run in parallel, so a cold run is bounded by the largest rather than
+  by their sum, and Stryker's incremental mode re-tests only what changed. Measured on
+  `erasure.ts`: 4m50 cold, 2m08 with nothing changed, the remainder being the dry run
+  that cannot be skipped.
+
+  **Sunday runs with `--force`.** Incremental mode decides a mutant need not be re-run,
+  and if that decision is ever wrong a mutant recorded as killed stays killed while it
+  actually survives, with nothing to report it. So the Sunday rebuild is the
+  measurement and the other nights are a fast regression detector. Scope is unchanged.
+
 ### Added
 
 - **The zeroization of key material is verified, after the first mutation run showed it

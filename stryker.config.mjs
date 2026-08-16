@@ -29,6 +29,16 @@
  * exactly the two anchored against an external implementation earlier. stego.ts
  * (63.8%), vault.ts (64.7%) and access.ts (64.8%) trail.
  *
+ * SECOND NIGHTLY, 16 August: cancelled at the 180-minute timeout having tested
+ * 1,509 of 1,605 mutants, so a full pass is about 3h20 at 7.0 seconds per mutant.
+ * Widening the test selection is what did it: vault and stego mutants now re-run
+ * the CLI integration tests. Extrapolating 70 to 80 minutes from access.ts alone
+ * was wrong by a factor of nearly three, because per-mutant cost varies by an
+ * order of magnitude between files.
+ *
+ * The nightly is sharded and incremental since, so this default scope is what a
+ * local run covers rather than what CI runs in one go.
+ *
  * 115 mutants had no coverage, and that number was an artefact of the test
  * selection after all. Measured on access.ts: core-only gave 64.8% with 33
  * uncovered; adding all of src/cli gives 79.01% with 7. `modes.test.ts` drives
@@ -66,10 +76,18 @@ export default {
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },
   htmlReporter: { fileName: 'reports/mutation/index.html' },
 
+  // The default scope. The nightly overrides it per shard with --mutate; this
+  // list is what a local `npm run mutation` covers and the union the shards must
+  // add back up to.
+  //
+  // `src/core/slots.ts` used to be listed here and does not exist: only
+  // slots.test.ts does, and the slot logic lives in crypto.ts. Stryker ignores a
+  // pattern that matches nothing, so the entry sat there silently. Worth noticing
+  // for the general case: had a real file been renamed, its disappearance from
+  // the scope would have been just as quiet.
   mutate: [
     'src/core/crypto.ts',
     'src/core/access.ts',
-    'src/core/slots.ts',
     'src/core/vault.ts',
     'src/core/stego.ts',
     'src/core/erasure.ts',
@@ -85,5 +103,15 @@ export default {
   // run performs thousands. The suite's own fast parameters keep this bounded;
   // this timeout covers the rest.
   timeoutMS: 60_000,
+
+  // Four workers on a four-vCPU GitHub runner, while vitest parallelises inside
+  // each of them. That is very likely oversubscribed, and it is a plausible part
+  // of why the per-mutant cost is 7.0 seconds. Plausible, not established: the
+  // dominant cost is that widening the test selection put CLI integration tests
+  // in the covering set for vault and stego mutants.
+  //
+  // Left at 4 on purpose until someone measures 3 and 2 on a single shard. A
+  // number changed on a hunch is how this file would end up with a comment
+  // asserting something nobody checked.
   concurrency: 4,
 };
