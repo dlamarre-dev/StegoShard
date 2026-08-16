@@ -7,6 +7,15 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The mutation summary job failed on its first run**, 69 minutes into the nightly. A
+  backtick escaped through YAML, then bash, then `node -e` arrived as `\\` and broke a
+  template literal, which nothing short of running it could have caught. The script is a
+  file now, `scripts/mutation-summary.mjs`, so it lints and can be pointed at a directory
+  of downloaded artifacts by hand. Verified against the four real reports, against a
+  missing shard, and against no reports at all.
+
 ### Changed
 
 - **The mutation nightly is sharded and incremental.** It was cancelled at the

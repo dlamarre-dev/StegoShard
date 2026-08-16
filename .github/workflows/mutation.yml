@@ -15,8 +15,22 @@
 # wrong.
 #
 # Four shards in parallel bound the cold cost to the largest one rather than to
-# their sum. The split below is by mutant count because that is what was known;
-# the criterion that matters is time, so rebalance on measured durations.
+# their sum. Measured on the first sharded run, cold, 16 August:
+#
+#   crypto  69 min  463 mutants  8.9 s each
+#   codes   49 min  417 mutants  7.1 s each
+#   stego   42 min  320 mutants  7.9 s each
+#   vault   30 min  405 mutants  4.4 s each
+#
+# 69 minutes of wall clock against 3h20 in sequence. The split was made by mutant
+# count and the durations show why that was only a starting point: vault has
+# nearly as many mutants as crypto and costs less than half as much, because what
+# drives the cost is which tests cover a mutant, not how many mutants there are.
+#
+# No rebalancing follows from that, though. crypto.ts alone is 69 minutes and is a
+# single file, which Stryker cannot split, so it is the binding constraint and
+# moving work between the other three changes nothing. Splitting it would mean
+# splitting the source file, which is not a reason to reshape production code.
 #
 # WHY THIS IS INCREMENTAL, AND WHAT THAT COSTS
 # Mutation testing is deterministic given the same code and the same tests, so
@@ -67,9 +81,10 @@ jobs:
   stryker:
     name: Mutation score (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # Per shard, and generous until the sharded cold run has been measured.
-    # Tighten from the real figure, as the erasure job was tightened from 41 to
-    # 133 to 243 seconds.
+    # 90 against a measured 69-minute worst case, cold. Kept rather than tightened
+    # further: only a cold run costs that, and a cold run is exactly when a tight
+    # limit would bite for no good reason, after a cache eviction or a Sunday
+    # rebuild. Incremental nights finish in minutes.
     timeout-minutes: 90
     strategy:
       # One slow shard must not cancel the others: a partial table is still worth
@@ -167,49 +182,4 @@ jobs:
           path: reports
 
       - name: Write one table for all four shards
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            // One directory per shard, each holding the report the config names.
-            // The incremental files sit alongside and must not be parsed as
-            // reports: they have a different shape and would throw.
-            const files = fs.existsSync("reports")
-              ? fs.readdirSync("reports", { recursive: true })
-                  .map(String)
-                  .filter((f) => /(^|\/)mutation\.json$/.test(f))
-              : [];
-            const rows = [];
-            let killed = 0, total = 0;
-            for (const f of files) {
-              const r = JSON.parse(fs.readFileSync(`reports/${f}`, "utf-8"));
-              for (const [path, v] of Object.entries(r.files)) {
-                const live = v.mutants.filter((m) => m.status !== "Ignored");
-                const k = live.filter((m) => m.status === "Killed" || m.status === "Timeout").length;
-                const nc = live.filter((m) => m.status === "NoCoverage").length;
-                killed += k; total += live.length;
-                rows.push({
-                  f: String(path).replace(/^.*src\//, "src/"),
-                  pct: live.length ? ((100 * k) / live.length).toFixed(1) : "-",
-                  k, n: live.length, nc,
-                });
-              }
-            }
-            rows.sort((a, b) => Number(a.pct) - Number(b.pct));
-            const out = [
-              `## Mutation score${total ? `: ${((100 * killed) / total).toFixed(2)}%` : ": no report"}`,
-              "",
-              "| file | score | killed | mutants | no coverage |",
-              "|---|---|---|---|---|",
-              ...rows.map((r) => `| \\`${r.f}\\` | ${r.pct}% | ${r.k} | ${r.n} | ${r.nc} |`),
-              "",
-              `${files.length} of 4 shards reported.` +
-                (files.length < 4 ? " **A shard is missing; this table is partial.**" : ""),
-              "",
-              "No threshold is set: these runs measure before anything is gated on them.",
-              "A score below 100% is not by itself a gap, since some mutants are equivalent",
-              "and no test can kill them. Only the Sunday rebuild is a measurement; the other",
-              "nights re-test just what changed.",
-            ];
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n"));
-            console.log(out.join("\n"));
-          '
+        run: node scripts/mutation-summary.mjs reports
