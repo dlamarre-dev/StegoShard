@@ -1,34 +1,60 @@
-# Mutation testing, nightly.
+# Mutation testing, nightly, sharded and incremental.
 #
 # Coverage says a line ran. It does not say anything would have noticed had the
-# line been wrong. This repository has found that difference by hand more than
-# once: a GF(256) test whose name promised a known-answer check and whose body
-# asserted commutativity; an invalid-vector count a decryptor accepting all 3,919
-# forgeries still passed; a fuzzer that discarded every parser's return value
-# while claiming to check it; an `if (found) break;` in openSlotArray that 669
-# tests could not see.
+# line been wrong. This repository has found that difference by hand five times,
+# most recently an `if (found) break;` in openSlotArray that 669 tests could not
+# see. Stryker is that method, automated.
 #
-# Every one of those was found the same way: break the code deliberately, watch
-# what stays green. Stryker is that method, automated.
+# WHY THIS IS SHARDED
+# The first full nightly took 40 minutes over 1,605 mutants. Widening the test
+# selection so the score stopped under-reporting made every vault and stego mutant
+# re-run the CLI integration tests, and the next run was cancelled at the
+# 180-minute timeout having done 86% of the work: about 3h20 end to end, at 7.0
+# seconds per mutant against 2.4 for access.ts alone. Per-mutant cost varies by an
+# order of magnitude between files, which is why extrapolating from one file was
+# wrong.
 #
-# THIS JOB DOES NOT GATE ANYTHING YET, ON PURPOSE.
-# `break: null` in stryker.config.mjs means no threshold. The mutation score for
-# the full scope has never been measured, and turning an unmeasured number into a
-# gate is the mistake this project keeps correcting: the TestU01 tolerance was
-# calibrated over 40 runs before being fixed at 2, and the erasure job's duration
-# was taken from a real run rather than estimated. The first nightly runs are the
-# calibration. Set a threshold once the score is known and stable, in a commit
-# that records the numbers it came from.
+# Four shards in parallel bound the cold cost to the largest one rather than to
+# their sum. The split below is by mutant count because that is what was known;
+# the criterion that matters is time, so rebalance on measured durations.
 #
-# Nightly rather than per pull request because it is slow: gf256.ts alone, 50
-# mutants over a 464-test suite, took 2 minutes 38 locally. The full eight-file
-# scope is a different order of magnitude, which the first run will establish.
+# WHY THIS IS INCREMENTAL, AND WHAT THAT COSTS
+# Mutation testing is deterministic given the same code and the same tests, so
+# re-running unchanged mutants every night buys no information at all. Stryker's
+# incremental mode stores results and re-tests only what changed.
+#
+# Measured on erasure.ts before writing this: 4m50 cold, 2m08 warm with nothing
+# changed. The 2 minutes that remain are the dry run, which establishes which
+# tests cover which mutant and cannot be skipped, so that is the floor per shard
+# rather than zero. Four shards in parallel put a quiet night at two or three
+# minutes of wall clock.
+#
+# That introduces a trust assumption, and it is the dangerous kind: incremental
+# mode decides a mutant need not be re-run. If that decision is ever wrong, a
+# mutant recorded as killed stays killed forever while it actually survives, and
+# nothing reports it. A silent pass, introduced by an optimisation.
+#
+# So Sunday runs with --force, ignoring the stored results and measuring
+# everything. **The Sunday number is the measurement; the other nights are a fast
+# regression detector.** Read them differently.
+#
+# THIS STILL GATES NOTHING. See `break: null` in stryker.config.mjs and the note
+# there: the score has moved with every configuration change so far, so no
+# threshold can be set until a few forced runs agree.
 name: Mutation testing
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    # Monday through Saturday: incremental, fast, detects regressions.
+    - cron: '0 3 * * 1-6'
+    # Sunday: a full rebuild, which is the only run whose score means anything.
+    - cron: '0 3 * * 0'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignore stored results and re-test every mutant'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,11 +65,26 @@ concurrency:
 
 jobs:
   stryker:
-    name: Mutation score (core)
+    name: Mutation score (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # Generous, because the point of the first runs is to find out how long this
-    # takes. Tighten it once that is known.
-    timeout-minutes: 180
+    # Per shard, and generous until the sharded cold run has been measured.
+    # Tighten from the real figure, as the erasure job was tightened from 41 to
+    # 133 to 243 seconds.
+    timeout-minutes: 90
+    strategy:
+      # One slow shard must not cancel the others: a partial table is still worth
+      # reading, and the aggregate job below is built to say which shard is absent.
+      fail-fast: false
+      matrix:
+        include:
+          - shard: crypto
+            files: src/core/crypto.ts
+          - shard: vault
+            files: src/core/vault.ts
+          - shard: stego
+            files: src/core/stego.ts
+          - shard: codes
+            files: src/core/reed-solomon.ts,src/core/access.ts,src/core/gf256.ts,src/core/erasure.ts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -52,43 +93,123 @@ jobs:
           node-version: 22.23.2
           cache: npm
 
+      - name: Decide incremental or forced
+        id: mode
+        run: |
+          set -euo pipefail
+          # The Sunday cron and an explicit dispatch both force a full rebuild.
+          if [ "${{ github.event.schedule }}" = "0 3 * * 0" ] || [ "${{ inputs.force }}" = "true" ]; then
+            echo "force=--force" >> "$GITHUB_OUTPUT"
+            echo "label=full rebuild" >> "$GITHUB_OUTPUT"
+          else
+            echo "force=" >> "$GITHUB_OUTPUT"
+            echo "label=incremental" >> "$GITHUB_OUTPUT"
+          fi
+
+      # One file per shard: they mutate different sets, so a shared file would
+      # invalidate the others' results.
+      #
+      # Rolling key with restore-keys, because a cache entry is immutable: the run
+      # restores the most recent entry for its shard and writes a new one under a
+      # key carrying this run's id.
+      - name: Restore the incremental results
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/mutation/incremental-${{ matrix.shard }}.json
+          key: stryker-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: stryker-${{ matrix.shard }}-
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Stryker
-        run: npm run mutation
+      - name: Run Stryker (${{ steps.mode.outputs.label }})
+        run: |
+          # The report name stays whatever stryker.config.mjs sets. Stryker has no
+          # CLI flag for a nested reporter option, and it does not need one here:
+          # each shard uploads under its own artifact name, so the aggregate job
+          # gets one directory per shard with an identically named file inside.
+          npm run mutation -- \
+            --mutate '${{ matrix.files }}' \
+            --incremental \
+            --incrementalFile 'reports/mutation/incremental-${{ matrix.shard }}.json' \
+            ${{ steps.mode.outputs.force }}
 
-      # The report is the deliverable while there is no threshold: without it the
-      # job would run for an hour and tell nobody anything.
-      - name: Upload the mutation report
+      # Saved even when the run failed: a partial incremental file is still ahead
+      # of no file, and the next run re-tests whatever is missing from it.
+      - name: Save the incremental results
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/mutation/incremental-${{ matrix.shard }}.json
+          key: stryker-${{ matrix.shard }}-${{ github.run_id }}
+
+      # Distinct names per shard. upload-artifact v4 and later refuse a second
+      # upload under a name that already exists, so a shared name would fail the
+      # moment two shards finished.
+      - name: Upload this shard's report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mutation-report
+          name: mutation-report-${{ matrix.shard }}
           path: reports/mutation
           if-no-files-found: warn
 
-      - name: Summarise the score
-        if: always()
+  summarise:
+    name: Mutation score (all shards)
+    needs: stryker
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: mutation-report-*
+          path: reports
+
+      - name: Write one table for all four shards
         run: |
-          set -euo pipefail
-          f=reports/mutation/mutation.json
-          [ -f "$f" ] || { echo "no report produced" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
           node -e '
-            const r = require("./reports/mutation/mutation.json");
-            const rows = Object.entries(r.files).map(([f, v]) => {
-              const c = {};
-              for (const m of v.mutants) c[m.status] = (c[m.status] ?? 0) + 1;
-              const killed = (c.Killed ?? 0) + (c.Timeout ?? 0);
-              const total = v.mutants.filter((m) => m.status !== "Ignored").length;
-              return { f: f.replace(/^.*src\//, "src/"), killed, total,
-                       pct: total ? ((100 * killed) / total).toFixed(1) : "-" };
-            }).sort((a, b) => Number(a.pct) - Number(b.pct));
-            const out = ["| file | score | killed | mutants |", "|---|---|---|---|",
-              ...rows.map((r) => `| \`${r.f}\` | ${r.pct}% | ${r.killed} | ${r.total} |`),
-              "", "No threshold is set. These runs exist to measure the score before",
-              "anything is gated on it. Note that a score below 100% is not by itself a",
-              "gap: some mutants are equivalent and cannot be killed by any test.",
+            const fs = require("node:fs");
+            // One directory per shard, each holding the report the config names.
+            // The incremental files sit alongside and must not be parsed as
+            // reports: they have a different shape and would throw.
+            const files = fs.existsSync("reports")
+              ? fs.readdirSync("reports", { recursive: true })
+                  .map(String)
+                  .filter((f) => /(^|\/)mutation\.json$/.test(f))
+              : [];
+            const rows = [];
+            let killed = 0, total = 0;
+            for (const f of files) {
+              const r = JSON.parse(fs.readFileSync(`reports/${f}`, "utf-8"));
+              for (const [path, v] of Object.entries(r.files)) {
+                const live = v.mutants.filter((m) => m.status !== "Ignored");
+                const k = live.filter((m) => m.status === "Killed" || m.status === "Timeout").length;
+                const nc = live.filter((m) => m.status === "NoCoverage").length;
+                killed += k; total += live.length;
+                rows.push({
+                  f: String(path).replace(/^.*src\//, "src/"),
+                  pct: live.length ? ((100 * k) / live.length).toFixed(1) : "-",
+                  k, n: live.length, nc,
+                });
+              }
+            }
+            rows.sort((a, b) => Number(a.pct) - Number(b.pct));
+            const out = [
+              `## Mutation score${total ? `: ${((100 * killed) / total).toFixed(2)}%` : ": no report"}`,
+              "",
+              "| file | score | killed | mutants | no coverage |",
+              "|---|---|---|---|---|",
+              ...rows.map((r) => `| \\`${r.f}\\` | ${r.pct}% | ${r.k} | ${r.n} | ${r.nc} |`),
+              "",
+              `${files.length} of 4 shards reported.` +
+                (files.length < 4 ? " **A shard is missing; this table is partial.**" : ""),
+              "",
+              "No threshold is set: these runs measure before anything is gated on them.",
+              "A score below 100% is not by itself a gap, since some mutants are equivalent",
+              "and no test can kill them. Only the Sunday rebuild is a measurement; the other",
+              "nights re-test just what changed.",
             ];
-            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n"));
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n"));
+            console.log(out.join("\n"));
           '
