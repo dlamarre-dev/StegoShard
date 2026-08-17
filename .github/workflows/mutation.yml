@@ -37,11 +37,16 @@
 # re-running unchanged mutants every night buys no information at all. Stryker's
 # incremental mode stores results and re-tests only what changed.
 #
-# Measured on erasure.ts before writing this: 4m50 cold, 2m08 warm with nothing
-# changed. The 2 minutes that remain are the dry run, which establishes which
-# tests cover which mutant and cannot be skipped, so that is the floor per shard
-# rather than zero. Four shards in parallel put a quiet night at two or three
-# minutes of wall clock.
+# Measured in CI, 16 August, cold then warm with nothing changed:
+#
+#   crypto  69 min -> 3 min
+#   codes   49 min -> 2 min
+#   stego   42 min -> 3 min
+#   vault   30 min -> 3 min
+#
+# 69 minutes of wall clock down to 3. What remains is the dry run, which
+# establishes which tests cover which mutant and cannot be skipped, so a quiet
+# night costs that and not zero.
 #
 # That introduces a trust assumption, and it is the dangerous kind: incremental
 # mode decides a mutant need not be re-run. If that decision is ever wrong, a
@@ -176,6 +181,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Needed for scripts/mutation-summary.mjs. The summary used to be an inline
+      # `node -e` string, which required no checkout; moving it to a file to make
+      # it testable made this job depend on the repository, and the dependency was
+      # not added with it. It failed twice for two different reasons before this
+      # job ran green once.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: mutation-report-*
