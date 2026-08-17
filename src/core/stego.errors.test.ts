@@ -113,9 +113,7 @@ describe('capacity refusals', () => {
     const height = 16;
     const rgba = new Uint8Array(width * height * 4).fill(128);
     const exact = new Uint8Array((width * height * 3) / 8 / 2); // half capacity
-    await expect(
-      embedBytesStegoRgba(rgba, width, height, exact, SEED, 2),
-    ).resolves.toBeUndefined();
+    await expect(embedBytesStegoRgba(rgba, width, height, exact, SEED, 2)).resolves.toBeUndefined();
   });
 
   it('drains the position keystream at margin 1, which the doc comment denies', async () => {
@@ -214,9 +212,9 @@ describe('the restart-marker fallback refuses too', () => {
     expect(jpegStegoCapacityBits(small)).toBeLessThan(KEY_BLOCK_LEN * 8 * 2);
 
     const keyBlock = new Uint8Array(KEY_BLOCK_LEN).fill(3);
-    await expect(
-      embedKeyBlockStegoJpeg(small, keyBlock, 'a password', FAST),
-    ).rejects.toMatchObject({ name: 'StegoCapacityError' });
+    await expect(embedKeyBlockStegoJpeg(small, keyBlock, 'a password', FAST)).rejects.toMatchObject(
+      { name: 'StegoCapacityError' },
+    );
   });
 
   it('still round-trips a payload that fits, so the guard is not simply always firing', async () => {
