@@ -123,7 +123,18 @@ describe('verifyBinaryExport rejects a rename too', () => {
   });
 });
 
-describe('verifyDisguisedExport, which had no test at all', () => {
+// 30s against a measured 800ms per test, which needs explaining rather than
+// looking like padding. `exportVaultBinaryDisguised` takes no Argon2 parameters:
+// it hardcodes the production ones, 256 MiB and four passes, and then builds a
+// DB_LADDER-sized SQLite container. The other tests in this file take 3ms because
+// they can pass FAST params; these cannot.
+//
+// In isolation 800ms is comfortably inside vitest's 5s default. In the full suite
+// it is not: workers compete for the memory bandwidth Argon2 exists to consume,
+// and one run timed out at 5s having done work that normally takes under one.
+// The test was not hung, it was queued. A generous ceiling is the honest fix,
+// since the alternative is a suite that fails on a loaded machine.
+describe('verifyDisguisedExport, which had no test at all', { timeout: 30_000 }, () => {
   // The disguised `.db` is the deniable path, so a bad save here is the one
   // least likely to be noticed by other means: the file still looks like an
   // ordinary SQLite database whether or not it carries a recoverable vault.

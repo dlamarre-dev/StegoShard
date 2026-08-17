@@ -61,9 +61,15 @@ const subtle = globalThis.crypto.subtle;
 
 // Per-cover keystream nonce for the key-block stego paths (SPEC §5.3/§5.4). The
 // keystream that both whitens the payload and selects carrier positions is bound
-// to a fingerprint of the *cover*, so two vaults saved with the same password
-// into different covers (or the same cover reused) never share a whitening pad or
-// a carrier layout, which would otherwise be a two-time-pad / correlation leak.
+// to a fingerprint of the *cover*, so two vaults saved with the same password into
+// DIFFERENT covers never share a whitening pad or a carrier layout, which would
+// otherwise be a two-time-pad / correlation leak.
+//
+// Reusing ONE cover does share both, and cannot be made not to: the fingerprint is
+// taken over embedding-invariant bits so extraction can recompute it with nothing
+// stored, which is the same reason it cannot change between two embeddings. A
+// cover carries at most one payload per password. See SPEC §5.3 and the measured
+// demonstration in stego.binding.test.ts.
 // The fingerprint is taken over exactly the bits embedding never changes (RGB
 // with the LSB masked; JPEG coefficient magnitudes with bit 0 masked), so it is
 // identical at embed and at extract and NOTHING has to be stored in the image
@@ -211,12 +217,36 @@ async function keystream(
   return stream;
 }
 
+/**
+ * Position selection ran past the end of its keystream.
+ *
+ * This is a bug signal, not a user-facing condition, and it is deliberately left
+ * loud. An earlier attempt converted it into a StegoCapacityError, on the
+ * reasoning that draining the stream means the cover cannot hold the payload at
+ * that density. Measured, that made things worse: mutants in StreamReader and
+ * pickPositions that had been caught precisely *because* they drained the stream
+ * and threw something no test expected now produced an error a test welcomed, and
+ * stego.ts fell from 83.8% to 79.9% with fourteen new survivors.
+ *
+ * So the callers are kept clear of it instead. `embedBytesStegoRgba` and
+ * `embedBytesStegoJpeg` default to a margin of 2, measured to leave the stream
+ * about 45% headroom, and their capacity guard refuses anything denser with a
+ * StegoCapacityError before selection begins. Reaching this class means a fault
+ * in the selection code, which is a thing worth hearing about.
+ */
+class KeystreamExhausted extends Error {
+  constructor() {
+    super('stego: keystream exhausted');
+    this.name = 'KeystreamExhausted';
+  }
+}
+
 /** Reads uniform values from a fixed keystream; throws if it runs dry. */
 class StreamReader {
   private o = 0;
   constructor(private readonly bytes: Uint8Array) {}
   next4(): number {
-    if (this.o + 4 > this.bytes.length) throw new Error('stego: keystream exhausted');
+    if (this.o + 4 > this.bytes.length) throw new KeystreamExhausted();
     const b = this.bytes;
     const v =
       ((b[this.o]! << 24) | (b[this.o + 1]! << 16) | (b[this.o + 2]! << 8) | b[this.o + 3]!) >>> 0;
@@ -561,10 +591,16 @@ function positionStreamLen(payloadBits: number): number {
  * `margin` requires the carrier count to exceed the payload by that factor, which keeps
  * embedding sparse and keeps `pickPositions` clear of the end of the keystream.
  *
- * That second part is a property of the margin, not of the guard, and the default of 1
- * does not have it: filling a cover to capacity needs about N·ln(N) draws while the
- * stream supplies 2N+1024, so selection throws `stego: keystream exhausted` rather than
- * a StegoCapacityError. Measured clear from margin 2 up; 1.25 sits on the boundary.
+ * That second part is a property of the margin, not of the guard, which is why the
+ * default is 2 and not 1. Filling a cover to capacity needs about N·ln(N) draws while
+ * the stream supplies 2N+1024, so a margin of 1 lets the guard accept a payload that
+ * selection then cannot place, and the failure surfaced as a bare internal error rather
+ * than a refusal a caller could act on.
+ *
+ * At margin 2 the payload is at most half the carriers, needing N·ln2 = 0.69N draws
+ * against up to N+1024 available, about 45% headroom; measured clear at 16, 32, 64 and
+ * 128 square, with 1.25 on the boundary and 1 draining at every size. Anything denser is
+ * now refused by the guard below with a StegoCapacityError before selection starts.
  * Production passes GALLERY_CAPACITY_MARGIN = 4. See stego.errors.test.ts.
  */
 export async function embedBytesStegoRgba(
@@ -573,7 +609,7 @@ export async function embedBytesStegoRgba(
   height: number,
   data: Uint8Array,
   seed: Uint8Array,
-  margin = 1,
+  margin = 2,
 ): Promise<void> {
   const capacity = capacityBits(width, height);
   const payloadBits = data.length * 8;
@@ -591,9 +627,18 @@ export async function embedBytesStegoRgba(
 
 /**
  * Extract `length` bytes from an RGBA buffer at seed-derived LSBs. Returns null if
- * the carrier count is below `length*8*margin`, the same threshold embedding used,
- * so a real carrier always clears it and a too-small image is skipped (never drains
- * the keystream).
+ * the carrier count is below `length*8*margin`, so a too-small image is skipped
+ * rather than draining the keystream.
+ *
+ * The default stays 1 while embedding's is 2, and the asymmetry is deliberate.
+ * Raising it here too was a compatibility break, caught in review: a payload
+ * written at margin 1 sits above the margin-2 threshold, so extraction refuses to
+ * read data that embedding had accepted. Tightening what a writer will produce is
+ * safe; tightening what a reader will accept makes existing carriers unreadable.
+ *
+ * A lower margin only makes this function *attempt* more, never less, and it
+ * cannot drain the stream on anything real: a carrier only exists if embedding
+ * placed it, and embedding could not place what it could not draw positions for.
  */
 export async function extractBytesStegoRgba(
   rgba: Uint8Array | Uint8ClampedArray,
@@ -635,7 +680,7 @@ export async function embedBytesStegoJpeg(
   jpegBytes: Uint8Array,
   data: Uint8Array,
   seed: Uint8Array,
-  margin = 1,
+  margin = 2,
 ): Promise<Uint8Array> {
   const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
   const payloadBits = data.length * 8;
@@ -665,8 +710,12 @@ export async function embedBytesStegoJpeg(
 
 /**
  * Extract `length` bytes from a baseline JPEG's coefficients. Returns null if
- * undecodable or if the carrier count is below `length*8*margin` (same threshold
- * as embedding, so real carriers pass and undersized images are skipped safely).
+ * undecodable or if the carrier count is below `length*8*margin`, so undersized
+ * images are skipped safely.
+ *
+ * Defaults to 1 while embedding defaults to 2, for the reason given on
+ * `extractBytesStegoRgba`: a reader must stay able to open anything a writer once
+ * produced.
  */
 export async function extractBytesStegoJpeg(
   jpegBytes: Uint8Array,

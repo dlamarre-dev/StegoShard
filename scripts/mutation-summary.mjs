@@ -29,16 +29,28 @@ function reportPaths(root) {
     .map((f) => join(root, f));
 }
 
+// The four statuses that make up a mutation score, matching how Stryker computes
+// its own. Everything else is excluded rather than merely `Ignored`: this used to
+// filter `Ignored` alone, which quietly swept `RuntimeError`, `CompileError` and
+// `Pending` into the denominator as though they were survivors. That deflates the
+// score, and worse, it does so silently, so a shard that died halfway reads as a
+// complete run whose quality dropped rather than as a run that did not finish.
+const SCORED = new Set(['Killed', 'Timeout', 'Survived', 'NoCoverage']);
+
 function rowsFrom(paths) {
   const rows = [];
   let killed = 0;
   let total = 0;
+  const unscored = new Map();
   for (const path of paths) {
     const report = JSON.parse(readFileSync(path, 'utf-8'));
     for (const [file, entry] of Object.entries(report.files ?? {})) {
-      // Ignored mutants were never candidates; counting them would deflate the
-      // score for a reason that has nothing to do with the tests.
-      const live = entry.mutants.filter((m) => m.status !== 'Ignored');
+      for (const m of entry.mutants) {
+        if (!SCORED.has(m.status) && m.status !== 'Ignored') {
+          unscored.set(m.status, (unscored.get(m.status) ?? 0) + 1);
+        }
+      }
+      const live = entry.mutants.filter((m) => SCORED.has(m.status));
       if (live.length === 0) continue;
       const k = live.filter((m) => m.status === 'Killed' || m.status === 'Timeout').length;
       const nc = live.filter((m) => m.status === 'NoCoverage').length;
@@ -54,11 +66,11 @@ function rowsFrom(paths) {
     }
   }
   rows.sort((a, b) => a.pct - b.pct);
-  return { rows, killed, total };
+  return { rows, killed, total, unscored };
 }
 
 function render(paths) {
-  const { rows, killed, total } = rowsFrom(paths);
+  const { rows, killed, total, unscored } = rowsFrom(paths);
   const score = total > 0 ? `${((100 * killed) / total).toFixed(2)}%` : 'no report';
   const out = [
     `## Mutation score: ${score}`,
@@ -77,6 +89,17 @@ function render(paths) {
   // than as a job that did not finish.
   if (paths.length < EXPECTED_SHARDS) {
     out.push('', '**A shard is missing, so the score above covers only part of the scope.**');
+  }
+  // Reported rather than folded into the score. A mutant that failed to compile
+  // or never ran says something about the run, not about the tests, and the two
+  // must not be averaged together.
+  if (unscored.size > 0) {
+    const detail = [...unscored].map(([status, n]) => `${n} ${status}`).join(', ');
+    out.push(
+      '',
+      `**${detail}.** These are excluded from the score above, as Stryker excludes them`,
+      'from its own. They mean the run had trouble, not that a test got weaker.',
+    );
   }
   out.push(
     '',

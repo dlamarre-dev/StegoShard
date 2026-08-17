@@ -350,8 +350,53 @@ info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    embedding-invariant bits it is identical at embed and extract, so **nothing is
    stored in the image**: the "no header/magic/length" property is preserved.
    This binds the keystream to the specific cover: the same password over two
-   different covers (or the same cover reused) never repeats the whitening pad or
-   the carrier layout.
+   **different** covers never repeats the whitening pad or the carrier layout.
+
+   **Reusing one cover does repeat both, and that is a limit of the design rather
+   than an oversight.** The two sentences above are in tension: `fp` is computed
+   from embedding-invariant bits precisely so that extraction can recompute it
+   with nothing stored, which means embedding cannot change it, which means a
+   second embedding into the same cover under the same password derives the same
+   key, the same pad and the same positions. Making reuse safe would require a
+   per-embedding nonce, and storing one would give the image the header this
+   format exists to avoid.
+
+   The consequence is concrete. Both embeddings share a layout and a pad, so at
+   each carrier the two images hold `a_i XOR pad_i` and `b_i XOR pad_i`: the pad
+   cancels, and the images differ at exactly the carriers where the payloads
+   differ. Measured in `src/core/stego.binding.test.ts`, flipping one payload bit
+   moves exactly one image bit and flipping three moves three, against 763 for the
+   same cover under a different password.
+
+   What an observer holding both images therefore learns is the Hamming distance
+   between the two payloads, and that many positions of the secret carrier layout,
+   with every further reuse exposing more of it. They do **not** thereby learn the
+   payload XOR in payload order, because the correspondence runs through the
+   password-derived permutation. An earlier revision of this section said the
+   images reveal the payload XOR outright; that overstated it. The leak is a
+   Hamming-distance and layout leak, which is reason enough to forbid reuse.
+
+   So the rule is a usage constraint, and it belongs to whatever drives this
+   layer: **a cover image's content is used at most once per password.**
+   Different passwords over one cover are unaffected, because the seed and
+   therefore the key differ.
+
+   That constraint is about the cover's _content_, not about a particular file,
+   and the distinction is what makes it awkward to enforce. Two pristine copies
+   of one photograph are two different files and one cover, so the danger is not
+   visible from either of them. A pre-embedding extraction attempt catches only
+   the narrower case of writing over an artifact that already carries a payload
+   under that password; both copies return null and both then leak. An earlier
+   revision of this section claimed such a check detected reuse exactly, and that
+   was wrong.
+
+   Detecting the general case needs state the format does not carry: either the
+   caller remembers which cover contents it has already used with a password, for
+   example by keeping fingerprints of them, or the layer gains genuine
+   per-embedding uniqueness, which means storing a nonce and giving up the
+   headerless property. Neither is specified here, so the constraint is stated
+   and left to the caller. Nothing in this repository enforces it today.
+
 2. `stream = AES-256-CTR(key, counter = 0¹²⁸)` applied to zero bytes,
    generating as many bytes as needed. The first `KEY_BLOCK_LEN` bytes are the
    **whitening pad**; the remainder feeds position selection.
