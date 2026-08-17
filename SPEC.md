@@ -350,8 +350,43 @@ info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    embedding-invariant bits it is identical at embed and extract, so **nothing is
    stored in the image**: the "no header/magic/length" property is preserved.
    This binds the keystream to the specific cover: the same password over two
-   different covers (or the same cover reused) never repeats the whitening pad or
-   the carrier layout.
+   **different** covers never repeats the whitening pad or the carrier layout.
+
+   **Reusing one cover does repeat both, and that is a limit of the design rather
+   than an oversight.** The two sentences above are in tension: `fp` is computed
+   from embedding-invariant bits precisely so that extraction can recompute it
+   with nothing stored, which means embedding cannot change it, which means a
+   second embedding into the same cover under the same password derives the same
+   key, the same pad and the same positions. Making reuse safe would require a
+   per-embedding nonce, and storing one would give the image the header this
+   format exists to avoid.
+
+   The consequence is concrete: two different key blocks written into copies of
+   one cover under one password XOR to the same value as the two stego images
+   themselves, which is a two-time pad. Measured, not inferred, in
+   `src/core/stego.binding.test.ts`.
+
+   So the rule is a usage constraint, and it belongs to whatever drives this
+   layer: **a cover image's content is used at most once per password.**
+   Different passwords over one cover are unaffected, because the seed and
+   therefore the key differ.
+
+   That constraint is about the cover's _content_, not about a particular file,
+   and the distinction is what makes it awkward to enforce. Two pristine copies
+   of one photograph are two different files and one cover, so the danger is not
+   visible from either of them. A pre-embedding extraction attempt catches only
+   the narrower case of writing over an artifact that already carries a payload
+   under that password; both copies return null and both then leak. An earlier
+   revision of this section claimed such a check detected reuse exactly, and that
+   was wrong.
+
+   Detecting the general case needs state the format does not carry: either the
+   caller remembers which cover contents it has already used with a password, for
+   example by keeping fingerprints of them, or the layer gains genuine
+   per-embedding uniqueness, which means storing a nonce and giving up the
+   headerless property. Neither is specified here, so the constraint is stated
+   and left to the caller. Nothing in this repository enforces it today.
+
 2. `stream = AES-256-CTR(key, counter = 0¹²⁸)` applied to zero bytes,
    generating as many bytes as needed. The first `KEY_BLOCK_LEN` bytes are the
    **whitening pad**; the remainder feeds position selection.

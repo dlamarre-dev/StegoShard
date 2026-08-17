@@ -20,6 +20,7 @@ import {
   StegoCapacityError,
   StegoCoverFormatError,
   embedBytesStegoRgba,
+  extractBytesStegoRgba,
   embedBytesStegoJpeg,
   extractBytesStegoJpeg,
   embedKeyBlockStegoJpeg,
@@ -116,40 +117,71 @@ describe('capacity refusals', () => {
     await expect(embedBytesStegoRgba(rgba, width, height, exact, SEED, 2)).resolves.toBeUndefined();
   });
 
-  it('drains the position keystream at margin 1, which the doc comment denies', async () => {
-    // A measurement, not a wish. `embedBytesStegoRgba` documents that its margin
-    // "guarantees pickPositions never drains the keystream", and at the default
-    // margin of 1 that guarantee does not hold: the capacity guard passes a
-    // payload that exactly fills the cover, and then position selection runs out
-    // of stream and throws a bare Error instead of a StegoCapacityError.
+  it('refuses at its default margin a payload that selection could not place', async () => {
+    // `embedBytesStegoRgba` documented that its margin "guarantees pickPositions
+    // never drains the keystream", and the default of 1 did not have that
+    // property: the guard accepted a payload filling the cover, and selection
+    // then ran out of stream and threw a bare internal error.
     //
     // The arithmetic says why. Picking b distinct positions out of N by
-    // rejection costs about N·ln(N/(N−b)) draws, while the stream supplies
+    // rejection costs about N·ln(N/(N-b)) draws while the stream supplies
     // 2b+1024. At b = N those are N·ln(N) against 2N+1024, and the left side
-    // wins for any N past a few dozen.
+    // wins for any N past a few dozen. Measured at 16, 32, 64 and 128 square:
+    // margin 1 drained at every size, margin 2 and above was clear, and 1.25 sat
+    // on the boundary (1.61·N needed against 1.60·N+1024) so it is not claimed.
     //
-    // Measured at 16, 32, 64 and 128 square: margin 1 drains at every size,
-    // margin 2 and above is clear. Margin 1.25 also passed, but it sits on the
-    // boundary (1.61·N draws needed against 1.60·N+1024 available) and is not
-    // claimed here.
+    // Two fixes were tried. Converting the exhaustion into a StegoCapacityError
+    // inside pickPositions was measured and rejected: mutants in StreamReader and
+    // pickPositions that had been caught *because* they drained the stream then
+    // produced an error a test welcomed, and stego.ts fell from 83.8% to 79.9%
+    // with fourteen new survivors. Swallowing an internal fault into an expected
+    // refusal is the same mistake in a different coat.
     //
-    // No user reaches this: gallery.ts, the only production caller, passes
-    // GALLERY_CAPACITY_MARGIN = 4. It is the exported default that carries the
-    // false promise, so this test pins the real behaviour rather than the
-    // comment's.
+    // So the default margin is 2 instead, which keeps the guard in front of the
+    // condition and leaves exhaustion loud. This test pins the refusal a caller
+    // now gets, and its type.
     const w = 32;
     const h = 32;
+    const capacity = w * h * 3;
     const rgba = new Uint8Array(w * h * 4).fill(128);
-    const fills = new Uint8Array((w * h * 3) / 8); // exactly capacity
+    const fills = new Uint8Array(capacity / 8); // exactly capacity
 
-    await expect(embedBytesStegoRgba(rgba, w, h, fills, SEED, 1)).rejects.toThrow(
-      /keystream exhausted/,
-    );
+    await expect(embedBytesStegoRgba(rgba, w, h, fills, SEED)).rejects.toMatchObject({
+      name: 'StegoCapacityError',
+      capacityBits: capacity,
+    });
 
-    // And the margin that does hold, so this test fails if the bound moves in
-    // either direction rather than only recording today's breakage.
-    const half = new Uint8Array((w * h * 3) / 8 / 2);
-    await expect(embedBytesStegoRgba(rgba, w, h, half, SEED, 2)).resolves.toBeUndefined();
+    // Half the capacity is what the default admits, so the boundary is pinned on
+    // both sides rather than only on the refusing one.
+    const half = new Uint8Array(capacity / 8 / 2);
+    await expect(embedBytesStegoRgba(rgba, w, h, half, SEED)).resolves.toBeUndefined();
+  });
+
+  it('still reads a carrier written at the old margin of 1', async () => {
+    // The compatibility half of that default change, and the half I got wrong.
+    // Raising embedding's default to 2 is safe: it only refuses to *produce*
+    // something denser. Raising extraction's default too was a break, caught in
+    // review, because a payload written at margin 1 sits above the margin-2
+    // threshold and extraction would answer null for data it used to read.
+    //
+    // So embedding defaults to 2 and extraction stays at 1. A reader must stay
+    // able to open anything a writer once produced, and this pins that.
+    const w = 32;
+    const h = 32;
+    const capacity = w * h * 3;
+    const dense = new Uint8Array(Math.floor((capacity * 0.6) / 8)).map((_, i) => i & 0xff);
+
+    const rgba = new Uint8Array(w * h * 4).fill(128);
+    await embedBytesStegoRgba(rgba, w, h, dense, SEED, 1); // as an older writer would
+
+    const back = await extractBytesStegoRgba(rgba, w, h, SEED, dense.length); // default margin
+    expect(back, 'a carrier written at margin 1 is no longer readable by default').not.toBeNull();
+    expect([...back!]).toEqual([...dense]);
+
+    // And the same density is refused on the way in, so the guard still moved.
+    await expect(
+      embedBytesStegoRgba(new Uint8Array(w * h * 4).fill(128), w, h, dense, SEED),
+    ).rejects.toMatchObject({ name: 'StegoCapacityError' });
   });
 
   it('refuses a JPEG whose eligible coefficients cannot hold the payload', async () => {

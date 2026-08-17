@@ -1,11 +1,17 @@
 /**
  * The stego layer is bound to its cover, and nothing checked that.
  *
- * SPEC §5.3 states it as a property: "This binds the keystream to the specific
- * cover: the same password over two different covers (or the same cover reused)
- * never repeats the whitening pad or the carrier layout." The mechanism is the
- * cover fingerprint, hashed from embedding-invariant bits and used as the HKDF
- * salt, so the derived key differs per cover while surviving the embedding.
+ * SPEC §5.3 states it as a property: the same password over two **different**
+ * covers never repeats the whitening pad or the carrier layout. The mechanism is
+ * the cover fingerprint, hashed from embedding-invariant bits and used as the
+ * HKDF salt, so the derived key differs per cover while surviving the embedding.
+ *
+ * The spec used to add "(or the same cover reused)" and that half was false. A
+ * code review caught it, and this file is why it was worth catching: the header
+ * quoted the sentence in full while testing only the true half, and the
+ * idempotence test below is a direct demonstration of the false one. Reuse
+ * repeats pad and layout exactly, necessarily, because a fingerprint that
+ * survives embedding cannot also change with it. See the last describe block.
  *
  * The first mutation run showed that claim was unprotected. Of the 94 survivors
  * in stego.ts, 34 sat in the two fingerprint functions, and the pattern is
@@ -324,5 +330,95 @@ describe('the JPEG carrier layout is bound to the cover (SPEC §5.3)', () => {
     const out = await extractKeyBlockStegoJpeg(twice, PWJ, FAST);
     expect(out).not.toBeNull();
     expect([...out!]).toEqual([...kb]);
+  });
+});
+
+/**
+ * Reusing one cover repeats the pad and the layout, and that is pinned here so
+ * the claim cannot quietly come back.
+ *
+ * This is the half of SPEC §5.3 that used to be asserted and was wrong. It is
+ * not a bug to fix in this file: it follows from the design. The fingerprint is
+ * computed from embedding-invariant bits so extraction can recompute it with
+ * nothing stored, so embedding cannot move it, so a second embed under the same
+ * password derives the same key, the same pad and the same positions. Making
+ * reuse safe needs a per-embedding nonce, and storing one would give the image
+ * the header this format exists not to have.
+ *
+ * The test asserts the weakness rather than a fix, which is unusual and
+ * deliberate. It exists so that anyone who later writes "reuse is safe" in the
+ * spec has to delete a passing test that says otherwise, and so the constraint
+ * has a measured number attached instead of a paragraph of reasoning.
+ */
+describe('reusing one cover repeats the keystream (SPEC §5.3 constraint)', () => {
+  it('leaks the XOR of two payloads written into the same cover under one password', async () => {
+    // The two-time pad, demonstrated end to end. Two different key blocks go
+    // into two copies of one cover with one password. If pad and layout are
+    // shared, then XOR-ing the two stego images reproduces the XOR of the two
+    // payloads exactly, and an observer holding both images learns that
+    // difference without knowing the password.
+    const first = await keyBlockBytes('pw-one');
+    const second = await keyBlockBytes('pw-two');
+    const a = makeCover(7);
+    const b = makeCover(7); // an identical copy, not a different photo
+    expect([...a]).toEqual([...b]);
+
+    await embedKeyBlockStego(a, W, H, first, PW, FAST);
+    await embedKeyBlockStego(b, W, H, second, PW, FAST);
+
+    let payloadBitsDiffering = 0;
+    for (let i = 0; i < first.length; i++) {
+      let x = first[i]! ^ second[i]!;
+      while (x) {
+        payloadBitsDiffering += x & 1;
+        x >>= 1;
+      }
+    }
+    const outputBitsDiffering = changedPositions(a, b).length;
+
+    // Equal counts mean every payload difference landed on a carrier the two
+    // embeddings shared, which is only possible when both used one layout and
+    // one pad. Different covers give unrelated counts; see the first test.
+    expect(payloadBitsDiffering).toBeGreaterThan(0);
+    expect(
+      outputBitsDiffering,
+      'the stego difference no longer equals the payload difference, so reuse behaviour changed',
+    ).toBe(payloadBitsDiffering);
+  });
+
+  it('is not detectable from the cover alone, which a preflight check cannot fix', async () => {
+    // This test used to be called "is avoidable by the caller, since extraction
+    // detects the reuse case first", and the claim was wrong in the case that
+    // matters. A review caught it, pointing at the test directly above: that one
+    // builds its two covers with makeCover(7) twice, two pristine copies of one
+    // photograph, and both leak. Neither carries anything yet, so a preflight
+    // extraction returns null on both and permits both writes.
+    //
+    // What a preflight actually catches is the narrower case of overwriting an
+    // artifact that already carries a payload under that password. Useful, and
+    // not the same thing. Recorded as a test because the wrong version of this
+    // claim reached the spec once already.
+    const kb = await keyBlockBytes('pw-one');
+
+    // Two copies of one cover. Both are clean, so a preflight check permits both.
+    const first = makeCover(11);
+    const second = makeCover(11);
+    expect([...first]).toEqual([...second]);
+    expect(await extractKeyBlockStego(first, W, H, PW, FAST)).toBeNull();
+    expect(await extractKeyBlockStego(second, W, H, PW, FAST)).toBeNull();
+
+    await embedKeyBlockStego(first, W, H, kb, PW, FAST);
+
+    // The second copy is still pristine and still passes the check, and writing
+    // to it is exactly the reuse the constraint forbids. Nothing observable in
+    // this image says so.
+    expect(await extractKeyBlockStego(second, W, H, PW, FAST)).toBeNull();
+
+    // The narrower case the check does catch: writing over the artifact itself.
+    expect(await extractKeyBlockStego(first, W, H, PW, FAST)).not.toBeNull();
+
+    // And a different password over one cover is not reuse at all: different
+    // seed, different key, no shared pad or layout.
+    expect(await extractKeyBlockStego(first, W, H, 'an unrelated password', FAST)).toBeNull();
   });
 });

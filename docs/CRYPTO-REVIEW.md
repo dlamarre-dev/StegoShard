@@ -584,6 +584,17 @@ fixed salt)` produces a seed, which is combined with a **fingerprint of the cove
   use this binding: its slots are independent AES-GCM messages (fresh random nonce, no
   whitening), so repeated carrier positions across covers leak nothing and a per-cover
   hash would be cost without benefit.
+  **What this does not close, and cannot:** reusing one cover's _content_ under one
+  password repeats both pad and layout exactly. The fingerprint is taken over
+  embedding-invariant bits so extraction can recompute it with nothing stored, which is
+  the same reason embedding cannot change it. Two different payloads written into two
+  pristine copies of one photograph under one password XOR to each other, measured in
+  `src/core/stego.binding.test.ts`. It is a usage constraint, not a defect to patch: a
+  per-embedding nonce would have to be stored, and storing it would give the image the
+  header this format exists to avoid. Note that a pre-embedding extraction check does
+  **not** detect it, since both copies are clean at that point; only the narrower
+  overwrite case is visible that way. Nothing in the repository enforces the constraint
+  today, and the UI and CLI embed without any such check.
 - **No structure on the wire.** Fixed payload length, no magic/length/header in
   the image. Wrong-password extraction yields random bytes that fail the §5.1
   key-block magic check and is reported identically to "no key here"
