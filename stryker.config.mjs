@@ -47,6 +47,9 @@
  *   reed-solomon.ts   91.5%    access.ts   79.0%    (7 uncovered)
  *   crypto.ts         82.1%     (9 uncovered)
  *
+ * A second run with nothing changed took 3 minutes of wall clock against 69,
+ * which is what the incremental mode is for.
+ *
  * Up from 73.52%, and the rise is a measurement change rather than better tests:
  * widening the test selection recovered access.ts from 64.8% and vault.ts from
  * 64.7%. stego.ts did not move at all, and its 22 uncovered mutants are the
