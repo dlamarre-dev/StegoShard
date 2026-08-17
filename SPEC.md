@@ -361,10 +361,20 @@ info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    per-embedding nonce, and storing one would give the image the header this
    format exists to avoid.
 
-   The consequence is concrete: two different key blocks written into copies of
-   one cover under one password XOR to the same value as the two stego images
-   themselves, which is a two-time pad. Measured, not inferred, in
-   `src/core/stego.binding.test.ts`.
+   The consequence is concrete. Both embeddings share a layout and a pad, so at
+   each carrier the two images hold `a_i XOR pad_i` and `b_i XOR pad_i`: the pad
+   cancels, and the images differ at exactly the carriers where the payloads
+   differ. Measured in `src/core/stego.binding.test.ts`, flipping one payload bit
+   moves exactly one image bit and flipping three moves three, against 763 for the
+   same cover under a different password.
+
+   What an observer holding both images therefore learns is the Hamming distance
+   between the two payloads, and that many positions of the secret carrier layout,
+   with every further reuse exposing more of it. They do **not** thereby learn the
+   payload XOR in payload order, because the correspondence runs through the
+   password-derived permutation. An earlier revision of this section said the
+   images reveal the payload XOR outright; that overstated it. The leak is a
+   Hamming-distance and layout leak, which is reason enough to forbid reuse.
 
    So the rule is a usage constraint, and it belongs to whatever drives this
    layer: **a cover image's content is used at most once per password.**

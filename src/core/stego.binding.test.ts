@@ -349,41 +349,59 @@ describe('the JPEG carrier layout is bound to the cover (SPEC §5.3)', () => {
  * deliberate. It exists so that anyone who later writes "reuse is safe" in the
  * spec has to delete a passing test that says otherwise, and so the constraint
  * has a measured number attached instead of a paragraph of reasoning.
+ *
+ * What leaks, stated precisely, because the first version of this overstated it.
+ * XOR-ing the two images cancels the whitening pad, so they differ at exactly the
+ * carriers where the payloads differ. An observer holding both learns the Hamming
+ * distance between the two payloads and learns that many positions of the secret
+ * carrier layout, and every further reuse exposes more of it. They do not learn
+ * the payload XOR in payload order, because the correspondence runs through the
+ * password-derived permutation. That is a smaller claim than "the images reveal
+ * the payload XOR" and it is the accurate one.
  */
 describe('reusing one cover repeats the keystream (SPEC §5.3 constraint)', () => {
-  it('leaks the XOR of two payloads written into the same cover under one password', async () => {
-    // The two-time pad, demonstrated end to end. Two different key blocks go
-    // into two copies of one cover with one password. If pad and layout are
-    // shared, then XOR-ing the two stego images reproduces the XOR of the two
-    // payloads exactly, and an observer holding both images learns that
-    // difference without knowing the password.
-    const first = await keyBlockBytes('pw-one');
-    const second = await keyBlockBytes('pw-two');
-    const a = makeCover(7);
-    const b = makeCover(7); // an identical copy, not a different photo
-    expect([...a]).toEqual([...b]);
+  it('cancels the pad, so payload differences map one-to-one onto image differences', async () => {
+    // The two-time pad, demonstrated by counting rather than by argument, and
+    // stated more carefully than it was at first.
+    //
+    // Both embeddings share a layout and a pad, so at each carrier the two images
+    // hold `a_i XOR pad_i` and `b_i XOR pad_i`. The pad cancels: the images differ
+    // at exactly the carriers where the payloads differ, and nowhere else. Flip
+    // one payload bit and one image bit moves; flip three and three move.
+    //
+    // What that does NOT show, and an earlier version of this test and of SPEC
+    // §5.3 both claimed, is recovery of the payload XOR *in order*. The
+    // correspondence runs through the password-derived position map, so an
+    // observer holding both images sees the difference scattered across the
+    // carriers without knowing which difference bit is which. The leak is real
+    // and is a Hamming-distance and layout leak, not an ordered plaintext XOR.
+    const base = await keyBlockBytes('pw-one');
+    const oneBitOff = base.slice();
+    oneBitOff[40] = oneBitOff[40]! ^ 0x01;
+    const threeBitsOff = base.slice();
+    threeBitsOff[10] = threeBitsOff[10]! ^ 0x07;
 
-    await embedKeyBlockStego(a, W, H, first, PW, FAST);
-    await embedKeyBlockStego(b, W, H, second, PW, FAST);
+    const embedPair = async (other: Uint8Array, passwordB: string) => {
+      const a = makeCover(7);
+      const b = makeCover(7); // an identical copy, not a different photo
+      await embedKeyBlockStego(a, W, H, base, PW, FAST);
+      await embedKeyBlockStego(b, W, H, other, passwordB, FAST);
+      return changedPositions(a, b).length;
+    };
 
-    let payloadBitsDiffering = 0;
-    for (let i = 0; i < first.length; i++) {
-      let x = first[i]! ^ second[i]!;
-      while (x) {
-        payloadBitsDiffering += x & 1;
-        x >>= 1;
-      }
-    }
-    const outputBitsDiffering = changedPositions(a, b).length;
+    // One payload bit, one carrier bit. Nothing else in the image moves.
+    expect(await embedPair(oneBitOff, PW)).toBe(1);
+    // Three payload bits, three carrier bits.
+    expect(await embedPair(threeBitsOff, PW)).toBe(3);
 
-    // Equal counts mean every payload difference landed on a carrier the two
-    // embeddings shared, which is only possible when both used one layout and
-    // one pad. Different covers give unrelated counts; see the first test.
-    expect(payloadBitsDiffering).toBeGreaterThan(0);
+    // The control, and the reason those numbers mean something: the same cover
+    // under a *different* password shares no layout and no pad, so a one-bit
+    // payload change disturbs hundreds of carriers instead of one.
+    const independent = await embedPair(oneBitOff, 'an unrelated password');
     expect(
-      outputBitsDiffering,
-      'the stego difference no longer equals the payload difference, so reuse behaviour changed',
-    ).toBe(payloadBitsDiffering);
+      independent,
+      'a different password no longer produces an independent layout',
+    ).toBeGreaterThan(100);
   });
 
   it('is not detectable from the cover alone, which a preflight check cannot fix', async () => {
