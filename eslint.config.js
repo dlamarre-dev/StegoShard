@@ -32,7 +32,11 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['**/*.ts'],
+    // .mjs as well as .ts: scripts/mutation-summary.mjs runs under plain node in a
+    // CI job that installs no dependencies, so it cannot go through tsx like the
+    // rest of scripts/. Without this glob it inherited no globals and lint
+    // reported `process` and `console` as undefined.
+    files: ['**/*.ts', '**/*.mjs'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {

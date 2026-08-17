@@ -39,6 +39,19 @@
  * The nightly is sharded and incremental since, so this default scope is what a
  * local run covers rather than what CI runs in one go.
  *
+ * FIRST SHARDED RUN, 16 August, cold: 76.45% over the same 1,605 mutants, in 69
+ * minutes of wall clock against 3h20 in sequence. Per file:
+ *
+ *   erasure.ts       100.0%    stego.ts    63.8%   (22 uncovered)
+ *   gf256.ts          92.0%    vault.ts    68.9%   (31 uncovered)
+ *   reed-solomon.ts   91.5%    access.ts   79.0%    (7 uncovered)
+ *   crypto.ts         82.1%     (9 uncovered)
+ *
+ * Up from 73.52%, and the rise is a measurement change rather than better tests:
+ * widening the test selection recovered access.ts from 64.8% and vault.ts from
+ * 64.7%. stego.ts did not move at all, and its 22 uncovered mutants are the
+ * clearest remaining gap in the scope.
+ *
  * 115 mutants had no coverage, and that number was an artefact of the test
  * selection after all. Measured on access.ts: core-only gave 64.8% with 33
  * uncovered; adding all of src/cli gives 79.01% with 7. `modes.test.ts` drives
