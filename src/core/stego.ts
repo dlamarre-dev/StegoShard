@@ -559,7 +559,13 @@ function positionStreamLen(payloadBits: number): number {
 /**
  * Embed `data` into an RGBA buffer in place at seed-derived LSBs (no whitening).
  * `margin` requires the carrier count to exceed the payload by that factor, which keeps
- * embedding sparse AND guarantees `pickPositions` never drains the keystream.
+ * embedding sparse and keeps `pickPositions` clear of the end of the keystream.
+ *
+ * That second part is a property of the margin, not of the guard, and the default of 1
+ * does not have it: filling a cover to capacity needs about N·ln(N) draws while the
+ * stream supplies 2N+1024, so selection throws `stego: keystream exhausted` rather than
+ * a StegoCapacityError. Measured clear from margin 2 up; 1.25 sits on the boundary.
+ * Production passes GALLERY_CAPACITY_MARGIN = 4. See stego.errors.test.ts.
  */
 export async function embedBytesStegoRgba(
   rgba: Uint8Array | Uint8ClampedArray,
