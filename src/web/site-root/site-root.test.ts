@@ -50,9 +50,12 @@ describe('site-root', () => {
 
 describe('sitemap.xml', () => {
   const xml = read('sitemap.xml');
-  // Comments stripped first: this file explains in prose which optional elements
-  // it leaves out, and naming them there must not read as using them.
-  const markup = xml.replace(/<!--[\s\S]*?-->/g, '');
+  // The element body, taken from the opening tag rather than by stripping the
+  // comments above it. The file explains in prose which optional elements it
+  // leaves out, and naming them there must not read as using them; a regex that
+  // removed comments to achieve that would be an incomplete sanitizer, which is
+  // a bad habit to practise even where the input is this file itself.
+  const markup = xml.slice(xml.indexOf('<urlset'));
   const locs = [...markup.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
 
   it('lists every page the site build emits, and nothing else', () => {
