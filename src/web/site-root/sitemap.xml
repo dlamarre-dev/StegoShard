@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The three pages the site actually serves. Kept in step with the build's entry
+  points by src/web/site-root/site-root.test.ts, which reads them from
+  vite.web.config.ts rather than trusting this list.
+
+  No <lastmod>: the Pages workflow checks out shallow, so every file's last
+  commit is the tip commit, and a lastmod that moved on every deploy whether or
+  not the page changed would only teach crawlers to ignore it. No <changefreq>
+  or <priority> either; Google ignores both.
+
+  No hreflang: all nine languages share one URL and are selected client-side, so
+  there is nothing to annotate.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://dlamarre-dev.github.io/StegoShard/</loc>
+  </url>
+  <url>
+    <loc>https://dlamarre-dev.github.io/StegoShard/privacy.html</loc>
+  </url>
+  <url>
+    <loc>https://dlamarre-dev.github.io/StegoShard/terms.html</loc>
+  </url>
+</urlset>

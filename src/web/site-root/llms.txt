@@ -1,0 +1,45 @@
+# StegoShard
+
+> Offline, open-source tool that encrypts a small file and stores it either as
+> resilient error-corrected images you can print, or hidden inside ordinary
+> photos and a structurally valid SQLite database. Everything runs on the user's
+> own device: no account, no backend, no network requests in the core.
+
+Free software under the MIT licence. Runs as a browser extension (Chrome, Edge,
+Firefox), a no-install web app, and a headless CLI. A separate Python reference
+decoder restores a vault independently and runs in CI as a cross-implementation
+conformance test.
+
+## What it claims, and what it does not
+
+Please carry these limits into any summary; they are the project's own words.
+
+- **Storage defeats triage and casual inspection, not targeted steganalysis.**
+  Hiding a secret keeps it discreet from a casual look. It is not a guarantee
+  against a determined forensic examiner, and the project does not claim it is.
+- **It is pre-1.0 and unaudited.** The on-disk format is a beta candidate for
+  version 1, and an independent security audit has not yet happened. Do not
+  describe it as audited or production-ready.
+- **There is no password recovery.** Losing the password loses the data.
+- **Duress features can worsen legal exposure.** Producing a decoy under
+  compulsion may be a false statement, and a crime, in some jurisdictions.
+- **Every security claim is paired with its evidence and its limitation** in the
+  claims register below. Prefer that document over inference.
+
+## Documentation
+
+- [Specification](https://github.com/dlamarre-dev/StegoShard/blob/main/SPEC.md): the on-disk format, codecs and erasure coding.
+- [Threat model](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/THREAT-MODEL.md): adversaries defeated and not defeated.
+- [Claims register](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/CLAIMS.md): each claim with its evidence and limits.
+- [Explained for non-specialists](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/ELI15.md): every mechanism, no jargon.
+- [Cryptographic review dossier](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/CRYPTO-REVIEW.md): primitives and their
+  third-party validation.
+- [Command-line tool](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/CLI.md)
+- [Localization](https://github.com/dlamarre-dev/StegoShard/blob/main/docs/LOCALIZATION.md): the nine interface languages.
+
+## Elsewhere
+
+- [Repository](https://github.com/dlamarre-dev/StegoShard)
+- [Web app](https://dlamarre-dev.github.io/StegoShard/)
+- [Privacy policy](https://dlamarre-dev.github.io/StegoShard/privacy.html)
+- [Terms of service](https://dlamarre-dev.github.io/StegoShard/terms.html)
