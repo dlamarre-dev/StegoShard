@@ -16,6 +16,7 @@ concurrency:
 jobs:
   build:
     name: Lint, typecheck, test, build
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -84,6 +85,7 @@ jobs:
 
   browser-e2e:
     name: Browser, accessibility, CSP, and extension smoke
+    timeout-minutes: 30
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -105,8 +107,20 @@ jobs:
       # fail rather than skip, so this step cannot be dropped unnoticed.
       - name: Build CLI and offline web app
         run: npm run build:cli
+      # Same treatment, same reason: the browser download hung alongside the apt
+      # one, so the cap belongs on both rather than on whichever was noticed.
       - name: Install pinned browsers
-        run: npx playwright install --with-deps chromium firefox
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 420 npx playwright install --with-deps chromium firefox; then
+              exit 0
+            fi
+            echo "::warning::playwright install attempt $attempt did not finish; retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::playwright install did not finish after three attempts"
+          exit 1
       - name: Run browser E2E suite
         run: npm run test:e2e
       - name: Upload browser diagnostics
@@ -121,6 +135,7 @@ jobs:
 
   crypto-scan:
     name: Post-quantum crypto scan (QRAMM)
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -159,6 +174,7 @@ jobs:
 
   steganalysis:
     name: Steganalysis (zsteg, StegExpose)
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
       # Archived since 2018 and unlicensed, so it is fetched rather than vendored,
@@ -213,6 +229,7 @@ jobs:
 
   erasure-field:
     name: Erasure cross-check (reedsolo, galois)
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -249,6 +266,7 @@ jobs:
 
   crypto-compliance:
     name: Primitive compliance (crypto-condor)
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
       # TestU01 still uses K&R function definitions, which a C23-default compiler
@@ -277,8 +295,23 @@ jobs:
           path: ~/.cache/crypto-condor
           key: crypto-condor-${{ runner.os }}-${{ hashFiles('python/requirements-compliance.lock') }}
 
+      # Capped and retried: this step hung for over thirty minutes on three
+      # separate runs while every other job passed, and with no ceiling it would
+      # have run to the six-hour default. A mirror that stops answering is not a
+      # reason to hold a pull request all afternoon.
       - name: Install build tools for TestU01
-        run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool
+        timeout-minutes: 10
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 180 sudo apt-get update && \
+               timeout 180 sudo apt-get install -y autoconf automake libtool; then
+              exit 0
+            fi
+            echo "::warning::apt-get attempt $attempt did not finish; retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::apt-get did not finish after three attempts"
+          exit 1
 
       - name: Install dependencies
         run: npm ci
@@ -318,6 +351,7 @@ jobs:
 
   conformance:
     name: Python decoder conformance
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
