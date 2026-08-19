@@ -61,9 +61,9 @@ the extension requests no host access (see PRIVACY.md).
 
 ## Before 1.0
 
-- Native proofread of the `ja` and `zh_TW` locales (see LOCALIZATION.md), and of
+- Native proofread of the `ja`, `ko` and `zh_TW` locales (see LOCALIZATION.md), and of
   the repositioned strings (`extName`, `extDesc`, `destSqlite`, `popupTagline`,
-  `onboardingOvert`, incl. the "robust" → "resilient" rewording) across all eight
+  `onboardingOvert`, incl. the "robust" → "resilient" rewording) across all nine
   locales; the two-storage-models wording was drafted, not natively reviewed.
 - Close the independent security review and the browser/physical QA checklist.
 - Generate localized store screenshots (pipeline still manual).

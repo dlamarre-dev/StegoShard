@@ -3,7 +3,7 @@ StegoShard オフライン版ウェブアプリ
 
 English: README.txt | Français: README.fr.txt | Deutsch: README.de.txt
 Español: README.es.txt | Italiano: README.it.txt | Português: README.pt.txt
-繁體中文: README.zh_TW.txt
+한국어: README.ko.txt | 繁體中文: README.zh_TW.txt
 
 index.html を直接開けない理由
 -----------------------------

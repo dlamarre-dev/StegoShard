@@ -242,9 +242,9 @@ export function openInBrowser(url: string): void {
  * The startup notice, per locale.
  *
  * Held here rather than in `public/_locales`, which is the home for *UI* strings:
- * those catalogs are ~40KB each and importing eight of them would put 320KB of
+ * those catalogs are ~40KB each and importing nine of them would put 360KB of
  * JSON into a 7KB launcher, for four lines of terminal output. The keys are the
- * codes from `locales.ts`, so the same eight languages as the app.
+ * codes from `locales.ts`, so the same nine languages as the app.
  *
  * `$URL$` is substituted rather than concatenated: the address does not come last
  * in every language.
@@ -291,6 +291,12 @@ const NOTICE: Record<string, readonly string[]> = {
     'このマシン上でのみ提供されます。どこにも送信されません。',
     'ブラウザーのキャッシュ、履歴、ダウンロードフォルダーにこのセッションの痕跡が残ります。コマンドラインだけでは残りません。docs/THREAT-MODEL.md を参照してください。',
     'タブを開いている間は実行したままにしてください。停止するには Ctrl+C。',
+  ],
+  ko: [
+    'StegoShard 화면: $URL$',
+    '이 컴퓨터에서만 제공됩니다. 어디로도 전송되지 않습니다.',
+    '브라우저의 캐시, 기록, 다운로드 폴더에 이 세션의 흔적이 남습니다. 명령줄만 쓸 때는 남지 않습니다. docs/THREAT-MODEL.md 를 참고하세요.',
+    '탭이 열려 있는 동안에는 계속 실행해 두세요. 멈추려면 Ctrl+C.',
   ],
   zh_TW: [
     'StegoShard 介面：$URL$',

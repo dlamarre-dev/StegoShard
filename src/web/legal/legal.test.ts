@@ -7,6 +7,7 @@ import es from './es.json';
 import itIt from './it.json';
 import pt from './pt.json';
 import ja from './ja.json';
+import ko from './ko.json';
 import zhTW from './zh_TW.json';
 
 const CATALOGS: Record<string, unknown> = {
@@ -17,6 +18,7 @@ const CATALOGS: Record<string, unknown> = {
   it: itIt,
   pt,
   ja,
+  ko,
   zh_TW: zhTW,
 };
 
@@ -50,8 +52,8 @@ describe('legal catalogs', () => {
   const enCodes: string[] = [];
   collect(en, enHrefs, enCodes);
 
-  it('ships all eight supported locales', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['en', 'fr', 'de', 'es', 'it', 'pt', 'ja', 'zh_TW']);
+  it('ships all nine supported locales', () => {
+    expect(SUPPORTED_LOCALES).toEqual(['en', 'fr', 'de', 'es', 'it', 'pt', 'ja', 'ko', 'zh_TW']);
     for (const code of SUPPORTED_LOCALES) expect(CATALOGS[code]).toBeDefined();
   });
 

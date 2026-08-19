@@ -185,6 +185,24 @@ export const INSTRUCTIONS: Record<string, InstructionCopy> = {
     footer: '復元: StegoShard + パスワード、十分なページ数が必要です。',
     page: 'ページ',
   },
+  ko: {
+    heading: '이 금고를 복원하는 방법',
+    intro: '이 페이지들에는 오류 정정이 적용된 QR 이미지로 부호화된 암호화 파일이 담겨 있습니다.',
+    steps: [
+      '1. 아래 프로젝트 페이지에서 StegoShard(확장 프로그램 또는 CLI)나 Python 참조 디코더를 받으세요.',
+      '2. 모든 페이지를 스캔하거나 촬영한 뒤 이미지 파일(또는 PDF)을 불러오세요.',
+      '3. 비밀번호를 입력하면 원본 파일이 복원됩니다.',
+    ],
+    resilience: '대부분의 페이지가 남아 있다면 몇 장을 잃거나 손상되어도 복원할 수 있습니다.',
+    project: '프로젝트 및 참조 디코더:',
+    keyLocation: '키 보관 위치:',
+    passwordHint: '비밀번호 힌트:',
+    preservation:
+      '보관 요령: 레이저 프린터로 인쇄하고, 빛과 습기를 피해 보관하며, 서로 떨어진 여러 장소에 사본을 두세요.',
+    warning: '이 종이는 암호화되어 있지 않습니다. 여기에 비밀번호를 적지 마세요.',
+    footer: '복원: StegoShard + 비밀번호, 그리고 충분한 수의 페이지.',
+    page: '페이지',
+  },
   zh_CN: {
     heading: '如何恢复此保险库',
     intro: '这些页面包含一个加密文件，以带纠错的二维码图像编码。',

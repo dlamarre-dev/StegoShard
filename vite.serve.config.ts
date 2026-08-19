@@ -35,7 +35,7 @@ function offlineLaunchers(): Plugin {
     // disk, which is when the directory is complete enough to add to.
     writeBundle() {
       // Everything in the directory, rather than a list to keep in step: the
-      // README exists in eight languages, and a ninth should need no edit here.
+      // README exists in nine languages, and a tenth should need no edit here.
       for (const name of readdirSync(from)) {
         copyFileSync(resolve(from, name), resolve(OUT, name));
       }

@@ -305,8 +305,8 @@ provisional until the external audit and release QA gates close.
 - **Independent recovery.** A standalone **[Python reference decoder](python/README.md)**
   restores a vault without the extension and runs in CI as a cross-implementation
   conformance test, and a headless **CLI** (below) creates and restores the same format.
-- **Localization.** The UI, privacy policy, and terms are localized into 8 languages
-  (en, fr, it, de, es, pt, ja, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)),
+- **Localization.** The UI, privacy policy, and terms are localized into 9 languages
+  (en, fr, it, de, es, pt, ja, ko, zh_TW; see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)),
   with native review still required for the locales listed in
   [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 

@@ -30,6 +30,8 @@ python/tests/_fixtures/
 
 # IDE / editor
 .idea/
+# JetBrains 'Export to HTML': a rendering of a source file, not a source file.
+exportToHTML/
 .vscode/
 *.swp
 

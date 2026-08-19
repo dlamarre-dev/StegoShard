@@ -8,7 +8,7 @@
  *
  * Written here rather than taken from `string-width` because this is a runtime
  * dependency of a CLI that advertises adding none, and of a 13KB launcher. The
- * table below covers the eight languages shipped; anything else counts as one
+ * table below covers the nine languages shipped; anything else counts as one
  * cell, which is what a terminal does for Latin, Greek and Cyrillic anyway.
  */
 

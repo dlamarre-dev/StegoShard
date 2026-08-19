@@ -7,6 +7,23 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Korean (`ko`) is the ninth UI locale**, present on every surface Japanese already
+  reached: the 274 UI message keys, the CLI catalog, the privacy and terms pages, the
+  offline bundle's README, the printed instruction sheet, the CLI's startup notice, and
+  a store long description. Like `ja` and `zh_TW`, it is translated but **needs a native
+  review before 1.0** (docs/LOCALIZATION.md).
+
+  The only part that was not data: the CLI's paper sheet resolves a Unicode font from
+  the OS, and `needsCjkFont` matched `ja|zh` only, so a Korean sheet would have printed
+  in English. Widening it is not enough on its own: PingFang and Yu Gothic carry no
+  Hangul, and a font missing a glyph draws a blank rather than failing, which would have
+  printed an _empty_ sheet. The system-font candidates are per-script now: Korean gets
+  Malgun Gothic and Apple SD Gothic Neo, plus the pan-CJK faces (Arial Unicode, Noto CJK)
+  that do cover Hangul. `width.ts` needed no change; its wide table already carried the
+  Hangul blocks.
+
 ### Fixed
 
 - **The mutation summary job failed on its first run**, 69 minutes into the nightly. A

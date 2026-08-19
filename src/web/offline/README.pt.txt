@@ -3,7 +3,7 @@ StegoShard, aplicação web offline
 
 English: README.txt | Français: README.fr.txt | Deutsch: README.de.txt
 Español: README.es.txt | Italiano: README.it.txt | 日本語: README.ja.txt
-繁體中文: README.zh_TW.txt
+한국어: README.ko.txt | 繁體中文: README.zh_TW.txt
 
 Porque é que o index.html não abre diretamente
 ----------------------------------------------

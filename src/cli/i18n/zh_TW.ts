@@ -150,7 +150,7 @@ export const zhTW: CliCatalog = {
   helpCover: '--key-mode stego 的封面照片（金鑰藏在其中）',
   helpTitle: '可讀的標籤 / PDF 標題',
   helpDate: '頁面上顯示的日期（預設：今天）',
-  helpLocale: '說明頁的語言，例如 fr、ja、zh_TW',
+  helpLocale: '說明頁的語言，例如 fr、ja、ko、zh_TW',
   helpInstructions: '附上還原說明頁（紙本）',
   helpPasswordHint: '印在說明頁上的密碼提示',
   helpKeyLocation: '金鑰存放位置，會印在說明頁上',

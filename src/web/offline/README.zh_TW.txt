@@ -3,7 +3,7 @@ StegoShard 離線網頁應用程式
 
 English: README.txt | Français: README.fr.txt | Deutsch: README.de.txt
 Español: README.es.txt | Italiano: README.it.txt | Português: README.pt.txt
-日本語: README.ja.txt
+日本語: README.ja.txt | 한국어: README.ko.txt
 
 為什麼不能直接開啟 index.html
 -----------------------------

@@ -1,0 +1,997 @@
+{
+  "extName": {
+    "message": "StegoShard: 비밀을 암호화하고 이미지에 백업·은닉"
+  },
+  "extDesc": {
+    "message": "비밀을 이미지에 보관: 오류 정정으로 복원력 높은 백업, 부인 가능한 스테가노그래피, 또는 둘 다."
+  },
+  "popupTagline": {
+    "message": "파일을 복원력 높은 이미지, 내용이 드러나지 않는 단일 파일, 또는 위장 데이터베이스로 암호화합니다."
+  },
+  "optionsTitle": {
+    "message": "StegoShard 설정"
+  },
+  "extShortName": {
+    "message": "StegoShard"
+  },
+  "pillLocked": {
+    "message": "잠김"
+  },
+  "pillUnlocked": {
+    "message": "잠금 해제됨"
+  },
+  "webIntro": {
+    "message": "무료 오픈 소스 웹 버전입니다. 설치도 계정도 필요 없으며, 어떤 데이터도 기기를 벗어나지 않습니다. 여기서 파일을 저장하거나 복원하세요."
+  },
+  "unlockHeading": {
+    "message": "금고"
+  },
+  "unlockPrompt": {
+    "message": "저장 기능을 사용하려면 비밀번호를 입력하세요."
+  },
+  "btnUnlock": {
+    "message": "잠금 해제"
+  },
+  "btnLock": {
+    "message": "잠그기"
+  },
+  "statusUnlocked": {
+    "message": "잠금 해제됨: 파일을 저장할 수 있습니다."
+  },
+  "noKeyTitle": {
+    "message": "아직 금고 키가 없습니다"
+  },
+  "noKeyBody": {
+    "message": "파일을 저장하기 전에 옵션 페이지에서 금고 키를 설정하세요."
+  },
+  "btnOpenOptions": {
+    "message": "옵션 열기"
+  },
+  "saveHeading": {
+    "message": "비밀 저장"
+  },
+  "restoreHeading": {
+    "message": "비밀 복원"
+  },
+  "labelFile": {
+    "message": "파일"
+  },
+  "labelImages": {
+    "message": "이미지 파일"
+  },
+  "labelPassword": {
+    "message": "비밀번호"
+  },
+  "destHeading": {
+    "message": "저장 형식"
+  },
+  "destDisk": {
+    "message": "이미지"
+  },
+  "destPaper": {
+    "message": "종이"
+  },
+  "labelInstructions": {
+    "message": "안내문 포함"
+  },
+  "labelPasswordHint": {
+    "message": "비밀번호 힌트(선택)"
+  },
+  "labelKeyLocation": {
+    "message": "키 보관 위치 메모(선택)"
+  },
+  "paperCleartextWarn": {
+    "message": "안내문은 암호화되지 않습니다. 힌트만 적고 비밀번호는 절대 적지 마세요."
+  },
+  "statusSavedPdf": {
+    "message": "완료. $COUNT$페이지 PDF를 내려받았습니다. 비밀번호를 안전하게 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keyModeHeading": {
+    "message": "키"
+  },
+  "keyModeEmbedded": {
+    "message": "내장"
+  },
+  "keyModeKeyfile": {
+    "message": "키 파일"
+  },
+  "keyModeHelp": {
+    "message": "키 파일을 따로 두면 이미지가 유출되어도 그 자체로는 아무것도 드러나지 않습니다. 다만 .key 파일도 함께 보관해야 합니다."
+  },
+  "dropTitleMulti": {
+    "message": "여기에 파일을 놓으세요"
+  },
+  "btnClearFiles": {
+    "message": "지우기"
+  },
+  "dropPrompt": {
+    "message": "또는 클릭해서 선택"
+  },
+  "advancedOptions": {
+    "message": "고급 옵션"
+  },
+  "whyLabel": {
+    "message": "왜?"
+  },
+  "savedTitle": {
+    "message": "저장됨"
+  },
+  "restoredTitle": {
+    "message": "복원됨"
+  },
+  "labelAddBand": {
+    "message": "이미지에 읽을 수 있는 라벨 넣기"
+  },
+  "labelTitle": {
+    "message": "라벨 제목"
+  },
+  "titlePlaceholder": {
+    "message": "이 금고의 이름을 정하세요. 예: “아카이브 알파”. “비트코인 키” 같은 이름은 피하세요."
+  },
+  "bandWarning": {
+    "message": "라벨은 암호화되지 않습니다. 비밀은 절대 적지 마세요."
+  },
+  "labelKeyFile": {
+    "message": "키 파일(.key)"
+  },
+  "keyFileHint": {
+    "message": "별도의 .key 파일로 저장한 세트에만 필요합니다(.zip 안에 들어 있다면 건너뛰세요)."
+  },
+  "labelShareFiles": {
+    "message": "임계값 공유 파일(비소지 모드)"
+  },
+  "shareFilesHint": {
+    "message": "비소지 금고는 n개의 공유 파일(.txt) 중 아무 k개를 추가하면 열립니다. 그 외에는 필요 없습니다."
+  },
+  "labelAsZip": {
+    "message": "전부 하나의 .zip으로 묶기"
+  },
+  "labelImagesOrZip": {
+    "message": "이미지 파일, .zip, 또는 인쇄된 PDF"
+  },
+  "btnSave": {
+    "message": "암호화 후 이미지 내려받기"
+  },
+  "btnRestore": {
+    "message": "파일 복원"
+  },
+  "estimateFiles": {
+    "message": "예상 파일 수:"
+  },
+  "labelFileSize": {
+    "message": "크기:"
+  },
+  "footerPrivacy": {
+    "message": "개인정보처리방침"
+  },
+  "footerTerms": {
+    "message": "이용약관"
+  },
+  "footerSource": {
+    "message": "소스 코드(MIT)"
+  },
+  "statusSaving": {
+    "message": "암호화하고 이미지를 만드는 중…"
+  },
+  "statusSaved": {
+    "message": "완료. 이미지 $COUNT$개를 내려받았습니다. 비밀번호를 안전하게 보관하세요. 복구할 방법은 없습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedKeyfile": {
+    "message": "완료. 이미지 $COUNT$개와 .key 파일을 내려받았습니다. .key 파일과 비밀번호를 안전하게 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusRestoring": {
+    "message": "이미지를 해독하고 복원하는 중…"
+  },
+  "statusRestored": {
+    "message": "$NAME$을(를) 복원해 내려받았습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "errNoFile": {
+    "message": "파일을 하나 이상 선택하세요."
+  },
+  "errNoImages": {
+    "message": "복원에 사용할 이미지 파일을 선택하세요."
+  },
+  "errNoPassword": {
+    "message": "비밀번호를 입력하세요."
+  },
+  "errWrongPassword": {
+    "message": "비밀번호가 틀렸습니다. 다시 시도하세요."
+  },
+  "errLocked": {
+    "message": "먼저 금고를 잠금 해제하세요."
+  },
+  "errMissingKey": {
+    "message": "이 이미지 세트를 복원하려면 별도의 .key 파일이 필요합니다."
+  },
+  "errFileTooLarge": {
+    "message": "파일이 너무 큽니다($SIZE$ KB). 이 금고는 작은 비밀을 위한 것입니다(최대 $LIMIT$ KB).",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "errTooManyImages": {
+    "message": "이 파일에는 이미지 $COUNT$개가 필요합니다(최대 $LIMIT$개). 더 작은 파일로 시도하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "errTooManyFiles": {
+    "message": "파일이 너무 많습니다: $COUNT$개(최대 $LIMIT$개). 더 적게 선택하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "optKeyHeading": {
+    "message": "금고 키"
+  },
+  "optKeyBodyNew": {
+    "message": "금고 키를 만드세요. 저장하는 모든 파일이 이 키로 암호화됩니다."
+  },
+  "optKeyBodyExists": {
+    "message": "이 기기에 금고 키가 설정되어 있습니다."
+  },
+  "labelNewPassword": {
+    "message": "새 비밀번호"
+  },
+  "labelConfirmPassword": {
+    "message": "비밀번호 확인"
+  },
+  "labelOldPassword": {
+    "message": "현재 비밀번호"
+  },
+  "btnCreateKey": {
+    "message": "키 만들기"
+  },
+  "passwordHint": {
+    "message": "비밀번호는 복구할 수 없습니다. 잊어버리면 금고를 잃게 되므로 키를 내보내 두는 것을 고려하세요."
+  },
+  "errPasswordMismatch": {
+    "message": "비밀번호가 일치하지 않습니다."
+  },
+  "errPasswordTooShort": {
+    "message": "$COUNT$자 이상 사용하세요. 이 최소 길이는 건너뛸 수 없습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusKeyCreated": {
+    "message": "금고 키를 만들었습니다."
+  },
+  "changePwHeading": {
+    "message": "비밀번호 변경"
+  },
+  "btnChangePw": {
+    "message": "비밀번호 변경"
+  },
+  "statusPwChanged": {
+    "message": "비밀번호를 변경했습니다."
+  },
+  "exportHeading": {
+    "message": "키 내보내기"
+  },
+  "exportBody": {
+    "message": "감싼 키(.key)를 내려받아 옮기거나 백업하세요. 비밀번호로 보호된 상태가 유지됩니다."
+  },
+  "btnExportKey": {
+    "message": ".key 내보내기"
+  },
+  "statusKeyExported": {
+    "message": "키를 내보냈습니다."
+  },
+  "importHeading": {
+    "message": "키 가져오기"
+  },
+  "importBody": {
+    "message": "다른 기기의 .key 파일을 가져옵니다. 현재 키를 대체합니다."
+  },
+  "btnImportKey": {
+    "message": "키 가져오기"
+  },
+  "statusKeyImported": {
+    "message": "키를 가져왔습니다."
+  },
+  "eraseHeading": {
+    "message": "키 삭제"
+  },
+  "eraseBody": {
+    "message": "이 기기에서 금고 키를 영구히 삭제합니다. 내보낸 .key 파일을 보관해 두지 않았다면 이미 저장한 파일은 복구할 수 없게 됩니다. 되돌릴 수 없습니다."
+  },
+  "btnEraseKey": {
+    "message": "키 삭제"
+  },
+  "confirmErase": {
+    "message": "금고 키를 정말 삭제할까요? 내보낸 .key 파일이 없으면 저장된 파일을 복구할 수 없습니다."
+  },
+  "statusKeyErased": {
+    "message": "금고 키를 삭제했습니다."
+  },
+  "btnScanCamera": {
+    "message": "카메라로 페이지 스캔"
+  },
+  "cameraTitle": {
+    "message": "카메라로 스캔"
+  },
+  "cameraHint": {
+    "message": "각 이미지나 인쇄된 페이지에 카메라를 비추세요. 새 코드는 자동으로 추가됩니다."
+  },
+  "cameraDone": {
+    "message": "완료"
+  },
+  "cameraCount": {
+    "message": "이미지 $COUNT$개 캡처됨",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCamera": {
+    "message": "카메라를 사용할 수 없거나 접근이 거부되었습니다."
+  },
+  "keyModeStego": {
+    "message": "사진 속에"
+  },
+  "coverTitle": {
+    "message": "커버 사진(PNG 또는 JPG)"
+  },
+  "stegoWarning": {
+    "message": "키는 이 사진 안에 숨겨집니다. 저장된 파일을 있는 그대로 보관하세요. 다시 저장하거나 크기를 바꾸거나 재압축하면 키가 파괴됩니다. JPEG 커버는 같은 크기와 이름의 JPEG로, PNG는 PNG로 남습니다. 이미지와는 따로 보관하세요."
+  },
+  "labelKeyFileOrImage": {
+    "message": "키 파일(.key) 또는 키 사진"
+  },
+  "labelStegoPassword": {
+    "message": "금고 비밀번호(키 사진을 잠급니다)"
+  },
+  "errNoCover": {
+    "message": "키를 숨길 커버 사진을 선택하세요."
+  },
+  "errCoverTooSmall": {
+    "message": "그 사진은 키를 담기에 너무 작습니다. 더 큰 사진을 선택하세요."
+  },
+  "statusSavedStego": {
+    "message": "이미지 $COUNT$개를 저장했습니다. 키는 커버 사진에 숨겨져 있습니다. 복원하려면 그 PNG와 비밀번호를 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errCoverFormat": {
+    "message": "지원하지 않는 커버 이미지입니다. 베이스라인 JPEG 또는 PNG를 사용하세요(프로그레시브 JPEG와 HEIC는 지원하지 않습니다)."
+  },
+  "destBinary": {
+    "message": "파일"
+  },
+  "destGallery": {
+    "message": "갤러리"
+  },
+  "restoreModeStandard": {
+    "message": "표준"
+  },
+  "restoreModeGallery": {
+    "message": "사진에서(갤러리)"
+  },
+  "binaryVariantHeading": {
+    "message": "파일 형식"
+  },
+  "binaryVariantBranded": {
+    "message": "StegoShard 파일(.ssbn)"
+  },
+  "binaryVariantDisguised": {
+    "message": "데이터베이스로 위장(.db)"
+  },
+  "binaryVariantHelpBranded": {
+    "message": "StegoShard 이름을 가진 내용이 드러나지 않는 단일 파일입니다. 나중에 찾기 쉽고, 숨기려 하지 않습니다."
+  },
+  "binaryVariantHelpDisguised": {
+    "message": "SQLite 데이터베이스 헤더를 붙여 폴더 목록에서 평범한 앱 데이터베이스로 보이게 합니다. 무심코 훑어보는 눈은 막아 주지만, 실제로 열어 보는 도구는 막지 못합니다."
+  },
+  "sizeWarnImages": {
+    "message": "큰 비밀(약 $SIZE$ KiB) → 이미지 $COUNT$개. 아래 단일 파일 옵션을 고려하세요.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusSavedBinary": {
+    "message": "완료. $VARIANT$을(를) 내려받았습니다. 비밀번호를 안전하게 보관하세요. 복구할 방법은 없습니다.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryKeyfile": {
+    "message": "완료. $VARIANT$과(와) 별도의 키 파일을 내려받았습니다. 둘 다와 비밀번호를 안전하게 보관하세요.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusSavedBinaryStego": {
+    "message": "완료. $VARIANT$을(를) 내려받았습니다. 키는 커버 사진에 숨겨져 있습니다. 그 이미지와 비밀번호를 보관하세요.",
+    "placeholders": {
+      "variant": {
+        "content": "$1"
+      }
+    }
+  },
+  "galleryHeading": {
+    "message": "갤러리: 여러 사진에 나눠 숨기기"
+  },
+  "galleryIntro": {
+    "message": "작은 비밀을 여러 장의 평범한 사진(과 미끼 사진)에 나눠 숨깁니다. 몇 장을 잃어도 괜찮습니다. 사진들을 함께 보관하고 비밀번호를 기억하세요."
+  },
+  "galleryPasswordHint": {
+    "message": "갤러리는 위의 비밀번호를 사용합니다. 비밀을 암호화하는 동시에 각 사진의 어디에 숨길지도 결정합니다. 따로 보관할 키 파일은 없습니다."
+  },
+  "gallerySecretTitle": {
+    "message": "숨길 파일"
+  },
+  "galleryCoversTitle": {
+    "message": "커버 사진(5장 이상)"
+  },
+  "galleryRestoreHeading": {
+    "message": "갤러리: 사진에서 복원"
+  },
+  "galleryPhotosTitle": {
+    "message": "사진(폴더 또는 선택한 파일)"
+  },
+  "btnGallerySave": {
+    "message": "사진에 나눠 숨기기"
+  },
+  "btnGalleryRestore": {
+    "message": "사진에서 복원"
+  },
+  "statusGallerySaving": {
+    "message": "비밀을 사진들에 나눠 숨기는 중…"
+  },
+  "statusGallerySaved": {
+    "message": "사진 $COUNT$장에 나눠 저장했습니다. 사진을 함께 두고 비밀번호를 안전하게 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusGalleryRestoring": {
+    "message": "사진을 살펴보고 복원하는 중…"
+  },
+  "errNoCovers": {
+    "message": "커버 사진을 추가하세요(5장 이상)."
+  },
+  "errGalleryTooFew": {
+    "message": "사진이 부족합니다. $COUNT$장 이상 추가하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "errGalleryTooLarge": {
+    "message": "그 비밀은 갤러리 모드에 비해 너무 큽니다. 더 작은 파일을 사용하세요."
+  },
+  "errGalleryCoverTooSmall": {
+    "message": "사진 “$NAME$”은(는) 너무 작거나 밋밋해서 조각을 숨길 수 없습니다. 더 크고 세부가 많은 사진을 사용하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "errGalleryRestore": {
+    "message": "이 사진들에서 비밀을 복원하지 못했습니다(비밀번호가 틀렸거나 갤러리가 아닙니다)."
+  },
+  "btnWorkflows": {
+    "message": "작업 방식"
+  },
+  "chooserTitle": {
+    "message": "어떤 방식으로 진행할까요?"
+  },
+  "chooserBody": {
+    "message": "처음이라면 단계별 안내를, 도구에 익숙하다면 한 화면에 모두 담긴 전문가 화면을 선택하세요. 언제든 바꿀 수 있습니다."
+  },
+  "workflowGuided": {
+    "message": "안내형"
+  },
+  "workflowGuidedDesc": {
+    "message": "몇 가지 질문에 한 단계씩 답하세요. 알맞은 옵션을 제안하고 필요할 때 파일을 요청합니다."
+  },
+  "workflowExpert": {
+    "message": "전문가"
+  },
+  "workflowExpertDesc": {
+    "message": "모든 옵션을 드러낸 한 화면입니다. 익숙해지면 가장 빠릅니다."
+  },
+  "workflowRecommended": {
+    "message": "최근 사용"
+  },
+  "wizStep": {
+    "message": "$TOTAL$단계 중 $STEP$단계",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "wizBack": {
+    "message": "뒤로"
+  },
+  "wizNext": {
+    "message": "다음"
+  },
+  "wizStartOver": {
+    "message": "처음부터"
+  },
+  "wizActionTitle": {
+    "message": "무엇을 하시겠습니까?"
+  },
+  "wizActionSave": {
+    "message": "비밀 저장"
+  },
+  "wizActionSaveDesc": {
+    "message": "파일을 암호화해 이미지로 만들거나 사진 속에 숨깁니다."
+  },
+  "wizActionRestore": {
+    "message": "비밀 복원"
+  },
+  "wizActionRestoreDesc": {
+    "message": "이미지, PDF, .zip 또는 사진에서 원본 파일을 되찾습니다."
+  },
+  "wizFileTitle": {
+    "message": "어떤 파일을 보호할까요?"
+  },
+  "wizDestTitle": {
+    "message": "어디에 저장할까요?"
+  },
+  "wizKeyTitle": {
+    "message": "키는 어떻게 다룰까요?"
+  },
+  "wizPasswordTitle": {
+    "message": "비밀번호 선택"
+  },
+  "wizPasswordDesc": {
+    "message": "복원하려면 바로 이 비밀번호가 필요합니다. 잃어버리면 복구할 방법이 없습니다."
+  },
+  "wizRestoreModeTitle": {
+    "message": "무엇에서 복원하나요?"
+  },
+  "wizRestoreStandardDesc": {
+    "message": "StegoShard 이미지, 인쇄된 PDF, 또는 저장으로 만든 .zip."
+  },
+  "wizRestoreGalleryDesc": {
+    "message": "갤러리 모드 비밀을 몰래 담고 있는 평범한 사진들."
+  },
+  "wizRestoreFilesTitle": {
+    "message": "복원에 사용할 파일 추가"
+  },
+  "wizReviewTitle": {
+    "message": "준비되면 시작하세요"
+  },
+  "wizReviewFile": {
+    "message": "파일"
+  },
+  "wizRunSave": {
+    "message": "이미지 만들기"
+  },
+  "wizRunRestore": {
+    "message": "파일 복원"
+  },
+  "destDiskDesc": {
+    "message": "로컬 보관용으로 .zip에 담은 PNG 이미지."
+  },
+  "destPaperDesc": {
+    "message": "인쇄용 PDF: 페이지마다 QR 하나, 인쇄와 스캔을 견딥니다."
+  },
+  "destBinaryDesc": {
+    "message": "이미지 대신 내용이 드러나지 않는 파일 하나. 큰 비밀에 가장 알맞습니다."
+  },
+  "destGalleryDesc": {
+    "message": "직접 고른 평범한 사진들과 미끼 사진에 나눠 숨깁니다."
+  },
+  "keyModeEmbeddedDesc": {
+    "message": "키가 이미지 안에 함께 담깁니다. 가장 단순합니다. 비밀번호 하나만 보관하면 됩니다."
+  },
+  "keyModeKeyfileDesc": {
+    "message": "이미지와 따로 보관하는 별도의 .key 파일입니다. 복원하려면 둘 다 필요합니다."
+  },
+  "keyModeStegoDesc": {
+    "message": "키가 사용자가 제공한 평범한 사진 안에 숨겨집니다. 복원하려면 그 사진을 보관하세요."
+  },
+  "destSqlite": {
+    "message": "위장 DB"
+  },
+  "destSqliteDesc": {
+    "message": "평범한 SQLite 데이터베이스로 위장한 파일 하나. 파일 형식 검사에서 .db로 읽힙니다."
+  },
+  "statusGallerySavedKeyfile": {
+    "message": "사진 $COUNT$장에 나눠 저장했습니다. 복원하려면 별도의 .key 파일과 비밀번호를 모두 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusGallerySavedStego": {
+    "message": "사진 $COUNT$장에 나눠 저장했습니다. 복원하려면 키 사진과 비밀번호를 모두 보관하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizComputing": {
+    "message": "사용 가능한 형식을 확인하는 중…"
+  },
+  "wizFileInfo": {
+    "message": "$SIZE$ · 사용 가능: $FORMATS$",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "formats": {
+        "content": "$2"
+      }
+    }
+  },
+  "wizNoFormat": {
+    "message": "이 파일은 어떤 형식에도 너무 큽니다. 더 작은 파일로 시도하세요."
+  },
+  "wizTooLarge": {
+    "message": "너무 큼(최대 1 MB)"
+  },
+  "wizTooLargeGallery": {
+    "message": "사진에 담기에 너무 큼(압축 후 약 $MAX$ KB)",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizTooLargeBinary": {
+    "message": "너무 큼(최대 256 MiB)"
+  },
+  "wizTooManyImages": {
+    "message": "이미지가 $MAX$개를 넘게 필요함",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizImagesCount": {
+    "message": "이미지 $N$개",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizOneFile": {
+    "message": "파일 1개"
+  },
+  "wizGalleryPhotos": {
+    "message": "사진 약 $N$장",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryCovers": {
+    "message": "사진을 $N$장 이상 추가하세요(JPG 또는 PNG, 되도록 형식을 통일하세요).",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "wizGalleryNeed": {
+    "message": "이 갤러리에는 사진이 $N$장 이상 필요합니다.",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "pwVeryWeak": {
+    "message": "매우 약함"
+  },
+  "pwWeak": {
+    "message": "약함"
+  },
+  "pwFair": {
+    "message": "보통"
+  },
+  "pwGood": {
+    "message": "양호"
+  },
+  "pwStrong": {
+    "message": "강함"
+  },
+  "confirmWeakPassword": {
+    "message": "이 비밀번호는 약해 보이며 오프라인에서 추측될 수 있습니다. 그래도 계속할까요?"
+  },
+  "pwBits": {
+    "message": "비트"
+  },
+  "pwGenerate": {
+    "message": "강력한 암호구 생성"
+  },
+  "badgeDeniable": {
+    "message": "부인 가능"
+  },
+  "badgeOvert": {
+    "message": "공개"
+  },
+  "modeLegend": {
+    "message": "부인 가능한 방식은 평범한 파일처럼 섞여 들고, 나머지는 드러내 놓고 StegoShard입니다."
+  },
+  "recoveryHeading": {
+    "message": "나중에 복원하려면 다음을 보관하세요:"
+  },
+  "recoveryPassword": {
+    "message": "비밀번호: 잃어버리면 복구할 방법이 없습니다"
+  },
+  "recoveryImages": {
+    "message": "저장된 이미지"
+  },
+  "recoveryFile": {
+    "message": "저장된 파일"
+  },
+  "recoveryPhotos": {
+    "message": "이 세트의 모든 사진"
+  },
+  "recoveryKeyfile": {
+    "message": "별도의 키 파일"
+  },
+  "recoveryCover": {
+    "message": "숨겨진 키를 담고 있는 커버 사진"
+  },
+  "recoveryLossless": {
+    "message": "저장된 그대로 보관하세요. 크기 변경, 재압축, 또는 이미지를 다시 인코딩하는 서비스를 거치면 파괴됩니다."
+  },
+  "filesCreatedHeading": {
+    "message": "생성된 파일:"
+  },
+  "filePurposeVault": {
+    "message": "금고: 파일을 담고 있습니다"
+  },
+  "filePurposeArchive": {
+    "message": "모든 이미지를 하나의 .zip에 묶음"
+  },
+  "filePurposeDocument": {
+    "message": "인쇄용 시트"
+  },
+  "filePurposePhotos": {
+    "message": "조각 사진: 세트 전체를 보관하세요"
+  },
+  "filePurposeKeyfile": {
+    "message": "별도의 키: 비밀번호와 함께 필요합니다"
+  },
+  "filePurposeStegoCover": {
+    "message": "숨겨진 키를 담은 사진"
+  },
+  "filePurposeShare": {
+    "message": "복구용 공유본, 보관자 한 명 몫"
+  },
+  "onboardingTitle": {
+    "message": "StegoShard에 오신 것을 환영합니다"
+  },
+  "onboardingBody": {
+    "message": "StegoShard는 파일을 암호화한 뒤 선택한 형태로 저장합니다. 결과물은 크게 두 갈래입니다:"
+  },
+  "onboardingDeniable": {
+    "message": "평범한 파일처럼 섞여 듭니다: 사진 묶음이나 진짜처럼 보이는 데이터베이스. 비밀이 존재한다는 사실 자체를 숨기는 것이 목적일 때 선택하세요."
+  },
+  "onboardingOvert": {
+    "message": "드러내 놓고 StegoShard입니다: QR 이미지, 인쇄용 PDF, 또는 평범한 파일. 간단하고 복원력 있는 백업을 원할 때 선택하세요."
+  },
+  "onboardingKeep": {
+    "message": "어느 쪽이든 비밀번호를 보관하세요. 잃어버리면 복구할 방법이 없습니다."
+  },
+  "onboardingDismiss": {
+    "message": "시작하기"
+  },
+  "statusCompressing": {
+    "message": "압축하는 중…"
+  },
+  "statusEncrypting": {
+    "message": "암호화하는 중…"
+  },
+  "statusDecrypting": {
+    "message": "복호화하는 중…"
+  },
+  "statusVerifying": {
+    "message": "검증하는 중…"
+  },
+  "statusUnlocking": {
+    "message": "잠금 해제하는 중…"
+  },
+  "statusRendering": {
+    "message": "만드는 중…"
+  },
+  "accessModeHeading": {
+    "message": "접근 방식"
+  },
+  "accessModePlain": {
+    "message": "일반"
+  },
+  "accessModeDuress": {
+    "message": "강요(미끼)"
+  },
+  "accessModeNonpossession": {
+    "message": "비소지(공유본)"
+  },
+  "labelDuressPassword": {
+    "message": "강요용 비밀번호(미끼를 엽니다)"
+  },
+  "decoyTitle": {
+    "message": "미끼 파일"
+  },
+  "duressWarning": {
+    "message": "강요를 받아 미끼를 내놓는 행위는 지역에 따라 허위 진술이자 범죄가 될 수 있습니다. 먼저 위협 모델을 읽어 보세요."
+  },
+  "duressLegalLink": {
+    "message": "강요와 키 공개 관련 법 →"
+  },
+  "factorDuressHint": {
+    "message": "키 파일이나 스테고 커버를 쓰면 그 추가 요소는 진짜 파일만 보호합니다. 미끼는 여전히 강요용 비밀번호만으로 열립니다."
+  },
+  "labelThreshold": {
+    "message": "임계값(보관자 n명 중 k명)"
+  },
+  "thresholdHint": {
+    "message": "혼자서 이것을 열 수 있는 것은 아무것도 남기지 않습니다. n개의 공유 파일 중 아무 k개면 열립니다."
+  },
+  "labelExtraEntropy": {
+    "message": "추가 엔트로피 넣기(선택, 전문가용)"
+  },
+  "labelThresholdN": {
+    "message": "만들 공유본 수(n)"
+  },
+  "labelThresholdK": {
+    "message": "필요한 공유본 수(k)"
+  },
+  "thresholdSummary": {
+    "message": "$N$개의 공유본 중 $K$개를 모아야 합니다.",
+    "placeholders": {
+      "k": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
+  "errNoThreshold": {
+    "message": "올바른 k-of-n 임계값을 입력하세요(1 ≤ k ≤ n)."
+  },
+  "errDuressInputs": {
+    "message": "강요 모드에는 강요용 비밀번호와 미끼 파일이 필요합니다."
+  },
+  "errDuressGallery": {
+    "message": "강요 모드는 사진 갤러리에서 사용할 수 없습니다. 위장 데이터베이스(.db)를 사용하세요."
+  },
+  "errModeExcluded": {
+    "message": "이 접근 방식은 위장 데이터베이스(.db)나 사진 갤러리에서만 사용할 수 있습니다."
+  },
+  "codecHeading": {
+    "message": "이미지 부호"
+  },
+  "codecColor": {
+    "message": "컬러 그리드"
+  },
+  "codecColorDesc": {
+    "message": "흑백 대신 정사각형마다 여덟 가지 색을 씁니다. 데이터가 약 세 배라서 파일 수는 약 3분의 1이 됩니다. 디스크 보관에 가장 알맞습니다."
+  },
+  "codecQr": {
+    "message": "QR 코드"
+  },
+  "codecQrDesc": {
+    "message": "어떤 휴대폰으로도 읽히는 평범한 흑백 QR 코드입니다. 같은 비밀에 파일이 더 많이 필요하지만, 이미지가 이 앱보다 오래 남아야 한다면 가장 안전한 선택입니다."
+  },
+  "codecHelp": {
+    "message": "복원 방법은 같습니다. StegoShard가 둘 다 자동으로 읽습니다. 컬러는 이미지 한 장에 더 많이 담고, QR은 어디서나 읽히는 형식입니다. 인쇄 페이지는 항상 QR을 씁니다."
+  },
+  "codecCount": {
+    "message": "파일 $N$개",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "extraEntropyHeading": {
+    "message": "추가 엔트로피(선택)"
+  },
+  "extraEntropyPlaceholder": {
+    "message": "아무렇게나 입력하거나 주사위 눈을 적으세요…"
+  },
+  "extraEntropyAlwaysCsprng": {
+    "message": "브라우저의 안전한 난수 생성기는 항상 사용됩니다."
+  },
+  "extraEntropyBits": {
+    "message": "약 $N$비트 추가됨",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "extraEntropyKeyHelp": {
+    "message": "금고 키 자체를 덮을 수 있는 곳은 여기뿐입니다. 키는 지금 만들어지며, 나중에 저장 시점에 넣은 엔트로피는 이 키에 소급되지 않습니다. 이 키는 이 기기에서 만드는 모든 금고를 보호합니다."
+  },
+  "extraEntropyHelp": {
+    "message": "여기에 입력한 내용은 이번 저장에서 생성되는 모든 난수에 섞입니다(XOR). 브라우저의 안전한 난수 생성기는 그와 무관하게 항상 함께 쓰입니다. 불확실성을 더할 뿐 대체하지는 않으므로 약한 문자열이 금고를 약하게 만들 수는 없습니다. 이번 저장의 솔트, 논스, 그 밖에 생성되는 값에 적용되며, 키 저장소에 이미 있는 금고 키는 그 전에 만들어졌으므로 영향을 받지 않습니다. 입력한 내용은 저장되지 않으며, 복원할 때 다시 입력할 필요도 없습니다."
+  },
+  "btnSaveFile": {
+    "message": "암호화 후 파일 내려받기"
+  },
+  "wizRunSaveFile": {
+    "message": "파일 만들기"
+  },
+  "statusSavingFile": {
+    "message": "암호화하고 파일을 쓰는 중…"
+  },
+  "keyModeEmbeddedDescFile": {
+    "message": "키가 파일 안에 함께 담깁니다. 가장 단순합니다. 비밀번호 하나만 보관하면 됩니다."
+  },
+  "keyModeKeyfileDescFile": {
+    "message": "금고 파일과 따로 보관하는 별도의 .key 파일입니다. 복원하려면 둘 다 필요합니다."
+  },
+  "keyModeHelpFile": {
+    "message": "키 파일을 따로 두면 금고 파일이 유출되어도 그 자체로는 아무것도 드러나지 않습니다. 다만 .key 파일도 함께 보관해야 합니다."
+  },
+  "restoreModeHeading": {
+    "message": "무엇에서 복원하나요?"
+  }
+}

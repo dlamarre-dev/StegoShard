@@ -143,8 +143,8 @@ modules and module workers are both blocked over `file://`).
 ## Language
 
 The CLI speaks the system language: `--help`, every error, the progress phases and
-the result lines, in the same eight locales as the app (`en`, `fr`, `de`, `es`,
-`it`, `pt`, `ja`, `zh_TW`), falling back to English for anything else.
+the result lines, in the same nine locales as the app (`en`, `fr`, `de`, `es`,
+`it`, `pt`, `ja`, `ko`, `zh_TW`), falling back to English for anything else.
 
 Detection is ICU's default locale, which is the only portable source: Windows sets
 no `LANG`, and ICU there follows the regional settings, while on Unix it follows
@@ -196,5 +196,6 @@ Two ways to install, depending on whether you already have Node:
   own launcher.
 
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
-CJK (`ja`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to English if
-none is found; nothing is ever downloaded.
+CJK (`ja`/`ko`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to
+English if none is found; nothing is ever downloaded. The system-font candidates are
+per-script, since a Japanese or Chinese face carries no Hangul.

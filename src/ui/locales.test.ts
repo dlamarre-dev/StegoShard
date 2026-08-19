@@ -23,6 +23,8 @@ describe('resolveLocale', () => {
     expect(resolveLocale(null, 'pt-BR')).toBe('pt');
     expect(resolveLocale('fr-CA', 'en-US')).toBe('fr');
     expect(resolveLocale(null, 'de_AT.UTF-8')).toBe('de');
+    expect(resolveLocale(null, 'ko-KR')).toBe('ko');
+    expect(resolveLocale('ko_KR', 'en-US')).toBe('ko');
   });
 
   it('sends every Chinese tag to the one Chinese UI shipped', () => {
@@ -43,7 +45,7 @@ describe('resolveLocale', () => {
 
   it('resolves every code it lists', () => {
     for (const code of LOCALE_CODES) expect(resolveLocale(code, 'en')).toBe(code);
-    expect(LOCALE_CODES).toEqual(['en', 'fr', 'de', 'es', 'it', 'pt', 'ja', 'zh_TW']);
+    expect(LOCALE_CODES).toEqual(['en', 'fr', 'de', 'es', 'it', 'pt', 'ja', 'ko', 'zh_TW']);
     // Each entry is complete enough for a selector and for <html lang>.
     for (const locale of LOCALES) {
       expect(locale.name.length, locale.code).toBeGreaterThan(0);
