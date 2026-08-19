@@ -189,7 +189,7 @@ describe('startup notice', () => {
   });
 
   it('speaks every language the app does', () => {
-    // A ninth locale added to the list without a notice would otherwise show up
+    // A tenth locale added to the list without a notice would otherwise show up
     // as silent English for those users.
     for (const code of LOCALE_CODES) {
       const notice = startupNotice(URL_, code);

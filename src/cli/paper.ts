@@ -4,7 +4,7 @@
  * Reuses the neutral `buildPaperPdf` with a Node text engine. No fonts are
  * bundled: Latin locales (en/fr/de/es/it/pt) render with pdf-lib's built-in
  * Helvetica (WinAnsi), exactly like the browser's vector path. CJK locales
- * (ja/zh) need a real font, resolved from `--font` or the OS's system fonts and
+ * (ja/ko/zh) need a real font, resolved from `--font` or the OS's system fonts and
  * embedded via fontkit as vector text. If no usable CJK font is found, the
  * instruction sheet falls back to English (the QR payload is unaffected). This
  * stays fully offline; nothing is ever downloaded.
@@ -64,24 +64,39 @@ class NodeTextEngine extends TextEngine {
   }
 }
 
-/** Known per-OS system font locations to try for CJK coverage. */
-function systemCjkFontCandidates(): string[] {
+/**
+ * Known per-OS system font locations to try for CJK coverage.
+ *
+ * Korean gets its own list rather than sharing one: a Japanese or Chinese face
+ * such as PingFang or Yu Gothic carries no Hangul, and a font missing a glyph
+ * draws a blank rather than failing, so offering those for `ko` would print an
+ * empty sheet instead of falling back to English. Only faces that actually cover
+ * Hangul are offered for Korean; the pan-CJK ones (Arial Unicode, Noto CJK) do,
+ * and appear in both.
+ */
+export function systemCjkFontCandidates(locale: string): string[] {
+  const korean = /^ko/i.test(locale.replace('_', '-'));
   switch (process.platform) {
     case 'win32':
-      return [
-        'C:/Windows/Fonts/YuGothM.ttc',
-        'C:/Windows/Fonts/msgothic.ttc',
-        'C:/Windows/Fonts/msyh.ttc',
-        'C:/Windows/Fonts/simsun.ttc',
-        'C:/Windows/Fonts/meiryo.ttc',
-      ];
+      return korean
+        ? ['C:/Windows/Fonts/malgun.ttf', 'C:/Windows/Fonts/gulim.ttc']
+        : [
+            'C:/Windows/Fonts/YuGothM.ttc',
+            'C:/Windows/Fonts/msgothic.ttc',
+            'C:/Windows/Fonts/msyh.ttc',
+            'C:/Windows/Fonts/simsun.ttc',
+            'C:/Windows/Fonts/meiryo.ttc',
+          ];
     case 'darwin':
-      return [
-        '/System/Library/Fonts/PingFang.ttc',
-        '/System/Library/Fonts/Hiragino Sans GB.ttc',
-        '/Library/Fonts/Arial Unicode.ttf',
-      ];
+      return korean
+        ? ['/System/Library/Fonts/AppleSDGothicNeo.ttc', '/Library/Fonts/Arial Unicode.ttf']
+        : [
+            '/System/Library/Fonts/PingFang.ttc',
+            '/System/Library/Fonts/Hiragino Sans GB.ttc',
+            '/Library/Fonts/Arial Unicode.ttf',
+          ];
     default:
+      // Noto CJK is one family across all four scripts, Hangul included.
       return [
         '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
         '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
@@ -90,9 +105,15 @@ function systemCjkFontCandidates(): string[] {
   }
 }
 
-/** True when the locale needs a CJK-capable font. */
-function needsCjkFont(locale?: string): boolean {
-  return /^(ja|zh)/i.test((locale ?? '').replace('_', '-'));
+/**
+ * True when the locale needs a CJK-capable font.
+ *
+ * Exported with `systemCjkFontCandidates` as a testing seam: whether a locale
+ * reaches the font path at all, and which faces it is offered, are decisions no
+ * end-to-end assertion can pin down on a machine whose system fonts are unknown.
+ */
+export function needsCjkFont(locale?: string): boolean {
+  return /^(ja|ko|zh)/i.test((locale ?? '').replace('_', '-'));
 }
 
 /**
@@ -100,8 +121,8 @@ function needsCjkFont(locale?: string): boolean {
  * then system fonts. Returns null when none is found (caller falls back to
  * English). Only the file is read here; embeddability is validated later.
  */
-function resolveCjkFontBytes(fontPath: string | undefined): Uint8Array | null {
-  const candidates = fontPath ? [fontPath] : systemCjkFontCandidates();
+function resolveCjkFontBytes(fontPath: string | undefined, locale: string): Uint8Array | null {
+  const candidates = fontPath ? [fontPath] : systemCjkFontCandidates(locale);
   for (const path of candidates) {
     if (existsSync(path)) {
       try {
@@ -170,7 +191,7 @@ export async function buildCliPaperPdf(
   // Decide the font (and thus the effective locale) BEFORE building, so the
   // instruction sheet's language and its glyphs are guaranteed consistent.
   if (needsCjkFont(effectiveLocale)) {
-    const bytes = resolveCjkFontBytes(options.fontPath);
+    const bytes = resolveCjkFontBytes(options.fontPath, effectiveLocale);
     if (bytes && (await canEmbed(bytes))) {
       unicodeBytes = bytes;
     } else {

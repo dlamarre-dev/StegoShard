@@ -16,6 +16,7 @@ import es from './es.json';
 import it from './it.json';
 import pt from './pt.json';
 import ja from './ja.json';
+import ko from './ko.json';
 import zhTW from './zh_TW.json';
 // One definition, shared with the web app's i18n and the offline launcher.
 import { LOCALES, LOCALE_CODES, resolveLocale } from '../../ui/locales';
@@ -45,6 +46,7 @@ const CATALOGS: Record<string, Pages> = {
   it: it as unknown as Pages,
   pt: pt as unknown as Pages,
   ja: ja as unknown as Pages,
+  ko: ko as unknown as Pages,
   zh_TW: zhTW as unknown as Pages,
 };
 

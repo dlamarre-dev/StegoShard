@@ -28,6 +28,7 @@ export const LOCALES: readonly UiLocale[] = [
   { code: 'it', name: 'Italiano', htmlLang: 'it' },
   { code: 'pt', name: 'Português', htmlLang: 'pt' },
   { code: 'ja', name: '日本語', htmlLang: 'ja' },
+  { code: 'ko', name: '한국어', htmlLang: 'ko' },
   { code: 'zh_TW', name: '繁體中文', htmlLang: 'zh-Hant' },
 ];
 

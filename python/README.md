@@ -155,7 +155,7 @@ python -m stegoshard.decode ./vault/cache.db \
 The share files carry their 38 bytes as a dash-grouped **Crockford base32**
 token (no `I`, `L`, `O`, `U`, so a handwritten share cannot be mistranscribed
 into a different valid one) wrapped in instructions. The token is located by
-pattern, so the surrounding prose, in any of the eight shipped languages, is
+pattern, so the surrounding prose, in any of the nine shipped languages, is
 ignored, and a user who pastes only the token is equally fine.
 
 From Python:

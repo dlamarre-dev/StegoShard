@@ -154,7 +154,7 @@ export const es: CliCatalog = {
   helpCover: 'Foto de portada para --key-mode stego (la clave va dentro)',
   helpTitle: 'Etiqueta legible / título del PDF',
   helpDate: 'Fecha mostrada en las páginas (por defecto: hoy)',
-  helpLocale: 'Idioma de la hoja de instrucciones, p. ej. fr, ja, zh_TW',
+  helpLocale: 'Idioma de la hoja de instrucciones, p. ej. fr, ja, ko, zh_TW',
   helpInstructions: 'Incluir la hoja de instrucciones de restauración (papel)',
   helpPasswordHint: 'Pista de contraseña impresa en la hoja',
   helpKeyLocation: 'Dónde se guarda la clave, impreso en la hoja',

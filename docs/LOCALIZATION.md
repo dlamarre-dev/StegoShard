@@ -4,15 +4,15 @@ StegoShard's UI strings live in `public/_locales/<code>/messages.json` and are
 resolved with `chrome.i18n` (see `src/ui/i18n.ts`). The browser locale is
 followed automatically; there is no in-app language switcher for the main UI
 (plan §7). Missing keys fall back to the default locale (`en`), so a partially
-translated locale still works. The standalone web app bundles all eight
+translated locale still works. The standalone web app bundles all nine
 catalogs at build time and selects one from `navigator.language` (see
 `src/web/i18n.ts`), so it stays in sync with the extension.
 
-## Target locales (8)
+## Target locales (9)
 
 Default **English (`en`)**, plus EFIGS (fr, it, de, es), generic Portuguese
-(`pt`), Japanese (`ja`), and Traditional Chinese (`zh_TW`). All 274 UI message keys
-are present in every locale.
+(`pt`), Japanese (`ja`), Korean (`ko`), and Traditional Chinese (`zh_TW`). All 274 UI
+message keys are present in every locale.
 
 ## Review status
 
@@ -21,7 +21,7 @@ are present in every locale.
 | en             | Source of truth.                                                          |
 | fr             | Author-reviewed (project language).                                       |
 | it, de, es, pt | Translated; recommend a light native proofread before 1.0.                |
-| ja, zh_TW      | Translated; **native review required** before store submission (plan §7). |
+| ja, ko, zh_TW  | Translated; **native review required** before store submission (plan §7). |
 
 The store `name` (`extName`, ≤ 75 chars) and `description` (`extDesc`, ≤ 132
 chars) are keyword-oriented rather than literal translations. Before publishing,
@@ -32,7 +32,7 @@ the CJK locales.
 
 The web app's `privacy.html` and `terms.html` keep fixed URLs (already
 registered with search engines) but render in the reader's language. The prose
-for all eight locales lives as structured JSON in `src/web/legal/<code>.json`;
+for all nine locales lives as structured JSON in `src/web/legal/<code>.json`;
 `src/web/legal/render.ts` picks the locale (from a `?lang=` override or the
 browser, with any `zh-*` mapped to `zh_TW`), builds the page as real DOM nodes,
 and shows a visible language selector. `docs/PRIVACY.md` and `docs/TERMS.md`
@@ -44,7 +44,7 @@ public 1.0.
 
 `src/web/legal/legal.test.ts` guards the catalogs: every locale must match the
 English structure exactly and preserve each `href` and `code` literal verbatim
-(URLs and permission names are never translated). The **ja and zh_TW** legal
+(URLs and permission names are never translated). The **ja, ko and zh_TW** legal
 translations, like the UI strings, **need native review** before store
 submission.
 
@@ -52,7 +52,7 @@ submission.
 
 The CLI has its own catalogs in `src/cli/i18n/<code>.ts`: its strings share nothing
 with the UI's (`--threshold must look like "2-of-3"` has no place in a browser), and
-importing eight ~40KB `messages.json` files would have put 320KB of JSON into a
+importing nine ~40KB `messages.json` files would have put 360KB of JSON into a
 7KB launcher for a handful of terminal lines.
 
 They are TypeScript, not JSON, so **`en.ts` is the type**: every other locale is
@@ -63,12 +63,12 @@ a language legitimately spells the English way), and that flag names and
 `STEGOSHARD_*` variables were not translated.
 
 `--help` is **data**, not prose. `usage.ts` renders the flag columns from the
-descriptions, so alignment is computed once instead of being hand-kept in eight
+descriptions, so alignment is computed once instead of being hand-kept in nine
 languages, and no locale can drift out of structure. Adding an option means adding
 a row and a description key.
 
-Its wrapping measures **terminal cells, not characters** (`width.ts`). A Japanese or
-Chinese character occupies two cells, so wrapping by `String.length` put the
+Its wrapping measures **terminal cells, not characters** (`width.ts`). A Japanese,
+Korean or Chinese character occupies two cells, so wrapping by `String.length` put the
 Japanese help 152 columns wide against a promised 88, and CJK text carries no spaces
 to break a line on at all: a run wider than the column is broken by character, one
 step earlier when that would strand a `。` or a closing bracket at the head of a
@@ -81,14 +81,14 @@ suite pins `STEGOSHARD_LANG=en` (`vitest.config.ts`) so assertions on CLI text d
 not depend on whose machine they run on. See
 [CLI.md → Language](CLI.md#language).
 
-The offline web bundle's notes ship in all eight languages too
+The offline web bundle's notes ship in all nine languages too
 (`src/web/offline/README.<code>.txt`), since someone who cannot read the English one
 is exactly who needs them. The launcher wrappers' "Node.js was not found" message
 stays English on purpose: it only appears when there is no Node to translate it.
 
 **Review status:** the CLI catalogs and the bundle READMEs were written the same way
-as the UI strings, so the same caveat applies. `ja` and `zh_TW` need a native review
-before 1.0; the EFIGS set deserves a light proofread.
+as the UI strings, so the same caveat applies. `ja`, `ko` and `zh_TW` need a native
+review before 1.0; the EFIGS set deserves a light proofread.
 
 ## Store screenshots (not yet automated)
 
@@ -99,9 +99,37 @@ Phase 6 / release task. Until then, store screenshots are produced manually.
 
 ## Adding or updating a locale
 
-1. Copy `public/_locales/en/messages.json` to the new `<code>/` folder.
-2. Translate each `message`. **Keep the `$PLACEHOLDER$` tokens** (e.g. `$COUNT$`,
-   `$ALBUM$`) and the accompanying `placeholders` object exactly.
-3. `description` fields are optional in non-default locales (they are translator
-   hints) and are omitted here to keep files compact.
-4. Run the build; verify the UI in that locale.
+`src/ui/locales.ts` is the source of truth: the web app, the legal renderer, the
+CLI catalogs, the CLI startup notice and the offline launcher all read `LOCALES`
+from it, so the code goes in there once. What does **not** follow automatically
+is the per-locale content, and it lives on more surfaces than the UI catalog.
+
+1. Add the entry to `LOCALES` in `src/ui/locales.ts` (code, native `name`,
+   `htmlLang`), in presentation order.
+2. Copy `public/_locales/en/messages.json` to the new `<code>/` folder and
+   translate each `message`. **Keep the `$PLACEHOLDER$` tokens** (e.g. `$COUNT$`,
+   `$ALBUM$`) and the accompanying `placeholders` object exactly. `description`
+   fields are optional in non-default locales (they are translator hints) and are
+   omitted to keep files compact. `extName` must stay ≤ 75 characters and
+   `extDesc` ≤ 132.
+3. Add the four other per-locale files, each modelled on its `en` counterpart:
+   `src/cli/i18n/<code>.ts` (typed `CliCatalog`, so a missing key is a build
+   error), `src/web/legal/<code>.json`, `src/web/offline/README.<code>.txt`, and
+   `docs/store/<code>.md`.
+4. Register them where the catalogs are imported: `src/web/i18n.ts`,
+   `src/web/legal/render.ts`, `src/cli/i18n/index.ts`. Add the startup-notice
+   block to `NOTICE` in `src/cli/ui.ts` and the instruction copy to
+   `INSTRUCTIONS` in `src/ui/paper-build.ts`.
+5. Add the new file to the cross-language index at the top of **every**
+   `src/web/offline/README*.txt`.
+6. For a non-Latin script, check `src/cli/i18n/width.ts` (does the script need two
+   terminal cells?) and `needsCjkFont` / `systemCjkFontCandidates` in
+   `src/cli/paper.ts` (is there a system font that actually carries the glyphs?).
+   A font missing a glyph draws a blank rather than failing, so the wrong
+   candidate list prints an empty instruction sheet.
+7. Update the locale counts in this file, `README.md`, `docs/CLI.md`,
+   `docs/STORE.md`, `docs/store/README.md`, and the tests that freeze the list
+   (`locales.test.ts`, `pickers.test.ts`, `legal.test.ts`, `paper-build.test.ts`,
+   `tests/e2e/cli-ui.spec.ts`).
+8. Run the build and the test suite, then verify the UI and `--help` in that
+   locale.

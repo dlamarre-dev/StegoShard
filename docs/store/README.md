@@ -21,10 +21,11 @@ and is **not** part of the copy.
 | it     | [`it.md`](it.md)       | Translated + copy-edited, native check optional                      |
 | pt     | [`pt.md`](pt.md)       | Translated (generic Portuguese) + copy-edited, native check optional |
 | ja     | [`ja.md`](ja.md)       | Native-reviewed                                                      |
+| ko     | [`ko.md`](ko.md)       | Translated; native review required                                   |
 | zh_TW  | [`zh_TW.md`](zh_TW.md) | Native-reviewed                                                      |
 
-`en.md` is the source of truth; the other seven mirror its structure. This is the
-same 8-locale set as the UI (`docs/LOCALIZATION.md`).
+`en.md` is the source of truth; the other eight mirror its structure. This is the
+same 9-locale set as the UI (`docs/LOCALIZATION.md`).
 
 ## Name & short description live elsewhere
 

@@ -40,9 +40,9 @@ const REQUIRED: (keyof InstructionCopy)[] = [
 ];
 
 describe('instruction copy', () => {
-  it('ships all nine locales, each complete', () => {
+  it('ships all ten locales, each complete', () => {
     expect(Object.keys(INSTRUCTIONS).sort()).toEqual(
-      ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'zh_CN', 'zh_TW'].sort(),
+      ['de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pt', 'zh_CN', 'zh_TW'].sort(),
     );
     for (const [code, copy] of Object.entries(INSTRUCTIONS)) {
       for (const field of REQUIRED) {
@@ -59,6 +59,7 @@ describe('instruction copy', () => {
     expect(instructionLangs('de')[0]!.page).toBe('Seite');
     expect(instructionLangs('es')[0]!.page).toBe('Página');
     expect(instructionLangs('ja')[0]!.page).toBe('ページ');
+    expect(instructionLangs('ko')[0]!.page).toBe('페이지');
     expect(instructionLangs('zh_TW')[0]!.page).toBe('頁');
     expect(instructionLangs('zh-CN')[0]!.page).toBe('页');
   });

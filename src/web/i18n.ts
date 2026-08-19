@@ -15,6 +15,7 @@ import es from '../../public/_locales/es/messages.json';
 import it from '../../public/_locales/it/messages.json';
 import pt from '../../public/_locales/pt/messages.json';
 import ja from '../../public/_locales/ja/messages.json';
+import ko from '../../public/_locales/ko/messages.json';
 import zhTW from '../../public/_locales/zh_TW/messages.json';
 import { friendlyError as friendlyErrorWith } from '../ui/domhelpers';
 // One definition, shared with the legal pages and the offline launcher.
@@ -36,6 +37,7 @@ const CATALOGS: Record<string, Catalog> = {
   it: it as Catalog,
   pt: pt as Catalog,
   ja: ja as Catalog,
+  ko: ko as Catalog,
   zh_TW: zhTW as Catalog,
 };
 

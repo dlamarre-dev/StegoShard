@@ -1,6 +1,6 @@
 /**
  * The destination / codec / key-mode pickers are duplicated across the extension
- * popup and the web app, and their labels live in eight locale files. Nothing
+ * popup and the web app, and their labels live in nine locale files. Nothing
  * else checks that those stay in step, and the failure mode is silent: a missing
  * key renders as an empty button.
  *
@@ -39,8 +39,8 @@ function segItems(html: string): string[] {
 }
 
 describe('option pickers', () => {
-  it('ships every referenced message key in all eight locales', () => {
-    expect(LOCALES.sort()).toEqual(['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'zh_TW']);
+  it('ships every referenced message key in all nine locales', () => {
+    expect(LOCALES.sort()).toEqual(['de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pt', 'zh_TW']);
     for (const [page, html] of Object.entries(PAGES)) {
       for (const key of new Set(referencedKeys(html))) {
         for (const [code, catalog] of Object.entries(CATALOGS)) {

@@ -4,7 +4,7 @@
  * The flag names, command lines and examples are literals: they are what the user
  * types, so they are the same in every language. Only the descriptions come from
  * the catalog, and the two-column layout is computed here, which is the whole
- * point of doing it this way: eight hand-aligned copies of a 90-line help text
+ * point of doing it this way: nine hand-aligned copies of a 90-line help text
  * would drift in structure the moment one translation ran long.
  */
 

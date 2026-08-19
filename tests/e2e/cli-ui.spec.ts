@@ -47,7 +47,7 @@ test('the offline bundle carries everything needed to run it', async () => {
   }
   // The notes exist in every language the app speaks. Someone who cannot read the
   // English one is exactly the person who needs them.
-  for (const code of ['fr', 'de', 'es', 'it', 'pt', 'ja', 'zh_TW']) {
+  for (const code of ['fr', 'de', 'es', 'it', 'pt', 'ja', 'ko', 'zh_TW']) {
     const name = `README.${code}.txt`;
     expect(existsSync(resolve(dir, name)), `${name} is missing from the bundle`).toBe(true);
   }

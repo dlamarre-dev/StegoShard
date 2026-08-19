@@ -63,7 +63,7 @@ def decode_share_text(text: str) -> bytes:
     """Read one share out of the text of a `recovery-N.txt` file.
 
     The file also holds a heading and instructions; the token is located by
-    pattern so that prose, in any of the eight shipped languages, is ignored.
+    pattern so that prose, in any of the nine shipped languages, is ignored.
     Falls back to decoding the whole text, which is what a user who pasted only
     the token would supply.
     """

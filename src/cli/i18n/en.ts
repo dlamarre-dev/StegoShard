@@ -172,7 +172,7 @@ export const en = {
   helpCover: 'Cover photo for --key-mode stego (key hidden in it)',
   helpTitle: 'Human-readable label / PDF title',
   helpDate: 'Date shown on the pages (default: today)',
-  helpLocale: 'Instruction-sheet language, e.g. fr, ja, zh_TW',
+  helpLocale: 'Instruction-sheet language, e.g. fr, ja, ko, zh_TW',
   helpInstructions: 'Include the restore instruction sheet (paper)',
   helpPasswordHint: 'Password hint printed on the instruction sheet',
   helpKeyLocation: 'Where the key is kept, printed on the sheet',

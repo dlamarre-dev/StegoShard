@@ -159,7 +159,7 @@ export const ja: CliCatalog = {
   helpCover: '--key-mode stego 用のカバー写真（この中に鍵を隠す）',
   helpTitle: '人が読めるラベル / PDF のタイトル',
   helpDate: 'ページに表示する日付（既定: 今日）',
-  helpLocale: '説明シートの言語。例: fr, ja, zh_TW',
+  helpLocale: '説明シートの言語。例: fr, ja, ko, zh_TW',
   helpInstructions: '復元手順のシートを同梱する（紙）',
   helpPasswordHint: 'シートに印刷するパスワードのヒント',
   helpKeyLocation: '鍵の保管場所。シートに印刷されます',

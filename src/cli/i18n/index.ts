@@ -3,7 +3,7 @@
  *
  * The catalogs are TypeScript rather than JSON so `en` can be the type: every
  * other locale is declared `CliCatalog`, which makes a missing or misnamed key a
- * build error. That matters at this size (over a hundred messages, eight
+ * build error. That matters at this size (over a hundred messages, nine
  * languages); a runtime parity test then checks that the placeholders match too.
  *
  * Detection matches the launcher's (`STEGOSHARD_LANG`, else ICU's default
@@ -19,12 +19,13 @@ import { es } from './es';
 import { it } from './it';
 import { pt } from './pt';
 import { ja } from './ja';
+import { ko } from './ko';
 import { zhTW } from './zh_TW';
 
 export type CliCatalog = typeof en;
 export type CliKey = keyof CliCatalog;
 
-export const CATALOGS: Record<string, CliCatalog> = { en, fr, de, es, it, pt, ja, zh_TW: zhTW };
+export const CATALOGS: Record<string, CliCatalog> = { en, fr, de, es, it, pt, ja, ko, zh_TW: zhTW };
 
 /**
  * Which language to speak.
