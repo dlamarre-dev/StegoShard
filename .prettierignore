@@ -8,3 +8,7 @@ local
 # its bytes, break the SHA-256 digests recorded in PROVENANCE.md, and trip
 # golden:check for a reason that has nothing to do with the format.
 tests/golden
+
+# Site-root tokens (search-engine and CA verification). Their contents are fixed
+# by the issuer and verification fails on any edit, including a trailing newline.
+src/web/site-root
