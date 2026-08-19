@@ -141,7 +141,8 @@ function seoMeta(): Plugin {
           tag({ property: 'og:image:height', content: '630' }),
           tag({
             property: 'og:image:alt',
-            content: 'The StegoShard wordmark and stegosaurus mark on a blue field.',
+            content:
+              'The StegoShard mark and wordmark above the project description, on a blue field.',
           }),
           tag({ name: 'twitter:card', content: 'summary_large_image' }),
           tag({ name: 'twitter:title', content: title }),
