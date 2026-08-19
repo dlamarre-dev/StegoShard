@@ -7,6 +7,26 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Privacy and Terms links ignored the language you picked.** Reported from the
+  published site: switch the app to Korean, click Privacy in the footer, and the page
+  opened in the browser's language. The legal pages consulted `?lang=` and
+  `navigator.language` and nothing else, so the one signal that mattered, the choice the
+  visitor had just made, was the one signal never read.
+
+  Precedence is now `?lang=` first, then the stored choice, then the browser. The URL
+  override stays on top so a shared link renders as its sender meant it to, and arriving
+  on one does not rewrite the recipient's own preference; only an explicit pick does.
+  Switching language _on_ a legal page now persists too, so the app honours it on the way
+  back, which was the same bug in the other direction.
+
+  The storage key moved to `src/web/lang-store.ts` rather than being read across from
+  `web/i18n.ts`: the legal pages are a separate entry point, and importing that module to
+  reach one constant would have pulled all nine `messages.json` catalogs into a page that
+  renders none of them. Covered by unit tests on the precedence and by browser tests that
+  click the real footer link under a deliberately mismatched browser locale.
+
 ### Added
 
 - **Korean (`ko`) is the ninth UI locale**, present on every surface Japanese already

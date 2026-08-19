@@ -20,6 +20,8 @@ import zhTW from '../../public/_locales/zh_TW/messages.json';
 import { friendlyError as friendlyErrorWith } from '../ui/domhelpers';
 // One definition, shared with the legal pages and the offline launcher.
 import { LOCALES, resolveLocale } from '../ui/locales';
+// Shared with the legal pages, which read the same choice.
+import { storedLocale, storeLocale } from './lang-store';
 
 export { LOCALES, resolveLocale };
 
@@ -41,17 +43,7 @@ const CATALOGS: Record<string, Catalog> = {
   zh_TW: zhTW as Catalog,
 };
 
-const STORAGE_KEY = 'stegoshard.lang';
-
-function stored(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null; // storage can be blocked; fall back to the browser language
-  }
-}
-
-let currentCode = resolveLocale(stored(), navigator.language || 'en');
+let currentCode = resolveLocale(storedLocale(), navigator.language || 'en');
 // Always fall back to English for any key missing from the active catalog.
 let messages: Catalog = { ...(en as Catalog), ...(CATALOGS[currentCode] ?? {}) };
 document.documentElement.lang = LOCALES.find((l) => l.code === currentCode)?.htmlLang ?? 'en';
@@ -98,11 +90,7 @@ export function setLocale(code: string): void {
   if (!CATALOGS[code]) return;
   currentCode = code;
   messages = { ...(en as Catalog), ...(CATALOGS[code] as Catalog) };
-  try {
-    localStorage.setItem(STORAGE_KEY, code);
-  } catch {
-    // Non-fatal: the switch still applies for this session.
-  }
+  storeLocale(code);
   document.documentElement.lang = LOCALES.find((l) => l.code === code)?.htmlLang ?? 'en';
   localizeDom();
   window.dispatchEvent(new CustomEvent('localechange', { detail: code }));

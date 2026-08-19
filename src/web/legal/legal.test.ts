@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveLocale, SUPPORTED_LOCALES } from './render';
+import { preferredLocale, resolveLocale, SUPPORTED_LOCALES } from './render';
 import en from './en.json';
 import fr from './fr.json';
 import de from './de.json';
@@ -96,5 +96,42 @@ describe('resolveLocale', () => {
     expect(resolveLocale('kl', 'kl')).toBe('en');
     expect(resolveLocale(null, '')).toBe('en');
     expect(resolveLocale(null, 'ru-RU')).toBe('en');
+  });
+});
+
+describe('preferredLocale', () => {
+  // The bug this exists for: the visitor switches the app to Korean, clicks
+  // Privacy in the footer, and the page opens in the browser's language because
+  // nothing but `?lang=` and `navigator.language` was ever consulted.
+  it('follows the choice the visitor made in the app', () => {
+    expect(preferredLocale(null, 'ko', 'en-US')).toBe('ko');
+    expect(preferredLocale(null, 'fr', 'en-US')).toBe('fr');
+    expect(preferredLocale(null, 'zh_TW', 'ja')).toBe('zh_TW');
+  });
+
+  it('lets an explicit ?lang= win, so a shared link reads as it was sent', () => {
+    expect(preferredLocale('de', 'ko', 'en-US')).toBe('de');
+    expect(preferredLocale('ja', null, 'fr-CA')).toBe('ja');
+  });
+
+  it('falls back to the browser only when nothing was chosen', () => {
+    expect(preferredLocale(null, null, 'ko-KR')).toBe('ko');
+    expect(preferredLocale(null, '', 'pt-BR')).toBe('pt');
+    expect(preferredLocale(undefined, undefined, 'it-IT')).toBe('it');
+  });
+
+  it('ignores an unrecognized ?lang= without discarding the stored choice', () => {
+    expect(preferredLocale('kl', 'ko', 'en-US')).toBe('ko');
+    expect(preferredLocale('', 'ko', 'en-US')).toBe('ko');
+  });
+
+  it('falls back to English when nothing anywhere is supported', () => {
+    expect(preferredLocale(null, 'kl', 'ru-RU')).toBe('en');
+    expect(preferredLocale(null, null, '')).toBe('en');
+  });
+
+  it('resolves a stored regional tag the same way the app does', () => {
+    expect(preferredLocale(null, 'ko_KR', 'en-US')).toBe('ko');
+    expect(preferredLocale(null, 'zh-Hans', 'en-US')).toBe('zh_TW');
   });
 });
