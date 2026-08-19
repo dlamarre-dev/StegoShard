@@ -20,6 +20,8 @@ import ko from './ko.json';
 import zhTW from './zh_TW.json';
 // One definition, shared with the web app's i18n and the offline launcher.
 import { LOCALES, LOCALE_CODES, resolveLocale } from '../../ui/locales';
+// The same stored choice the app writes; these pages are a separate entry point.
+import { storedLocale, storeLocale } from '../lang-store';
 
 type Run = string | { b: string } | { code: string } | { a: string; href: string };
 type Block = { p: Run[] } | { ul: Run[][] };
@@ -55,8 +57,37 @@ export const SUPPORTED_LOCALES = LOCALE_CODES;
 
 export { resolveLocale };
 
+/**
+ * Which language to render, in order of precedence: an explicit `?lang=`, then
+ * the choice the visitor made in the app, then the browser.
+ *
+ * The stored choice is what this exists for. These pages are reached by a footer
+ * link from an app the visitor may well have switched out of their browser's
+ * language, and following that link into a different language reads as the link
+ * being broken. `?lang=` still wins, so a shared link renders as its sender meant
+ * it to rather than in the recipient's saved preference.
+ *
+ * Pure, and separate from `pickLocale` below, because the precedence is the part
+ * worth testing and `location`/`navigator` are not available to a test.
+ */
+export function preferredLocale(
+  urlLang: string | null | undefined,
+  stored: string | null | undefined,
+  ambient: string,
+): string {
+  // Resolved innermost first: stored-or-browser gives a valid code, which then
+  // serves as the fallback for the URL override. An unrecognized `?lang=` is
+  // thereby ignored in favour of the stored choice rather than skipping past it.
+  const chosen = stored ? resolveLocale(stored, ambient) : resolveLocale(null, ambient);
+  return resolveLocale(urlLang, chosen);
+}
+
 function pickLocale(): string {
-  return resolveLocale(new URLSearchParams(location.search).get('lang'), navigator.language);
+  return preferredLocale(
+    new URLSearchParams(location.search).get('lang'),
+    storedLocale(),
+    navigator.language,
+  );
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -148,6 +179,10 @@ export function renderLegal(docKey: DocKey, date: string): void {
     const params = new URLSearchParams(location.search);
     params.set('lang', select.value);
     history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
+    // Persisted so the app honours it on the way back, the same way this page
+    // honours the app's. Only an explicit choice is stored: arriving on a
+    // `?lang=` link must not silently rewrite the visitor's own preference.
+    storeLocale(select.value);
     paint(select.value);
   });
 
