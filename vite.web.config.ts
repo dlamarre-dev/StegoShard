@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, readdirSync, readFileSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -26,7 +26,44 @@ const commit = process.env.GITHUB_SHA ?? 'development';
 const base = process.env.STEGOSHARD_WEB_BASE ?? '/StegoShard/';
 const outDir = process.env.STEGOSHARD_WEB_OUTDIR ?? 'web-dist';
 
+/**
+ * Copy `src/web/site-root/` verbatim to the top of the deployed site.
+ *
+ * For files a search engine or a certificate authority insists on finding at a
+ * fixed URL, whose contents are a token rather than something to build. They
+ * cannot go in `public/`, which this config shares with the *extension* build
+ * (`vite.config.ts`), and a Google verification token has no business inside a
+ * package submitted to the browser stores.
+ *
+ * Pages only. The offline bundle sets `STEGOSHARD_WEB_BASE`, and a site
+ * verification file means nothing in a zip someone unpacks on their own machine.
+ *
+ * Copied byte for byte and never rewritten: verification fails on any edit, so
+ * these are also excluded from Prettier (`.prettierignore`) and pinned by
+ * `src/web/site-root/site-root.test.ts`.
+ */
+function siteRootFiles(): Plugin {
+  const from = resolve(import.meta.dirname, 'src/web/site-root');
+  return {
+    name: 'stegoshard-site-root',
+    apply: 'build',
+    // `writeBundle`, not `closeBundle`: the output directory exists and has been
+    // emptied by then, so a copy into it survives.
+    writeBundle() {
+      if (process.env.STEGOSHARD_WEB_BASE) return; // offline bundle, not the site
+      const out = resolve(import.meta.dirname, outDir);
+      // Everything in the directory rather than a list to keep in step: a second
+      // verification file should need no edit here.
+      for (const name of readdirSync(from)) {
+        if (name.endsWith('.test.ts')) continue; // the guard, not a site file
+        copyFileSync(resolve(from, name), resolve(out, name));
+      }
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [siteRootFiles()],
   root: 'src/web',
   base,
   publicDir: resolve(import.meta.dirname, 'public'),
