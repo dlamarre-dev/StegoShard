@@ -33,7 +33,7 @@
     "preview:web": "vite preview --config vite.web.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "lint:shell": "shellcheck scripts/*.sh src/web/offline/serve.sh",
+    "lint:shell": "shellcheck scripts/*.sh src/web/offline/serve.sh .github/scripts/*.sh",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

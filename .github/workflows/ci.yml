@@ -109,14 +109,22 @@ jobs:
         run: npm run build:cli
       # Same treatment, same reason: the browser download hung alongside the apt
       # one, so the cap belongs on both rather than on whichever was noticed.
+      #
+      # `--with-deps` shells out to apt, and killing this on a timeout leaves
+      # that apt holding /var/lib/dpkg/lock-frontend, which made the first
+      # version of this retry fail both remaining attempts instantly with
+      # "Could not get lock". Every attempt after the first therefore reaps what
+      # the previous one left behind.
       - name: Install pinned browsers
         timeout-minutes: 15
         run: |
+          source .github/scripts/apt-lock.sh
           for attempt in 1 2 3; do
-            if timeout 420 npx playwright install --with-deps chromium firefox; then
+            if timeout --kill-after=30 420 npx playwright install --with-deps chromium firefox; then
               exit 0
             fi
             echo "::warning::playwright install attempt $attempt did not finish; retrying"
+            release_apt_locks
             sleep $((attempt * 15))
           done
           echo "::error::playwright install did not finish after three attempts"
@@ -302,12 +310,14 @@ jobs:
       - name: Install build tools for TestU01
         timeout-minutes: 10
         run: |
+          source .github/scripts/apt-lock.sh
           for attempt in 1 2 3; do
-            if timeout 180 sudo apt-get update && \
-               timeout 180 sudo apt-get install -y autoconf automake libtool; then
+            if timeout --kill-after=30 180 sudo apt-get update && \
+               timeout --kill-after=30 180 sudo apt-get install -y autoconf automake libtool; then
               exit 0
             fi
             echo "::warning::apt-get attempt $attempt did not finish; retrying"
+            release_apt_locks
             sleep $((attempt * 15))
           done
           echo "::error::apt-get did not finish after three attempts"
