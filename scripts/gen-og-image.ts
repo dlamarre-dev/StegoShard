@@ -19,7 +19,16 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
-import { ACCENT_BOT, ACCENT_TOP, drawMark, drawText, textWidth } from '../src/core/brand';
+import {
+  ACCENT_BOT,
+  ACCENT_TOP,
+  drawMark,
+  drawText,
+  foldToBrandText,
+  textHeight,
+  textWidth,
+} from '../src/core/brand';
+import { wrapText } from '../src/ui/text-wrap';
 
 const W = 1200;
 const H = 630;
@@ -30,9 +39,47 @@ const WHITE: readonly [number, number, number] = [0xff, 0xff, 0xff];
 const MUTED: readonly [number, number, number] = [0xc7, 0xd2, 0xfe];
 
 const WORDMARK = 'STEGOSHARD';
-// Folded to the glyph set (ASCII 32..90, uppercase) the bitmap font covers.
-const TAGLINE = 'ENCRYPT FILES INTO RESILIENT IMAGES';
-const SUBLINE = 'OR HIDE THEM IN ORDINARY PHOTOS';
+
+/**
+ * The repository's About text, verbatim.
+ *
+ * One sentence describes this project in the places people meet it, so the card
+ * says what GitHub says. `foldToBrandText` maps it onto the font's ASCII 32..90
+ * glyph set at render time, rather than a second copy being kept in capitals.
+ */
+const ABOUT =
+  'Encrypt a file and save it as error-corrected QR images, hidden inside ordinary ' +
+  'photos, or disguised as a real SQLite database, deniable by design. ' +
+  'Browser extension, web app & CLI.';
+
+const MARGIN_X = 90;
+const MAX_TEXT_W = W - MARGIN_X * 2;
+const MARK = 168;
+const WORD_SCALE = 10;
+const GAP_MARK = 46;
+const GAP_WORD = 42;
+/** Smallest breathing room above and below the whole block. */
+const MARGIN_Y = 44;
+
+/** Line spacing scales with the type, so the block stays proportionate. */
+const lineGap = (scale: number): number => scale * 4;
+
+function layout(scale: number): { lines: string[]; height: number } {
+  const lines = wrapText(ABOUT, MAX_TEXT_W, (s) => textWidth(foldToBrandText(s), scale));
+  const body = lines.length * textHeight(scale) + (lines.length - 1) * lineGap(scale);
+  return { lines, height: MARK + GAP_MARK + textHeight(WORD_SCALE) + GAP_WORD + body };
+}
+
+/**
+ * Largest type the description fits in at. Chosen rather than fixed because the
+ * About text is the kind of thing that gets rewritten, and a hardcoded scale
+ * would silently overflow the card the next time it grows.
+ */
+const scale = [6, 5, 4, 3, 2].find((s) => layout(s).height <= H - MARGIN_Y * 2) ?? 2;
+const { lines, height } = layout(scale);
+if (height > H - MARGIN_Y * 2) {
+  throw new Error(`the description does not fit the card even at scale 2 (${height}px)`);
+}
 
 const png = new PNG({ width: W, height: H });
 const canvas = { data: new Uint8ClampedArray(png.data.buffer, 0, W * H * 4), width: W, height: H };
@@ -52,25 +99,21 @@ for (let y = 0; y < H; y++) {
   }
 }
 
-const MARK = 200;
-const WORD_SCALE = 11;
-const TAG_SCALE = 4;
+const centred = (text: string, s: number): number => Math.round((W - textWidth(text, s)) / 2);
 
-// Centred as one block: mark, wordmark, then the two tagline rows.
-const wordW = textWidth(WORDMARK, WORD_SCALE);
-const blockH = MARK + 56 + 7 * WORD_SCALE + 48 + 7 * TAG_SCALE + 20 + 7 * TAG_SCALE;
-let y = Math.round((H - blockH) / 2);
+let y = Math.round((H - height) / 2);
 
 drawMark(canvas, Math.round((W - MARK) / 2), y, MARK);
-y += MARK + 56;
+y += MARK + GAP_MARK;
 
-drawText(canvas, WORDMARK, Math.round((W - wordW) / 2), y, WORD_SCALE, WHITE);
-y += 7 * WORD_SCALE + 48;
+drawText(canvas, WORDMARK, centred(WORDMARK, WORD_SCALE), y, WORD_SCALE, WHITE);
+y += textHeight(WORD_SCALE) + GAP_WORD;
 
-drawText(canvas, TAGLINE, Math.round((W - textWidth(TAGLINE, TAG_SCALE)) / 2), y, TAG_SCALE, MUTED);
-y += 7 * TAG_SCALE + 20;
-
-drawText(canvas, SUBLINE, Math.round((W - textWidth(SUBLINE, TAG_SCALE)) / 2), y, TAG_SCALE, MUTED);
+for (const line of lines) {
+  const folded = foldToBrandText(line);
+  drawText(canvas, folded, centred(folded, scale), y, scale, MUTED);
+  y += textHeight(scale) + lineGap(scale);
+}
 
 writeFileSync(OUT, PNG.sync.write(png));
-console.log(`og.png  ${W}x${H}  ->  ${OUT}`);
+console.log(`og.png  ${W}x${H}  ${lines.length} lines at scale ${scale}  ->  ${OUT}`);
