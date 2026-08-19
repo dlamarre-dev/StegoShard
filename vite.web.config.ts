@@ -62,8 +62,99 @@ function siteRootFiles(): Plugin {
   };
 }
 
+/** Where the deployed site lives. Only the Pages build has a public address. */
+const SITE_ORIGIN = 'https://dlamarre-dev.github.io';
+
+/**
+ * The canonical path of each page, relative to the deployed base.
+ *
+ * Only the path is listed. The title and the description are *read back out of
+ * the page* below rather than repeated here, so the summary a search engine
+ * shows and the one a link preview shows cannot drift from each other or from
+ * the page itself. Repeating them was the first version of this, and it
+ * immediately produced two different descriptions for the home page.
+ */
+const PAGE_PATHS: Record<string, string> = {
+  'index.html': '',
+  'privacy.html': 'privacy.html',
+  'terms.html': 'terms.html',
+};
+
+/**
+ * Canonical, Open Graph and Twitter tags.
+ *
+ * Pages only, on the same signal `siteRootFiles()` uses: every URL here is
+ * absolute, so in the offline bundle a canonical would point a file:// copy at a
+ * website it is not, and `og:image` would name a host it never contacts. The
+ * bundle has no search presence to manage.
+ *
+ * The description itself is *not* injected: it belongs in the page source, where
+ * it is useful to every copy of the app, and where a reader editing the page can
+ * see it. This plugin only reads it, and fails the build if a page has none,
+ * because the alternative is shipping a page whose search result has no summary
+ * and finding out from Search Console weeks later.
+ *
+ * `og:image` is `og.png` from `site-root/`, which is why it is 1200x630 and why
+ * it lives beside these pages rather than in `public/` (shared with the extension
+ * build). Its dimensions are declared so a scraper can lay the card out before it
+ * finishes downloading.
+ */
+function seoMeta(): Plugin {
+  return {
+    name: 'stegoshard-seo-meta',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html, ctx) {
+        if (process.env.STEGOSHARD_WEB_BASE) return; // offline bundle, no public URL
+        const page = ctx.path.replace(/^\//, '') || 'index.html';
+        const pagePath = PAGE_PATHS[page];
+        if (pagePath === undefined) return;
+
+        // Attributes may sit on separate lines: these files are Prettier-formatted.
+        const title = /<title>([\s\S]*?)<\/title>/.exec(html)?.[1]?.trim();
+        const description = /<meta\s+name="description"\s+content="([^"]*)"/.exec(html)?.[1];
+        if (!title || !description) {
+          throw new Error(
+            `${page}: needs a <title> and a <meta name="description"> before it can be ` +
+              'given canonical and Open Graph tags. Add one to the page source.',
+          );
+        }
+
+        const url = `${SITE_ORIGIN}${base}${pagePath}`;
+        const image = `${SITE_ORIGIN}${base}og.png`;
+        const tag = (attrs: Record<string, string>) => ({
+          tag: 'meta' as const,
+          attrs,
+          injectTo: 'head' as const,
+        });
+
+        return [
+          { tag: 'link', attrs: { rel: 'canonical', href: url }, injectTo: 'head' as const },
+          tag({ property: 'og:type', content: 'website' }),
+          tag({ property: 'og:site_name', content: 'StegoShard' }),
+          tag({ property: 'og:url', content: url }),
+          tag({ property: 'og:title', content: title }),
+          tag({ property: 'og:description', content: description }),
+          tag({ property: 'og:image', content: image }),
+          tag({ property: 'og:image:width', content: '1200' }),
+          tag({ property: 'og:image:height', content: '630' }),
+          tag({
+            property: 'og:image:alt',
+            content: 'The StegoShard wordmark and stegosaurus mark on a blue field.',
+          }),
+          tag({ name: 'twitter:card', content: 'summary_large_image' }),
+          tag({ name: 'twitter:title', content: title }),
+          tag({ name: 'twitter:description', content: description }),
+          tag({ name: 'twitter:image', content: image }),
+        ];
+      },
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [siteRootFiles()],
+  plugins: [siteRootFiles(), seoMeta()],
   root: 'src/web',
   base,
   publicDir: resolve(import.meta.dirname, 'public'),

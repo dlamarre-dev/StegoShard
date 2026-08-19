@@ -1,0 +1,14 @@
+# Nothing here is disallowed: the site is three public pages and a client-side
+# app, and there is no crawl budget worth shaping.
+#
+# NOTE: at the moment this file does nothing. Crawlers read robots.txt only from
+# the root of a host, which for a GitHub Pages project site is
+# https://dlamarre-dev.github.io/robots.txt, not this path. The file that is
+# actually honoured lives in the dlamarre-dev.github.io repository. This copy
+# becomes authoritative the moment a custom domain points at StegoShard, which
+# is the only reason it is kept in step.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://dlamarre-dev.github.io/StegoShard/sitemap.xml

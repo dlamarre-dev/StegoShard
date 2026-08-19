@@ -55,6 +55,7 @@
     "vectors": "tsx scripts/gen-vectors.ts",
     "fuzz": "tsx scripts/fuzz.ts",
     "icons": "tsx scripts/gen-icons.ts",
+    "og": "tsx scripts/gen-og-image.ts",
     "notices": "tsx scripts/generate-notices.ts",
     "notices:check": "tsx scripts/generate-notices.ts --check",
     "audit": "npm audit --audit-level=moderate && npm audit --omit=dev --audit-level=moderate",
