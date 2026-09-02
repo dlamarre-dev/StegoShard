@@ -22,8 +22,8 @@ import {
   TextEngine,
   type TextBlockOpts,
   buildPaperPdf,
-} from '../ui/paper-build';
-import { wrapText } from '../ui/text-wrap';
+} from '../../ui/paper-build';
+import { wrapText } from '../../ui/text-wrap';
 
 /** Replace characters Helvetica (WinAnsi) cannot encode. */
 function sanitizeWinAnsi(text: string): string {
@@ -180,8 +180,8 @@ export interface CliPaperResult {
  */
 export async function buildCliPaperPdf(
   imagePayloads: Uint8Array[],
-  encodeQr: (payload: Uint8Array) => import('@core').ImageDataLike,
-  pngEncode: (img: import('@core').ImageDataLike) => Uint8Array,
+  encodeQr: (payload: Uint8Array) => import('../../core').ImageDataLike,
+  pngEncode: (img: import('../../core').ImageDataLike) => Uint8Array,
   options: CliPaperOptions,
 ): Promise<CliPaperResult> {
   let effectiveLocale = options.locale ?? 'en';
