@@ -17,6 +17,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   type Argon2Params,
   type KeyBlock,
+  DEFAULT_ARGON2,
   DEK_LEN,
   GCM_TAG_LEN,
   IV_LEN,
@@ -446,6 +447,21 @@ describe('Argon2id parameter boundaries', () => {
       bytes.set(p.value, p.offset);
       expect(() => parseKeyBlock(bytes), p.name).toThrow(/out of range/);
     }
+  });
+
+  // DEFAULT_ARGON2 is the default argument of every derivation in crypto.ts, so a
+  // single mutation would weaken every KDF in the process at once. Frozen, the
+  // attempt throws in strict mode (ES modules are always strict) instead of
+  // silently succeeding.
+  it('DEFAULT_ARGON2 cannot be weakened in place', () => {
+    expect(Object.isFrozen(DEFAULT_ARGON2)).toBe(true);
+    const mutable = DEFAULT_ARGON2 as Argon2Params;
+    expect(() => {
+      mutable.memoryKiB = 8;
+    }).toThrow(TypeError);
+    expect(DEFAULT_ARGON2.memoryKiB).toBe(256 * 1024);
+    expect(DEFAULT_ARGON2.iterations).toBe(4);
+    expect(DEFAULT_ARGON2.parallelism).toBe(1);
   });
 });
 
