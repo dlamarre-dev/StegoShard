@@ -14,6 +14,18 @@ export default defineConfig({
     // English text. Without this they pass or fail by whose machine they run on
     // (this was written on a fr-CA one).
     env: { STEGOSHARD_LANG: 'en' },
+    // Vitest's 5s default was never a deliberate budget for this suite. Argon2id
+    // at 256 MiB, the 4096-iteration container corruption sweeps and the erasure
+    // reconstruct matrices legitimately take seconds, and several of them sat just
+    // inside 5s: adding any test raised the parallel load enough to push whichever
+    // one lost the race over the edge, first sqlite-container.test.ts, then
+    // vault.reconstruct.test.ts, and only under `--coverage`, where the v8
+    // instrumentation adds its own overhead. That is a flake, not a signal.
+    //
+    // 20s still catches a genuinely hung test well inside the CI job budget, and
+    // the deliberately long tests keep declaring their own `SLOW` timeouts (30s to
+    // 90s), so the intent of those stays visible in the test files.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
