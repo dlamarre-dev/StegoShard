@@ -1,0 +1,7 @@
+[
+  "node_modules/@pdf-lib/fontkit",
+  "node_modules/fast-png",
+  "node_modules/iobuffer",
+  "node_modules/jpeg-js",
+  "node_modules/pako"
+]

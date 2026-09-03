@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { recordBundledPackages } from './scripts/bundled-packages';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { builtinModules } from 'node:module';
@@ -37,6 +38,7 @@ const nodeBuiltins = [...builtinModules, ...builtinModules.map((m) => `node:${m}
 const externalPackages = ['pdf-lib', 'fflate', 'hash-wasm', 'jsqr', 'qrcode'];
 
 export default defineConfig({
+  plugins: [recordBundledPackages('lib')],
   // Vite copies `public/` into outDir by default, which for this build would mean
   // shipping the browser extension's icons and locale catalogs inside the npm
   // package. Nothing in the library reads them.

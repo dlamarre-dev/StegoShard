@@ -1,0 +1,12 @@
+[
+  "node_modules/@pdf-lib/standard-fonts",
+  "node_modules/@pdf-lib/upng",
+  "node_modules/dijkstrajs",
+  "node_modules/fflate",
+  "node_modules/hash-wasm",
+  "node_modules/jsqr",
+  "node_modules/pako",
+  "node_modules/pdf-lib",
+  "node_modules/qrcode",
+  "node_modules/tslib"
+]

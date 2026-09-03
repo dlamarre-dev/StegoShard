@@ -57,6 +57,18 @@ same reasoning as the golden corpus, one layer up.
 `tests/api/surface.txt` is the same guard at the value level, catching a runtime
 export the declaration rollup cannot see. It is compared by an ordinary test.
 
+### Third-party notices
+
+`THIRD_PARTY_NOTICES.txt` covers everything we distribute: what npm installs for a
+consumer, **and** what each build inlines into an artifact we hand out. The second
+half comes from `.bundled/<build>.json`, written by the bundler and committed.
+
+So a change to dependencies, or to what a build bundles, means: run the builds,
+then `npm run notices`, and commit both. CI fails if `.bundled/` moves without the
+notices following. A package whose licence is not on the approved list, or that
+ships no licence text, stops the build; both are decisions to record in
+[docs/LICENSING.md](docs/LICENSING.md), not gates to loosen.
+
 ### Release dry run
 
 The release workflows only fire on a `v*` tag, so their first real execution

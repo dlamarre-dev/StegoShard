@@ -60,3 +60,9 @@ Thumbs.db
 # Stryker output and its incremental cache.
 reports/
 .stryker-tmp/
+
+# NOTE: `.bundled/` is deliberately NOT ignored. Each build writes the list of
+# npm packages it inlined, and generate-notices.ts reads them, so the lists are
+# committed for two reasons: `ci:node` runs `notices:check` before any build has
+# happened, and a change to what we distribute should be a reviewable diff rather
+# than something that only appears in a regenerated notices file.

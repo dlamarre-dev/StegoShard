@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { recordBundledPackages } from './scripts/bundled-packages';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { builtinModules } from 'node:module';
@@ -14,6 +15,7 @@ import { builtinModules } from 'node:module';
 const nodeBuiltins = [...builtinModules, ...builtinModules.map((m) => `node:${m}`)];
 
 export default defineConfig({
+  plugins: [recordBundledPackages('cli')],
   // Vite copies `public/` into outDir by default, which put the extension's
   // `_locales/` and `icons/` beside the CLI bundle. Nothing reads them there: the
   // CLI's own strings are compiled in from `src/cli/i18n`, and the browser UI

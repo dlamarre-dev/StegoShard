@@ -72,6 +72,24 @@ jobs:
       - name: Check the npm tarball
         run: npm run pack:check
 
+      # Every build above rewrote `.bundled/`, the record of which npm packages it
+      # inlined. Those files are committed and drive THIRD_PARTY_NOTICES.txt, so a
+      # change here means we now distribute something different: either the notices
+      # were regenerated with it, or this is the first anyone would have known.
+      # `ci:node` already ran `notices:check` against the committed manifests, so
+      # the pair of checks is what closes the loop.
+      - name: Fail if what we distribute changed without the notices
+        run: |
+          if ! git diff --quiet -- .bundled; then
+            echo "The set of bundled packages changed:"
+            git --no-pager diff --stat -- .bundled
+            git --no-pager diff -- .bundled
+            echo
+            echo "Run the builds, then 'npm run notices', and commit both."
+            exit 1
+          fi
+          echo "bundled package manifests are current"
+
       - name: Set up Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
