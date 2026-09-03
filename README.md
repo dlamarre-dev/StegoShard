@@ -347,6 +347,7 @@ tool.
 | [Why StegoShard?](docs/WHY.md)                                                                         | The problem, and the reasoning behind the two-model design.                                     |
 | [Where it fits](docs/COMPARISON.md)                                                                    | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools. |
 | [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                      |
+| [Machine interfaces](docs/API.md)                                                                      | Driving StegoShard from a program: the `--json` envelope, error codes, stability.               |
 | [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                     |
 | [Format specification](SPEC.md)                                                                        | The beta on-disk / on-image format candidate (`FORMAT_VERSION = 1`).                            |
 | [Cryptographic review dossier](docs/CRYPTO-REVIEW.md)                                                  | Claims → where enforced → which test proves it, for auditors.                                   |

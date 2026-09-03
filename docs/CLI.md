@@ -100,6 +100,21 @@ The password is taken (in order) from `--password` (which prints a warning, sinc
 visible in your shell history and the process list), `--password-file`, the
 `STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
+## Driving it from a script
+
+`--json` replaces the human output with one JSON document on stdout and
+newline-delimited progress events on stderr, so a script in any language can call
+StegoShard without parsing prose that changes with the user's locale:
+
+```bash
+stegoshard estimate secret.txt --json | jq .result.images
+```
+
+The mode is non-interactive by construction: it never prompts, and never falls
+back to reading stdin, so a caller with an idle pipe gets an error rather than a
+hang. The envelope, the error codes and the schema-version rules are in
+[API.md](API.md).
+
 ## The same app, in a browser, from your own machine
 
 `stegoshard ui` serves the web build locally and prints an address to open. It is the

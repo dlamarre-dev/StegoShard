@@ -76,6 +76,23 @@ jobs:
           diff /tmp/ss-secret.txt /tmp/ss-restored/ss-secret.txt
           echo "Deno round-trip OK"
 
+      # The machine-readable mode, checked on the same bundled + Deno + no-network
+      # path as the round-trip above, because that is where a third-party script
+      # will actually meet it. Asserts the two properties everything else rests
+      # on: stdout is exactly one parseable document, and the schema is the one
+      # consumers pinned against.
+      - name: CLI --json envelope (Deno)
+        run: |
+          deno run --allow-read --allow-write --allow-env \
+            dist-cli/stegoshard.js estimate /tmp/ss-secret.txt --json > /tmp/ss-env.json
+          test "$(wc -l < /tmp/ss-env.json)" -eq 1 || { echo "stdout was not one line"; cat /tmp/ss-env.json; exit 1; }
+          node -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/ss-env.json", "utf8"));
+            if (d.schema !== "stegoshard.cli/1") throw new Error("schema drifted: " + d.schema);
+            if (d.ok !== true || typeof d.result.images !== "number") throw new Error("bad envelope");
+            console.log("envelope OK:", d.schema, d.result.images, "images");
+          '
+
       - name: Upload validated browser builds
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

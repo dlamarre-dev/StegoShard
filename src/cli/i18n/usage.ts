@@ -100,6 +100,7 @@ const RESTORE_ROWS: Row[] = [
 const COMMON_ROWS: Row[] = [
   ['--force', 'helpForce'],
   ['--quiet', 'helpQuiet'],
+  ['--json', 'helpJson'],
 ];
 
 const PASSWORD_ROWS: Row[] = [

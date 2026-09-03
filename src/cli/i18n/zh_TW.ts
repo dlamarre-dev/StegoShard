@@ -35,6 +35,8 @@ export const zhTW: CliCatalog = {
   errEntropyFlagEmpty: '--entropy 是空的（若不需要額外亂度，請不要加這個選項）',
   errEstimateMissing: 'estimate：缺少 <檔案>',
   errUiPort: 'ui：--port 必須是通訊埠號（收到「{value}」）',
+  errJsonUiUnsupported:
+    'ui：不支援 --json；本機網頁介面是互動式且長時間執行的，因此沒有可輸出的結果文件。',
   errUiNoWebApp:
     'ui：這個組建不含網頁應用程式。\n' +
     '獨立執行檔在編譯時沒有網路存取權，因此無法提供服務。請使用\n' +
@@ -161,6 +163,7 @@ export const zhTW: CliCatalog = {
   helpShare: 'nonpossession 保險庫的分片檔（可重複指定）',
   helpForce: '覆寫既有的輸出檔（預設：拒絕）',
   helpQuiet: '不在 stderr 顯示進度',
+  helpJson: '在 stdout 輸出一份 JSON 文件；進度以 NDJSON 輸出至 stderr',
   helpPasswordFlag: '不建議：會出現在 shell 歷史／處理程序清單',
   helpPasswordFile: '從檔案讀取密碼（第一行）',
   helpPasswordEnv: '環境變數',

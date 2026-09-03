@@ -31,6 +31,8 @@ export const pt: CliCatalog = {
   errEntropyFlagEmpty: '--entropy estava vazio (omita a opção se não quiser entropia adicional)',
   errEstimateMissing: 'estimate: falta <ficheiro>',
   errUiPort: 'ui: --port tem de ser um número de porta (recebido «{value}»)',
+  errJsonUiUnsupported:
+    'ui: --json não é suportado; a interface web local é interativa e de longa duração, portanto não há documento de resultado a emitir',
   errUiNoWebApp:
     'ui: esta versão não inclui a aplicação web.\n' +
     'Os binários autónomos são compilados sem acesso à rede, pelo que não a podem\n' +
@@ -167,6 +169,7 @@ export const pt: CliCatalog = {
   helpShare: 'Um ficheiro de parte (repetível) para um cofre nonpossession',
   helpForce: 'Substituir os ficheiros de saída existentes (por omissão: recusa)',
   helpQuiet: 'Ocultar o indicador de progresso no stderr',
+  helpJson: 'Emitir um documento JSON no stdout; o progresso como NDJSON no stderr',
   helpPasswordFlag: 'Não recomendado: visível no histórico / lista de processos',
   helpPasswordFile: 'Ler a palavra-passe de um ficheiro (primeira linha)',
   helpPasswordEnv: 'Variável de ambiente',

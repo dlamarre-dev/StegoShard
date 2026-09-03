@@ -26,18 +26,11 @@ import {
   type SaveOptions,
 } from '../api/node/commands';
 import { codecArgError, entropyArgError } from './argcheck';
-import { CliError, type CliErrorCode } from './errors';
+import { CliError, type CliErrorCode, toCliFailure } from './errors';
 import type { CliIo } from './io';
-import {
-  MAX_FILE_BYTES_BINARY_CLI,
-  collapseManifest,
-  installUserEntropy,
-  type FilePurpose,
-  type KeyMode,
-  type ManifestEntry,
-  type OnProgress,
-  type Progress,
-} from '@core';
+import { humanPresenter, type Presenter } from './present';
+import { jsonPresenter } from './json';
+import { MAX_FILE_BYTES_BINARY_CLI, installUserEntropy, type KeyMode } from '@core';
 import {
   MIN_PASSWORD_LENGTH,
   isStrongNewPassword,
@@ -45,10 +38,24 @@ import {
   passwordStrength,
 } from '../ui/password';
 import { collectAssets, findWebRoot, openInBrowser, startUiServer, startupNotice } from './ui';
-import { t, type CliKey } from './i18n';
+import { t } from './i18n';
 import { usage } from './i18n/usage';
 
 const ACCESS_MODES: AccessMode[] = ['plain', 'duress', 'nonpossession'];
+
+/**
+ * Abandon the command with an already-localized message.
+ *
+ * Throws rather than exiting, so the argument layer is testable: this used to
+ * call `process.exit`, which took the test runner down with the first bad flag.
+ * The bootstrap in `main.ts` is now the only thing that exits, and under `--json`
+ * `run()` catches instead, so the failure becomes the document on stdout. Kept as
+ * a `never`-returning helper so it still narrows control flow at its ~40 call
+ * sites, none of which had to change.
+ */
+function fail(message: string, code: CliErrorCode = 'USAGE', exitCode = 1): never {
+  throw new CliError(code, message, exitCode);
+}
 
 /** Parse a `k-of-n` threshold spec. */
 function parseThreshold(spec: string): { k: number; n: number } {
@@ -60,109 +67,14 @@ function parseThreshold(spec: string): { k: number; n: number } {
   return { k, n };
 }
 
-/** Plain-English purpose for each produced file (the app localizes the same set). */
-const PURPOSE_KEYS = {
-  vault: 'purposeVault',
-  archive: 'purposeArchive',
-  document: 'purposeDocument',
-  photos: 'purposePhotos',
-  keyfile: 'purposeKeyfile',
-  stegoCover: 'purposeStegoCover',
-  share: 'purposeShare',
-} as const satisfies Record<FilePurpose, CliKey>;
-
-/**
- * "Files created" block for the end of a save.
- *
- * Every destination gets one, not just the deniable ones: `cache.db` and
- * `recovery-1.txt` are anonymous by design, and `stegoshard-a1b2-07.png` still
- * does not say which file holds the key. Numbered runs collapse to first … last
- * so a 40-image save stays readable.
- */
-function manifestLines(manifest: readonly ManifestEntry[]): string {
-  if (manifest.length === 0) return '';
-  const groups = collapseManifest(manifest);
-  const rendered = groups.map((g) => ({
-    name: g.count > 1 ? `${g.first} … ${g.last}` : g.first,
-    text: g.count > 1 ? `${t(PURPOSE_KEYS[g.purpose])} (${g.count})` : t(PURPOSE_KEYS[g.purpose]),
-  }));
-  const width = Math.max(...rendered.map((r) => r.name.length));
-  return `${t('outFilesCreated')}\n${rendered
-    .map((r) => `  ${r.name.padEnd(width)}  ${r.text}`)
-    .join('\n')}\n`;
-}
-
-/**
- * What a restore produced. A bundle unpacks to several files, so naming the
- * envelope ("bundle.zip") and one output path would describe neither.
- */
-function restoredLine(res: { filename: string; files: string[] }): string {
-  const files = res.files;
-  if (files.length === 1) {
-    return `${t('outRestoredOne', { name: res.filename, path: files[0]! })}\n`;
-  }
-  return `${t('outRestoredMany', { count: files.length })}\n${files
-    .map((f) => `  ${f}`)
-    .join('\n')}\n`;
-}
-
-/**
- * Abandon the command with an already-localized message.
- *
- * Throws rather than exiting, so the argument layer is testable: this used to
- * call `process.exit`, which took the test runner down with the first bad flag.
- * The bootstrap in `main.ts` is now the only thing that exits. Kept as a
- * `never`-returning helper so it still narrows control flow at its ~40 call
- * sites, none of which had to change.
- */
-function fail(message: string, code: CliErrorCode = 'USAGE', exitCode = 1): never {
-  throw new CliError(code, message, exitCode);
-}
-
-const PHASE_KEYS = {
-  compress: 'phaseCompress',
-  encrypt: 'phaseEncrypt',
-  decrypt: 'phaseDecrypt',
-  verify: 'phaseVerify',
-  unlock: 'phaseUnlock',
-  render: 'phaseRender',
-} as const satisfies Record<Progress['phase'], CliKey>;
-
-/**
- * A progress reporter on stderr (results stay on stdout, so piping is unaffected).
- * On a TTY it redraws a single line with a live percentage; when piped it emits one
- * plain line per phase change. Returns undefined when quiet, plus a `done()` to
- * finish the line. The core drives it through the shared `onProgress` callback.
- */
-function makeProgress(io: CliIo, quiet: boolean): { onProgress?: OnProgress; done: () => void } {
-  if (quiet) return { done: () => {} };
-  const tty = Boolean(io.isStderrTty);
-  let lastLabel = '';
-  let wroteTty = false;
-  const onProgress: OnProgress = (p) => {
-    const key = PHASE_KEYS[p.phase];
-    const label = key ? t(key) : p.phase;
-    if (tty) {
-      const suffix = p.total > 0 ? `… ${Math.floor((p.done / p.total) * 100)}%` : '…';
-      io.err(`\r\x1b[2K${label}${suffix}`);
-      wroteTty = true;
-    } else if (label !== lastLabel) {
-      io.err(`${label}…\n`);
-      lastLabel = label;
-    }
-  };
-  return {
-    onProgress,
-    done: () => {
-      if (tty && wroteTty) io.err('\r\x1b[2K');
-    },
-  };
-}
-
-async function resolvePassword(io: CliIo, values: Record<string, unknown>): Promise<string> {
+async function resolvePassword(
+  io: CliIo,
+  present: Presenter,
+  values: Record<string, unknown>,
+): Promise<string> {
   let pw: string;
   if (typeof values.password === 'string') {
-    io.err(`${t('warnPasswordFlag')}\n`);
+    present.warn({ code: 'PASSWORD_FLAG_VISIBLE', message: t('warnPasswordFlag') });
     pw = values.password;
   } else if (typeof values['password-file'] === 'string') {
     pw = readFileSync(values['password-file'], 'utf8').split(/\r?\n/)[0] ?? '';
@@ -200,6 +112,7 @@ async function resolveDuressPassword(io: CliIo, values: Record<string, unknown>)
 
 async function requireStrongOrAcknowledged(
   io: CliIo,
+  present: Presenter,
   password: string,
   values: Record<string, unknown>,
   label = t('labelPassword'),
@@ -221,7 +134,7 @@ async function requireStrongOrAcknowledged(
   const estimate = passwordStrength(password);
   const warning = t('warnWeakPassword', { label, bits: estimate.bits });
   if (values['allow-weak-password'] === true) {
-    io.err(`${warning}\n`);
+    present.warn({ code: 'WEAK_PASSWORD', message: warning, details: { bits: estimate.bits } });
     return;
   }
   // No confirmation available (piped, or a mode that withholds prompting): refuse
@@ -252,7 +165,11 @@ function entropyFlagGiven(values: Record<string, unknown>): boolean {
  * actually generate key material, and only *after* the password has been read.
  * two prompts cannot share a piped stdin, and the password must win it.
  */
-async function installEntropy(io: CliIo, values: Record<string, unknown>): Promise<void> {
+async function installEntropy(
+  io: CliIo,
+  present: Presenter,
+  values: Record<string, unknown>,
+): Promise<void> {
   const problem = entropyArgError({
     text: values.entropy as string | undefined,
     file: values['entropy-file'] as string | undefined,
@@ -262,7 +179,7 @@ async function installEntropy(io: CliIo, values: Record<string, unknown>): Promi
 
   let text: string;
   if (typeof values.entropy === 'string') {
-    io.err(`${t('warnEntropyFlag')}\n`);
+    present.warn({ code: 'ENTROPY_FLAG_VISIBLE', message: t('warnEntropyFlag') });
     text = values.entropy;
   } else if (typeof values['entropy-file'] === 'string') {
     // Whole file, not just the first line: a page of dice rolls is the point.
@@ -333,7 +250,74 @@ async function runUi(io: CliIo, args: string[]): Promise<number> {
   return 0;
 }
 
-export async function run(argv: string[], io: CliIo): Promise<number> {
+/**
+ * Every option the save/restore family accepts.
+ *
+ * Hoisted out of `run()` so `wantsJson` can derive which ones take a value from
+ * the same table `parseArgs` uses. Two copies of that list would drift the first
+ * time an option was added, and the drift would be silent.
+ */
+const OPTIONS = {
+  out: { type: 'string' },
+  paper: { type: 'boolean' },
+  zip: { type: 'boolean' },
+  binary: { type: 'boolean' },
+  disguise: { type: 'boolean' },
+  mode: { type: 'string' },
+  decoy: { type: 'string' },
+  threshold: { type: 'string' },
+  'duress-password-file': { type: 'string' },
+  share: { type: 'string', multiple: true },
+  'key-mode': { type: 'string' },
+  codec: { type: 'string' },
+  cover: { type: 'string' },
+  title: { type: 'string' },
+  date: { type: 'string' },
+  locale: { type: 'string' },
+  instructions: { type: 'boolean' },
+  'password-hint': { type: 'string' },
+  'key-location': { type: 'string' },
+  font: { type: 'string' },
+  key: { type: 'string' },
+  password: { type: 'string' },
+  'password-file': { type: 'string' },
+  entropy: { type: 'string' },
+  'entropy-file': { type: 'string' },
+  'entropy-prompt': { type: 'boolean' },
+  force: { type: 'boolean' },
+  quiet: { type: 'boolean' },
+  'allow-weak-password': { type: 'boolean' },
+  json: { type: 'boolean' },
+} as const;
+
+/** `--name` for every option above that consumes the next argument. */
+const VALUE_FLAGS = new Set(
+  Object.entries(OPTIONS)
+    .filter(([, spec]) => spec.type === 'string')
+    .map(([name]) => `--${name}`),
+);
+
+/**
+ * Whether this invocation asked for JSON, decided before anything is parsed.
+ *
+ * It has to be known first, because a *parse* failure must also be reportable as
+ * JSON: a caller that asked for a document should never get a bare line of prose
+ * because it mistyped a flag. Scanning rather than reading the parsed value
+ * costs one subtlety, which is why the value-flag skip exists: in
+ * `--title --json`, the `--json` is the title, not a request for JSON, and
+ * `--` ends the options.
+ */
+export function wantsJson(argv: string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--') return false;
+    if (arg === '--json') return true;
+    if (VALUE_FLAGS.has(arg)) i++;
+  }
+  return false;
+}
+
+async function runCommand(argv: string[], io: CliIo, present: Presenter): Promise<number> {
   const command = argv[0];
   if (!command || command === '--help' || command === '-h' || command === 'help') {
     io.out(usage());
@@ -344,37 +328,7 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv.slice(1),
     allowPositionals: true,
-    options: {
-      out: { type: 'string' },
-      paper: { type: 'boolean' },
-      zip: { type: 'boolean' },
-      binary: { type: 'boolean' },
-      disguise: { type: 'boolean' },
-      mode: { type: 'string' },
-      decoy: { type: 'string' },
-      threshold: { type: 'string' },
-      'duress-password-file': { type: 'string' },
-      share: { type: 'string', multiple: true },
-      'key-mode': { type: 'string' },
-      codec: { type: 'string' },
-      cover: { type: 'string' },
-      title: { type: 'string' },
-      date: { type: 'string' },
-      locale: { type: 'string' },
-      instructions: { type: 'boolean' },
-      'password-hint': { type: 'string' },
-      'key-location': { type: 'string' },
-      font: { type: 'string' },
-      key: { type: 'string' },
-      password: { type: 'string' },
-      'password-file': { type: 'string' },
-      entropy: { type: 'string' },
-      'entropy-file': { type: 'string' },
-      'entropy-prompt': { type: 'boolean' },
-      force: { type: 'boolean' },
-      quiet: { type: 'boolean' },
-      'allow-weak-password': { type: 'boolean' },
-    },
+    options: OPTIONS,
   });
 
   // Only `save` and `gallery-save` generate key material. Say so rather than
@@ -415,15 +369,15 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       threshold = parseThreshold(values.threshold as string);
     }
 
-    const password = await resolvePassword(io, values);
-    await requireStrongOrAcknowledged(io, password, values);
+    const password = await resolvePassword(io, present, values);
+    await requireStrongOrAcknowledged(io, present, password, values);
     if (mode === 'duress') {
       duressPassword = await resolveDuressPassword(io, values);
-      await requireStrongOrAcknowledged(io, duressPassword, values, 'duress password');
+      await requireStrongOrAcknowledged(io, present, duressPassword, values, 'duress password');
     }
     // After the passwords (they get first claim on stdin), before anything is
     // generated.
-    await installEntropy(io, values);
+    await installEntropy(io, present, values);
     const opts: SaveOptions = {
       inputs,
       outDir,
@@ -455,27 +409,29 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       maxBytes: MAX_FILE_BYTES_BINARY_CLI,
     };
 
-    const progress = makeProgress(io, Boolean(values.quiet));
+    const progress = present.progress(Boolean(values.quiet));
     const res = await runSave(opts, progress.onProgress);
     progress.done();
-    if (res.fontWarning) io.err(`${res.fontWarning}\n`);
+    // Both of these are English-only at the source (paper.ts and commands.ts
+    // build them from literals; only the `warnPrefix` wrapper was localized), so
+    // JSON callers key on the code and read the message as a hint.
+    if (res.fontWarning) {
+      present.warn({ code: 'FONT_FALLBACK', message: res.fontWarning });
+    }
     if (res.sizeWarning) {
-      io.err(`${t('warnPrefix', { message: res.sizeWarning })}\n`);
+      present.warn({
+        code: 'LARGE_SECRET',
+        message: t('warnPrefix', { message: res.sizeWarning }),
+      });
     }
-    const what = res.binary
-      ? t('outSavedBinary', { variant: res.binary, keyMode: res.keyMode })
-      : t('outSavedImages', { count: res.imageCount, keyMode: res.keyMode });
-    io.out(`${t('outSaved', { what })}\n${manifestLines(res.manifest)}`);
-    if (res.keyMode !== 'embedded') {
-      io.out(`${t('outKeepKeyArtifact')}\n`);
-    }
+    present.save(res);
     return 0;
   }
 
   if (command === 'restore') {
     if (positionals.length === 0) fail(t('errRestoreMissing'));
-    const password = await resolvePassword(io, values);
-    const progress = makeProgress(io, Boolean(values.quiet));
+    const password = await resolvePassword(io, present, values);
+    const progress = present.progress(Boolean(values.quiet));
     const res = await runRestore(
       {
         inputs: positionals,
@@ -489,8 +445,7 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       progress.onProgress,
     );
     progress.done();
-    io.err(`${t('outDecoded', { decoded: res.decoded, seen: res.seen })}\n`);
-    io.out(restoredLine(res));
+    present.restore(res);
     return 0;
   }
 
@@ -513,9 +468,9 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       if (!values.threshold) fail(t('errGalleryThreshold'));
       gThreshold = parseThreshold(values.threshold as string);
     }
-    const password = await resolvePassword(io, values);
-    await requireStrongOrAcknowledged(io, password, values);
-    await installEntropy(io, values);
+    const password = await resolvePassword(io, present, values);
+    await requireStrongOrAcknowledged(io, present, password, values);
+    await installEntropy(io, present, values);
     const res = await runGallerySave({
       secretFile,
       covers,
@@ -527,25 +482,13 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       threshold: gThreshold,
       force,
     });
-    io.out(
-      `${t('outSavedGallery', {
-        files: res.files.length,
-        k: res.k,
-        m: res.m,
-        decoys: res.decoys,
-        keyMode: res.keyMode,
-      })}\n${manifestLines(res.manifest)}`,
-    );
-    io.out(`${t('outGalleryKeep', { k: res.k })}\n`);
-    if (res.keyMode !== 'embedded') {
-      io.out(`${t('outGalleryKeepKey')}\n`);
-    }
+    present.gallerySave(res);
     return 0;
   }
 
   if (command === 'gallery-restore') {
     if (positionals.length === 0) fail(t('errGalleryRestoreMissing'));
-    const password = await resolvePassword(io, values);
+    const password = await resolvePassword(io, present, values);
     const res = await runGalleryRestore({
       inputs: positionals,
       outDir,
@@ -554,8 +497,7 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
       sharePaths: values.share as string[] | undefined,
       force,
     });
-    io.err(`${t('outScanned', { seen: res.seen })}\n`);
-    io.out(restoredLine(res));
+    present.galleryRestore(res);
     return 0;
   }
 
@@ -566,9 +508,51 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
     if (estProblem) fail(`estimate: ${estProblem}`);
     const estCodec = ((values.codec as string | undefined) ?? 'color') as CodecChoice;
     const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper), estCodec);
-    io.out(`${t('outEstimate', { images, k, m })}\n`);
+    present.estimate({ images, k, m });
     return 0;
   }
 
   fail(t('errUnknownCommand', { command }), 'USAGE', 2);
+}
+
+/**
+ * Run one invocation of the command line.
+ *
+ * Two modes, one body. The human mode leaves failures to the bootstrap, which
+ * prints them to stderr; the JSON mode catches them here, because under `--json`
+ * a failure is itself the document a caller reads off stdout, and letting it
+ * escape would hand them a bare line of prose instead.
+ *
+ * JSON mode also strips the interactive prompts from the io it passes down. That
+ * is what makes non-interactivity structural rather than a check that could be
+ * forgotten: with no `promptHidden`, the password resolver cannot reach stdin,
+ * so a caller with an inherited idle pipe gets `PASSWORD_REQUIRED` instead of
+ * hanging forever on a prompt it cannot see.
+ */
+export async function run(argv: string[], io: CliIo): Promise<number> {
+  if (!wantsJson(argv)) return runCommand(argv, io, humanPresenter(io));
+
+  const present = jsonPresenter(io, argv[0] ?? null);
+  // `ui` is interactive and long-running; there is no envelope that could
+  // describe it, so asking for both is a usage error rather than a silent
+  // downgrade.
+  if (argv[0] === 'ui') {
+    const failure = new CliError('USAGE', t('errJsonUiUnsupported'));
+    present.failure(toCliFailure(failure), failure);
+    return failure.exitCode;
+  }
+  const quiet: CliIo = {
+    out: io.out,
+    err: io.err,
+    env: io.env,
+    isStdinTty: io.isStdinTty,
+    isStderrTty: io.isStderrTty,
+  };
+  try {
+    return await runCommand(argv, quiet, present);
+  } catch (err) {
+    const failure = toCliFailure(err);
+    present.failure(failure, err);
+    return failure.exitCode;
+  }
 }
