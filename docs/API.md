@@ -322,12 +322,22 @@ description says what it costs. Without the flag an inline password is **refused
 rather than ignored, since dropping it silently would surface one step later as a
 baffling `PASSWORD_REQUIRED` on a request that plainly supplied one.
 
+The schema follows the flag. Without it, `password_source` is simply required.
+With it, neither is required outright and an `anyOf` asks for one of the two, so a
+schema-validating client can use the inline mode on its own rather than having to
+send a redundant source alongside the password it already has.
+
 ### Path confinement
 
 `--root <dir>`, repeatable. Every path argument is resolved and then compared
 against the canonical roots, with `realpath` on both sides so a symlink pointing
 out is caught, and a separator in the comparison so a root of `/data/vault` does
 not also admit `/data/vault-backup`.
+
+A root that does not exist yet stays exactly the directory you named. Both sides
+of the comparison resolve symlinks as far as the filesystem goes and keep the
+remainder verbatim, so `--root /vault/new` means `/vault/new` whether or not it
+has been created, and does not quietly become `/vault`.
 
 **With no `--root`, the server starts and `tools/list` works, but every
 `tools/call` returns `ROOT_NOT_CONFIGURED`.** Forgetting to configure it gets you

@@ -27,7 +27,7 @@
  */
 
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 
 /** Why a request was refused. Machine-stable, like every other code. */
 export type PolicyErrorCode =
@@ -73,33 +73,62 @@ export function makePolicy(
   opts: { allowInlinePassword?: boolean; env?: NodeJS.ProcessEnv } = {},
 ): Policy {
   return {
-    roots: roots.map((r) => canonical(resolve(r))),
+    roots: roots.map((r) => canonicalPath(resolve(r))),
     allowInlinePassword: opts.allowInlinePassword ?? false,
     env: opts.env ?? process.env,
   };
 }
 
 /**
- * The deepest existing ancestor of `path`, canonicalized.
+ * The deepest existing ancestor of `path`, canonicalized, and how much of the
+ * path was left unresolved.
  *
- * An output directory usually does not exist yet, so `realpath` on it would
- * throw. Walking up to the nearest real ancestor still resolves every symlink on
- * the way, which is the part that matters.
+ * A path that does not exist yet cannot be `realpath`'d, so the walk stops at the
+ * nearest real ancestor. That still resolves every symlink on the way, which is
+ * the part that matters for a containment check.
  */
-function canonical(path: string): string {
+function deepestReal(path: string): { real: string; missing: string[] } {
   let current = resolve(path);
+  const missing: string[] = [];
   for (;;) {
     if (existsSync(current)) {
       try {
-        return realpathSync(current);
+        return { real: realpathSync(current), missing };
       } catch {
-        return current;
+        return { real: current, missing };
       }
     }
     const parent = dirname(current);
-    if (parent === current) return current;
+    if (parent === current) return { real: current, missing };
+    missing.unshift(current.slice(parent.length + (parent.endsWith(sep) ? 0 : 1)));
     current = parent;
   }
+}
+
+/**
+ * A path in comparable form: symlinks resolved as far as the filesystem goes,
+ * and the part that does not exist yet kept verbatim.
+ *
+ * Keeping the unresolved tail is the whole correctness argument, and dropping it
+ * was a real hole found in review. The first version returned only the deepest
+ * existing ancestor, which is *almost* right for a candidate path, since an
+ * `out_dir` legitimately does not exist yet, and badly wrong for a root:
+ * `--root /vault/intended-new-dir` became `--root /vault` and quietly granted
+ * every sibling under it.
+ *
+ * Fixing only the root side looked sufficient and was not: a candidate inside a
+ * not-yet-created root then resolved *above* that root and was refused, so the
+ * root became unusable rather than over-broad. Both sides need the same rule, and
+ * with it every case works out:
+ *
+ *  - `/vault/new/deeper` under root `/vault` stays inside it;
+ *  - `/base/other.txt` under root `/base/new` does not;
+ *  - a symlink that exists is still followed, so one pointing out of the root is
+ *    still caught, which is the case a string comparison cannot see.
+ */
+function canonicalPath(path: string): string {
+  const { real, missing } = deepestReal(path);
+  return missing.length === 0 ? real : join(real, ...missing);
 }
 
 function contains(root: string, candidate: string): boolean {
@@ -123,7 +152,7 @@ export function resolveInRoot(policy: Policy, argName: string, value: string): s
     );
   }
   const resolved = isAbsolute(value) ? resolve(value) : resolve(policy.roots[0]!, value);
-  const probe = canonical(resolved);
+  const probe = canonicalPath(resolved);
   if (!policy.roots.some((root) => contains(root, probe))) {
     throw new PolicyError('PATH_OUTSIDE_ROOT', `${argName} resolves outside every --root`, {
       argument: argName,

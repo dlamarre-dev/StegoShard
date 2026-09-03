@@ -109,6 +109,65 @@ describe('path confinement', () => {
   });
 
   /**
+   * A root that does not exist yet must not widen to its parent.
+   *
+   * Found in review, and it was a real hole rather than a theoretical one: roots
+   * were canonicalized with the same helper as candidate paths, which drops the
+   * part of a path that does not exist yet. That is correct for an `out_dir` the
+   * save is about to create and wrong for a root, because
+   * `--root /vault/intended-new-dir` then became `--root /vault` and granted every
+   * sibling under it. The two now use different helpers, and this is the test that
+   * says why.
+   */
+  describe('a root that does not exist yet', () => {
+    it('does not grant access to its parent', () => {
+      const base = tmp();
+      const p = makePolicy([join(base, 'intended-new-dir')]);
+      expectPolicy(() => resolveInRoot(p, 'input', join(base, 'other.txt')), 'PATH_OUTSIDE_ROOT');
+    });
+
+    it('does not grant access to a sibling holding someone else data', () => {
+      const base = tmp();
+      const sibling = join(base, 'someone-elses-data');
+      mkdirSync(sibling);
+      writeFileSync(join(sibling, 'secret.txt'), 'not yours');
+      const p = makePolicy([join(base, 'intended-new-dir')]);
+      expectPolicy(
+        () => resolveInRoot(p, 'input', join(sibling, 'secret.txt')),
+        'PATH_OUTSIDE_ROOT',
+      );
+    });
+
+    it('keeps the root the operator asked for, verbatim', () => {
+      const base = tmp();
+      const asked = join(base, 'deep', 'nested', 'not-created-yet');
+      expect(makePolicy([asked]).roots).toEqual([asked]);
+    });
+
+    it('still admits paths inside it, once it is used', () => {
+      const base = tmp();
+      const root = join(base, 'intended-new-dir');
+      const p = makePolicy([root]);
+      expect(() => resolveInRoot(p, 'out_dir', join(root, 'vault'))).not.toThrow();
+      expect(() => resolveInRoot(p, 'input', join(root, 'a.txt'))).not.toThrow();
+    });
+
+    // The existing part of the path is still canonicalized, so a symlinked
+    // ancestor cannot be used to smuggle a root somewhere else.
+    it('still resolves symlinks in the part that does exist', () => {
+      const real = tmp();
+      const base = tmp();
+      const link = join(base, 'link');
+      try {
+        symlinkSync(real, link, 'dir');
+      } catch {
+        return; // no symlink privilege here
+      }
+      expect(makePolicy([join(link, 'new')]).roots).toEqual([join(real, 'new')]);
+    });
+  });
+
+  /**
    * A symlink inside the root pointing out is the case a string comparison
    * cannot catch, which is why both sides are realpath'd.
    *

@@ -50,6 +50,18 @@ describe('the advertised tools', () => {
     expect(toolDefinitions(false)).toMatchSnapshot();
   });
 
+  /**
+   * The opt-in variant is pinned too, and it was not before.
+   *
+   * That gap is exactly where review found a bug: `--allow-inline-password`
+   * produces a materially different schema, and with only the default pinned,
+   * nothing noticed that the inline mode it advertised could not be satisfied.
+   * A surface with two shapes needs two snapshots.
+   */
+  it('match the pinned schema with inline passwords allowed', () => {
+    expect(toolDefinitions(true)).toMatchSnapshot();
+  });
+
   it('advertise no inline password property by default', () => {
     for (const tool of toolDefinitions(false)) {
       const props = (tool.inputSchema as { properties: Record<string, unknown> }).properties;
@@ -63,6 +75,64 @@ describe('the advertised tools', () => {
     expect(Object.keys(props)).toContain('password');
     // And the description says what it costs, since that text reaches the model.
     expect(JSON.stringify(props.password)).toMatch(/transcript/);
+  });
+
+  /**
+   * The schema has to be satisfiable the way the dispatch actually behaves.
+   *
+   * Found in review: with the opt-in on, `password` was advertised while
+   * `password_source` stayed in `required`, so a schema-validating client could
+   * not use the inline mode on its own. It would have had to send a redundant
+   * source alongside the password it already had, which is the opposite of the
+   * point. `anyOf` now says "one of the two", matching `readPassword`.
+   */
+  describe('the credential requirement matches what the dispatch accepts', () => {
+    const credentialTools = (allowInline: boolean) =>
+      toolDefinitions(allowInline).filter((t) => t.name !== 'stegoshard_estimate');
+
+    it('requires password_source outright when inline is off', () => {
+      for (const tool of credentialTools(false)) {
+        const s = tool.inputSchema as { required: string[]; anyOf?: unknown };
+        expect(s.required, tool.name).toContain('password_source');
+        expect(s.anyOf, `${tool.name} needs no alternative when there is one way`).toBeUndefined();
+      }
+    });
+
+    it('requires either one when inline is on, and neither outright', () => {
+      for (const tool of credentialTools(true)) {
+        const s = tool.inputSchema as { required: string[]; anyOf?: { required: string[] }[] };
+        expect(s.required, tool.name).not.toContain('password_source');
+        expect(s.required, tool.name).not.toContain('password');
+        expect(
+          s.anyOf
+            ?.map((a) => a.required)
+            .flat()
+            .sort(),
+          tool.name,
+        ).toEqual(['password', 'password_source']);
+      }
+    });
+
+    // The non-credential arguments stay mandatory either way.
+    it('keeps the path arguments required in both modes', () => {
+      for (const allowInline of [false, true]) {
+        for (const tool of credentialTools(allowInline)) {
+          const s = tool.inputSchema as { required: string[] };
+          expect(s.required, `${tool.name} (inline=${allowInline})`).toEqual(
+            expect.arrayContaining(['inputs', 'out_dir']),
+          );
+        }
+      }
+    });
+
+    it('estimate needs no credential at all', () => {
+      for (const allowInline of [false, true]) {
+        const est = toolDefinitions(allowInline).find((t) => t.name === 'stegoshard_estimate')!;
+        const s = est.inputSchema as { required: string[]; properties: Record<string, unknown> };
+        expect(s.required).toEqual(['input']);
+        expect(Object.keys(s.properties)).not.toContain('password_source');
+      }
+    });
   });
 
   // The absent options are decisions, not omissions.
@@ -143,6 +213,20 @@ describe('credential rules', () => {
       }),
       'INLINE_PASSWORD_REFUSED',
     );
+  });
+
+  // What the opt-in schema now advertises has to actually work: an inline
+  // password *alone*, with no redundant password_source alongside it.
+  it('accepts an inline password on its own once the operator opted in', SLOW, async () => {
+    const root = tmp();
+    const input = secretIn(root);
+    const policy = makePolicy([root], { allowInlinePassword: true, env: {} });
+    const saved = await callTool(policy, 'stegoshard_save', {
+      inputs: [input],
+      out_dir: join(root, 'v'),
+      password: PW,
+    });
+    expect(saved.result.imageCount).toBeGreaterThan(0);
   });
 });
 

@@ -94,6 +94,23 @@ export function toolDefinitions(allowInline: boolean): ToolDefinition[] {
     ...props,
   });
 
+  /**
+   * How a schema says "a credential is mandatory".
+   *
+   * Without the opt-in there is one way to supply one, so `password_source` is
+   * simply required. With it there are two, and listing `password_source` as
+   * required anyway would advertise an inline mode no schema-valid client could
+   * actually use on its own: it would have to send a redundant source alongside.
+   * `anyOf` states what the dispatch already accepts.
+   */
+  const needsCredential = (...base: string[]) =>
+    allowInline
+      ? {
+          required: base,
+          anyOf: [{ required: ['password_source'] }, { required: ['password'] }],
+        }
+      : { required: [...base, 'password_source'] };
+
   return [
     {
       name: 'stegoshard_estimate',
@@ -117,7 +134,7 @@ export function toolDefinitions(allowInline: boolean): ToolDefinition[] {
       inputSchema: {
         type: 'object',
         additionalProperties: false,
-        required: ['inputs', 'out_dir', 'password_source'],
+        ...needsCredential('inputs', 'out_dir'),
         properties: secret({
           inputs: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 64 },
           out_dir: { type: 'string' },
@@ -143,7 +160,7 @@ export function toolDefinitions(allowInline: boolean): ToolDefinition[] {
       inputSchema: {
         type: 'object',
         additionalProperties: false,
-        required: ['inputs', 'out_dir', 'password_source'],
+        ...needsCredential('inputs', 'out_dir'),
         properties: secret({
           inputs: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 256 },
           out_dir: { type: 'string' },
