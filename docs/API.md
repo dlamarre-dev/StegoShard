@@ -1,6 +1,7 @@
 # Machine interfaces
 
-Ways to drive StegoShard from a program rather than by hand.
+Ways to drive StegoShard from a program rather than by hand: a **JavaScript /
+TypeScript library**, and a **machine-readable command line**.
 
 > **Status: unstable.** These interfaces ship at 0.9.x so integrators can build
 > against them and report problems. They are **not** frozen: any 0.9.z release may
@@ -16,6 +17,115 @@ Ways to drive StegoShard from a program rather than by hand.
 Nothing here opens a socket. The only HTTP code in StegoShard is `stegoshard ui`,
 which serves static files on loopback and exposes no endpoint; see
 [THREAT-MODEL.md](THREAT-MODEL.md#the-local-web-ui).
+
+## The JavaScript / TypeScript library
+
+Two entry points, disjoint on purpose.
+
+```ts
+// Environment-neutral: bytes in, bytes out. Runs anywhere WebCrypto does.
+import { createVaultKey, exportVault, importVault } from 'stegoshard';
+
+// Node: files in, files out. The same orchestration the command line drives.
+import { save, restore, estimate } from 'stegoshard/node';
+```
+
+`stegoshard/node` does **not** re-export `stegoshard`. There are no `node` or
+`browser` resolver _conditions_ either: an environment condition would silently
+hand a Node consumer the filesystem build when they asked for the neutral one, so
+the choice stays visible at the import site.
+
+```ts
+import { save, restore } from 'stegoshard/node';
+
+const saved = await save({
+  inputs: ['secret.txt'],
+  outDir: './vault',
+  password: process.env.VAULT_PASSWORD!,
+  paper: false,
+  zip: false,
+  keyMode: 'embedded',
+});
+// saved.files, saved.manifest, saved.imageCount, saved.setId
+
+await restore({ inputs: ['./vault'], outDir: './restored', password: … });
+```
+
+### What is in it, and what is not
+
+The published surface is **curated**, not the internal barrel. `src/core/index.ts`
+re-exports 255 names; the library exports 118 across both entries. What a
+consumer needs to save and restore a vault is there. What is deliberately not:
+
+- the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,
+  `splitIntoShards`, …);
+- the low-level crypto primitives (`deriveKEK`, `hkdf`, `aeadSeal`, `wrapDEK`, …),
+  which are easy to misuse and offer nothing `createVaultKey` does not;
+- the whole SPEC §10 slot and region layer. Only the two **container** builders
+  are public, `buildDuressDbContainer` and `buildNonPossessionDbContainer`, and
+  they self-verify both regions before returning. Publishing the geometry beneath
+  them would freeze it;
+- the wire-format internals (`buildVaultBlob`, `buildSegmentedBlob`, `packSqlite`,
+  `encodeHeader`, …), and the JPEG coefficient model, whose exports are a bare
+  `decode`/`encode` pair;
+- the format magic constants and salts, which are mutable module state.
+
+Deep imports past the two entry points are not supported and are not covered by
+the stability note above. The exact surface is recorded in
+[`docs/api/stegoshard.api.md`](api/stegoshard.api.md) and
+[`docs/api/stegoshard-node.api.md`](api/stegoshard-node.api.md), which are
+generated, committed, and verified in CI, so a change to either shows up as a
+reviewable diff.
+
+### Three things to know before building on it
+
+**Post-save verification is not optional.** `save()` decrypts what it wrote and
+compares it to the original before returning, and there is no flag to skip it. If
+you assemble your own pipeline from `exportVault` instead, you must call the
+matching `verifyImageExport` / `verifyBinaryExport` / `verifyDisguisedExport` /
+`verifyGalleryExport` yourself. A vault that never round-tripped is a vault
+nobody has shown is recoverable.
+
+**The binary path defaults to 256 MiB, not the command line's 1 GiB.** The core's
+own default is the terminal figure, which suits a headless command bounded only
+by RAM and not a library inside someone else's process, where a 1 GiB in-memory
+buffer an untrusted caller can request is a denial-of-service surface. Raise it
+per call with `maxBytes` when the caller is trusted; `DEFAULT_MAX_BINARY_BYTES`
+and `MAX_FILE_BYTES_BINARY_CLI` are both exported. The image and paper paths are
+hard-capped at `MAX_FILE_BYTES` (1 MiB) and are not configurable, and the duress
+and non-possession `.db` paths are capped at 64 MiB per region by the §10.4
+bucket ladder.
+
+**The user-entropy layer is process-global.** `installUserEntropy` clears any
+existing layer first, so a second install silently replaces the first and the
+earlier caller's draws fall back to the plain CSPRNG with nothing thrown. Install
+once at startup if at all; never per request, and never in a multi-tenant or
+concurrent server. There is deliberately no `withUserEntropy(text, fn)` helper: it
+would advertise a scoping guarantee the module-global cannot provide.
+
+Two smaller ones. Passwords are ordinary JavaScript strings and cannot be wiped
+from memory (SECURITY.md). And `save({ inputs })` treats its paths as **trusted**:
+it walks directories with no symlink guard and no file-count cap, so do not hand
+it a path an untrusted party controls. Output is safer, since a restored bundle's
+entries are reduced to basenames and cannot escape `outDir`.
+
+### Not published
+
+The package is built and verified on every CI run but **is not on npm**:
+`package.json` is still `private: true`, so an accidental publish is impossible.
+Publishing is a separate decision, gated on the 1.0 audit. Until then the way to
+use the library is a checkout, `npm run build:lib`, and a file or workspace
+dependency.
+
+Three dependencies are **bundled** into the package rather than installed
+alongside it: `fast-png`, `jpeg-js` and `@pdf-lib/fontkit`. They are runtime
+imports of the Node adapter that sit in `devDependencies`, and promoting them
+trips two guards in `scripts/generate-notices.ts` that exist for good reasons:
+`jpeg-js` is BSD-3-Clause, which is not on the approved-licence list, and
+`@pdf-lib/fontkit@1.1.1` declares MIT but ships no licence file. Bundling matches
+what `dist-cli` already does and leaves the notices, the SBOM and
+`npm audit --omit=dev` untouched. Resolving it properly is a licensing decision
+tracked on its own.
 
 ## `--json`: the command line, for programs
 

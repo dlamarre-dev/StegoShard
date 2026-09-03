@@ -11,7 +11,12 @@ export default [
       'web-dist/**',
       'web-dist-offline/**',
       'dist-cli/**',
+      'dist-lib/**',
       'dist-release/**',
+      // The declaration staging tree for the library's type rollup. Generated
+      // .d.ts files, not source, and linting them reported hundreds of "'Buffer'
+      // is not defined" against code nobody wrote.
+      '.types/**',
       'coverage/**',
       'node_modules/**',
       'local/**',

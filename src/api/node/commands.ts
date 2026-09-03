@@ -32,7 +32,6 @@ import {
   binaryKeyName,
   binaryVaultName,
   codecName,
-  createKeyBlock,
   decodeHeader,
   drawBrandBand,
   estimateImages,
@@ -47,7 +46,6 @@ import {
   importVaultBinary,
   looksLikeBinaryContainer,
   recoveryLines,
-  serializeKeyBlock,
   toHex,
   unwrapBinary,
   verifyBinaryExport,
@@ -67,7 +65,6 @@ import {
   type KeyMode,
   type ManifestEntry,
   type OnProgress,
-  type VaultKey,
 } from '../../core';
 import {
   embedKeyImage,
@@ -79,9 +76,9 @@ import {
   imageDataToPng,
 } from './image-io';
 import { gatherImageFiles, gatherInputs, walk } from './inputs';
-import { buildCliPaperPdf } from './paper';
 import { BUNDLE_NAME, packBundle, unpackBundle } from '../../ui/bundle';
 import { StegoShardApiError } from '../errors';
+import { createVaultKey } from '../keys';
 
 export { WrongPasswordError, MissingKeyError };
 
@@ -168,10 +165,9 @@ function writeExternalKey(
  */
 export const DEFAULT_MAX_BINARY_BYTES = MAX_FILE_BYTES_BINARY_UI;
 
-async function makeKey(password: string): Promise<VaultKey> {
-  const { dek, block } = await createKeyBlock(password, DEFAULT_ARGON2);
-  return { dek, keyBlock: serializeKeyBlock(block) };
-}
+// `makeKey` lived here and did the same createKeyBlock + serializeKeyBlock pair
+// the public surface needs, so it moved to ../keys.ts and both use it.
+const makeKey = createVaultKey;
 
 /** §10 access mode for the supported paths (.db, gallery). */
 export type AccessMode = 'plain' | 'duress' | 'nonpossession';
@@ -489,6 +485,11 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       : undefined;
 
   if (opts.paper) {
+    // Loaded here rather than at the top of the module: the PDF path pulls in
+    // fontkit, about a megabyte of font machinery, and most callers never render
+    // paper. The CLI bundle is unaffected, since `vite.cli.config.ts` inlines
+    // dynamic imports into its single file.
+    const { buildCliPaperPdf } = await import('./paper');
     const encodeQr = (p: Uint8Array): ImageDataLike => codec.encode(p, PROFILE_PAPER);
     const built = await buildCliPaperPdf(imagePayloads, encodeQr, imageDataToPng, {
       title: opts.title,
