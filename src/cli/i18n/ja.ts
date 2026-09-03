@@ -36,6 +36,8 @@ export const ja: CliCatalog = {
     '--entropy が空でした（追加エントロピーが不要ならオプションを外してください）',
   errEstimateMissing: 'estimate: <ファイル> がありません',
   errUiPort: 'ui: --port はポート番号で指定してください（受け取った値: {value}）',
+  errJsonUiUnsupported:
+    '{command}: --json は使用できません。このコマンドは長時間動作するサーバーであり、結果を出力するコマンドではありません。',
   errUiNoWebApp:
     'ui: このビルドにはウェブアプリが含まれていません。\n' +
     'スタンドアロンのバイナリはネットワークアクセスなしでコンパイルされているため、\n' +
@@ -170,6 +172,8 @@ export const ja: CliCatalog = {
   helpShare: 'nonpossession の保管庫用のシェアファイル（繰り返し指定可）',
   helpForce: '既存の出力ファイルを上書きする（既定: 拒否）',
   helpQuiet: 'stderr の進捗表示を出さない',
+  helpJson: 'JSON ドキュメントを 1 件 stdout に出力し、進捗は NDJSON で stderr に出力します',
+  helpMcp: 'Model Context Protocol を stdio で提供します（AI エージェント向け、docs/API.md 参照）',
   helpPasswordFlag: '非推奨: シェル履歴やプロセス一覧に見えます',
   helpPasswordFile: 'ファイルからパスワードを読む（1 行目）',
   helpPasswordEnv: '環境変数',

@@ -1,0 +1,28 @@
+{
+  // Declaration-only pass for the published library.
+  //
+  // The root config is `noEmit` with `moduleResolution: "bundler"` and
+  // `allowImportingTsExtensions`, which is right for a bundled project and cannot
+  // emit: tsc does not rewrite the ~270 extensionless relative imports, so its
+  // JavaScript would fail every import under Node ESM. Vite emits the JavaScript
+  // (vite.lib.config.ts); this emits `.d.ts` into a staging tree that
+  // api-extractor then rolls up into one flat declaration file per entry point.
+  //
+  // The rollup is what makes the types usable under `node16`/`nodenext`, not just
+  // under `bundler`: a mirrored tree would carry the same extensionless
+  // specifiers, plus the `@core` alias, which tsc never rewrites either.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true,
+    "allowImportingTsExtensions": false,
+    "outDir": ".types",
+    // Only what the library needs. `chrome` and `webextension-polyfill` would
+    // drag the extension's ambient types into a consumer's compilation.
+    "types": ["node"]
+  },
+  "include": ["src/api", "src/core", "src/ui"],
+  "exclude": ["**/*.test.ts"]
+}

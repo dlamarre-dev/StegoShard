@@ -31,8 +31,8 @@ import {
   serializeKeyBlock,
   type VaultKey,
 } from '../src/core/index';
-import { imageDataToPng } from '../src/cli/node-image-io';
-import { buildCliPaperPdf } from '../src/cli/paper';
+import { imageDataToPng } from '../src/api/node/image-io';
+import { buildCliPaperPdf } from '../src/api/node/paper';
 
 const OUT = resolve(process.cwd(), 'docs/images');
 

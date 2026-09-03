@@ -100,6 +100,21 @@ The password is taken (in order) from `--password` (which prints a warning, sinc
 visible in your shell history and the process list), `--password-file`, the
 `STEGOSHARD_PASSWORD` environment variable, or an interactive hidden prompt.
 
+## Driving it from a script
+
+`--json` replaces the human output with one JSON document on stdout and
+newline-delimited progress events on stderr, so a script in any language can call
+StegoShard without parsing prose that changes with the user's locale:
+
+```bash
+stegoshard estimate secret.txt --json | jq .result.images
+```
+
+The mode is non-interactive by construction: it never prompts, and never falls
+back to reading stdin, so a caller with an idle pipe gets an error rather than a
+hang. The envelope, the error codes and the schema-version rules are in
+[API.md](API.md).
+
 ## The same app, in a browser, from your own machine
 
 `stegoshard ui` serves the web build locally and prints an address to open. It is the
@@ -194,6 +209,13 @@ Two ways to install, depending on whether you already have Node:
   listening socket, and a permission this claim rests on is not worth spending on a
   convenience. The npm/`npx` CLI has it instead, and the offline web bundle carries its
   own launcher.
+
+  `stegoshard mcp` **is** in them, and the contrast is the point: it speaks
+  newline-delimited JSON-RPC on stdin and stdout, so it needs no permission the
+  binaries lack. A zero-dependency, network-incapable executable driven over a
+  pipe is arguably the best place to run it. See [API.md](API.md) and the
+  [threat model](THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp), which is
+  worth reading first: a restore writes plaintext the agent can then read.
 
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`ko`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to

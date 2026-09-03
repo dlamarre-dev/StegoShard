@@ -7,7 +7,12 @@ dist/
 web-dist/
 web-dist-offline/
 dist-cli/
+dist-lib/
 dist-release/
+# Staging tree for the library's declaration rollup (tsconfig.lib.json), plus
+# api-extractor's scratch copy of the report. The report itself, under docs/api/,
+# IS committed: it is the reviewable record of the public surface.
+.types/
 # deno compile output
 /stegoshard
 /stegoshard-*
@@ -55,3 +60,9 @@ Thumbs.db
 # Stryker output and its incremental cache.
 reports/
 .stryker-tmp/
+
+# NOTE: `.bundled/` is deliberately NOT ignored. Each build writes the list of
+# npm packages it inlined, and generate-notices.ts reads them, so the lists are
+# committed for two reasons: `ci:node` runs `notices:check` before any build has
+# happened, and a change to what we distribute should be a reviewable diff rather
+# than something that only appears in a regenerated notices file.

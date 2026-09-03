@@ -31,6 +31,8 @@ npm run ci:node
 npm run package
 npm run build:web
 npm run build:cli
+npm run build:lib
+npm run pack:check
 npm run test:e2e
 ```
 
@@ -39,6 +41,33 @@ Dependabot also run on the repository.
 
 `ci:node` includes `format:check`, so unformatted code fails the build. Run
 `npm run format` to fix it.
+
+### The public API surface
+
+`docs/api/stegoshard.api.md` and `docs/api/stegoshard-node.api.md` record every
+export of the published library, with its signature. They are **generated** by
+api-extractor and **committed**, and `ci:node` runs `api:check`, which fails when
+the live surface and the committed report disagree.
+
+If your change moves the surface, regenerate with `npm run build:types` and commit
+the result. Treat the diff as the decision it is: widening the API is a promise
+that outlives the pull request, and narrowing it later is a breaking change. The
+same reasoning as the golden corpus, one layer up.
+
+`tests/api/surface.txt` is the same guard at the value level, catching a runtime
+export the declaration rollup cannot see. It is compared by an ordinary test.
+
+### Third-party notices
+
+`THIRD_PARTY_NOTICES.txt` covers everything we distribute: what npm installs for a
+consumer, **and** what each build inlines into an artifact we hand out. The second
+half comes from `.bundled/<build>.json`, written by the bundler and committed.
+
+So a change to dependencies, or to what a build bundles, means: run the builds,
+then `npm run notices`, and commit both. CI fails if `.bundled/` moves without the
+notices following. A package whose licence is not on the approved list, or that
+ships no licence text, stops the build; both are decisions to record in
+[docs/LICENSING.md](docs/LICENSING.md), not gates to loosen.
 
 ### Release dry run
 

@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { recordBundledPackages } from './scripts/bundled-packages';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { copyFileSync, readdirSync, readFileSync } from 'node:fs';
@@ -155,7 +156,7 @@ function seoMeta(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [siteRootFiles(), seoMeta()],
+  plugins: [siteRootFiles(), seoMeta(), recordBundledPackages('web')],
   root: 'src/web',
   base,
   publicDir: resolve(import.meta.dirname, 'public'),

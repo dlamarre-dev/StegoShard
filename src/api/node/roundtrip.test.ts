@@ -10,14 +10,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
-import {
-  runEstimate,
-  runRestore,
-  runSave,
-  codecArgError,
-  codecIdForSave,
-  entropyArgError,
-} from './commands';
+import { runEstimate, runRestore, runSave, codecIdForSave } from './commands';
 import { CODEC_COLOR_GRID, CODEC_QR_GRID, clearUserEntropy, installUserEntropy } from '@core';
 
 // Production Argon2 (64 MiB) runs on every save; give these room under CI.
@@ -350,29 +343,8 @@ describe('CLI round-trips', () => {
     expect(sizeWarning).toMatch(/binary/);
   });
 
-  it('accepts plain --paper, and only rejects an explicit --codec color with it', () => {
-    // Regression: the codec default is 'color', so validating the *resolved*
-    // value instead of what the user typed broke `save --paper` outright.
-    expect(codecArgError(undefined, true)).toBeNull();
-    expect(codecArgError(undefined, false)).toBeNull();
-    expect(codecArgError('qr', true)).toBeNull();
-    expect(codecArgError('color', false)).toBeNull();
-    expect(codecArgError('color', true)).toMatch(/--paper/);
-    expect(codecArgError('rainbow', false)).toMatch(/invalid --codec/);
-  });
-
-  it('rejects unusable --entropy* combinations, accepts a single source', () => {
-    expect(entropyArgError({})).toBeNull();
-    expect(entropyArgError({ text: 'dice' })).toBeNull();
-    expect(entropyArgError({ file: 'dice.txt' })).toBeNull();
-    expect(entropyArgError({ prompt: true })).toBeNull();
-    expect(entropyArgError({ text: 'dice', file: 'dice.txt' })).toMatch(/mutually exclusive/);
-    expect(entropyArgError({ file: 'dice.txt', prompt: true })).toMatch(/mutually exclusive/);
-    expect(entropyArgError({ text: '' })).toMatch(/empty/);
-    // The env var is an ambient fallback a typed flag simply outranks, so it is
-    // deliberately not part of the exclusivity check.
-    expect(entropyArgError({ text: 'dice', prompt: false })).toBeNull();
-  });
+  // The `--codec` / `--entropy*` argument validators are exercised in
+  // src/cli/argcheck.test.ts, beside the layer that parses those flags.
 
   it('paper always renders QR, whatever the codec argument resolves to', () => {
     expect(codecIdForSave(true, 'color')).toBe(CODEC_QR_GRID);

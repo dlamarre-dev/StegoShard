@@ -23,6 +23,7 @@ import {
   CODEC_COLOR_GRID,
   CODEC_QR_GRID,
   DEFAULT_ARGON2,
+  MAX_FILE_BYTES_BINARY_UI,
   MissingKeyError,
   PROFILE_DISK,
   PROFILE_PAPER,
@@ -31,7 +32,6 @@ import {
   binaryKeyName,
   binaryVaultName,
   codecName,
-  createKeyBlock,
   decodeHeader,
   drawBrandBand,
   estimateImages,
@@ -46,7 +46,6 @@ import {
   importVaultBinary,
   looksLikeBinaryContainer,
   recoveryLines,
-  serializeKeyBlock,
   toHex,
   unwrapBinary,
   verifyBinaryExport,
@@ -66,8 +65,7 @@ import {
   type KeyMode,
   type ManifestEntry,
   type OnProgress,
-  type VaultKey,
-} from '@core';
+} from '../../core';
 import {
   embedKeyImage,
   embedKeyFactorImage,
@@ -76,11 +74,11 @@ import {
   fileToGalleryCover,
   galleryImageToFile,
   imageDataToPng,
-} from './node-image-io';
+} from './image-io';
 import { gatherImageFiles, gatherInputs, walk } from './inputs';
-import { buildCliPaperPdf } from './paper';
-import { BUNDLE_NAME, packBundle, unpackBundle } from '../ui/bundle';
-import { t } from './i18n';
+import { BUNDLE_NAME, packBundle, unpackBundle } from '../../ui/bundle';
+import { StegoShardApiError } from '../errors';
+import { createVaultKey } from '../keys';
 
 export { WrongPasswordError, MissingKeyError };
 
@@ -88,15 +86,24 @@ function read(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));
 }
 
-// Set per run from the command's --force flag; guards writeOut against clobbering
-// existing files (a mistyped --out, or restoring a name that already exists).
-let allowOverwrite = false;
+/**
+ * Where a run writes, and whether it may clobber.
+ *
+ * Both travel together on purpose. This used to be a module-global
+ * `allowOverwrite` set at the top of each `run*`, which was fine for a CLI that
+ * runs one command per process and wrong for a library: two concurrent `save`
+ * calls with different `force` would silently take each other's setting, and the
+ * loser would either refuse a legitimate write or overwrite a file it was told to
+ * protect. Every option type already carries both fields, so the whole `opts`
+ * object is the target and nothing has to be threaded by hand.
+ */
+type WriteTarget = { outDir: string; force?: boolean | undefined };
 
-function writeOut(dir: string, name: string, bytes: Uint8Array): string {
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, name);
-  if (!allowOverwrite && existsSync(path)) {
-    throw new Error(t('errOverwrite', { path }));
+function writeOut(target: WriteTarget, name: string, bytes: Uint8Array): string {
+  mkdirSync(target.outDir, { recursive: true });
+  const path = join(target.outDir, name);
+  if (!target.force && existsSync(path)) {
+    throw new StegoShardApiError('OUTPUT_EXISTS', `refusing to overwrite ${path}`, { path });
   }
   writeFileSync(path, bytes);
   return path;
@@ -113,8 +120,8 @@ function writeOut(dir: string, name: string, bytes: Uint8Array): string {
 type OutFile = { path: string; purpose: FilePurpose };
 
 /** Write a file and record its purpose. */
-function emit(dir: string, name: string, bytes: Uint8Array, purpose: FilePurpose): OutFile {
-  return { path: writeOut(dir, name, bytes), purpose };
+function emit(target: WriteTarget, name: string, bytes: Uint8Array, purpose: FilePurpose): OutFile {
+  return { path: writeOut(target, name, bytes), purpose };
 }
 
 /**
@@ -128,10 +135,10 @@ const asFiles = (outs: readonly OutFile[]) => ({
 
 /** Write the external key artifact, copying the cover's timestamps when stego. */
 function writeExternalKey(
-  dir: string,
+  target: WriteTarget,
   ext: { name: string; bytes: Uint8Array; mimicPath?: string },
 ): OutFile {
-  const path = writeOut(dir, ext.name, ext.bytes);
+  const path = writeOut(target, ext.name, ext.bytes);
   if (ext.mimicPath) {
     try {
       const s = statSync(ext.mimicPath);
@@ -144,10 +151,23 @@ function writeExternalKey(
   return { path, purpose: ext.mimicPath ? 'stegoCover' : 'keyfile' };
 }
 
-async function makeKey(password: string): Promise<VaultKey> {
-  const { dek, block } = await createKeyBlock(password, DEFAULT_ARGON2);
-  return { dek, keyBlock: serializeKeyBlock(block) };
-}
+/**
+ * Default ceiling on the binary path, for callers that do not choose one.
+ *
+ * The core's own default is `MAX_FILE_BYTES_BINARY`, which aliases the **1 GiB**
+ * terminal budget, and nothing here used to override it. That is the right number
+ * for a headless command bounded only by the machine's RAM, and the wrong one for
+ * a library embedded in someone else's process, where a 1 GiB in-memory buffer an
+ * untrusted caller can request is a denial-of-service surface. So the
+ * conservative browser figure is the default and the CLI opts back up to 1 GiB
+ * explicitly, which leaves terminal behaviour unchanged and makes the larger
+ * budget a visible decision rather than an inherited one.
+ */
+export const DEFAULT_MAX_BINARY_BYTES = MAX_FILE_BYTES_BINARY_UI;
+
+// `makeKey` lived here and did the same createKeyBlock + serializeKeyBlock pair
+// the public surface needs, so it moved to ../keys.ts and both use it.
+const makeKey = createVaultKey;
 
 /** §10 access mode for the supported paths (.db, gallery). */
 export type AccessMode = 'plain' | 'duress' | 'nonpossession';
@@ -189,6 +209,15 @@ export interface SaveOptions {
   fontPath?: string | undefined;
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
+  /**
+   * Ceiling on the binary path's payload, and on its decompression (a gzip-bomb
+   * guard). Defaults to {@link DEFAULT_MAX_BINARY_BYTES}; pass
+   * `MAX_FILE_BYTES_BINARY_CLI` for the 1 GiB terminal budget. Ignored on the
+   * image and paper paths, which are hard-capped at `MAX_FILE_BYTES` (1 MiB),
+   * and on the duress / non-possession `.db` paths, which the §10.4 bucket ladder
+   * already caps at 64 MiB per region.
+   */
+  maxBytes?: number | undefined;
 }
 
 export interface SaveResult {
@@ -223,7 +252,12 @@ async function externalKey(
   variant: 'block' | 'factor' = 'block',
 ): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
   if (keyMode === 'stego') {
-    if (!cover) throw new Error(t('errStegoNeedsCover'));
+    if (!cover) {
+      throw new StegoShardApiError(
+        'STEGO_NEEDS_COVER',
+        'stego key mode needs a cover image to hide the key in',
+      );
+    }
     const key =
       variant === 'factor'
         ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password)
@@ -250,6 +284,7 @@ async function runSaveDisguised(
   // keyfile/stego mint a 32-byte external key factor (§10.3); it composes with any
   // access mode (an extra layer on top of the password / duress / shares).
   const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES;
 
   /** Deliver the minted key factor as a .key container (keyfile) or hidden in a
    *  cover photo (stego), keyed by the per-save password. */
@@ -257,21 +292,26 @@ async function runSaveDisguised(
     if (!keyFactor) return [];
     if (keyMode === 'keyfile') {
       return [
-        emit(
-          opts.outDir,
-          binaryKeyName('disguised'),
-          wrapBinary(keyFactor, 'disguised'),
-          'keyfile',
-        ),
+        emit(opts, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised'), 'keyfile'),
       ];
     }
     const ext = await externalKey('stego', keyFactor, '', opts.password, opts.cover, 'factor');
-    return ext ? [writeExternalKey(opts.outDir, ext)] : [];
+    return ext ? [writeExternalKey(opts, ext)] : [];
   }
 
   if (mode === 'duress') {
-    if (!opts.decoyFile) throw new Error(t('errSaveDuressDecoy'));
-    if (!opts.duressPassword) throw new Error(t('errDuressNeedsPassword'));
+    if (!opts.decoyFile) {
+      throw new StegoShardApiError(
+        'DURESS_DECOY_REQUIRED',
+        'duress mode needs a decoy payload to open under the second password',
+      );
+    }
+    if (!opts.duressPassword) {
+      throw new StegoShardApiError(
+        'DURESS_PASSWORD_REQUIRED',
+        'duress mode needs a second, independent password',
+      );
+    }
     const decoyContent = read(opts.decoyFile);
     const decoyName = basename(opts.decoyFile);
     // Core builds + self-verifies both regions and wraps the container.
@@ -288,12 +328,17 @@ async function runSaveDisguised(
       undefined,
       input.bundle,
     );
-    const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
+    const outs = [emit(opts, outName, container, 'vault'), ...(await deliverFactor())];
     return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
   }
 
   if (mode === 'nonpossession') {
-    if (!opts.threshold) throw new Error(t('errSaveThreshold'));
+    if (!opts.threshold) {
+      throw new StegoShardApiError(
+        'THRESHOLD_REQUIRED',
+        'non-possession mode needs a k-of-n threshold',
+      );
+    }
     const { k, n } = opts.threshold;
     const { container, shares } = await buildNonPossessionDbContainer(
       name,
@@ -307,7 +352,7 @@ async function runSaveDisguised(
       undefined,
       input.bundle,
     );
-    const outs = [emit(opts.outDir, outName, container, 'vault'), ...(await deliverFactor())];
+    const outs = [emit(opts, outName, container, 'vault'), ...(await deliverFactor())];
     shares.forEach((share, i) => {
       // Deniable path: neutral filename and a neutral heading inside the file.
       const body = shareFileText(
@@ -318,9 +363,7 @@ async function runSaveDisguised(
         'and load them at restore with --share <file>.',
         'neutral',
       );
-      outs.push(
-        emit(opts.outDir, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'),
-      );
+      outs.push(emit(opts, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'));
     });
     return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
   }
@@ -330,20 +373,18 @@ async function runSaveDisguised(
     name,
     content,
     opts.password,
-    { keyMode, bundle: input.bundle },
+    { keyMode, bundle: input.bundle, maxBytes },
     onProgress,
   );
   await verifyDisguisedExport(container, dek, regionIndex, name, content, onProgress);
-  const outs = [emit(opts.outDir, outName, container, 'vault')];
+  const outs = [emit(opts, outName, container, 'vault')];
   if (keyMode === 'keyfile') {
-    outs.push(
-      emit(opts.outDir, binaryKeyName('disguised'), wrapBinary(keyBlock, 'disguised'), 'keyfile'),
-    );
+    outs.push(emit(opts, binaryKeyName('disguised'), wrapBinary(keyBlock, 'disguised'), 'keyfile'));
   } else if (keyMode === 'stego') {
     // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
     // cover, keyed by the same per-save password that derives the slot KEK.
     const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover, 'factor');
-    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
+    if (ext) outs.push(writeExternalKey(opts, ext));
   }
   return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
 }
@@ -367,7 +408,9 @@ function readSaveInputs(paths: string[]): {
     if (statSync(path).isDirectory()) files.push(...walk(path));
     else files.push(path);
   }
-  if (files.length === 0) throw new Error(t('errNoInputFiles'));
+  if (files.length === 0) {
+    throw new StegoShardApiError('NO_INPUT_FILES', 'no input files to save');
+  }
   if (files.length === 1) {
     const only = files[0]!;
     return { name: basename(only), content: read(only), bundle: false, count: 1 };
@@ -377,9 +420,9 @@ function readSaveInputs(paths: string[]): {
 }
 
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
-  allowOverwrite = Boolean(opts.force);
   const input = readSaveInputs(opts.inputs);
   const content = input.content;
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES;
 
   // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
   // region gets its own DEK; the managed key is not used on this supported path).
@@ -388,7 +431,11 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   }
   // A non-plain access mode is only meaningful on the supported .db path.
   if (opts.mode && opts.mode !== 'plain') {
-    throw new Error(t('errModeNeedsDisguise', { mode: String(opts.mode) }));
+    throw new StegoShardApiError(
+      'MODE_NEEDS_DISGUISE',
+      `access mode "${String(opts.mode)}" needs the disguised binary path`,
+      { mode: String(opts.mode) },
+    );
   }
 
   const key = await makeKey(opts.password);
@@ -400,18 +447,16 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       input.name,
       content,
       key,
-      { keyMode: opts.keyMode, variant, bundle: input.bundle },
+      { keyMode: opts.keyMode, variant, bundle: input.bundle, maxBytes },
       onProgress,
     );
     await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
-    const outs = [emit(opts.outDir, binaryVaultName(variant), container, 'vault')];
+    const outs = [emit(opts, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
       const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
-      if (ext) outs.push(writeExternalKey(opts.outDir, ext));
+      if (ext) outs.push(writeExternalKey(opts, ext));
     } else if (keyMode === 'keyfile') {
-      outs.push(
-        emit(opts.outDir, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'),
-      );
+      outs.push(emit(opts, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'));
     }
     return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: variant };
   }
@@ -440,6 +485,11 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       : undefined;
 
   if (opts.paper) {
+    // Loaded here rather than at the top of the module: the PDF path pulls in
+    // fontkit, about a megabyte of font machinery, and most callers never render
+    // paper. The CLI bundle is unaffected, since `vite.cli.config.ts` inlines
+    // dynamic imports into its single file.
+    const { buildCliPaperPdf } = await import('./paper');
     const encodeQr = (p: Uint8Array): ImageDataLike => codec.encode(p, PROFILE_PAPER);
     const built = await buildCliPaperPdf(imagePayloads, encodeQr, imageDataToPng, {
       title: opts.title,
@@ -450,8 +500,8 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       keyLocation: opts.keyLocation,
       fontPath: opts.fontPath,
     });
-    outs.push(emit(opts.outDir, `stegoshard-${setHex}.pdf`, built.pdf, 'document'));
-    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
+    outs.push(emit(opts, `stegoshard-${setHex}.pdf`, built.pdf, 'document'));
+    if (ext) outs.push(writeExternalKey(opts, ext));
     return {
       ...asFiles(outs),
       imageCount: imagePayloads.length,
@@ -489,14 +539,12 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     const entries: Record<string, Uint8Array> = {};
     for (const p of pngs) entries[p.name] = p.bytes;
     if (ext && keyMode === 'keyfile') entries[ext.name] = ext.bytes;
-    outs.push(
-      emit(opts.outDir, `stegoshard-${setHex}.zip`, zipSync(entries, { level: 0 }), 'archive'),
-    );
+    outs.push(emit(opts, `stegoshard-${setHex}.zip`, zipSync(entries, { level: 0 }), 'archive'));
     // The stego image is always delivered on its own (an innocuous photo).
-    if (ext && keyMode === 'stego') outs.push(writeExternalKey(opts.outDir, ext));
+    if (ext && keyMode === 'stego') outs.push(writeExternalKey(opts, ext));
   } else {
-    for (const p of pngs) outs.push(emit(opts.outDir, p.name, p.bytes, 'vault'));
-    if (ext) outs.push(writeExternalKey(opts.outDir, ext));
+    for (const p of pngs) outs.push(emit(opts, p.name, p.bytes, 'vault'));
+    if (ext) outs.push(writeExternalKey(opts, ext));
   }
 
   return {
@@ -517,6 +565,13 @@ export interface RestoreOptions {
   sharePaths?: string[] | undefined;
   /** Overwrite an existing output file instead of refusing. */
   force?: boolean | undefined;
+  /**
+   * Ceiling on a binary container's decrypted payload, and on its decompression
+   * (a gzip-bomb guard on bytes an adversary may have written). Defaults to
+   * {@link DEFAULT_MAX_BINARY_BYTES}; pass `MAX_FILE_BYTES_BINARY_CLI` for the
+   * 1 GiB terminal budget.
+   */
+  maxBytes?: number | undefined;
 }
 
 /** The dash-grouped base32 share token, so instruction prose in the file is ignored. */
@@ -586,7 +641,6 @@ export async function runRestore(
   opts: RestoreOptions,
   onProgress?: OnProgress,
 ): Promise<RestoreResult> {
-  allowOverwrite = Boolean(opts.force);
   const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
   if (binaryVaultPath) {
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
@@ -595,10 +649,10 @@ export async function runRestore(
     const { filename, content, bundled } = await importVaultBinary(
       read(binaryVaultPath),
       opts.password,
-      { keyBlock, secret: secret ?? null },
+      { keyBlock, secret: secret ?? null, maxBytes: opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES },
       onProgress,
     );
-    const written = writeRestored(opts.outDir, filename, content, bundled);
+    const written = writeRestored(opts, filename, content, bundled);
     return { outPath: written[0]!, files: written, filename, seen: 1, decoded: 1 };
   }
 
@@ -607,13 +661,13 @@ export async function runRestore(
   if (opts.keyPath) keyBlock = await resolveKeyBlock(opts.keyPath, opts.password);
 
   if (gathered.payloads.length === 0) {
-    throw new Error(t('errNoReadableImages'));
+    throw new StegoShardApiError('NO_READABLE_IMAGES', 'no readable vault images among the inputs');
   }
 
   const { filename, content, bundled } = await importVault(gathered.payloads, opts.password, {
     keyBlock,
   });
-  const written = writeRestored(opts.outDir, filename, content, bundled);
+  const written = writeRestored(opts, filename, content, bundled);
   const outPath = written[0]!;
   return { outPath, files: written, filename, seen: gathered.seen, decoded: gathered.decoded };
 }
@@ -651,11 +705,12 @@ export interface GallerySaveResult {
 }
 
 export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
-  allowOverwrite = Boolean(opts.force);
   const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
-  if (coverPaths.length === 0) throw new Error(t('errNoCoversFound'));
+  if (coverPaths.length === 0) {
+    throw new StegoShardApiError('NO_COVERS_FOUND', 'no usable cover photos found');
+  }
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
   const mode = opts.mode ?? 'plain';
@@ -697,7 +752,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     // Two covers can share a basename; disambiguate so nothing is overwritten.
     for (let n = 2; used.has(name); n++) name = f.name.replace(/(\.[^.]+)?$/, `-${n}$1`);
     used.add(name);
-    return emit(opts.outDir, name, f.bytes, 'photos');
+    return emit(opts, name, f.bytes, 'photos');
   });
   // Deliver the external key alongside the photos for keyfile/stego galleries.
   // Gallery is a multi-region path → the external artifact is the 32-byte factor.
@@ -709,7 +764,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     opts.keyCover,
     'factor',
   );
-  if (ext) outs.push(writeExternalKey(opts.outDir, ext));
+  if (ext) outs.push(writeExternalKey(opts, ext));
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {
     const { k, n } = opts.threshold;
@@ -723,9 +778,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
         'and load them at restore with --share <file>.',
         'neutral',
       );
-      outs.push(
-        emit(opts.outDir, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'),
-      );
+      outs.push(emit(opts, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'));
     });
   }
   return { ...asFiles(outs), k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
@@ -733,14 +786,17 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
 
 export interface GalleryRestoreResult {
   outPath: string;
+  /** Every path written, first one first. Always length 1: a gallery holds one secret. */
+  files: string[];
   filename: string;
   seen: number;
 }
 
 export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
-  allowOverwrite = Boolean(opts.force);
   const coverPaths = gatherImageFiles(opts.inputs);
-  if (coverPaths.length === 0) throw new Error(t('errNoGalleryImages'));
+  if (coverPaths.length === 0) {
+    throw new StegoShardApiError('NO_GALLERY_IMAGES', 'no images to scan for a gallery');
+  }
   const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
 
   // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
@@ -749,8 +805,8 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   const secret = await recoverSecret(opts.sharePaths);
   const { filename, content } = await galleryDecode(covers, opts.password, { keyBlock, secret });
   const outName = basename(filename) || 'restored.bin';
-  const outPath = writeOut(opts.outDir, outName, content);
-  return { outPath, filename, seen: covers.length };
+  const outPath = writeOut(opts, outName, content);
+  return { outPath, files: [outPath], filename, seen: covers.length };
 }
 
 /**
@@ -759,14 +815,14 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
  * Returns the paths written, first one first.
  */
 function writeRestored(
-  dir: string,
+  target: WriteTarget,
   filename: string,
   content: Uint8Array,
   bundled: boolean,
 ): string[] {
-  if (!bundled) return [writeOut(dir, basename(filename) || 'restored.bin', content)];
-  // unpackBundle reduces every entry to a basename, so nothing can escape `dir`.
-  return unpackBundle(content).map((f) => writeOut(dir, f.name, f.bytes));
+  if (!bundled) return [writeOut(target, basename(filename) || 'restored.bin', content)];
+  // unpackBundle reduces every entry to a basename, so nothing can escape the dir.
+  return unpackBundle(content).map((f) => writeOut(target, f.name, f.bytes));
 }
 
 export async function runEstimate(
@@ -790,60 +846,8 @@ export function codecIdForSave(paper: boolean, codec: CodecChoice | undefined): 
   return !paper && codec !== 'qr' ? CODEC_COLOR_GRID : CODEC_QR_GRID;
 }
 
-/**
- * Reject a `--codec` / `--paper` combination that cannot mean what it says, and
- * return the message to print. Null when the arguments are fine.
- *
- * `requested` is what the user actually typed, not the resolved default: plain
- * `--paper` must keep working, and only an *explicit* `--codec color --paper` is
- * a mistake worth naming.
- */
-export function codecArgError(requested: string | undefined, paper: boolean): string | null {
-  if (requested !== undefined && !CODEC_CHOICES.includes(requested as CodecChoice)) {
-    return t('errCodecInvalid', { value: String(requested) });
-  }
-  if (requested === 'color' && paper) {
-    return t('errCodecColorPaper');
-  }
-  return null;
-}
-
-/** The ways the extra entropy layer can be supplied on the command line. */
-export interface EntropySources {
-  /** `--entropy <text>` */
-  text?: string | undefined;
-  /** `--entropy-file <path>` */
-  file?: string | undefined;
-  /** `--entropy-prompt` */
-  prompt?: boolean | undefined;
-}
-// `STEGOSHARD_ENTROPY` is not listed: like STEGOSHARD_PASSWORD it is an ambient
-// fallback that any typed flag simply outranks, so there is no combination of
-// sources to reject.
-
-/**
- * Reject an unusable `--entropy*` combination and return the message to print.
- * Null when the arguments are fine.
- *
- * Two rules. Combining sources is refused because it would be ambiguous which
- * one won, and silently ignoring the other is exactly the kind of surprise a
- * user reaching for this option cannot afford. An explicitly *empty* source is
- * refused for the same reason `resolvePassword` refuses an empty password: the
- * flag would have done nothing at all, and the user would never know.
- */
-export function entropyArgError(src: EntropySources): string | null {
-  const given = [
-    src.text !== undefined && '--entropy',
-    src.file !== undefined && '--entropy-file',
-    src.prompt === true && '--entropy-prompt',
-  ].filter((s): s is string => typeof s === 'string');
-  if (given.length > 1) {
-    return t('errEntropyExclusive', { flags: given.join(' and ') });
-  }
-  if (src.text !== undefined && src.text === '') {
-    return t('errEntropyFlagEmpty');
-  }
-  return null;
-}
+// `codecArgError` / `entropyArgError` used to live here. They reject flag
+// combinations by name and must stay localized, so they moved to
+// `src/cli/argcheck.ts` when this module stopped depending on the CLI locale.
 
 export { CODEC_COLOR_GRID, CODEC_QR_GRID };

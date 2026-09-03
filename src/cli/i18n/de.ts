@@ -33,6 +33,8 @@ export const de: CliCatalog = {
     '--entropy war leer (lassen Sie die Option weg, wenn Sie keine zusätzliche Entropie wollen)',
   errEstimateMissing: 'estimate: <Datei> fehlt',
   errUiPort: 'ui: --port muss eine Portnummer sein (erhalten: „{value}“)',
+  errJsonUiUnsupported:
+    '{command}: --json wird nicht unterstützt; dieser Befehl ist ein langlaufender Server und keine Aktion, die ein Ergebnis liefert',
   errUiNoWebApp:
     'ui: dieser Build enthält die Web-App nicht.\n' +
     'Die eigenständigen Binaries sind ohne Netzwerkzugriff kompiliert und können sie\n' +
@@ -171,6 +173,9 @@ export const de: CliCatalog = {
   helpShare: 'Eine Anteilsdatei (wiederholbar) für einen nonpossession-Tresor',
   helpForce: 'Vorhandene Ausgabedateien überschreiben (Standard: verweigern)',
   helpQuiet: 'Die Fortschrittsanzeige auf stderr unterdrücken',
+  helpJson: 'Ein JSON-Dokument auf stdout ausgeben; Fortschritt als NDJSON auf stderr',
+  helpMcp:
+    'Das Model Context Protocol über stdio bereitstellen, für KI-Agenten (siehe docs/API.md)',
   helpPasswordFlag: 'Nicht empfohlen: in Shell-Historie / Prozessliste sichtbar',
   helpPasswordFile: 'Das Passwort aus einer Datei lesen (erste Zeile)',
   helpPasswordEnv: 'Umgebungsvariable',

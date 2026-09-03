@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { runRestore, runSave } from './commands';
 import { buildCliPaperPdf, needsCjkFont, systemCjkFontCandidates } from './paper';
 import { CODEC_QR_GRID, PROFILE_PAPER, getCodec, type ImageDataLike } from '@core';
-import { imageDataToPng } from './node-image-io';
+import { imageDataToPng } from './image-io';
 
 const SLOW = { timeout: 60_000 };
 const PW = 'paper password';

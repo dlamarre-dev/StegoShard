@@ -14,7 +14,7 @@ import {
   encodeImagePayload,
   getCodec,
 } from '@core';
-import { downscale, fileToImageData, imageDataToPng, decodeImageToPayload } from './node-image-io';
+import { downscale, fileToImageData, imageDataToPng, decodeImageToPayload } from './image-io';
 
 const codec = getCodec(CODEC_QR_GRID);
 

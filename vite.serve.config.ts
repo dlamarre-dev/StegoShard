@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { recordBundledPackages } from './scripts/bundled-packages';
 import { chmodSync, copyFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { builtinModules } from 'node:module';
@@ -47,7 +48,7 @@ function offlineLaunchers(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [offlineLaunchers()],
+  plugins: [offlineLaunchers(), recordBundledPackages('serve')],
   build: {
     outDir: OUT,
     emptyOutDir: false,

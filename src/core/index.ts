@@ -28,3 +28,4 @@ export * from './gallery';
 export * from './shamir';
 export * from './access';
 export * from './codec';
+export * from './errors';

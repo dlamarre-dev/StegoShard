@@ -61,6 +61,35 @@ jobs:
       - name: Build (CLI)
         run: npm run build:cli
 
+      # The published library: two entry points, their rolled-up declarations,
+      # and the API report that `ci:node` verifies against docs/api/.
+      - name: Build (library)
+        run: npm run build:lib
+
+      # What `files` in package.json actually resolves to. The package is still
+      # private, so this is `npm pack`, which works on a private package while
+      # `npm publish --dry-run` refuses.
+      - name: Check the npm tarball
+        run: npm run pack:check
+
+      # Every build above rewrote `.bundled/`, the record of which npm packages it
+      # inlined. Those files are committed and drive THIRD_PARTY_NOTICES.txt, so a
+      # change here means we now distribute something different: either the notices
+      # were regenerated with it, or this is the first anyone would have known.
+      # `ci:node` already ran `notices:check` against the committed manifests, so
+      # the pair of checks is what closes the loop.
+      - name: Fail if what we distribute changed without the notices
+        run: |
+          if ! git diff --quiet -- .bundled; then
+            echo "The set of bundled packages changed:"
+            git --no-pager diff --stat -- .bundled
+            git --no-pager diff -- .bundled
+            echo
+            echo "Run the builds, then 'npm run notices', and commit both."
+            exit 1
+          fi
+          echo "bundled package manifests are current"
+
       - name: Set up Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
@@ -75,6 +104,59 @@ jobs:
             dist-cli/stegoshard.js restore /tmp/ss-out --out /tmp/ss-restored
           diff /tmp/ss-secret.txt /tmp/ss-restored/ss-secret.txt
           echo "Deno round-trip OK"
+
+      # The machine-readable mode, checked on the same bundled + Deno + no-network
+      # path as the round-trip above, because that is where a third-party script
+      # will actually meet it. Asserts the two properties everything else rests
+      # on: stdout is exactly one parseable document, and the schema is the one
+      # consumers pinned against.
+      - name: CLI --json envelope (Deno)
+        run: |
+          deno run --allow-read --allow-write --allow-env \
+            dist-cli/stegoshard.js estimate /tmp/ss-secret.txt --json > /tmp/ss-env.json
+          test "$(wc -l < /tmp/ss-env.json)" -eq 1 || { echo "stdout was not one line"; cat /tmp/ss-env.json; exit 1; }
+          node -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/ss-env.json", "utf8"));
+            if (d.schema !== "stegoshard.cli/1") throw new Error("schema drifted: " + d.schema);
+            if (d.ok !== true || typeof d.result.images !== "number") throw new Error("bad envelope");
+            console.log("envelope OK:", d.schema, d.result.images, "images");
+          '
+
+      # The MCP server on the same bundled + Deno + no-network path. This step is
+      # the mechanical evidence for the docs/CLAIMS.md row: the handshake and a
+      # real tool call complete without `--allow-net`, so the server demonstrably
+      # needs no socket.
+      - name: MCP handshake (Deno, no network permission)
+        run: |
+          printf '%s\n%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"stegoshard_estimate","arguments":{"input":"/tmp/ss-secret.txt"}}}' \
+          | deno run --allow-read --allow-write --allow-env \
+              dist-cli/stegoshard.js mcp --root /tmp > /tmp/ss-mcp.jsonl
+          node -e '
+            const lines = require("fs").readFileSync("/tmp/ss-mcp.jsonl", "utf8").trim().split("\n");
+            if (lines.length !== 3) throw new Error("expected 3 responses, got " + lines.length);
+            const [init, list, call] = lines.map((l) => JSON.parse(l));
+            for (const m of [init, list, call]) {
+              if (m.jsonrpc !== "2.0") throw new Error("stray line on stdout: " + JSON.stringify(m).slice(0, 120));
+              if (m.error) throw new Error("unexpected error: " + JSON.stringify(m.error));
+            }
+            const names = list.result.tools.map((t) => t.name).join(",");
+            if (names !== "stegoshard_estimate,stegoshard_save,stegoshard_restore") {
+              throw new Error("tool surface drifted: " + names);
+            }
+            // A refused call comes back as a *result* carrying isError, not as a
+            // JSON-RPC error, so check it explicitly or the next line fails with
+            // an unreadable TypeError instead of the reason.
+            if (call.result.isError) {
+              throw new Error("estimate was refused: " + call.result.content[0].text);
+            }
+            if (typeof call.result.structuredContent?.images !== "number") {
+              throw new Error("estimate returned no image count");
+            }
+            console.log("MCP OK:", init.result.protocolVersion, "|", names);
+          '
 
       - name: Upload validated browser builds
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

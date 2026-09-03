@@ -25,7 +25,7 @@ import {
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
   isJpeg as isJpegBytes,
-} from '@core';
+} from '../../core';
 
 /** A produced stego key image: raw bytes plus how to name it. */
 export interface StegoKeyImage {

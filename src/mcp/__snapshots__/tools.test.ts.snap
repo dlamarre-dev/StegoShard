@@ -1,0 +1,439 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the advertised tools > match the pinned schema 1`] = `
+[
+  {
+    "description": "How many carrier images a file would need. Read-only: reads the file size, writes nothing, needs no password.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "codec": {
+          "default": "color",
+          "enum": [
+            "color",
+            "qr",
+          ],
+          "type": "string",
+        },
+        "input": {
+          "description": "Path to the file, inside a --root directory.",
+          "type": "string",
+        },
+        "paper": {
+          "default": false,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "input",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_estimate",
+  },
+  {
+    "description": "Encrypt one or more files into StegoShard carriers. Writes new files into out_dir and refuses to overwrite. The duress and non-possession access modes are not available over MCP; use the command line for those.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_weak_password": {
+          "default": false,
+          "type": "boolean",
+        },
+        "binary": {
+          "default": false,
+          "type": "boolean",
+        },
+        "codec": {
+          "default": "color",
+          "enum": [
+            "color",
+            "qr",
+          ],
+          "type": "string",
+        },
+        "cover": {
+          "description": "Required when key_mode is stego.",
+          "type": "string",
+        },
+        "disguise": {
+          "default": false,
+          "description": "Requires binary. Writes a decoy SQLite database instead of a .ssbn file.",
+          "type": "boolean",
+        },
+        "inputs": {
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+        },
+        "key_mode": {
+          "default": "embedded",
+          "enum": [
+            "embedded",
+            "keyfile",
+            "stego",
+          ],
+          "type": "string",
+        },
+        "out_dir": {
+          "type": "string",
+        },
+        "paper": {
+          "default": false,
+          "type": "boolean",
+        },
+        "password_source": {
+          "description": "Where to read the password from. Never pass the password itself: tool arguments are recorded in the agent transcript and may be sent to a model provider.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "description": "Name of an environment variable holding the password. Only STEGOSHARD_* names are readable.",
+                  "pattern": "^STEGOSHARD_[A-Z0-9_]*$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "env",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "description": "Path to a file whose first line is the password. Must be inside a --root directory.",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "file",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "zip": {
+          "default": false,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "inputs",
+        "out_dir",
+        "password_source",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_save",
+  },
+  {
+    "description": "Recover a file from StegoShard carriers. WARNING: this writes the decrypted plaintext into out_dir, where this agent can read it.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array",
+        },
+        "key_file": {
+          "description": "A .key file, or the cover photo a stego key hides in.",
+          "type": "string",
+        },
+        "out_dir": {
+          "type": "string",
+        },
+        "password_source": {
+          "description": "Where to read the password from. Never pass the password itself: tool arguments are recorded in the agent transcript and may be sent to a model provider.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "description": "Name of an environment variable holding the password. Only STEGOSHARD_* names are readable.",
+                  "pattern": "^STEGOSHARD_[A-Z0-9_]*$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "env",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "description": "Path to a file whose first line is the password. Must be inside a --root directory.",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "file",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "share_files": {
+          "description": "Threshold share files for a non-possession vault (SPEC §10.6).",
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 255,
+          "type": "array",
+        },
+      },
+      "required": [
+        "inputs",
+        "out_dir",
+        "password_source",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_restore",
+  },
+]
+`;
+
+exports[`the advertised tools > match the pinned schema with inline passwords allowed 1`] = `
+[
+  {
+    "description": "How many carrier images a file would need. Read-only: reads the file size, writes nothing, needs no password.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "codec": {
+          "default": "color",
+          "enum": [
+            "color",
+            "qr",
+          ],
+          "type": "string",
+        },
+        "input": {
+          "description": "Path to the file, inside a --root directory.",
+          "type": "string",
+        },
+        "paper": {
+          "default": false,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "input",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_estimate",
+  },
+  {
+    "description": "Encrypt one or more files into StegoShard carriers. Writes new files into out_dir and refuses to overwrite. The duress and non-possession access modes are not available over MCP; use the command line for those.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "password_source",
+          ],
+        },
+        {
+          "required": [
+            "password",
+          ],
+        },
+      ],
+      "properties": {
+        "allow_weak_password": {
+          "default": false,
+          "type": "boolean",
+        },
+        "binary": {
+          "default": false,
+          "type": "boolean",
+        },
+        "codec": {
+          "default": "color",
+          "enum": [
+            "color",
+            "qr",
+          ],
+          "type": "string",
+        },
+        "cover": {
+          "description": "Required when key_mode is stego.",
+          "type": "string",
+        },
+        "disguise": {
+          "default": false,
+          "description": "Requires binary. Writes a decoy SQLite database instead of a .ssbn file.",
+          "type": "boolean",
+        },
+        "inputs": {
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+        },
+        "key_mode": {
+          "default": "embedded",
+          "enum": [
+            "embedded",
+            "keyfile",
+            "stego",
+          ],
+          "type": "string",
+        },
+        "out_dir": {
+          "type": "string",
+        },
+        "paper": {
+          "default": false,
+          "type": "boolean",
+        },
+        "password": {
+          "description": "The password itself. This value will appear in the agent transcript and may be sent to a model provider. Prefer password_source.",
+          "type": "string",
+        },
+        "password_source": {
+          "description": "Where to read the password from. Never pass the password itself: tool arguments are recorded in the agent transcript and may be sent to a model provider.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "description": "Name of an environment variable holding the password. Only STEGOSHARD_* names are readable.",
+                  "pattern": "^STEGOSHARD_[A-Z0-9_]*$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "env",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "description": "Path to a file whose first line is the password. Must be inside a --root directory.",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "file",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "zip": {
+          "default": false,
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "inputs",
+        "out_dir",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_save",
+  },
+  {
+    "description": "Recover a file from StegoShard carriers. WARNING: this writes the decrypted plaintext into out_dir, where this agent can read it.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "password_source",
+          ],
+        },
+        {
+          "required": [
+            "password",
+          ],
+        },
+      ],
+      "properties": {
+        "inputs": {
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array",
+        },
+        "key_file": {
+          "description": "A .key file, or the cover photo a stego key hides in.",
+          "type": "string",
+        },
+        "out_dir": {
+          "type": "string",
+        },
+        "password": {
+          "description": "The password itself. This value will appear in the agent transcript and may be sent to a model provider. Prefer password_source.",
+          "type": "string",
+        },
+        "password_source": {
+          "description": "Where to read the password from. Never pass the password itself: tool arguments are recorded in the agent transcript and may be sent to a model provider.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "description": "Name of an environment variable holding the password. Only STEGOSHARD_* names are readable.",
+                  "pattern": "^STEGOSHARD_[A-Z0-9_]*$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "env",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "description": "Path to a file whose first line is the password. Must be inside a --root directory.",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "file",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "share_files": {
+          "description": "Threshold share files for a non-possession vault (SPEC §10.6).",
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 255,
+          "type": "array",
+        },
+      },
+      "required": [
+        "inputs",
+        "out_dir",
+      ],
+      "type": "object",
+    },
+    "name": "stegoshard_restore",
+  },
+]
+`;

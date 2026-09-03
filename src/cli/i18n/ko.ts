@@ -36,6 +36,8 @@ export const ko: CliCatalog = {
     '--entropy 가 비어 있습니다(추가 엔트로피를 원하지 않으면 이 플래그를 빼세요)',
   errEstimateMissing: 'estimate: <파일> 이 없습니다',
   errUiPort: 'ui: --port 는 포트 번호여야 합니다(받은 값: "{value}")',
+  errJsonUiUnsupported:
+    '{command}: --json은 지원되지 않습니다. 이 명령은 오래 실행되는 서버이며 결과를 출력하는 명령이 아닙니다.',
   errUiNoWebApp:
     'ui: 이 빌드에는 웹 앱이 들어 있지 않습니다.\n' +
     '단독 실행 파일은 네트워크 접근 없이 컴파일되므로 웹 앱을 제공할 수 없습니다.\n' +
@@ -162,6 +164,8 @@ export const ko: CliCatalog = {
   helpShare: 'nonpossession 금고용 임계값 공유 파일(여러 번 지정 가능)',
   helpForce: '기존 출력 파일 덮어쓰기(기본값: 덮어쓰지 않음)',
   helpQuiet: 'stderr 의 진행 표시 숨기기',
+  helpJson: 'stdout에 JSON 문서 하나를 출력하고, 진행 상황은 NDJSON으로 stderr에 출력합니다',
+  helpMcp: 'Model Context Protocol을 stdio로 제공합니다(AI 에이전트용, docs/API.md 참고)',
   helpPasswordFlag: '권장하지 않음: 셸 기록과 프로세스 목록에 드러남',
   helpPasswordFile: '파일에서 비밀번호 읽기(첫 줄)',
   helpPasswordEnv: '환경 변수',

@@ -151,6 +151,49 @@ it.
 at all, which is a guarantee worth more than the convenience; see
 [CLI.md](CLI.md#the-same-app-in-a-browser-from-your-own-machine).
 
+## Driving StegoShard from an agent (MCP)
+
+`stegoshard mcp` lets an AI agent call save, restore and estimate as tools. It is
+off unless you invoke it, and it is a different bargain from every other surface.
+
+**What it does not cost you.** stdio only: newline-delimited JSON-RPC on stdin and
+stdout. The server opens no socket, binds no port and speaks no HTTP, so the
+property stated above for the local web UI, that the server exposes no endpoint,
+is not weakened; MCP adds no endpoint of any kind. The standalone binaries still
+hold no network permission, and this needs none.
+
+**What it costs you: the agent is the network client.** Everything you pass and
+everything you get back may be transmitted to a model provider and retained
+there. That is why passwords travel by reference rather than by value, and why
+only `STEGOSHARD_*` environment variables are readable. It is also why the
+duress and non-possession modes are not available over MCP at all: duress needs a
+second, independent credential that would land in the transcript, and its
+independence check would become a recorded oracle relating the two, in a mode
+whose entire point is that no record exists of which credential is real;
+non-possession writes its threshold shares into a directory the agent reads back
+in the same session. Both remain fully available from the command line, where a
+person is holding them.
+
+**And a restore shows the agent your secret.** It writes the recovered plaintext
+into `out_dir`, where the agent's own filesystem tools can read it. There is no
+way around that: it is what a restore does. Driving a restore from an agent is a
+decision to show the agent the file. If that is not what you want, restore from
+the command line.
+
+**Confinement is a policy, not a sandbox.** `--root` is enforced in the server,
+with symlinks resolved on both sides, and with no `--root` every tool call is
+refused. But `deno compile` bakes blanket read and write permission into the
+released binaries, so a bug in that policy is not backstopped by the runtime. The
+runtime-enforced version, which the network-free design makes possible, is to
+narrow the permissions when you launch it:
+
+```bash
+deno run --allow-read=/path/to/vault --allow-write=/path/to/vault --allow-env \
+  dist-cli/stegoshard.js mcp --root /path/to/vault
+```
+
+See [API.md](API.md) for the tool schemas and the error codes.
+
 ## Deliberate non-goals
 
 StegoShard does **not** claim, and you should not rely on:

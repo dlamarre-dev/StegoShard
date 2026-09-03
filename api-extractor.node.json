@@ -1,0 +1,45 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+
+  // Rolls the staged declaration tree from `tsconfig.lib.json` into one flat
+  // .d.ts per entry point, and writes the API report that guards the surface.
+  // The report is committed: a widened surface then shows up as a reviewable
+  // diff rather than as a silent addition. Regenerate with `npm run build:types`.
+  "mainEntryPointFilePath": "<projectFolder>/.types/api/node.d.ts",
+  "bundledPackages": [],
+
+  // LF, not the CRLF default. The report is committed under .gitattributes'
+  // `text=auto eol=lf`, and `api:check` compares it byte for byte, so a
+  // CRLF-writing run on Windows would fail against an LF checkout for a reason
+  // that has nothing to do with the API.
+  "newlineKind": "lf",
+
+  "compiler": { "tsconfigFilePath": "<projectFolder>/tsconfig.lib.json" },
+
+  "apiReport": {
+    "enabled": true,
+    "reportFolder": "<projectFolder>/docs/api/",
+    "reportTempFolder": "<projectFolder>/.types/api-report-temp/",
+    "reportFileName": "stegoshard-node.api.md"
+  },
+
+  "docModel": { "enabled": false },
+
+  "dtsRollup": {
+    "enabled": true,
+    "publicTrimmedFilePath": "<projectFolder>/dist-lib/node.d.ts"
+  },
+
+  "tsdocMetadata": { "enabled": false },
+
+  "messages": {
+    "compilerMessageReporting": { "default": { "logLevel": "warning" } },
+    "extractorMessageReporting": {
+      "default": { "logLevel": "warning" },
+      // Every export here is deliberate and documented in docs/API.md rather
+      // than with a release tag; the project does not use @public/@beta.
+      "ae-missing-release-tag": { "logLevel": "none" }
+    },
+    "tsdocMessageReporting": { "default": { "logLevel": "none" } }
+  }
+}

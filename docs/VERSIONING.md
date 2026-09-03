@@ -1,6 +1,6 @@
 # Versioning
 
-StegoShard has **two independent version lines**. Don't conflate them.
+StegoShard has **three independent version lines**. Don't conflate them.
 
 ## 1. Application / CLI version (SemVer)
 
@@ -66,3 +66,24 @@ _disguised SQLite container's_ internal rows but the vault blob and container
 detection were unchanged, so no version bump; only the SemVer app version moved.
 
 See also the "Format stability" section of [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## 3. Machine-interface schema version
+
+The `--json` envelope and, later, the MCP tool results carry
+`schema: "stegoshard.cli/N"`. It versions the **shape of the description**, never
+the bytes on disk, and it moves independently of every constant in §2: a change to
+the envelope must not bump `FORMAT_VERSION`, and a format change does not bump the
+schema unless it changes what a caller reads.
+
+`stegoshard.cli/1` today. The rules:
+
+- **Additive changes do not bump it.** A new field, a new error code, a new warning
+  code. A consumer that ignores unknown keys keeps working, which is the contract.
+- **Breaking changes bump to `/2`.** Removing a field, retyping one, or changing
+  what an existing code means. Renaming a code is removing one and adding another.
+- **`stability` is a value in the payload, not the version.** It reads `"unstable"`
+  until 1.0, and flipping it to `"stable"` is itself an additive change rather than
+  a schema break, so a consumer can branch on it instead of on a version number.
+
+Pre-1.0 this interface may still break inside a `0.9.z`, which is what `stability`
+says out loud so no consumer has to infer it. See [API.md](API.md).

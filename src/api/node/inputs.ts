@@ -10,9 +10,9 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { unzipSync } from 'fflate';
-import { MAX_IMAGES } from '@core';
-import { extractPdfImages } from '../ui/pdf-restore';
-import { decodeImageToPayload, decodePixelsToPayload } from './node-image-io';
+import { MAX_IMAGES } from '../../core';
+import { extractPdfImages } from '../../ui/pdf-restore';
+import { decodeImageToPayload, decodePixelsToPayload } from './image-io';
 
 const isZip = (n: string) => /\.zip$/i.test(n);
 const isKey = (n: string) => /\.key$/i.test(n);

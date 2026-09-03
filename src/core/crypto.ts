@@ -70,12 +70,16 @@ export function validateArgon2Params(p: Argon2Params): void {
  * viability remain release-QA gates. Tests override these with cheaper values,
  * and the Python reference decoder mirrors them for the stego/gallery layer
  * (whose cost is not stored; see python/stegoshard/stego.py).
+ *
+ * Frozen: this object is the default argument of every derivation in this module,
+ * so a single mutation anywhere in the process would silently weaken every KDF at
+ * once. Callers that want cheaper parameters pass their own object; tests do.
  */
-export const DEFAULT_ARGON2: Argon2Params = {
+export const DEFAULT_ARGON2: Argon2Params = Object.freeze({
   iterations: 4,
   memoryKiB: 256 * 1024, // 256 MiB
   parallelism: 1,
-};
+});
 
 /**
  * Optional user-supplied entropy layer (SPEC: generation-side only).

@@ -29,10 +29,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { KEY_BLOCK_LEN, isSerializedKeyBlock } from '../core/index';
-import { extractKeyImage } from './node-image-io';
+import { KEY_BLOCK_LEN, isSerializedKeyBlock } from '../../core/index';
+import { extractKeyImage } from './image-io';
 
-const ROOT = join(import.meta.dirname, '..', '..', 'tests', 'golden');
+const ROOT = join(import.meta.dirname, '..', '..', '..', 'tests', 'golden');
 
 function manifest(dir: string): { password: string } {
   return JSON.parse(readFileSync(join(ROOT, dir, 'manifest.json'), 'utf-8')) as {

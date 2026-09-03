@@ -8,8 +8,26 @@
   "bin": {
     "stegoshard": "dist-cli/stegoshard.js"
   },
+  "main": "./dist-lib/index.js",
+  "types": "./dist-lib/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist-lib/index.d.ts",
+      "default": "./dist-lib/index.js"
+    },
+    "./node": {
+      "types": "./dist-lib/node.d.ts",
+      "default": "./dist-lib/node.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
-    "dist-cli"
+    "dist-cli",
+    "dist-lib",
+    "docs/API.md",
+    "SPEC.md",
+    "THIRD_PARTY_NOTICES.txt"
   ],
   "engines": {
     "node": ">=20.19"
@@ -20,8 +38,12 @@
     "cli": "tsx src/cli/main.ts",
     "build": "tsc --noEmit && vite build",
     "build:cli": "tsc --noEmit && vite build --config vite.cli.config.ts && npm run build:web:offline && tsx scripts/copy-web-ui.ts",
-    "prepublishOnly": "npm run build:cli",
-    "package:cli": "deno compile --allow-read --allow-write --no-prompt --output stegoshard dist-cli/stegoshard.js",
+    "build:lib": "tsc --noEmit && vite build --config vite.lib.config.ts && npm run build:types",
+    "build:types": "tsc -p tsconfig.lib.json && api-extractor run --local -c api-extractor.index.json && api-extractor run --local -c api-extractor.node.json",
+    "api:check": "tsc -p tsconfig.lib.json && api-extractor run -c api-extractor.index.json && api-extractor run -c api-extractor.node.json",
+    "pack:check": "tsx scripts/check-pack.ts",
+    "prepublishOnly": "npm run build:cli && npm run build:lib",
+    "package:cli": "deno compile --allow-read --allow-write --allow-env --no-prompt --output stegoshard dist-cli/stegoshard.js",
     "build:firefox": "cross-env STEGOSHARD_TARGET=firefox vite build",
     "build:edge": "cross-env STEGOSHARD_TARGET=edge vite build",
     "build:store": "tsc --noEmit && vite build --mode store",
@@ -59,7 +81,7 @@
     "notices": "tsx scripts/generate-notices.ts",
     "notices:check": "tsx scripts/generate-notices.ts --check",
     "audit": "npm audit --audit-level=moderate && npm audit --omit=dev --audit-level=moderate",
-    "ci:node": "npm run notices:check && npm run format:check && npm run lint && npm run typecheck && npm run test:coverage",
+    "ci:node": "npm run notices:check && npm run format:check && npm run lint && npm run typecheck && npm run api:check && npm run test:coverage",
     "package": "npm run notices:check && npm run build:store && npm run build:store:edge && npm run build:store:firefox && tsx scripts/package.ts && tsx scripts/check-packages.ts",
     "package:check": "tsx scripts/check-packages.ts"
   },
@@ -74,6 +96,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@microsoft/api-extractor": "7.59.0",
     "@pdf-lib/fontkit": "^1.1.1",
     "@playwright/test": "^1.62.1",
     "@stryker-mutator/core": "^10.0.0",

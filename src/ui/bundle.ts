@@ -16,7 +16,7 @@ import {
   MAX_BROWSER_TOTAL_INPUT_BYTES,
   assertBrowserInputs,
 } from './input-limits';
-import { MAX_FILE_BYTES_BINARY_UI } from '@core';
+import { MAX_FILE_BYTES_BINARY_UI } from '../core';
 
 /** Name carried in the envelope for a multi-file save. */
 export const BUNDLE_NAME = 'bundle.zip';

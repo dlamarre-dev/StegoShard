@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { recordBundledPackages } from './scripts/bundled-packages';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 // The explicit `.ts` is deliberate, and this is the only import in the repo that
@@ -44,7 +45,7 @@ export default defineConfig(() => {
         '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
       },
     },
-    plugins: [manifestPlugin()],
+    plugins: [manifestPlugin(), recordBundledPackages(`extension-${target}`)],
     // Bundle Web Workers as ES modules (the app is ES modules and the worker
     // imports @core, which pulls in hash-wasm) instead of the default iife, which
     // would inline a duplicate copy of the core into the worker bundle.

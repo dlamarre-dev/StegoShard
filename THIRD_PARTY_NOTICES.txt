@@ -1,47 +1,86 @@
 StegoShard third-party notices
 
-Generated from package-lock.json. Do not edit by hand.
+Generated. Do not edit by hand; run `npm run notices`.
 
-- @pdf-lib/standard-fonts 1.0.0 — MIT — https://github.com/Hopding/standard-fonts
-- @pdf-lib/upng 1.0.1 — MIT — https://github.com/Hopding/upng
-- ansi-regex 5.0.1 — MIT — chalk/ansi-regex
-- ansi-styles 4.3.0 — MIT — chalk/ansi-styles
-- camelcase 5.3.1 — MIT — sindresorhus/camelcase
-- cliui 6.0.0 — ISC — http://github.com/yargs/cliui
-- color-convert 2.0.1 — MIT — Qix-/color-convert
-- color-name 1.1.4 — MIT — https://github.com/colorjs/color-name
-- decamelize 1.2.0 — MIT — sindresorhus/decamelize
-- dijkstrajs 1.0.3 — MIT — https://github.com/tcort/dijkstrajs
-- emoji-regex 8.0.0 — MIT — https://mths.be/emoji-regex
-- emoji-regex 8.0.0 — MIT — https://mths.be/emoji-regex
-- fflate 0.8.3 — MIT — https://101arrowz.github.io/fflate
-- find-up 4.1.0 — MIT — sindresorhus/find-up
-- get-caller-file 2.0.5 — ISC — https://github.com/stefanpenner/get-caller-file#readme
-- hash-wasm 4.12.0 — MIT — https://github.com/Daninet/hash-wasm#readme
-- is-fullwidth-code-point 3.0.0 — MIT — sindresorhus/is-fullwidth-code-point
-- jsqr 1.4.0 — Apache-2.0 — https://github.com/cozmo/jsQR
-- locate-path 5.0.0 — MIT — sindresorhus/locate-path
-- p-limit 2.3.0 — MIT — sindresorhus/p-limit
-- p-locate 4.1.0 — MIT — sindresorhus/p-locate
-- p-try 2.2.0 — MIT — sindresorhus/p-try
-- pako 1.0.11 — (MIT AND Zlib) — https://github.com/nodeca/pako
-- path-exists 4.0.0 — MIT — sindresorhus/path-exists
-- pdf-lib 1.17.1 — MIT — https://pdf-lib.js.org
-- pngjs 5.0.0 — MIT — https://github.com/lukeapage/pngjs
-- qrcode 1.5.4 — MIT — http://github.com/soldair/node-qrcode
-- require-directory 2.1.1 — MIT — https://github.com/troygoode/node-require-directory/
-- require-main-filename 2.0.0 — ISC — https://github.com/yargs/require-main-filename#readme
-- set-blocking 2.0.0 — ISC — https://github.com/yargs/set-blocking#readme
-- string-width 4.2.3 — MIT — sindresorhus/string-width
-- string-width 4.2.3 — MIT — sindresorhus/string-width
-- strip-ansi 6.0.1 — MIT — chalk/strip-ansi
-- tslib 1.14.1 — 0BSD — https://www.typescriptlang.org/
-- webextension-polyfill 0.12.0 — MPL-2.0 — https://github.com/mozilla/webextension-polyfill
-- which-module 2.0.1 — ISC — https://github.com/nexdrew/which-module#readme
-- wrap-ansi 6.2.0 — MIT — chalk/wrap-ansi
-- y18n 4.0.3 — ISC — https://github.com/yargs/y18n
-- yargs 15.4.1 — MIT — https://yargs.js.org/
-- yargs-parser 18.1.3 — ISC — https://github.com/yargs/yargs-parser
+Covers everything StegoShard distributes, which is the union of two sets: the
+packages npm installs for a consumer (from package-lock.json), and the packages
+each build inlines into an artifact we hand out directly (from .bundled/, written
+by the bundler). Each entry below says which.
+- @pdf-lib/fontkit 1.1.1 — MIT — https://github.com/Hopding/fontkit — bundled into: cli, lib
+- @pdf-lib/standard-fonts 1.0.0 — MIT — https://github.com/Hopding/standard-fonts — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- @pdf-lib/upng 1.0.1 — MIT — https://github.com/Hopding/upng — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- ansi-regex 5.0.1 — MIT — chalk/ansi-regex — installed by npm
+- ansi-styles 4.3.0 — MIT — chalk/ansi-styles — installed by npm
+- camelcase 5.3.1 — MIT — sindresorhus/camelcase — installed by npm
+- cliui 6.0.0 — ISC — http://github.com/yargs/cliui — installed by npm
+- color-convert 2.0.1 — MIT — Qix-/color-convert — installed by npm
+- color-name 1.1.4 — MIT — https://github.com/colorjs/color-name — installed by npm
+- decamelize 1.2.0 — MIT — sindresorhus/decamelize — installed by npm
+- dijkstrajs 1.0.3 — MIT — https://github.com/tcort/dijkstrajs — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- emoji-regex 8.0.0 — MIT — https://mths.be/emoji-regex — installed by npm
+- emoji-regex 8.0.0 — MIT — https://mths.be/emoji-regex — installed by npm
+- fast-png 8.0.0 — MIT — https://image-js.github.io/fast-png/ — bundled into: cli, lib
+- fflate 0.8.3 — MIT — https://101arrowz.github.io/fflate — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- find-up 4.1.0 — MIT — sindresorhus/find-up — installed by npm
+- get-caller-file 2.0.5 — ISC — https://github.com/stefanpenner/get-caller-file#readme — installed by npm
+- hash-wasm 4.12.0 — MIT — https://github.com/Daninet/hash-wasm#readme — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- iobuffer 6.0.1 — MIT — https://image-js.github.io/iobuffer/ — bundled into: cli, lib
+- is-fullwidth-code-point 3.0.0 — MIT — sindresorhus/is-fullwidth-code-point — installed by npm
+- jpeg-js 0.4.4 — BSD-3-Clause — https://github.com/eugeneware/jpeg-js — bundled into: cli, lib
+- jsqr 1.4.0 — Apache-2.0 — https://github.com/cozmo/jsQR — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- locate-path 5.0.0 — MIT — sindresorhus/locate-path — installed by npm
+- p-limit 2.3.0 — MIT — sindresorhus/p-limit — installed by npm
+- p-locate 4.1.0 — MIT — sindresorhus/p-locate — installed by npm
+- p-try 2.2.0 — MIT — sindresorhus/p-try — installed by npm
+- pako 1.0.11 — (MIT AND Zlib) — https://github.com/nodeca/pako — bundled into: cli, extension-chrome, extension-edge, extension-firefox, lib, web
+- path-exists 4.0.0 — MIT — sindresorhus/path-exists — installed by npm
+- pdf-lib 1.17.1 — MIT — https://pdf-lib.js.org — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- pngjs 5.0.0 — MIT — https://github.com/lukeapage/pngjs — installed by npm
+- qrcode 1.5.4 — MIT — http://github.com/soldair/node-qrcode — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- require-directory 2.1.1 — MIT — https://github.com/troygoode/node-require-directory/ — installed by npm
+- require-main-filename 2.0.0 — ISC — https://github.com/yargs/require-main-filename#readme — installed by npm
+- set-blocking 2.0.0 — ISC — https://github.com/yargs/set-blocking#readme — installed by npm
+- string-width 4.2.3 — MIT — sindresorhus/string-width — installed by npm
+- string-width 4.2.3 — MIT — sindresorhus/string-width — installed by npm
+- strip-ansi 6.0.1 — MIT — chalk/strip-ansi — installed by npm
+- tslib 1.14.1 — 0BSD — https://www.typescriptlang.org/ — bundled into: cli, extension-chrome, extension-edge, extension-firefox, web
+- webextension-polyfill 0.12.0 — MPL-2.0 — https://github.com/mozilla/webextension-polyfill — bundled into: extension-chrome, extension-edge, extension-firefox
+- which-module 2.0.1 — ISC — https://github.com/nexdrew/which-module#readme — installed by npm
+- wrap-ansi 6.2.0 — MIT — chalk/wrap-ansi — installed by npm
+- y18n 4.0.3 — ISC — https://github.com/yargs/y18n — installed by npm
+- yargs 15.4.1 — MIT — https://yargs.js.org/ — installed by npm
+- yargs-parser 18.1.3 — ISC — https://github.com/yargs/yargs-parser — installed by npm
+
+---
+
+MIT
+Applies to: @pdf-lib/fontkit 1.1.1
+
+Upstream ships no licence file. The licence is declared MIT by the author in
+two places: the "license" field of the package's own package.json, and the
+"## License" section of its README, both at https://github.com/Hopding/fontkit.
+
+No copyright line is published upstream, so none is reproduced here rather
+than one being composed on the author's behalf. The MIT permission text the
+declaration refers to follows.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ---
 
@@ -253,6 +292,33 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ---
 
 MIT
+Applies to: fast-png 8.0.0
+
+MIT License
+
+Copyright (c) 2015 Michaël Zasso
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+MIT
 Applies to: fflate 0.8.3
 
 MIT License
@@ -332,6 +398,64 @@ Special thank you to the authors of original C algorithms:
 - Yanbo Li dreamfly281@gmail.com, goldboar@163.comYanbo Li
 - Mark Adler
 - Yann Collet
+
+---
+
+MIT
+Applies to: iobuffer 6.0.1
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Michaël Zasso
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+BSD-3-Clause
+Applies to: jpeg-js 0.4.4
+
+Copyright (c) 2014, Eugene Ware
+All rights reserved.
+  
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:  
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.  
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.  
+3. Neither the name of Eugene Ware nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.  
+  
+THIS SOFTWARE IS PROVIDED BY EUGENE WARE ''AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL EUGENE WARE BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 

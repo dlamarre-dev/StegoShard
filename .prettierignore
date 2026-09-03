@@ -1,8 +1,15 @@
 dist
+dist-lib
+.types
 coverage
 node_modules
 local
 *.wasm
+
+# The API reports are written by api-extractor in its own layout. Reformatting
+# them would put prettier and the generator in a loop, each undoing the other,
+# and `npm run api:check` compares the file byte for byte.
+docs/api
 
 # The golden corpus is data, not source. Reformatting a manifest would change
 # its bytes, break the SHA-256 digests recorded in PROVENANCE.md, and trip

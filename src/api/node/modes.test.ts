@@ -10,6 +10,7 @@ import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import { runRestore, runSave } from './commands';
+import { StegoShardApiError } from '../errors';
 
 const SLOW = { timeout: 90_000 };
 const tmp = () => mkdtempSync(join(tmpdir(), 'ss-modes-'));
@@ -236,22 +237,29 @@ describe('CLI .db non-possession (Mode B)', () => {
 });
 
 describe('CLI mode refusal on excluded paths', () => {
-  it('rejects a non-plain mode without --binary --disguise', async () => {
+  // Asserted on the code, not the prose. `runSave` is the orchestration layer, so
+  // it throws locale-free English and leaves the flag-shaped wording
+  // ("--mode duress is only supported with --binary --disguise") to the CLI, which
+  // renders it from this code in the user's language.
+  it('rejects a non-plain mode on an excluded path', async () => {
     const dir = tmp();
     const secret = write(dir, 's.txt', 'x');
-    await expect(
-      runSave({
-        inputs: [secret],
-        outDir: tmp(),
-        password: REAL_PW,
-        paper: false,
-        zip: false,
-        binary: 'branded', // excluded path
-        mode: 'duress',
-        duressPassword: DURESS_PW,
-        decoyFile: secret,
-        keyMode: 'embedded',
-      }),
-    ).rejects.toThrow(/only supported with --binary --disguise/);
+    const failure = runSave({
+      inputs: [secret],
+      outDir: tmp(),
+      password: REAL_PW,
+      paper: false,
+      zip: false,
+      binary: 'branded', // excluded path
+      mode: 'duress',
+      duressPassword: DURESS_PW,
+      decoyFile: secret,
+      keyMode: 'embedded',
+    });
+    await expect(failure).rejects.toBeInstanceOf(StegoShardApiError);
+    await expect(failure).rejects.toMatchObject({
+      code: 'MODE_NEEDS_DISGUISE',
+      params: { mode: 'duress' },
+    });
   });
 });
