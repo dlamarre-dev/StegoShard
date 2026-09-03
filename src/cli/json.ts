@@ -31,10 +31,13 @@ import { CliError, type CliFailure } from './errors';
 import { StegoShardApiError } from '../api/errors';
 import type { CliIo } from './io';
 import { cliLocale } from './i18n';
-// The result types are not imported: `Presenter` already declares each method's
-// parameter, so they are inferred at the implementation and a second reference
-// here would only be a second thing to keep in step.
-import type { CliWarning, Presenter } from './present';
+import type { CliWarning, EstimateResult, Presenter } from './present';
+import type {
+  GalleryRestoreResult,
+  GallerySaveResult,
+  RestoreResult,
+  SaveResult,
+} from '../api/node/commands';
 
 /** Envelope schema version. Not the on-disk format version (docs/VERSIONING.md). */
 export const CLI_SCHEMA = 'stegoshard.cli/1';
@@ -107,6 +110,65 @@ function warningJson(w: CliWarning) {
  */
 const PROGRESS_INTERVAL_MS = 100;
 
+// ---------------------------------------------------------------------------
+// Result shapes
+//
+// Exported as pure functions rather than inlined into the presenter, because the
+// MCP server returns the same objects over a different transport. One contract,
+// two transports: a caller that has learned to read a `save` result off `--json`
+// reads the identical thing out of `stegoshard_save`, and there is no second
+// place for the shape to drift.
+// ---------------------------------------------------------------------------
+
+export function saveResultJson(res: SaveResult): Record<string, unknown> {
+  return {
+    files: abs(res.files),
+    manifest: res.manifest.map((m) => ({ name: resolve(m.name), purpose: m.purpose })),
+    imageCount: res.imageCount,
+    // Empty on the binary paths, which mint no image set. Always present, so a
+    // caller reads one shape rather than testing for the key.
+    setId: res.setId,
+    keyMode: res.keyMode,
+    ...(res.binary ? { binary: res.binary } : {}),
+    ...(res.effectiveLocale ? { effectiveLocale: res.effectiveLocale } : {}),
+  };
+}
+
+export function restoreResultJson(res: RestoreResult): Record<string, unknown> {
+  return {
+    files: abs(res.files),
+    outPath: resolve(res.outPath),
+    filename: res.filename,
+    seen: res.seen,
+    decoded: res.decoded,
+  };
+}
+
+export function gallerySaveResultJson(res: GallerySaveResult): Record<string, unknown> {
+  return {
+    files: abs(res.files),
+    manifest: res.manifest.map((m) => ({ name: resolve(m.name), purpose: m.purpose })),
+    k: res.k,
+    m: res.m,
+    decoys: res.decoys,
+    setId: res.setId,
+    keyMode: res.keyMode,
+  };
+}
+
+export function galleryRestoreResultJson(res: GalleryRestoreResult): Record<string, unknown> {
+  return {
+    files: abs(res.files),
+    outPath: resolve(res.outPath),
+    filename: res.filename,
+    seen: res.seen,
+  };
+}
+
+export function estimateResultJson(res: EstimateResult): Record<string, unknown> {
+  return { images: res.images, k: res.k, m: res.m };
+}
+
 /** Build the JSON presenter for one invocation of `command`. */
 export function jsonPresenter(io: CliIo, command: string | null): Presenter {
   const warnings: ReturnType<typeof warningJson>[] = [];
@@ -154,52 +216,23 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
     },
 
     save(res) {
-      ok({
-        files: abs(res.files),
-        manifest: res.manifest.map((m) => ({ name: resolve(m.name), purpose: m.purpose })),
-        imageCount: res.imageCount,
-        // Empty on the binary paths, which mint no image set. Always present, so
-        // a caller reads one shape rather than testing for the key.
-        setId: res.setId,
-        keyMode: res.keyMode,
-        ...(res.binary ? { binary: res.binary } : {}),
-        ...(res.effectiveLocale ? { effectiveLocale: res.effectiveLocale } : {}),
-      });
+      ok(saveResultJson(res));
     },
 
     restore(res) {
-      ok({
-        files: abs(res.files),
-        outPath: resolve(res.outPath),
-        filename: res.filename,
-        seen: res.seen,
-        decoded: res.decoded,
-      });
+      ok(restoreResultJson(res));
     },
 
     gallerySave(res) {
-      ok({
-        files: abs(res.files),
-        manifest: res.manifest.map((m) => ({ name: resolve(m.name), purpose: m.purpose })),
-        k: res.k,
-        m: res.m,
-        decoys: res.decoys,
-        setId: res.setId,
-        keyMode: res.keyMode,
-      });
+      ok(gallerySaveResultJson(res));
     },
 
     galleryRestore(res) {
-      ok({
-        files: abs(res.files),
-        outPath: resolve(res.outPath),
-        filename: res.filename,
-        seen: res.seen,
-      });
+      ok(galleryRestoreResultJson(res));
     },
 
     estimate(res) {
-      ok({ images: res.images, k: res.k, m: res.m });
+      ok(estimateResultJson(res));
     },
 
     failure(failure: CliFailure, err: unknown) {

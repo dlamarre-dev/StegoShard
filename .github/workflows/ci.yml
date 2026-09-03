@@ -104,6 +104,42 @@ jobs:
             console.log("envelope OK:", d.schema, d.result.images, "images");
           '
 
+      # The MCP server on the same bundled + Deno + no-network path. This step is
+      # the mechanical evidence for the docs/CLAIMS.md row: the handshake and a
+      # real tool call complete without `--allow-net`, so the server demonstrably
+      # needs no socket.
+      - name: MCP handshake (Deno, no network permission)
+        run: |
+          printf '%s\n%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"stegoshard_estimate","arguments":{"input":"/tmp/ss-secret.txt"}}}' \
+          | deno run --allow-read --allow-write --allow-env \
+              dist-cli/stegoshard.js mcp --root /tmp > /tmp/ss-mcp.jsonl
+          node -e '
+            const lines = require("fs").readFileSync("/tmp/ss-mcp.jsonl", "utf8").trim().split("\n");
+            if (lines.length !== 3) throw new Error("expected 3 responses, got " + lines.length);
+            const [init, list, call] = lines.map((l) => JSON.parse(l));
+            for (const m of [init, list, call]) {
+              if (m.jsonrpc !== "2.0") throw new Error("stray line on stdout: " + JSON.stringify(m).slice(0, 120));
+              if (m.error) throw new Error("unexpected error: " + JSON.stringify(m.error));
+            }
+            const names = list.result.tools.map((t) => t.name).join(",");
+            if (names !== "stegoshard_estimate,stegoshard_save,stegoshard_restore") {
+              throw new Error("tool surface drifted: " + names);
+            }
+            // A refused call comes back as a *result* carrying isError, not as a
+            // JSON-RPC error, so check it explicitly or the next line fails with
+            // an unreadable TypeError instead of the reason.
+            if (call.result.isError) {
+              throw new Error("estimate was refused: " + call.result.content[0].text);
+            }
+            if (typeof call.result.structuredContent?.images !== "number") {
+              throw new Error("estimate returned no image count");
+            }
+            console.log("MCP OK:", init.result.protocolVersion, "|", names);
+          '
+
       - name: Upload validated browser builds
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

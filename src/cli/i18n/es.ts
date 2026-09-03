@@ -32,7 +32,7 @@ export const es: CliCatalog = {
   errEstimateMissing: 'estimate: falta <archivo>',
   errUiPort: 'ui: --port debe ser un número de puerto (recibido «{value}»)',
   errJsonUiUnsupported:
-    'ui: --json no es compatible; la interfaz web local es interactiva y de larga duración, así que no hay ningún documento de resultado que emitir',
+    '{command}: --json no es compatible; esta orden es un servidor de larga duración, no una orden que produzca un resultado',
   errUiNoWebApp:
     'ui: esta compilación no incluye la aplicación web.\n' +
     'Los binarios independientes se compilan sin acceso a la red, así que no pueden\n' +
@@ -168,6 +168,7 @@ export const es: CliCatalog = {
   helpForce: 'Sobrescribir los archivos de salida existentes (por defecto: no)',
   helpQuiet: 'Ocultar el indicador de progreso en stderr',
   helpJson: 'Emitir un documento JSON en stdout; el progreso como NDJSON en stderr',
+  helpMcp: 'Servir el Model Context Protocol por stdio, para agentes de IA (véase docs/API.md)',
   helpPasswordFlag: 'No recomendado: visible en el historial / lista de procesos',
   helpPasswordFile: 'Leer la contraseña de un archivo (primera línea)',
   helpPasswordEnv: 'Variable de entorno',

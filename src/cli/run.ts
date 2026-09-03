@@ -38,6 +38,7 @@ import {
   passwordStrength,
 } from '../ui/password';
 import { collectAssets, findWebRoot, openInBrowser, startUiServer, startupNotice } from './ui';
+import { runMcp } from '../mcp/server';
 import { t } from './i18n';
 import { usage } from './i18n/usage';
 
@@ -324,6 +325,9 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     return 0;
   }
   if (command === 'ui') return runUi(io, argv.slice(1));
+  // Handled beside `ui` and for the same reason: it takes none of the save or
+  // restore flags and would otherwise have to declare them all to reject them.
+  if (command === 'mcp') return runMcp(io, argv.slice(1));
 
   const { values, positionals } = parseArgs({
     args: argv.slice(1),
@@ -533,11 +537,12 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
   if (!wantsJson(argv)) return runCommand(argv, io, humanPresenter(io));
 
   const present = jsonPresenter(io, argv[0] ?? null);
-  // `ui` is interactive and long-running; there is no envelope that could
-  // describe it, so asking for both is a usage error rather than a silent
-  // downgrade.
-  if (argv[0] === 'ui') {
-    const failure = new CliError('USAGE', t('errJsonUiUnsupported'));
+  // `ui` and `mcp` are long-running servers, not commands that produce a result.
+  // There is no envelope that could describe either, and `mcp` additionally owns
+  // stdout as its JSON-RPC channel, so a second document there would corrupt the
+  // protocol. Asking for both is a usage error rather than a silent downgrade.
+  if (argv[0] === 'ui' || argv[0] === 'mcp') {
+    const failure = new CliError('USAGE', t('errJsonUiUnsupported', { command: argv[0] }));
     present.failure(toCliFailure(failure), failure);
     return failure.exitCode;
   }

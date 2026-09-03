@@ -62,6 +62,7 @@ const COMMANDS = [
   'stegoshard gallery-save <file> <cover-photos|folder ...> [options]',
   'stegoshard gallery-restore <photos|folder ...> [options]',
   'stegoshard ui [--port <n>] [--open]',
+  'stegoshard mcp --root <dir> [--allow-inline-password]',
 ];
 
 const SAVE_ROWS: Row[] = [
@@ -131,6 +132,8 @@ const UI_ROWS: Row[] = [
   ['--open', 'helpUiOpen'],
 ];
 
+const MCP_ROWS: Row[] = [['mcp --root <dir>', 'helpMcp']];
+
 const EXAMPLES = [
   'stegoshard save secret.txt --out ./vault',
   'stegoshard save wallet.dat --key-mode stego --cover cat.jpg --out ./vault',
@@ -175,6 +178,8 @@ export function usage(): string {
     t('helpUiHeading'),
     para('helpUi'),
     ...UI_ROWS.map(row),
+    '',
+    ...MCP_ROWS.map(row),
     '',
     t('helpExamplesHeading'),
     ...EXAMPLES.map((e) => `  ${e}`),

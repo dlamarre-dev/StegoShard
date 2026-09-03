@@ -210,6 +210,13 @@ Two ways to install, depending on whether you already have Node:
   convenience. The npm/`npx` CLI has it instead, and the offline web bundle carries its
   own launcher.
 
+  `stegoshard mcp` **is** in them, and the contrast is the point: it speaks
+  newline-delimited JSON-RPC on stdin and stdout, so it needs no permission the
+  binaries lack. A zero-dependency, network-incapable executable driven over a
+  pipe is arguably the best place to run it. See [API.md](API.md) and the
+  [threat model](THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp), which is
+  worth reading first: a restore writes plaintext the agent can then read.
+
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`ko`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to
 English if none is found; nothing is ever downloaded. The system-font candidates are

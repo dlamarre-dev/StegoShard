@@ -44,7 +44,7 @@ export const en = {
   errEstimateMissing: 'estimate: missing <file>',
   errUiPort: 'ui: --port must be a port number (got "{value}")',
   errJsonUiUnsupported:
-    'ui: --json is not supported; the local web UI is interactive and long-running, so there is no result document to emit',
+    '{command}: --json is not supported; this command is a long-running server, not a command that produces a result',
   errUiNoWebApp:
     'ui: this build does not carry the web app.\n' +
     'The standalone binaries are compiled without network access, so they cannot\n' +
@@ -186,6 +186,7 @@ export const en = {
   helpForce: 'Overwrite existing output files (default: refuse)',
   helpQuiet: 'Suppress the progress indicator on stderr',
   helpJson: 'Emit one JSON document on stdout; progress as NDJSON on stderr',
+  helpMcp: 'Serve the Model Context Protocol over stdio, for AI agents (see docs/API.md)',
   helpPasswordFlag: 'Discouraged: visible in shell history / process list',
   helpPasswordFile: 'Read the password from a file (first line)',
   helpPasswordEnv: 'Environment variable',

@@ -1,7 +1,8 @@
 # Machine interfaces
 
 Ways to drive StegoShard from a program rather than by hand: a **JavaScript /
-TypeScript library**, and a **machine-readable command line**.
+TypeScript library**, a **machine-readable command line**, and an **MCP server**
+for AI agents.
 
 > **Status: unstable.** These interfaces ship at 0.9.x so integrators can build
 > against them and report problems. They are **not** frozen: any 0.9.z release may
@@ -16,7 +17,10 @@ TypeScript library**, and a **machine-readable command line**.
 
 Nothing here opens a socket. The only HTTP code in StegoShard is `stegoshard ui`,
 which serves static files on loopback and exposes no endpoint; see
-[THREAT-MODEL.md](THREAT-MODEL.md#the-local-web-ui).
+[THREAT-MODEL.md](THREAT-MODEL.md#the-local-web-ui). The MCP server speaks stdio,
+so it adds no endpoint either, but the **agent** on the other end of that pipe is
+a network client: see
+[Driving StegoShard from an agent](THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp).
 
 ## The JavaScript / TypeScript library
 
@@ -279,6 +283,104 @@ covering both "wrong password" and "these photos hold no gallery": the format
 cannot tell them apart on purpose, and a caller must not appear able to either.
 And the SPEC §10 access structures surface `WRONG_PASSWORD`, never anything naming
 a mode, a region or a slot.
+
+## `stegoshard mcp`: the Model Context Protocol, for agents
+
+```bash
+stegoshard mcp --root /path/to/vault
+```
+
+stdio only: newline-delimited JSON-RPC 2.0 in and out, no socket, no port, no
+HTTP. Three tools, returning the **same result objects** `--json` does, from the
+same code.
+
+| Tool                  | What it does                                                  |
+| --------------------- | ------------------------------------------------------------- |
+| `stegoshard_estimate` | How many carrier images a file needs. Read-only, no password. |
+| `stegoshard_save`     | Encrypt files into carriers. Refuses to overwrite.            |
+| `stegoshard_restore`  | Recover a file. **Writes plaintext the agent can then read.** |
+
+### Passwords never travel inline
+
+Tool arguments land in the agent's transcript and may be sent to a model
+provider, so the schema has **no** password property. A call points at one
+instead:
+
+```jsonc
+{ "password_source": { "env": "STEGOSHARD_PASSWORD" } }
+{ "password_source": { "file": "vault/pw.txt" } }
+```
+
+Only `STEGOSHARD_*` variables are readable, enforced in the server and not just
+advertised in the schema. Without that restriction an agent could name
+`AWS_SECRET_ACCESS_KEY`; the value is never echoed back, but handing a model an
+arbitrary-environment-read primitive by omission is not a thing to do. A password
+file is confined to a root like every other path, for the same reason.
+
+`stegoshard mcp --allow-inline-password` adds a literal `password` property whose
+description says what it costs. Without the flag an inline password is **refused**
+rather than ignored, since dropping it silently would surface one step later as a
+baffling `PASSWORD_REQUIRED` on a request that plainly supplied one.
+
+### Path confinement
+
+`--root <dir>`, repeatable. Every path argument is resolved and then compared
+against the canonical roots, with `realpath` on both sides so a symlink pointing
+out is caught, and a separator in the comparison so a root of `/data/vault` does
+not also admit `/data/vault-backup`.
+
+**With no `--root`, the server starts and `tools/list` works, but every
+`tools/call` returns `ROOT_NOT_CONFIGURED`.** Forgetting to configure it gets you
+the safe outcome and a message that explains the fix.
+
+Stated plainly: this is a policy in a server, not a sandbox. `deno compile` bakes
+in blanket `--allow-read --allow-write`, so a bug in the policy is not backstopped
+by the runtime. The runtime-enforced version, which the network-free design makes
+possible, is to narrow the permissions when launching it:
+
+```bash
+deno run --allow-read=/path/to/vault --allow-write=/path/to/vault --allow-env \
+  dist-cli/stegoshard.js mcp --root /path/to/vault
+```
+
+### What is deliberately absent
+
+**The SPEC §10 access modes.** `mode`, `decoy`, `threshold` and the duress
+password are refused with `MODE_NOT_AVAILABLE`. Duress needs a second,
+independent credential that would cross into the transcript, and
+`CredentialsNotIndependentError` would become a recorded oracle relating the two,
+in a mode whose entire point is that no record exists of which credential is
+real. Non-possession writes its n threshold shares into `out_dir`, which the
+agent reads back in the same session, destroying the property before the call
+returns. Both stay fully available in the library and in `--json`, where a person
+is holding them. Restore-side `share_files` **is** allowed: those shares already
+exist and someone chose to reference them.
+
+**Gallery Mode**, in 0.9. It rewrites a folder of real photographs in place and is
+the flow most likely to be driven badly by an agent.
+
+**`force`.** A name collision returns `OUTPUT_EXISTS` and the agent picks another
+directory; overwriting is not a call to make on an agent's judgement.
+
+**The `--entropy*` options and the paper prose options** (`title`, `locale`,
+`instructions`, …). The first needs a human choosing randomness; the rest are
+printed sheets an agent should not be authoring.
+
+### Errors
+
+A malformed call is a JSON-RPC error (`-32602` and friends). A well-formed call
+that failed is a normal result with `isError: true`, whose text is
+`{"code": …, "message": …}` using the same codes as `--json`, plus the
+MCP-specific `ROOT_NOT_CONFIGURED`, `PATH_OUTSIDE_ROOT`, `ENV_NOT_ALLOWED`,
+`INLINE_PASSWORD_REFUSED` and `MODE_NOT_AVAILABLE`. That distinction is MCP's, and
+it matters: the model sees a tool failure instead of the client swallowing it as a
+transport fault.
+
+### It is in the released binaries
+
+Unlike `stegoshard ui`, which is excluded because it needs `--allow-net`, MCP over
+stdio needs no permission the standalone binaries lack. A zero-dependency,
+network-incapable binary driven over a pipe is arguably the best place for it.
 
 ## Versioning
 
