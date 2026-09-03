@@ -133,6 +133,17 @@ export default defineConfig({
          * sets every one of them: statements 79.33, branches 52.08, functions
          * 93.33, lines 82.07. Its branches are the PNG/JPEG dispatch, where the
          * unexercised arms are mostly malformed-input paths worth covering next.
+         * Those figures are identical on Linux and Windows, which matters: see
+         * below.
+         *
+         * **Measure on the platform CI runs.** These floors were first derived
+         * from a Windows run and did not hold on the Linux runner, because
+         * `paper.ts` discovers CJK fonts by system path: on Windows it finds one
+         * and exercises the embedding, on a runner with no CJK font installed it
+         * never gets there. The fix was to cover that arm platform-independently,
+         * with a font file that exists and cannot be embedded, rather than to
+         * lower the floor. Only the darwin and win32 arms of the candidate list
+         * are unreachable now, symmetrically, and neither sets a floor.
          */
         'src/api/**/*.ts': {
           lines: 82,

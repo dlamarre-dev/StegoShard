@@ -161,4 +161,42 @@ describe('CLI paper PDF', () => {
     // The real guard: the Korean text reached the page, not just the locale tag.
     expect([...built.codePoints].filter(isHangul).length).toBeGreaterThan(20);
   });
+
+  /**
+   * A font file that exists but cannot be embedded.
+   *
+   * This is the arm the tests above cannot reach: the ones that find a real font
+   * skip it, and the ones that find none never get as far as reading a file. It
+   * is also the arm a CI runner hits in practice, since most systems ship their
+   * CJK fonts as `.ttc` collections pdf-lib refuses, and the whole point of
+   * probing embeddability on a throwaway document is to decide *before* the real
+   * PDF is built.
+   *
+   * Not platform-dependent, unlike everything else in this file, which is why it
+   * is worth having: the paths it covers were measured on Windows and unreachable
+   * on Linux, so the coverage floor derived from one did not hold on the other.
+   */
+  it('falls back to Latin when the font cannot be embedded, and says so', SLOW, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ss-badfont-'));
+    const bogus = join(dir, 'not-really-a-font.ttf');
+    writeFileSync(bogus, Buffer.from('this is not a font at all, just bytes'));
+
+    const built = await buildSheet('ja', bogus);
+
+    // The locale falls back rather than producing a sheet of blank glyphs.
+    expect(built.effectiveLocale).toBe('en');
+    expect(built.fontWarning).toBeTruthy();
+    // The warning distinguishes "found one but could not use it" from "found
+    // none", which is the difference between a fixable and an unfixable problem.
+    expect(built.fontWarning).toMatch(/embed/i);
+    // And no CJK reached the page, which is the point of deciding up front.
+    expect([...built.codePoints].filter((c) => c >= 0x3000).length).toBe(0);
+  });
+
+  it('falls back the same way when the named font does not exist', SLOW, async () => {
+    const missing = join(mkdtempSync(join(tmpdir(), 'ss-nofont-')), 'absent.ttf');
+    const built = await buildSheet('ja', missing);
+    expect(built.effectiveLocale).toBe('en');
+    expect(built.fontWarning).toBeTruthy();
+  });
 });
