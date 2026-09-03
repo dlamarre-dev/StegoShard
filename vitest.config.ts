@@ -35,7 +35,7 @@ export default defineConfig({
       // `src/ui` used to be outside coverage entirely. That hid input-limits.ts,
       // whose whole job is bounding untrusted input and which had no tests at
       // all. It is in now.
-      include: ['src/core/**/*.ts', 'src/ui/**/*.ts'],
+      include: ['src/core/**/*.ts', 'src/ui/**/*.ts', 'src/cli/**/*.ts', 'src/api/**/*.ts'],
       exclude: [
         '**/*.test.ts',
         '**/*.d.ts',
@@ -68,6 +68,25 @@ export default defineConfig({
         'src/ui/image-io.ts',
         'src/ui/pdf-restore.ts',
         'src/ui/save-controller.ts',
+        // The same rule, one layer over: unreachable from a test, not merely
+        // awkward. Both exist precisely to isolate what cannot be measured, so
+        // covering them would mean testing Node rather than StegoShard.
+        //
+        // `main.ts` calls `run()` at module scope and then exits the process, so
+        // importing it *is* running the CLI. That is deliberate: it is what lets
+        // `run(argv, io)` be tested at all.
+        //
+        // `io.ts` is the real terminal: raw-mode stdin for the hidden password
+        // prompt, a readline confirmation, and the TTY flags. Its whole purpose is
+        // that every other file can take a `CliIo` instead.
+        //
+        // `serve-standalone.ts` is the same shape as main.ts, and additionally is
+        // the closest match to the src/ui reasoning above: it *is* covered, by the
+        // Playwright `cli-ui` project ("offline serve.mjs serves an app that
+        // runs"), which collects no coverage.
+        'src/cli/main.ts',
+        'src/cli/io.ts',
+        'src/cli/serve-standalone.ts',
       ],
       thresholds: {
         // Per file, not aggregate. The aggregate gate let seven files sit below
@@ -94,11 +113,50 @@ export default defineConfig({
         // the numbers say which file sets each floor rather than hiding it:
         // run-in-worker.ts for lines (75.86) and branches (55.56), estimate.ts
         // for functions (70.00). Same ratchet rule.
+        //
+        // run-in-worker.ts is no longer the one setting them: widening the Worker
+        // error boundary to all nineteen core classes needed tests for its own
+        // uncovered paths, and it now measures 98/92/100/100. The floors stay
+        // where they are, since a ratchet is only ever raised deliberately.
         'src/ui/**/*.ts': {
           lines: 75,
           functions: 70,
           branches: 55,
           statements: 72,
+        },
+        /**
+         * The published library. Higher than the CLI because it is the surface
+         * third parties build on, and lower than the core because the Node
+         * adapters branch heavily on image format.
+         *
+         * Each floor is the weakest file today, rounded down, and image-io.ts
+         * sets every one of them: statements 79.33, branches 52.08, functions
+         * 93.33, lines 82.07. Its branches are the PNG/JPEG dispatch, where the
+         * unexercised arms are mostly malformed-input paths worth covering next.
+         */
+        'src/api/**/*.ts': {
+          lines: 82,
+          functions: 93,
+          branches: 52,
+          statements: 79,
+        },
+        /**
+         * The command line. The lowest floors in the project, and deliberately
+         * honest about it rather than propped up by excluding what is merely
+         * hard.
+         *
+         * `run.ts` sets statements (74.78), functions (80.00) and lines (74.61);
+         * `ui.ts` sets branches (70.83). What is left uncovered in `run.ts` is the
+         * body of the save and gallery-save commands, which cost a real Argon2id
+         * derivation at 256 MiB each to reach, so they are exercised by
+         * `run.human.test.ts` and the round-trip suites rather than exhaustively.
+         * Two files are excluded above, for reasons stated there.
+         */
+        'src/cli/**/*.ts': {
+          lines: 74,
+          functions: 80,
+          branches: 70,
+          statements: 74,
         },
       },
     },
