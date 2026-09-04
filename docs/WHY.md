@@ -1,78 +1,69 @@
 # Why StegoShard?
 
-This is not a specification. It is the story of a problem, and why StegoShard is shaped
-the way it is. If you want the format, read [SPEC.md](../SPEC.md); if you want the
-guarantees and their limits, read the [threat model](THREAT-MODEL.md).
+Why StegoShard is shaped the way it is. For the format read [SPEC.md](../SPEC.md); for
+the guarantees and their limits, the [threat model](THREAT-MODEL.md).
 
 ## The problem: small secrets that must outlive everything
 
-Some secrets are tiny but irreplaceable: a wallet seed phrase, an age/PGP private key, a
-password-manager export, the recovery codes for your accounts, a handful of `.env` files.
-They share three awkward properties:
+Some secrets are tiny but irreplaceable: a wallet seed phrase, a private key, a
+password-manager export, account recovery codes, a handful of `.env` files. They are
+awkward in three ways at once:
 
-1. **They must survive for years**, across dead laptops, rotated cloud accounts, bit-rot,
-   and the day you can no longer log in to the service that held them.
-2. **They are catastrophic to lose**: there is no "forgot password" for a seed phrase.
-3. **Sometimes their very existence is sensitive**: at a border, under duress, or on a
-   shared machine, the safest secret is one nobody knows is there.
+1. **They must last for years**, across dead laptops, closed cloud accounts, and the day
+   the service holding them shuts down.
+2. **Losing one is final.** There is no "forgot password" for a seed phrase.
+3. **Sometimes their existence is the sensitive part.** At a border, under duress, or on
+   a shared machine, the safest secret is one nobody knows is there.
 
-No single mainstream tool serves all three at once. That is not an accident; it is a
-consequence of how the tools are built.
+No mainstream tool serves all three, and that follows from how they are built.
 
 ## Why the usual answers fall short
 
-**Password managers** are excellent custodians while you are logged in, but they are a
-_single system you must keep trusting_: one account, one vendor, one recovery path. They
-don't give you an offline artifact you can print and put in a safe, and they make no
-attempt to hide that a vault exists; that is not their job.
+**Password managers** are excellent custodians while you are logged in, but they are one
+system you have to keep trusting: one account, one vendor, one recovery path. They give
+you no offline artifact to print and lock away, and they do not try to hide that a vault
+exists. That is not their job.
 
 **Classic encrypted backups** (an encrypted archive, a LUKS volume, an age file) solve
-durability and confidentiality, but the ciphertext is _conspicuously a secret_. A blob of
-high-entropy bytes named `backup.age` announces "something valuable is encrypted here."
-That is fine against a thief and useless against anyone who can **compel** you to hand it
-over, the existence of the secret is undeniable.
+durability and confidentiality, but the ciphertext is conspicuously a secret. A blob of
+high-entropy bytes named `backup.age` announces that something valuable is encrypted
+here. Fine against a thief, useless against anyone who can **compel** you to open it.
 
-**Classic steganography** hides the existence of data beautifully, until the carrier is
-touched. Re-encode the image, upload it to a social network, print and re-scan it, and the
-hidden payload is gone. Steganographic tools optimize for _undetectability_, which is
-fundamentally at odds with _surviving transformation_.
+**Classic steganography** hides data beautifully, until the carrier is touched. Re-encode
+the image, upload it to a social network, print and re-scan it, and the payload is gone.
+Those tools optimize for staying undetected, which is at odds with surviving change.
 
-## The insight: two goals that cannot be maximized together
+## The insight: two goals that cannot both be maximized
 
-Line those failures up and a pattern appears. There are **two properties** you might want
-from a carrier, and they pull in opposite directions:
+Line those failures up and the pattern is the same each time. Two properties, pulling in
+opposite directions:
 
 - **Resilience.** Survive loss, recompression, printing, and the death of any one copy.
-  Achieving it means adding redundancy and structure, which makes the carrier _look like_
-  what it is.
-- **Deniability.** Hide that the secret exists at all. Achieving it means blending into
-  ordinary-looking data, which is fragile: the moment the carrier is normalized (a social
-  network re-encodes your photo), the hidden bits die.
+  It needs redundancy and structure, which make the carrier look like what it is.
+- **Deniability.** Hide that the secret exists. It needs blending into ordinary data,
+  which is fragile: the moment a social network re-encodes your photo, the hidden bits
+  die.
 
-The more you have of one, the less you can have of the other. Any tool that claims "the
-best of both worlds" is either overselling or hiding a caveat.
+More of one means less of the other. Any tool claiming the best of both worlds is either
+overselling or hiding a caveat.
 
 ## What StegoShard does about it
 
-Instead of pretending the trade-off away, StegoShard **names it and hands you the
-choice**: two storage models plus a bridge:
+Rather than pretend the trade-off away, StegoShard names it and hands you the choice:
 
-- **🛡 Resilient Storage.** Encrypt, then spread the secret across error-corrected images
-  (or one opaque file) that survive recompression, printing, and cloud storage. Openly
-  artificial. Optimized for _never losing the data_.
-- **🎭 Deniable Storage.** Hide a small secret inside ordinary-looking photos, or wrap it
-  as a decoy database. Optimized for _nobody knowing it exists_. Fragile by design.
-- **🔗 Hybrid.** Store the encrypted archive resiliently, and hide **only the recovery
-  key** in an everyday photo. The bulky, robust part survives anything; the deniable part
-  is a small, expendable key. Lose the photo and you've lost the key, not the data, and
-  the key channel was never meant to survive a social network anyway.
+- **🛡 Resilient Storage.** Encrypt, then spread the secret across error-corrected images,
+  or one opaque file, built to survive recompression, printing and cloud storage. Openly
+  artificial. For never losing the data.
+- **🎭 Deniable Storage.** Hide a small secret inside ordinary photos, or wrap it as a
+  decoy database. For nobody knowing it exists. Fragile by design.
+- **🔗 Hybrid.** Store the archive resiliently and hide **only the recovery key** in an
+  everyday photo. The bulky part survives anything; the deniable part is small and
+  expendable. Lose the photo and you have lost the key, not the data.
 
-Seen this way, StegoShard is less a single feature and more a small **taxonomy of
-cryptographic carriers**: two incompatible properties, every carrier a compromise between
-them, and three concrete strategies that let _you_ decide which compromise your secret
-needs. The honest limits of each are written down in the [threat model](THREAT-MODEL.md),
-because a tool that hides its caveats is exactly the kind of tool this project is a
-reaction against.
+So StegoShard is really a choice between carriers rather than a single feature: two
+properties that cannot both be had, and three ways to decide which one your secret needs.
+The limits of each are written down in the [threat model](THREAT-MODEL.md), because a
+tool that hides its caveats is the kind of tool this project is a reaction against.
 
 ## Further reading
 
