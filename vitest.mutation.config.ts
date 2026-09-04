@@ -40,8 +40,35 @@ import { fileURLToPath } from 'node:url';
  * core. 130 tests, about 40 seconds of dry run against 33 for the previous list,
  * which is a small price for not having to maintain a grep.
  *
+ * A THIRD WAY TO GET IT WRONG, 3 September: the directory moved.
+ *
+ * `src/api` joined the list because the orchestration layer and its tests were
+ * moved there from `src/cli` when the programmatic API landed, which took ten
+ * test files out of this selection without editing it. Re-measured on `access.ts`,
+ * the same probe as the table above:
+ *
+ *   without `src/api`   70.37%   33 no-coverage   1m42
+ *   with `src/api`      80.25%    7 no-coverage   13m28
+ *
+ * That is the "core only" row again, reached by a rename. Ten points and 26
+ * mutants wrongly reported as uncovered, silently, in the direction that looks
+ * like a test regression rather than a measurement one.
+ *
+ * The lesson is not "add src/api". It is that a wholesale directory pattern
+ * protects against a new file and not against a moved one, and nothing here
+ * fails when it matches less than it used to. The same is true of the `mutate`
+ * list in stryker.config.mjs, where a stale `src/core/slots.ts` entry sat
+ * matching nothing.
+ *
  * Deliberately still excluded: everything that imports no core module, since it
  * can only add dry-run time. `tests/e2e` is Playwright and never ran here.
+ *
+ * Also excluded, and this one is a judgement rather than a measurement, so it is
+ * worth flagging as such: `src/mcp`. Its tools are a transport over `save` and
+ * `restore`, which the `src/api` tests now drive directly and far harder, and
+ * SPEC §10 is refused at the MCP boundary outright, so nothing there can reach
+ * `access.ts` at all. If MCP ever grows a path of its own into the core rather
+ * than through the library, that reasoning expires and this needs measuring.
  *
  * Coverage is off: instrumenting every run buys nothing when the thing being
  * measured is whether a test failed.
@@ -59,6 +86,20 @@ export default defineConfig({
       // directory wholesale is what stops a new file from silently becoming a
       // phantom no-coverage mutant.
       'src/cli/**/*.test.ts',
+      // And all of the library, for the same reason and by the same rule.
+      //
+      // This line is here because the rule failed anyway, in the one way taking a
+      // directory wholesale does not protect against: the directory moved. The
+      // orchestration layer and its tests went from `src/cli/` to `src/api/node/`
+      // when the programmatic API landed, taking ten test files out of this
+      // selection without changing a line of it, `modes.test.ts` among them, which
+      // is the file the measurements above credit with fourteen points and 26 of
+      // access.ts's 33 no-coverage mutants.
+      //
+      // Nothing reported it. It is the `slots.ts` failure one level up: a pattern
+      // that silently matches less than it did. The score would have fallen on the
+      // next forced run and read as a test regression rather than a selection one.
+      'src/api/**/*.test.ts',
       // The UI files that reach the core. The rest of src/ui needs a DOM and
       // cannot kill a core mutant, so it would only add dry-run time.
       'src/ui/estimate.test.ts',
