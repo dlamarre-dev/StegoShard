@@ -12,7 +12,13 @@
 
 import { describe, it, expect } from 'vitest';
 import * as core from './index';
-import { STEGO_ERROR_CODES, stegoErrorCode, stegoErrorDetails } from './errors';
+import {
+  STEGO_ERROR_CODES,
+  stegoErrorCode,
+  stegoErrorDetails,
+  stegoErrorFromWire,
+  stegoErrorToWire,
+} from './errors';
 import {
   BucketTooLargeError,
   CredentialsNotIndependentError,
@@ -170,6 +176,99 @@ describe('error details', () => {
     const plain = Object.assign(new Error('file too large'), { name: 'FileTooLargeError' });
     expect(stegoErrorCode(plain)).toBe('FILE_TOO_LARGE');
     expect(stegoErrorDetails(plain)).toBeUndefined();
+  });
+});
+
+/**
+ * Crossing the Worker boundary.
+ *
+ * `postMessage` clones an Error's name and message and drops its class, so the
+ * pipeline worker flattens and the main thread rebuilds. The rebuild used to
+ * cover five of the nineteen classes, which meant an `instanceof` check on the
+ * main thread silently never matched for the other fourteen.
+ *
+ * The round-trip over *every* class is the guard that matters: it fails if a new
+ * class arrives without a factory, and it fails if a constructor's message
+ * wrapping changes without its `unprefix` following.
+ */
+describe('wire round-trip', () => {
+  it('restores the exact class for every core error', () => {
+    for (const err of INSTANCES) {
+      const back = stegoErrorFromWire(stegoErrorToWire(err));
+      expect(back.constructor, err.name).toBe(err.constructor);
+      expect(back).toBeInstanceOf(err.constructor as new () => Error);
+    }
+  });
+
+  // The message is what a user sees, so an off-by-a-prefix rebuild is a real bug
+  // even when the class is right.
+  it('restores the message byte for byte', () => {
+    for (const err of INSTANCES) {
+      const back = stegoErrorFromWire(stegoErrorToWire(err));
+      expect(back.message, err.name).toBe(err.message);
+      expect(back.name, err.name).toBe(err.name);
+    }
+  });
+
+  it('restores the readonly fields, so details survive too', () => {
+    for (const err of INSTANCES) {
+      const back = stegoErrorFromWire(stegoErrorToWire(err));
+      expect(stegoErrorDetails(back), err.name).toEqual(stegoErrorDetails(err));
+      expect(stegoErrorCode(back), err.name).toBe(stegoErrorCode(err));
+    }
+  });
+
+  it('survives a structured clone, which is what actually happens', () => {
+    for (const err of INSTANCES) {
+      const cloned = structuredClone(stegoErrorToWire(err)) as unknown;
+      const back = stegoErrorFromWire(cloned);
+      expect(back.constructor, err.name).toBe(err.constructor);
+      expect(back.message, err.name).toBe(err.message);
+    }
+  });
+});
+
+describe('wire input this module does not trust', () => {
+  // A truncated or hostile payload must degrade to a named Error rather than
+  // yield an instance whose numbers are quietly wrong.
+  it('falls back when a known class arrives without its fields', () => {
+    const back = stegoErrorFromWire({ name: 'FileTooLargeError', message: 'file too large' });
+    expect(back).not.toBeInstanceOf(FileTooLargeError);
+    expect(back.name).toBe('FileTooLargeError');
+    expect(back.message).toBe('file too large');
+    // Still codeable, via the name fallback, so a caller is not left blind.
+    expect(stegoErrorCode(back)).toBe('FILE_TOO_LARGE');
+  });
+
+  it('falls back when a field is the wrong type', () => {
+    const back = stegoErrorFromWire({
+      name: 'TooManyImagesError',
+      message: 'would need many',
+      details: { count: 'not-a-number', limit: 150 } as unknown as Record<string, number>,
+    });
+    expect(back).not.toBeInstanceOf(TooManyImagesError);
+    expect(back.name).toBe('TooManyImagesError');
+  });
+
+  it('keeps an unknown name as a plain Error', () => {
+    const back = stegoErrorFromWire({ name: 'SomeFutureError', message: 'from a newer build' });
+    expect(back.name).toBe('SomeFutureError');
+    expect(back.message).toBe('from a newer build');
+    expect(stegoErrorCode(back)).toBeNull();
+  });
+
+  it('does not throw on rubbish', () => {
+    for (const junk of [undefined, null, 42, 'a string', [], {}, { name: 7, message: [] }]) {
+      const back = stegoErrorFromWire(junk);
+      expect(back).toBeInstanceOf(Error);
+      expect(typeof back.message).toBe('string');
+    }
+  });
+
+  it('flattens a non-Error throw rather than losing it', () => {
+    const wire = stegoErrorToWire('just a string');
+    expect(wire.message).toContain('just a string');
+    expect(stegoErrorFromWire(wire).message).toContain('just a string');
   });
 });
 
