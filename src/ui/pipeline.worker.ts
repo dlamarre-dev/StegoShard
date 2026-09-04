@@ -6,7 +6,7 @@
  *
  * Messages in:  { id, op:'encryptBinary'|'decryptBinary', ... } (see RunReq).
  * Messages out: { id, type:'progress', p } | { id, type:'result', ... }
- *               | { id, type:'error', name, message, extra? }.
+ *               | { id, type:'error', name, message, details? }.
  * The DEK crosses only as raw bytes (never a CryptoKey); large buffers are
  * transferred, not copied.
  */
@@ -14,7 +14,7 @@
 /// <reference lib="webworker" />
 
 import {
-  FileTooLargeError,
+  stegoErrorToWire,
   MAX_FILE_BYTES_BINARY_UI,
   type BinaryVariant,
   type KeyMode,
@@ -65,10 +65,16 @@ type RunReq =
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
+/**
+ * Flatten a failure for the trip back across `postMessage`.
+ *
+ * This used to special-case `FileTooLargeError`'s two fields by hand and drop
+ * every other class's, so fourteen of the nineteen core errors reached the main
+ * thread as bare messages. `stegoErrorToWire` knows all of them, from the same
+ * table that assigns their codes.
+ */
 function errorPayload(id: number, err: unknown) {
-  const e = err instanceof Error ? err : new Error(String(err));
-  const extra = e instanceof FileTooLargeError ? { size: e.size, limit: e.limit } : undefined;
-  return { id, type: 'error' as const, name: e.name, message: e.message, extra };
+  return { id, type: 'error' as const, ...stegoErrorToWire(err) };
 }
 
 interface Reply {

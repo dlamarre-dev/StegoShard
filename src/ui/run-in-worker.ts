@@ -10,11 +10,7 @@
  */
 
 import {
-  FileTooLargeError,
-  MissingKeyError,
-  SegmentedFormatError,
-  VerificationError,
-  WrongPasswordError,
+  stegoErrorFromWire,
   type BinaryVariant,
   type KeyMode,
   type OnProgress,
@@ -99,27 +95,16 @@ function getWorker(): Worker {
   return w;
 }
 
-function reconstructError(data: Record<string, unknown>): Error {
-  const name = typeof data.name === 'string' ? data.name : 'Error';
-  const message = typeof data.message === 'string' ? data.message : 'worker error';
-  const extra = data.extra as { size?: number; limit?: number } | undefined;
-  switch (name) {
-    case 'WrongPasswordError':
-      return new WrongPasswordError();
-    case 'MissingKeyError':
-      return new MissingKeyError();
-    case 'VerificationError':
-      return new VerificationError();
-    case 'SegmentedFormatError':
-      return new SegmentedFormatError(message.replace(/^segmented vault: /, ''));
-    case 'FileTooLargeError':
-      return extra && typeof extra.size === 'number' && typeof extra.limit === 'number'
-        ? new FileTooLargeError(extra.size, extra.limit)
-        : Object.assign(new Error(message), { name });
-    default:
-      return Object.assign(new Error(message), { name });
-  }
-}
+/**
+ * Restore the class of an error the worker sent.
+ *
+ * A switch here used to rebuild five of the nineteen core error classes and hand
+ * back a plain `Error` for the rest, so `instanceof GalleryRestoreError` on this
+ * side silently never matched even when that is exactly what failed.
+ * `stegoErrorFromWire` covers all of them, from the table that already knows each
+ * class's name and fields, and degrades the same way for anything unrecognized.
+ */
+const reconstructError = stegoErrorFromWire;
 
 function call<T>(
   message: Record<string, unknown>,

@@ -102,12 +102,16 @@ in CI (`npm run lint:shell`). To run it locally, install shellcheck first:
 
 - Written with [Vitest](https://vitest.dev/).
 - Coverage thresholds are **per file, not aggregate**, and they are a ratchet: raise
-  them as coverage rises, never lower one to make a build pass. The core (crypto,
-  codec, erasure coding) carries the higher floors; the UI modules that can be
-  measured from node carry lower ones, with `vitest.config.ts` naming which file sets
-  each. Modules needing a DOM, a Worker or browser storage are excluded and listed
-  there with the reason, since the Playwright suite exercises them without collecting
-  coverage.
+  them as coverage rises, never lower one to make a build pass. Four zones carry their
+  own floors, highest first: the core (crypto, codec, erasure coding), the published
+  library under `src/api`, the UI modules measurable from node, and the command line.
+  `vitest.config.ts` names which file sets each floor, so raising one is a decision
+  someone can check rather than a number to guess at.
+- A module is excluded only when it is **unreachable from a test**, not when it is
+  merely awkward: something needing a DOM, a Worker or browser storage, or a top-level
+  script that runs on import (`src/cli/main.ts`, `src/cli/serve-standalone.ts`). Each
+  exclusion is listed with its reason, and several are exercised by the Playwright
+  suite, which collects no coverage. Anything else belongs above the line with a floor.
 - Prefer round-trip and property tests for the pipeline (encode → decode identity,
   reconstruct with up to `m` missing shards, reject a wrong password, etc.).
 
