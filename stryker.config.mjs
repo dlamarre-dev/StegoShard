@@ -13,14 +13,53 @@
  * what stayed green. Mutation testing is that method, automated. It changes an
  * operator or drops a condition and reports whether any test failed.
  *
- * WHAT THIS DOES NOT DO YET
- * There is no threshold. The first runs exist to measure a mutation score that
- * nobody has seen, and turning an unmeasured number into a gate is the mistake
- * this project keeps correcting elsewhere: the TestU01 tolerance was calibrated
- * over 40 runs before being fixed at 2, and the erasure job's duration was
- * measured on a real run rather than estimated. `break: null` below is
- * deliberate. Set it once the score is known and stable, and record the
- * calibration in the commit that does so.
+ * CURRENT SCORE, and read this before quoting any number further down.
+ *
+ * Everything below the next heading is a dated log of how the measurement was
+ * built, not the state of the project. A review quoted this file's 16 August
+ * figures ("about 76% overall, steganography around 64%") as if they were
+ * current; they are three weeks and two forced runs stale, and stego.ts in
+ * particular has moved by more than twenty points since. Hence this block, at
+ * the top, where the live numbers are.
+ *
+ * The Sunday forced runs are the only ones whose score means anything (the other
+ * nights are incremental; see .github/workflows/mutation.yml):
+ *
+ *                    23 Aug   30 Aug
+ *   overall           83.58%   84.51%
+ *   reed-solomon.ts   92.09%   99.44%
+ *   codes shard       87.53%   91.13%
+ *   stego.ts          85.45%   85.45%
+ *   crypto.ts         82.29%   82.25%
+ *   vault.ts          79.51%   79.51%   <- the weakest, and what `break` is set against
+ *
+ * access.ts measured 80.25% locally on 4 September. Note how still the three
+ * unchanged files are across two independent cold runs: mutation testing is
+ * deterministic given the same code and tests, so movement is a signal, not noise.
+ *
+ * THE THRESHOLD, calibrated 4 September
+ *
+ * `break` was `null` for as long as the score was unmeasured, on the same
+ * principle as the TestU01 tolerance (calibrated over 40 runs before being fixed
+ * at 2) and the erasure job's duration (measured, not estimated). Two forced runs
+ * now agree to within 0.05 points on every file that did not change, which is the
+ * stability that was being waited for.
+ *
+ * It is set to 75, and it is a **regression alarm, not a quality target**. Stryker
+ * applies `break` to whichever run it is in, and the nightly runs one shard at a
+ * time, so the value has to clear the weakest shard rather than the average:
+ * vault.ts at 79.51% is the binding one, leaving about four and a half points of
+ * margin. That is enough to absorb a file legitimately gaining a few survivors and
+ * not enough to sleep through a collapse.
+ *
+ * This gates no pull request. The workflow is scheduled only, so the effect is
+ * that a score drop turns a nightly red instead of scrolling past in a summary
+ * table nobody opens. Raise it deliberately, the way the coverage ratchet is
+ * raised, and record the new calibration here when you do.
+ *
+ * ---
+ *
+ * HISTORY, in order. None of the figures below are current.
  *
  * FIRST NIGHTLY, 15 August 2026: 73.52% over 1,605 mutants in 40 minutes 16
  * seconds. Read it with three caveats, all measured rather than guessed.
@@ -67,7 +106,12 @@
  * failure-indistinguishability property. It stays on.
  *
  * The earlier local data point, kept for scale: gf256.ts scores 92%, 50 mutants
- * in 2 minutes 38 seconds. Two of its four survivors are *equivalent* mutants,
+ * in 2 minutes 38 seconds. **Do not plan against that duration.** The same file on
+ * 4 September, on a different machine and with the test selection since widened
+ * back to include `src/api`, took 19 minutes 47 for an unchanged 92% over the same
+ * 50 mutants. The two are not comparable and the point is only that per-mutant
+ * cost tracks the selection, not the mutants. The score is the part that held.
+ * Two of its four survivors are *equivalent* mutants,
  * unkillable by any test: `for (let i = 255; i < 512; i++)` relaxed to `<= 512`
  * writes past the end of a 512-byte array, which is silently ignored, and
  * `i < 255` relaxed to `<= 255` is repaired by the loop that follows. A score
@@ -111,9 +155,10 @@ export default {
     'src/core/gf256.ts',
   ],
 
-  // No gate yet. See the note above: the score has not been measured, and a
-  // threshold set from a guess would either pass everything or block every PR.
-  thresholds: { high: 80, low: 60, break: null },
+  // `break` is a regression alarm set below the weakest shard (vault.ts, 79.51%
+  // on both forced runs), not a quality target. See "THE THRESHOLD" above for the
+  // calibration; raise it deliberately and record the new one there.
+  thresholds: { high: 80, low: 60, break: 75 },
 
   // Argon2id at the production parameters takes seconds per call, and a mutation
   // run performs thousands. The suite's own fast parameters keep this bounded;
