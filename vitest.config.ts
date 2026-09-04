@@ -129,27 +129,34 @@ export default defineConfig({
          * third parties build on, and lower than the core because the Node
          * adapters branch heavily on image format.
          *
-         * Each floor is the weakest file today, rounded down, and image-io.ts
-         * sets every one of them: statements 79.33, branches 52.08, functions
-         * 93.33, lines 82.07. Its branches are the PNG/JPEG dispatch, where the
-         * unexercised arms are mostly malformed-input paths worth covering next.
-         * Those figures are identical on Linux and Windows, which matters: see
-         * below.
+         * Each floor is the weakest file, rounded down: `paper.ts` sets lines
+         * (91.48) and branches (71.05), `commands.ts` sets statements (90.79)
+         * and functions (93.75). `inputs.ts` sits just above on branches
+         * (71.42), so that floor has two files against it.
+         *
+         * `image-io.ts` used to set all four (79.33 / 52.08 / 93.33 / 82.07) and
+         * is now 98.34 / 95.83 / 100 / 98.11. What was missing was not really
+         * malformed input: six functions branch on cover format and only the PNG
+         * arm of each was exercised, so a JPEG cover reached the stego layer
+         * nowhere in the suite. See `image-io.formats.test.ts`.
          *
          * **Measure on the platform CI runs.** These floors were first derived
          * from a Windows run and did not hold on the Linux runner, because
          * `paper.ts` discovers CJK fonts by system path: on Windows it finds one
          * and exercises the embedding, on a runner with no CJK font installed it
-         * never gets there. The fix was to cover that arm platform-independently,
-         * with a font file that exists and cannot be embedded, rather than to
-         * lower the floor. Only the darwin and win32 arms of the candidate list
-         * are unreachable now, symmetrically, and neither sets a floor.
+         * never gets there. That is still true of two things here, and both were
+         * measured rather than assumed, by forcing the Linux shape locally (the
+         * `win32` arm of `systemCjkFontCandidates` made unreachable, and the
+         * Hangul test's Windows font dropped so it skips as it does on a runner):
+         * `paper.ts` reads 95.74 lines / 84.21 branches on Windows and
+         * 91.48 / 71.05 under that shape. Taking the Windows numbers would have
+         * set lines to 92 and broken the build again.
          */
         'src/api/**/*.ts': {
-          lines: 82,
+          lines: 91,
           functions: 93,
-          branches: 52,
-          statements: 79,
+          branches: 71,
+          statements: 90,
         },
         /**
          * The command line. The lowest floors in the project, and deliberately
