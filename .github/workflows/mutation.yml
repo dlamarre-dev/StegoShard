@@ -15,22 +15,37 @@
 # wrong.
 #
 # Four shards in parallel bound the cold cost to the largest one rather than to
-# their sum. Measured on the first sharded run, cold, 16 August:
+# their sum. Three forced runs have now been measured, the first sharded run on
+# 16 August and the two Sunday rebuilds since:
 #
-#   crypto  69 min  463 mutants  8.9 s each
-#   codes   49 min  417 mutants  7.1 s each
-#   stego   42 min  320 mutants  7.9 s each
-#   vault   30 min  405 mutants  4.4 s each
+#            16 Aug   23 Aug   30 Aug   mutants
+#   crypto   69 min   60 min   74 min       463
+#   codes    49 min   50 min   30 min       417
+#   stego    42 min   32 min   34 min       323
+#   vault    30 min   33 min   32 min       405
+#   ------   ------   ------   ------
+#   wall     69 min   61 min   74 min
 #
-# 69 minutes of wall clock against 3h20 in sequence. The split was made by mutant
-# count and the durations show why that was only a starting point: vault has
-# nearly as many mutants as crypto and costs less than half as much, because what
-# drives the cost is which tests cover a mutant, not how many mutants there are.
+# Against 3h20 in sequence, so the shape of the decision holds. Two things in that
+# table are worth reading, though, because neither was visible from one run.
 #
-# No rebalancing follows from that, though. crypto.ts alone is 69 minutes and is a
-# single file, which Stryker cannot split, so it is the binding constraint and
-# moving work between the other three changes nothing. Splitting it would mean
-# splitting the source file, which is not a reason to reshape production code.
+# **Run to run variance is wide.** crypto swings 60 to 74 minutes for the same 463
+# mutants: about 20%, on hosted runners of unknown neighbours. Any budget set here
+# is a budget against the spread, not against a number.
+#
+# **Survivors drive the cost, not mutants.** codes fell from 50 minutes to 30
+# between the two Sundays with its mutant count unchanged at 417, because 15
+# mutants moved from survived to killed (score 87.53 to 91.13). A killed mutant
+# stops at the first failing test; a survivor runs every test that covers it. So
+# better tests make the run *faster*, and a shard that slows down without its
+# mutant count moving is a shard whose score has slipped. That refines what the
+# first run already suggested: what drives the cost is which tests cover a mutant,
+# not how many mutants there are.
+#
+# No rebalancing follows from any of it. crypto.ts is the binding constraint in
+# all three runs and is a single file, which Stryker cannot split, so moving work
+# between the other three changes nothing. Splitting it would mean splitting the
+# source file, which is not a reason to reshape production code.
 #
 # WHY THIS IS INCREMENTAL, AND WHAT THAT COSTS
 # Mutation testing is deterministic given the same code and the same tests, so
@@ -47,6 +62,10 @@
 # 69 minutes of wall clock down to 3. What remains is the dry run, which
 # establishes which tests cover which mutant and cannot be skipped, so a quiet
 # night costs that and not zero.
+#
+# That has held. A quiet night on 3 September ran 3 min 20 to 3 min 42 across all
+# four shards, two weeks and several hundred tests later, which is what you would
+# expect of a cost that is the dry run rather than the mutants.
 #
 # That introduces a trust assumption, and it is the dangerous kind: incremental
 # mode decides a mutant need not be re-run. If that decision is ever wrong, a
@@ -86,11 +105,27 @@ jobs:
   stryker:
     name: Mutation score (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # 90 against a measured 69-minute worst case, cold. Kept rather than tightened
-    # further: only a cold run costs that, and a cold run is exactly when a tight
-    # limit would bite for no good reason, after a cache eviction or a Sunday
-    # rebuild. Incremental nights finish in minutes.
-    timeout-minutes: 90
+    # Raised from 90 to 120 once three forced runs existed instead of one.
+    #
+    # 90 was set against a single cold measurement of 69 minutes. The Sunday
+    # rebuilds since have run crypto at 60 and at 74, so the worst case the old
+    # number was sized against has already been passed, and 20% run-to-run spread
+    # on the same 463 mutants puts another bad Sunday within reach of 90 on
+    # variance alone.
+    #
+    # Two things make that worth paying for rather than riding. A cold run is not
+    # the exception here: Sunday forces one every week, by design, and it is the
+    # only run whose score means anything, so a timeout kill costs the week's one
+    # real measurement and leaves the incremental nights building on stale stored
+    # results. And both Sundays above predate the programmatic API, which added
+    # several hundred tests to the selection, a number of them paying a real
+    # Argon2id derivation each; more covering tests per mutant is exactly what took
+    # this suite from 40 minutes to 3h20 the first time, so the next forced run
+    # should be expected above 74 rather than at it.
+    #
+    # 120 still catches a hang by a wide margin: an incremental night is 3 to 4
+    # minutes, and the slowest forced shard ever recorded is 74.
+    timeout-minutes: 120
     strategy:
       # One slow shard must not cancel the others: a partial table is still worth
       # reading, and the aggregate job below is built to say which shard is absent.
