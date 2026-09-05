@@ -17,23 +17,34 @@
  * shard, decodes to a wrong blob, and the whole vault reads as unrecoverable
  * while the data needed to restore it is sitting right there.
  *
- * Two mutants in this function survive on purpose, recorded here so the next
- * reader does not hunt for a test that cannot exist. The `present.length < k`
+ * One mutant in this function survives on purpose: the `present.length < k`
  * early return is redundant with `kSubsets`, which yields nothing when k exceeds
- * the item count, so the function returns null either way. And the `catch` that
- * skips a subset with a singular matrix is unreachable by construction: the
- * erasure code uses a systematic Cauchy matrix, which is MDS, so every k-subset
- * of columns is invertible. Turning that `continue` into a `break` changes
- * nothing, because the branch never runs.
+ * the item count, so the function returns null either way. Defensive code
+ * guarding a property the surrounding design already provides, reasonable to
+ * keep and impossible to cover.
  *
- * Both are defensive code guarding properties the surrounding design already
- * provides. That is a reasonable thing to keep and an impossible thing to cover,
- * and the difference between those two statements is the whole reason to write
- * this paragraph instead of a test that appears to cover them.
+ * A SECOND ONE WAS CLAIMED HERE AND WAS WRONG, which is worth leaving on the
+ * record. This comment used to say the `catch` that skips a failed subset was
+ * "unreachable by construction", reasoning that the erasure code uses a
+ * systematic Cauchy matrix, which is MDS, so every k-subset of columns is
+ * invertible and no subset can be singular.
+ *
+ * The reasoning about matrices is correct. The conclusion is not, because a
+ * singular matrix is not the only way `decodeBlob` can throw: `rsReconstructData`
+ * rejects shards of unequal length first, before any matrix exists. A set
+ * carrying one shard of the wrong length reaches reconstruction, throws on every
+ * subset containing it, and is recovered from the subsets that exclude it. That
+ * is the test below, and it restores byte for byte.
+ *
+ * The lesson is not about Cauchy matrices. A claim that a branch cannot be
+ * reached is a claim about *every* path into it, and this one enumerated the
+ * interesting path while missing the boring one, then told the next reader not to
+ * bother looking. Prefer a failing experiment to a convincing argument.
  */
 
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, createKeyBlock, serializeKeyBlock } from './crypto';
+import { decodeImagePayload, encodeImagePayload } from './header';
 import { type VaultKey, exportVault, importVault } from './vault';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
@@ -151,5 +162,68 @@ describe('the integrity hash is what makes the retry safe', () => {
     const exactlyK = imagePayloads.slice(0, k);
     const out = await importVault(exactlyK, 'pw', { keyBlock: key.keyBlock });
     expect([...out.content]).toEqual([...CONTENT]);
+  });
+});
+
+/**
+ * The other retry, the one that fires when a subset does not decode at all.
+ *
+ * Everything above exercises the retry driven by the integrity hash: the subset
+ * decodes, produces a blob, and the hash says it is the wrong blob. This is the
+ * sibling path, where `decodeBlob` throws and the loop moves on without ever
+ * getting a blob to hash. Nothing reached it, which is why the mutation run
+ * reported the `catch` as having no coverage at all.
+ *
+ * A shard of the wrong length is the realistic way in. Nothing between the image
+ * header and reconstruction requires the shards of a set to agree on length, so
+ * one payload declaring a different `shardLen` travels all the way down and makes
+ * `rsReconstructData` refuse every subset it appears in.
+ */
+describe('reconstruction works around a shard that cannot be decoded at all', () => {
+  /**
+   * A payload that belongs to the set but carries a shard of the wrong length.
+   * Everything reassembly reads from a header (`setId`, `k`, `m`, `blobLen`,
+   * `hash`) is preserved, so it is not dropped as foreign and not treated as a
+   * different vault: it is a member, and it is undecodable.
+   */
+  function oddLengthShard(payload: Uint8Array): Uint8Array {
+    const { header } = decodeImagePayload(payload);
+    const shardLen = header.shardLen + 8;
+    return encodeImagePayload({ ...header, shardLen }, noise(shardLen));
+  }
+
+  it('restores byte for byte when one shard has the wrong length', async () => {
+    const key = await makeKey();
+    const { imagePayloads } = await exportVault(NAME, CONTENT, key);
+    expect(imagePayloads.length).toBeGreaterThan(1);
+
+    // Index 0 on purpose. `kSubsets` yields the lowest indices first, so the very
+    // first subset attempted contains the bad shard: the throw happens before any
+    // successful decode, which is what puts the loop through the catch.
+    const mixed = [...imagePayloads];
+    mixed[0] = oddLengthShard(imagePayloads[0]!);
+
+    const out = await importVault(mixed, 'pw', { keyBlock: key.keyBlock });
+    expect(out.filename).toBe(NAME);
+    expect([...out.content]).toEqual([...CONTENT]);
+  });
+
+  /**
+   * The other half, and the reason the test above is about the retry rather than
+   * about luck: take away the spare shards and the same bad set stops being
+   * recoverable. If reconstruction had simply ignored the odd shard, this would
+   * still succeed.
+   */
+  it('fails when there is no spare shard to retry with', async () => {
+    const key = await makeKey();
+    const { imagePayloads } = await exportVault(NAME, CONTENT, key);
+    const { header } = decodeImagePayload(imagePayloads[0]!);
+
+    const exactlyK = imagePayloads.slice(0, header.k);
+    exactlyK[0] = oddLengthShard(imagePayloads[0]!);
+
+    await expect(importVault(exactlyK, 'pw', { keyBlock: key.keyBlock })).rejects.toThrow(
+      /integrity check/,
+    );
   });
 });
