@@ -110,5 +110,23 @@ export default defineConfig({
       'src/ui/save-controller.test.ts',
     ],
     env: { STEGOSHARD_LANG: 'en' },
+    /**
+     * The same 20 seconds `vitest.config.ts` sets, and for the same reason,
+     * which this file should have been given at the time and was not.
+     *
+     * Vitest's 5s default was never a budget anyone chose for a suite that runs
+     * Argon2id at 256 MiB. It bit here as soon as `src/api` rejoined the
+     * selection above: the stego round-trips in `image-io.formats.test.ts` pay a
+     * real derivation each and measure 6 to 7 seconds, so they fail instantly on
+     * a machine no slower than the one that wrote this.
+     *
+     * That is worse here than in the ordinary suite. Stryker runs the whole
+     * selection once as a dry run before mutating anything, and a single failure
+     * in it aborts the entire run with "Something went wrong in the initial test
+     * run": not a lower score, no score at all. CI happened to stay under 5s and
+     * kept passing, which is the worst version of this bug, since the margin was
+     * a property of the runner rather than of the tests.
+     */
+    testTimeout: 20_000,
   },
 });

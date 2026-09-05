@@ -651,8 +651,18 @@ async function reconstructVerified(
   return null;
 }
 
-/** Lazily yield every k-combination of `items` (first yield = the first k). */
-function* kSubsets(items: number[], k: number): Generator<number[]> {
+/**
+ * Lazily yield every k-combination of `items` (first yield = the first k).
+ *
+ * Exported as a testing seam, in the same spirit as `needsCjkFont` in the paper
+ * builder. It decides which shard sets reconstruction ever attempts, so a bug
+ * that skipped combinations would show up only as a vault that failed to restore
+ * when it should have, in a case nobody happened to test. Reaching it through
+ * `importVault` costs an Argon2id derivation per attempt and still only probes
+ * the combinations one fixture happens to need; the contract itself (every
+ * subset, once, in order) is worth asserting directly.
+ */
+export function* kSubsets(items: number[], k: number): Generator<number[]> {
   const n = items.length;
   if (k > n || k < 1) return;
   const idx = Array.from({ length: k }, (_, i) => i);

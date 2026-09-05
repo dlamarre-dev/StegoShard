@@ -45,7 +45,7 @@
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, createKeyBlock, serializeKeyBlock } from './crypto';
 import { decodeImagePayload, encodeImagePayload } from './header';
-import { type VaultKey, exportVault, importVault } from './vault';
+import { type VaultKey, exportVault, importVault, kSubsets } from './vault';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 const NAME = 'secret.txt';
@@ -225,5 +225,79 @@ describe('reconstruction works around a shard that cannot be decoded at all', ()
     await expect(importVault(exactlyK, 'pw', { keyBlock: key.keyBlock })).rejects.toThrow(
       /integrity check/,
     );
+  });
+});
+
+/**
+ * The combination generator itself, which decides what reconstruction ever tries.
+ *
+ * Eight of the surviving mutants in this file's subject sat in these twelve
+ * lines, and the reason is worth stating: every test above reaches the generator
+ * through a real vault, so it only ever demands the handful of combinations that
+ * one fixture happens to need. A generator that skipped some subsets, or emitted
+ * a malformed one, would keep every test above green and would show up in
+ * production as a vault that failed to restore when it should have.
+ *
+ * So the contract is asserted directly: every subset, exactly once, in order.
+ */
+describe('the k-subset generator enumerates completely and in order', () => {
+  const choose = (n: number, k: number): number => {
+    let r = 1;
+    for (let i = 0; i < k; i++) r = (r * (n - i)) / (i + 1);
+    return Math.round(r);
+  };
+
+  // Small enough to enumerate exhaustively, wide enough that the odometer has to
+  // carry across several positions.
+  const shapes: [number, number][] = [
+    [1, 1],
+    [4, 1],
+    [4, 2],
+    [5, 3],
+    [7, 4],
+    [8, 8],
+    [9, 5],
+  ];
+
+  it.each(shapes)('yields every %i-choose-%i combination exactly once, ascending', (n, k) => {
+    const items = Array.from({ length: n }, (_, i) => i * 10); // not 0..n-1, so a
+    // generator returning indices instead of items would fail too.
+    const out = [...kSubsets(items, k)];
+
+    expect(out).toHaveLength(choose(n, k));
+    expect(new Set(out.map((s) => s.join(','))).size).toBe(out.length); // no repeats
+
+    for (const s of out) {
+      expect(s).toHaveLength(k);
+      expect(s.every((v) => items.includes(v))).toBe(true);
+      // Strictly ascending: a carry that failed to reset the trailing positions
+      // produces a subset that is not.
+      expect([...s].sort((a, b) => a - b)).toEqual(s);
+      expect(new Set(s).size).toBe(k);
+    }
+
+    // The first yield is the first k items, which is what makes reconstruction
+    // try the lowest-indexed shards before reaching for parity.
+    expect(out[0]).toEqual(items.slice(0, k));
+    // And the last is the final k, so the enumeration ran to the end rather than
+    // stopping early or running past it.
+    expect(out.at(-1)).toEqual(items.slice(n - k));
+  });
+
+  // Both refusals matter: `k > n` is the case reconstruction relies on when
+  // fewer than k shards survive, and it is what makes the `present.length < k`
+  // guard above the loop redundant rather than load-bearing.
+  it.each([
+    [3, 4],
+    [0, 1],
+    [3, 0],
+    [3, -1],
+  ])('yields nothing for %i items taken %i at a time', (n, k) => {
+    expect([
+      ...kSubsets(
+        Array.from({ length: n }, (_, i) => i),
+        k,
+      ),
+    ]).toEqual([]);
   });
 });
