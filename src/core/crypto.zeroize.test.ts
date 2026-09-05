@@ -29,10 +29,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   type Argon2Params,
   DEK_LEN,
+  clearUserEntropy,
   deriveContentKey,
   deriveKEK,
   exportDekRaw,
   generateDEK,
+  installUserEntropy,
   randomBytes,
   unwrapDEK,
   wrapDEK,
@@ -167,5 +169,71 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
     expect(wiped(999), 'a non-zero fill was counted as a wipe').toBe(0);
     buf.fill(0);
     expect(wiped(999), 'a zero fill was not counted').toBe(1);
+  });
+});
+
+/**
+ * The user-entropy layer, which holds more secret material for longer than
+ * anything else here.
+ *
+ * Its HKDF key lives for the whole session inside the HMAC instance, and its
+ * keystream blocks are, by construction, bytes that were XORed into salts, IVs
+ * and DEKs. A spent block left in memory is a spent one-time pad left in memory:
+ * anyone who recovers it can subtract the layer back off every value drawn from
+ * it. `crypto.ts` wipes all four buffers, and a mutation run showed that
+ * deleting any of those calls left the whole suite green.
+ *
+ * Counts are exact for the reason given above the `wiped` helper: the layer wipes
+ * a 32-byte buffer in three different places, so "at least one" would have
+ * passed with two of them deleted.
+ */
+describe('the user-entropy layer wipes its key material and spent keystream', () => {
+  afterEach(() => {
+    clearUserEntropy();
+  });
+
+  it('wipes the encoded text and the derived key on install', async () => {
+    const text = 'dice rolls 3 1 4 1 5'; // 20 ASCII bytes, so it cannot be confused
+    clearUserEntropy(); //                  with the 32-byte HKDF key below
+    wipes = [];
+
+    await installUserEntropy(text);
+
+    expect(wiped(20), 'the encoded passphrase was left in memory').toBe(1);
+    expect(wiped(32), 'the derived HKDF key was left in memory').toBe(1);
+  });
+
+  it('wipes each keystream block once it is spent', async () => {
+    await installUserEntropy('some entropy');
+    wipes = [];
+
+    randomBytes(64); // exactly two SHA-256 blocks, so one refill and one drain
+
+    // Block 0 is wiped when the refill replaces it, block 1 when the draw ends
+    // on a block boundary and the buffer is released.
+    expect(wiped(32), 'a spent keystream block was left in memory').toBe(2);
+  });
+
+  it('wipes the live block when the layer is cleared mid-block', async () => {
+    await installUserEntropy('some entropy');
+    randomBytes(16); // half of block 0 consumed, the rest still live
+    wipes = [];
+
+    clearUserEntropy();
+
+    expect(wiped(32), 'clearUserEntropy left an unspent keystream block behind').toBe(1);
+  });
+
+  it('wipes the previous layer before installing a new one', async () => {
+    await installUserEntropy('first');
+    randomBytes(16); // leave a live block behind
+    wipes = [];
+
+    await installUserEntropy('second');
+
+    // Two 32-byte wipes now: the old layer's live block, torn down first, and
+    // the new layer's HKDF key. Re-installing without that teardown would orphan
+    // the old keystream on the heap.
+    expect(wiped(32), 'reinstalling did not tear down the previous layer').toBe(2);
   });
 });
