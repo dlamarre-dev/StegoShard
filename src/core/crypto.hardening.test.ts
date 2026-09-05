@@ -29,6 +29,7 @@ import {
   decryptBytes,
   encryptBytes,
   hasUserEntropy,
+  hkdf,
   installUserEntropy,
   aeadOpen,
   aeadSeal,
@@ -41,6 +42,7 @@ import {
   validateArgon2Params,
 } from './crypto';
 import { toHex } from './bytes';
+import { createHMAC, createSHA256 } from 'hash-wasm';
 
 // Minimal-cost valid params: many tests below run hundreds of derivations.
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
@@ -624,5 +626,238 @@ describe('primitive argument guards', () => {
     expect(real.length).toBe(KEY_BLOCK_LEN);
     expect(isSerializedKeyBlock(real)).toBe(true);
     expect(isSerializedKeyBlock(new Uint8Array(KEY_BLOCK_LEN))).toBe(false);
+  });
+});
+
+/**
+ * The shape of the user-entropy keystream, not just that it contributes.
+ *
+ * The tests above establish that the CSPRNG is still consulted and that the
+ * layer changes the output. Neither says anything about *how* the keystream is
+ * consumed, and the whole cluster of surviving mutants sat there: the block
+ * refill, the offset tracking, the counter increment. A layer that restarted its
+ * counter on every draw would pass every assertion above while XORing the same
+ * keystream into two different secrets, which is the classic two-time-pad
+ * failure and would be worse than having no layer at all.
+ *
+ * The construction becomes deterministic under a stubbed CSPRNG, which is what
+ * makes this testable: `installUserEntropy` clears the pool before drawing its
+ * session salt, so that draw is unmixed, and a CSPRNG stuck at zero yields a
+ * fixed salt, a fixed HKDF key, and therefore a fixed keystream. With the CSPRNG
+ * contributing zeros, `randomBytes` returns the keystream itself.
+ */
+describe('user-entropy keystream discipline', () => {
+  const TEXT = 'dice 3 1 4 1 5 9 2 6';
+
+  afterEach(() => {
+    clearUserEntropy();
+  });
+
+  /** Run `fn` with the CSPRNG stuck at zero, so draws expose the keystream. */
+  async function withZeroCsprng<T>(fn: () => Promise<T>): Promise<T> {
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    spy.mockImplementation(((buf: Uint8Array) => {
+      buf.fill(0);
+      return buf;
+    }) as typeof globalThis.crypto.getRandomValues);
+    try {
+      return await fn();
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('is one continuous stream: the same bytes however a draw is split', async () => {
+    await withZeroCsprng(async () => {
+      // A fixed salt makes the layer reproducible across installs, so these four
+      // runs are comparable at all.
+      await installUserEntropy(TEXT);
+      const whole = toHex(randomBytes(64));
+
+      // 64 bytes is two SHA-256 keystream blocks, so this crosses a refill.
+      expect(whole).not.toBe('00'.repeat(64));
+      expect(whole.slice(0, 64)).not.toBe(whole.slice(64)); // block 0 != block 1
+
+      for (const split of [
+        [32, 32],
+        [16, 16, 16, 16],
+        [1, 63],
+        [63, 1],
+        [40, 24],
+      ]) {
+        await installUserEntropy(TEXT);
+        const parts = split.map((n) => toHex(randomBytes(n))).join('');
+        expect(parts, `split ${split.join('+')}`).toBe(whole);
+      }
+    });
+  });
+
+  it('never hands the same keystream to two draws in a session', async () => {
+    await withZeroCsprng(async () => {
+      await installUserEntropy(TEXT);
+      const seen = new Set<string>();
+      // Deliberately not a multiple of the 32-byte block, so a draw that ends
+      // mid-block is followed by one that must resume mid-block.
+      for (let i = 0; i < 40; i++) {
+        const hex = toHex(randomBytes(20));
+        expect(seen.has(hex), `draw ${i} repeated a keystream slice`).toBe(false);
+        seen.add(hex);
+      }
+    });
+  });
+
+  it('re-seeds on reinstall rather than continuing the old stream', async () => {
+    // The real CSPRNG here: a fresh session salt per install is the property, and
+    // stubbing it to zero would defeat exactly what is being measured.
+    await installUserEntropy(TEXT);
+    const first = toHex(randomBytes(32));
+    await installUserEntropy(TEXT);
+    const second = toHex(randomBytes(32));
+    expect(second).not.toBe(first);
+  });
+
+  it('stops contributing once cleared', async () => {
+    await withZeroCsprng(async () => {
+      await installUserEntropy(TEXT);
+      expect(toHex(randomBytes(32))).not.toBe('00'.repeat(32));
+      clearUserEntropy();
+      expect(hasUserEntropy()).toBe(false);
+      // With no layer and a zeroed CSPRNG, the draw is exactly what the CSPRNG
+      // gave: nothing is left mixing in.
+      expect(toHex(randomBytes(32))).toBe('00'.repeat(32));
+    });
+  });
+});
+
+/**
+ * `getRandomValues` refuses more than 65536 bytes per call, so larger requests
+ * are filled in windows. The windows have to tile the output exactly: a gap
+ * leaves zeros inside what a caller believes is random, and §10.4 fills dead
+ * regions up to the .db bucket ceiling this way, where a zeroed stretch would be
+ * a visible tell in a container whose whole purpose is to look unremarkable.
+ */
+describe('large draws are filled in windows that tile exactly', () => {
+  it.each([65_536, 65_537, 131_072, 200_000])('covers every byte of a %i-byte draw', (len) => {
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    const windows: [number, number][] = [];
+    spy.mockImplementation(((buf: Uint8Array) => {
+      windows.push([buf.byteOffset, buf.length]);
+      buf.fill(0xab);
+      return buf;
+    }) as typeof globalThis.crypto.getRandomValues);
+    try {
+      const out = randomBytes(len);
+      expect(out.length).toBe(len);
+
+      // No window may exceed the platform cap, or the call would have thrown.
+      for (const [, n] of windows) expect(n).toBeLessThanOrEqual(65_536);
+
+      // Contiguous from 0 to len, no gap and no overlap.
+      windows.sort((a, b) => a[0] - b[0]);
+      let cursor = 0;
+      for (const [off, n] of windows) {
+        expect(off, `window starts at ${off}, expected ${cursor}`).toBe(cursor);
+        cursor += n;
+      }
+      expect(cursor).toBe(len);
+
+      // And the bytes really landed: an unfilled gap would still be zero.
+      expect(out.every((b) => b === 0xab)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+/**
+ * The keystream against an independently computed expectation.
+ *
+ * Everything above compares the layer to itself: a split draw against a whole
+ * one, one draw against the next. Those are strong properties and they miss a
+ * whole class of fault, because a construction that refilled its block on every
+ * single byte would satisfy all of them and still be a different cipher than the
+ * one SPEC and the crypto dossier describe.
+ *
+ * So this restates the construction from the outside, the way the committed
+ * crypto vectors do: `HKDF-SHA256` over the NFC text with a known salt and info,
+ * then `HMAC-SHA256(key, u64be(counter))`, and asserts the bytes match. The info
+ * label is spelled out rather than imported, so a change to it has to be made
+ * twice, deliberately.
+ */
+describe('user-entropy keystream matches an independent derivation', () => {
+  afterEach(() => {
+    clearUserEntropy();
+  });
+
+  it('is HMAC-SHA256(HKDF(text), counter) from block zero', async () => {
+    const TEXT = 'a known phrase for the vector';
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
+    spy.mockImplementation(((buf: Uint8Array) => {
+      buf.fill(0);
+      return buf;
+    }) as typeof globalThis.crypto.getRandomValues);
+
+    let got: string;
+    try {
+      // With the CSPRNG at zero the session salt is 32 zero bytes, so the whole
+      // layer is reproducible, and the draw is the keystream unchanged.
+      await installUserEntropy(TEXT);
+      got = toHex(randomBytes(64));
+    } finally {
+      spy.mockRestore();
+    }
+
+    const info = new TextEncoder().encode('stegoshard/v1/user-entropy');
+    const key = await hkdf(
+      new TextEncoder().encode(TEXT.normalize('NFC')),
+      info,
+      32,
+      new Uint8Array(32),
+    );
+    const hmac = await createHMAC(createSHA256(), key);
+    const block = (counter: number): Uint8Array => {
+      const ctr = new Uint8Array(8);
+      new DataView(ctr.buffer).setUint32(0, Math.floor(counter / 0x1_0000_0000));
+      new DataView(ctr.buffer).setUint32(4, counter >>> 0);
+      hmac.init();
+      hmac.update(ctr);
+      return hmac.digest('binary') as Uint8Array;
+    };
+
+    expect(got).toBe(toHex(block(0)) + toHex(block(1)));
+  });
+});
+
+/**
+ * The windowing above is checked with a stubbed CSPRNG, which is what lets the
+ * windows be observed at all, and which also removes the constraint that makes
+ * the branch exist. This draws large through the real one.
+ *
+ * `crypto.getRandomValues` throws `QuotaExceededError` past 65,536 bytes, so a
+ * build that dropped the windowing would fail here and nowhere else in the
+ * suite.
+ *
+ * Three mutants in these ten lines survive both tests and always will, recorded
+ * so nobody spends an afternoon on them:
+ *
+ * - `len <= MAX` weakened to `len < MAX` sends exactly 65,536 bytes down the
+ *   windowed path, which produces a single window covering the whole buffer. The
+ *   same bytes, by a slightly longer route.
+ * - the same condition forced to `false` sends everything that way, for the same
+ *   reason: one window is what the loop makes of any length up to the cap.
+ * - `off < len` widened to `off <= len` adds one final pass with
+ *   `subarray(len, len)`, an empty view, which fills nothing.
+ *
+ * All three are the fast path being optional rather than load-bearing. The
+ * output is identical, so no assertion can separate them.
+ */
+describe('a large draw goes through the real CSPRNG without tripping its cap', () => {
+  it.each([65_536, 65_537, 200_000])('draws %i bytes', (len) => {
+    const out = randomBytes(len);
+    expect(out.length).toBe(len);
+    // Not a randomness test: just proof that every window was actually written,
+    // since an unfilled tail would stay zero.
+    expect(out.subarray(len - 64).some((b) => b !== 0)).toBe(true);
+    expect(out.subarray(0, 64).some((b) => b !== 0)).toBe(true);
   });
 });
