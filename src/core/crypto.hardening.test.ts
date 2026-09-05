@@ -582,10 +582,17 @@ describe('primitive argument guards', () => {
   it.each([11, 13, 0, 16])('refuses a %i-byte nonce on both seal and open', async (len) => {
     const key = await aesKey();
     const nonce = randomBytes(len);
-    await expect(aeadSeal(key, nonce, randomBytes(8), EMPTY_AAD)).rejects.toBeInstanceOf(
-      RangeError,
+    // The message is asserted, not only the type. A first version of this test
+    // checked `RangeError` alone, and mutation testing answered that emptying the
+    // message changes nothing it can see: a caller handed a bare RangeError out
+    // of a crypto primitive is left guessing which argument was wrong.
+    await expect(aeadSeal(key, nonce, randomBytes(8), EMPTY_AAD)).rejects.toThrow(
+      /aead: bad nonce length/,
     );
-    await expect(aeadOpen(key, nonce, randomBytes(32), EMPTY_AAD)).rejects.toBeInstanceOf(
+    await expect(aeadOpen(key, nonce, randomBytes(32), EMPTY_AAD)).rejects.toThrow(
+      /aead: bad nonce length/,
+    );
+    await expect(aeadSeal(key, nonce, randomBytes(8), EMPTY_AAD)).rejects.toBeInstanceOf(
       RangeError,
     );
   });

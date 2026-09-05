@@ -212,6 +212,36 @@ describe('slot layer argument guards', () => {
     }
   });
 
+  /**
+   * Trailing bytes are refused, and this is the assertion that makes the guard
+   * above load-bearing rather than decorative.
+   *
+   * Deleting the length check does not change the answer for a *short* array: the
+   * loop finds no match and the function throws the same WrongPasswordError at
+   * the bottom, so a test on short input alone cannot tell whether the guard is
+   * there. Mutation testing said exactly that, by leaving the mutant alive after
+   * the test above was written.
+   *
+   * A *longer* array separates them. The loop reads only the first SLOT_COUNT
+   * slots, so a valid array with bytes appended would open normally without the
+   * guard. That is the canonical-encoding property the format relies on
+   * elsewhere: exactly one byte sequence parses to a given container.
+   */
+  it('refuses a valid slot array with bytes appended', async () => {
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
+    const dek = randomBytes(DEK_LEN);
+    const arr = await buildSlotArray([{ kek, dek, regionIndex: 0 }]);
+
+    // The control: unmodified, it opens.
+    const ok = await openSlotArray(arr, [kek]);
+    expect([...ok.dek]).toEqual([...dek]);
+
+    const padded = new Uint8Array(arr.length + 1);
+    padded.set(arr);
+    await expect(openSlotArray(padded, [kek])).rejects.toBeInstanceOf(WrongPasswordError);
+  });
+
   // Same reasoning one layer up: whatever goes wrong while turning the password
   // into a KEK, the caller learns only that the password did not work.
   it('reports a failed key derivation as a wrong password', async () => {
