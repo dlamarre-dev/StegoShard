@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, createKeyBlock, serializeKeyBlock } from './crypto';
 import { CODEC_QR_GRID, PROFILE_PAPER } from './header';
+import { DB_LADDER } from './buckets';
 import {
   type VaultKey,
   FileTooLargeError,
@@ -137,11 +138,48 @@ describe('file size ceilings', () => {
     ).rejects.toMatchObject({ name: 'FileTooLargeError' });
   });
 
-  // The remaining size guard is deliberately left uncovered: translating
-  // BucketTooLargeError into FileTooLargeError needs content larger than the top
-  // DB_LADDER bucket, which is 64 MiB. Allocating and encrypting that once is
-  // affordable; doing it for every mutant that touches the file is not, and the
-  // nightly is already the thing being kept in budget. Noted rather than faked.
+  /**
+   * The last size guard, which used to be left uncovered on a cost argument
+   * worth revisiting rather than inheriting.
+   *
+   * The note here said this needed "allocating and encrypting" 64 MiB, too
+   * expensive to repeat for every mutant touching the file. Measured: the whole
+   * call takes about 2.5 seconds, and none of it is encryption. The ceiling is
+   * checked while picking the bucket, which happens before any key is derived or
+   * any byte is sealed; the 2.5 seconds is gzip refusing to shrink 64 MiB of
+   * random bytes, and allocating them costs 29 ms.
+   *
+   * It is affordable for the nightly too, for a reason the original note could
+   * not have known: `vault` is not the binding shard. crypto.ts runs 74 minutes
+   * against vault's 32, and the shards run in parallel, so two minutes added here
+   * changes the wall clock by nothing at all.
+   *
+   * What it buys: this is the only path that turns the internal
+   * BucketTooLargeError into the FileTooLargeError a caller can act on, and the
+   * limit it reports has to be the top of the ladder rather than some other
+   * number, or the message tells the user to shrink to the wrong size.
+   */
+  it(
+    'translates an over-ladder bucket into a size error naming the real ceiling',
+    { timeout: 60_000 },
+    async () => {
+      const top = DB_LADDER[DB_LADDER.length - 1]!;
+      // Incompressible and just past the top bucket: compressible filler would be
+      // squeezed back under the ceiling and never reach the guard.
+      const content = new Uint8Array(top + 1024);
+      for (let off = 0; off < content.length; off += 65536) {
+        crypto.getRandomValues(content.subarray(off, Math.min(off + 65536, content.length)));
+      }
+
+      // maxBytes is left at its default, well above this, so the earlier guard
+      // cannot be the one that fires: it would report 1 GiB as the limit.
+      await expect(exportVaultBinaryDisguised(NAME, content, 'pw', {})).rejects.toMatchObject({
+        name: 'FileTooLargeError',
+        size: content.length,
+        limit: top,
+      });
+    },
+  );
 });
 
 describe('branded-only guard on exportVaultBinary', () => {
