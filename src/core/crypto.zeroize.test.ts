@@ -33,9 +33,12 @@ import {
   deriveContentKey,
   deriveKEK,
   exportDekRaw,
+  aeadSeal,
   generateDEK,
   installUserEntropy,
   randomBytes,
+  serializeSlot,
+  tryOpenSlot,
   unwrapDEK,
   wrapDEK,
 } from './crypto';
@@ -235,5 +238,62 @@ describe('the user-entropy layer wipes its key material and spent keystream', ()
     // the new layer's HKDF key. Re-installing without that teardown would orphan
     // the old keystream on the heap.
     expect(wiped(32), 'reinstalling did not tear down the previous layer').toBe(2);
+  });
+});
+
+/**
+ * The slot layer's transient plaintexts.
+ *
+ * A slot plaintext is a raw DEK plus its region index. It exists for as long as
+ * it takes to seal or to copy out, on both sides, and `crypto.ts` wipes it in
+ * three places: after sealing, after a successful open, and on the path that
+ * refuses a slot naming a region that does not exist. All three deletions
+ * survived the mutation run.
+ */
+describe('slot plaintexts are wiped on both sides (SPEC §10.3)', () => {
+  const kekFor = () => deriveKEK('pw', randomBytes(16), PARAMS);
+  const SLOT_PLAINTEXT_LEN = 48;
+
+  it('wipes the plaintext it sealed', async () => {
+    const kek = await kekFor();
+    wipes = [];
+
+    await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0);
+
+    expect(wiped(SLOT_PLAINTEXT_LEN), 'serializeSlot left the raw DEK in its plaintext').toBe(1);
+  });
+
+  it('wipes the plaintext it opened, keeping only the DEK copy', async () => {
+    const kek = await kekFor();
+    const slot = await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0);
+    wipes = [];
+
+    const opened = await tryOpenSlot(kek, slot);
+
+    expect(opened).not.toBeNull();
+    expect(wiped(SLOT_PLAINTEXT_LEN), 'tryOpenSlot left the opened plaintext behind').toBe(1);
+    // The DEK handed back is a copy, so wiping the plaintext must not have
+    // blanked it.
+    expect(opened!.dek.some((b) => b !== 0)).toBe(true);
+  });
+
+  it('wipes the plaintext even when it refuses the slot', async () => {
+    // A forged slot naming a region that does not exist: it decrypts, so the
+    // plaintext is real key material, and then it is thrown away. That is the
+    // path most likely to forget the wipe, because nothing is returned.
+    const kek = await kekFor();
+    const nonce = randomBytes(12);
+    const pt = new Uint8Array(SLOT_PLAINTEXT_LEN);
+    pt.set(randomBytes(DEK_LEN), 0);
+    pt[DEK_LEN] = 99; // far outside the two regions
+    const forged = new Uint8Array([
+      ...nonce,
+      ...(await aeadSeal(kek, nonce, pt, new Uint8Array(0))),
+    ]);
+    wipes = [];
+
+    expect(await tryOpenSlot(kek, forged)).toBeNull();
+
+    expect(wiped(SLOT_PLAINTEXT_LEN), 'the refused slot plaintext was left in memory').toBe(1);
   });
 });

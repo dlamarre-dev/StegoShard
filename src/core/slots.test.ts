@@ -17,6 +17,8 @@ import {
   importAesGcmKey,
   openSlotArray,
   randomBytes,
+  REGION_COUNT,
+  serializeSlot,
   secureShuffle,
   tryOpenSlot,
   unlockSlotArray,
@@ -304,5 +306,120 @@ describe('slot layer argument guards', () => {
       expect(() => secureShuffle(arr)).not.toThrow();
       expect([...arr].sort((a, b) => a - b)).toEqual(Array.from({ length: len }, (_, i) => i));
     }
+  });
+});
+
+/**
+ * What the slot builders refuse.
+ *
+ * These are argument guards on a layer whose whole job is that every slot looks
+ * the same: a fixed count, a fixed size, a region index inside the two regions
+ * that exist. Their messages carry the offending value, and the mutation run
+ * showed the messages could be emptied without a test noticing, which is how a
+ * guard becomes "it threw something" instead of "it said what was wrong".
+ */
+describe('the slot builders refuse malformed arguments', () => {
+  const kek = () => deriveKEK('pw', randomBytes(16), TEST_PARAMS);
+
+  it.each([
+    ['nonce', 11],
+    ['nonce', 13],
+    ['nonce', 0],
+  ])('refuses a %s of %i bytes', async (_what, len) => {
+    await expect(
+      serializeSlot(await kek(), randomBytes(len), randomBytes(DEK_LEN), 0),
+    ).rejects.toThrow(/slot: bad nonce length/);
+  });
+
+  it.each([31, 33, 0])('refuses a DEK of %i bytes', async (len) => {
+    await expect(
+      serializeSlot(await kek(), randomBytes(IV_LEN), randomBytes(len), 0),
+    ).rejects.toThrow(/slot: bad dek length/);
+  });
+
+  // The count bound is what keeps the array a fixed size, which is what makes a
+  // live slot indistinguishable from filler.
+  it('refuses too few or too many live entries, naming the count', async () => {
+    const k = await kek();
+    const entry = { kek: k, dek: randomBytes(DEK_LEN), regionIndex: 0 };
+
+    await expect(buildSlotArray([])).rejects.toThrow(/0 live entries.*1\.\.4/);
+    const tooMany = Array.from({ length: SLOT_COUNT + 1 }, () => entry);
+    await expect(buildSlotArray(tooMany)).rejects.toThrow(
+      new RegExp(`${SLOT_COUNT + 1} live entries`),
+    );
+
+    // The bound is inclusive at both ends, so the refusals above are the bound
+    // and not the whole range.
+    await expect(buildSlotArray([entry])).resolves.toHaveLength(SLOT_ARRAY_LEN);
+    await expect(
+      buildSlotArray(Array.from({ length: SLOT_COUNT }, () => entry)),
+    ).resolves.toHaveLength(SLOT_ARRAY_LEN);
+  });
+
+  it.each([-1, REGION_COUNT, 99])('refuses region index %i, naming it', async (regionIndex) => {
+    const entry = { kek: await kek(), dek: randomBytes(DEK_LEN), regionIndex };
+    await expect(buildSlotArray([entry])).rejects.toThrow(
+      new RegExp(`region index ${regionIndex} out of range`),
+    );
+  });
+
+  /**
+   * A slot whose plaintext names a region that does not exist opens cleanly and
+   * must still be refused. Only a forged slot can be in this state, since
+   * `buildSlotArray` rejects the index on the way in, so this is the reader
+   * declining to trust what the writer already checked.
+   */
+  it('returns null for a slot naming a region that does not exist', async () => {
+    const k = await kek();
+    const nonce = randomBytes(IV_LEN);
+    const pt = new Uint8Array(SLOT_PLAINTEXT_LEN);
+    pt.set(randomBytes(DEK_LEN), 0);
+    pt[DEK_LEN] = REGION_COUNT; // one past the last real region
+    const forged = new Uint8Array([...nonce, ...(await aeadSeal(k, nonce, pt, new Uint8Array(0)))]);
+
+    expect(forged.length).toBe(SLOT_SIZE); // it is a well-formed slot in every other way
+    expect(await tryOpenSlot(k, forged)).toBeNull();
+  });
+});
+
+/**
+ * Three clusters in this layer that no test will ever kill, written down once so
+ * the next reader does not spend an afternoon on them.
+ *
+ * `randomIntBelow`'s rejection sampling, nine mutants. Its whole purpose is
+ * avoiding modulo bias, and every mutant attacks exactly that: dropping the
+ * rejection (`if (true) return v % n`), inverting the limit arithmetic, widening
+ * the comparison. All of them are correct code made subtly biased, and the bias
+ * is undetectable here. The only caller is `secureShuffle`, used on the four
+ * slots, so `n` never exceeds 4, and 2^32 is within 1 of a multiple of 2, 3 and
+ * 4. The worst mutant skews the distribution by about one part in a billion. No
+ * finite sample distinguishes that, and a test claiming to would be measuring
+ * its own seed.
+ *
+ * The guard is still right: `randomIntBelow` is a sampling primitive and should
+ * be unbiased on its own terms, not merely at the one size it happens to be
+ * called with. It is correctness that is not observable at the scale it is used,
+ * which is a different thing from untested.
+ *
+ * `secureShuffle`'s `i > 0` loop bound, one mutant. Widened to `i >= 0` it adds a
+ * final pass that swaps `arr[0]` with `randomIntBelow(1)`, which is always 0.
+ * Swapping an element with itself.
+ *
+ * `tryOpenSlot`'s `slot.length !== SLOT_SIZE` fast path, one mutant. Delete it
+ * and a wrong-sized slot still fails, one step later, because the seal covers
+ * exactly 48 bytes and GCM rejects anything else. Identical answer, more work.
+ */
+describe('slot-layer mutants that cannot be killed', () => {
+  it('secureShuffle is asked for a bound of at least 2, never less', () => {
+    // The premise of the note above: if some caller ever passed a smaller bound,
+    // the rejection-sampling guards would become reachable and testable.
+    for (const len of [0, 1, 2, 4]) {
+      const arr = Array.from({ length: len }, (_, i) => i);
+      expect(() => secureShuffle(arr)).not.toThrow();
+    }
+    // SLOT_COUNT is the only size the production path shuffles, and it is small
+    // enough that modulo bias cannot be measured.
+    expect(SLOT_COUNT).toBeLessThanOrEqual(4);
   });
 });

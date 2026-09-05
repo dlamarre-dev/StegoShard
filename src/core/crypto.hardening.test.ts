@@ -613,19 +613,40 @@ describe('primitive argument guards', () => {
    * password. A length check that answered `true` for the wrong length would turn
    * "no key here" into a parse attempt on arbitrary bytes.
    */
-  it('rejects a buffer that is not exactly a key block long', async () => {
-    for (const len of [0, 1, KEY_BLOCK_LEN - 1, KEY_BLOCK_LEN + 1, 1024]) {
-      expect(isSerializedKeyBlock(new Uint8Array(len)), `length ${len}`).toBe(false);
-    }
-
-    // Two controls, so this is a test of the length check rather than of a
-    // function that says no to everything: a real block passes, and a buffer of
-    // the right length with the wrong magic does not.
+  /**
+   * Each of the three checks is defeated on its own.
+   *
+   * A first version of this used buffers of zeros at various lengths, which fail
+   * the length, the magic and the version all at once. Every mutant survived it:
+   * a fixture that breaks everything pins nothing, because deleting any single
+   * check still leaves two others to reject it. Each case below is a valid key
+   * block with exactly one property spoiled.
+   */
+  it('rejects a buffer failing any one of length, magic or version', async () => {
     const { block } = await createKeyBlock('pw', FAST);
     const real = serializeKeyBlock(block);
     expect(real.length).toBe(KEY_BLOCK_LEN);
-    expect(isSerializedKeyBlock(real)).toBe(true);
-    expect(isSerializedKeyBlock(new Uint8Array(KEY_BLOCK_LEN))).toBe(false);
+    expect(isSerializedKeyBlock(real), 'a real block must be recognised').toBe(true);
+
+    // Length only: a real block with one byte appended, so magic and version are
+    // still correct and the length check is the only thing that can refuse it.
+    const tooLong = new Uint8Array(KEY_BLOCK_LEN + 1);
+    tooLong.set(real);
+    expect(isSerializedKeyBlock(tooLong), 'trailing byte').toBe(false);
+    expect(isSerializedKeyBlock(real.slice(0, KEY_BLOCK_LEN - 1)), 'one byte short').toBe(false);
+
+    // Magic only: right length, right version, one wrong byte in the four-byte
+    // tag. Every position, so a loop that stops early is caught too.
+    for (let i = 0; i < 4; i++) {
+      const badMagic = real.slice();
+      badMagic[i] = badMagic[i]! ^ 0xff;
+      expect(isSerializedKeyBlock(badMagic), `magic byte ${i}`).toBe(false);
+    }
+
+    // Version only: right length, right magic, an unsupported version.
+    const badVersion = real.slice();
+    badVersion[4] = badVersion[4]! + 1;
+    expect(isSerializedKeyBlock(badVersion), 'unsupported version').toBe(false);
   });
 });
 
@@ -859,5 +880,50 @@ describe('a large draw goes through the real CSPRNG without tripping its cap', (
     // since an unfilled tail would stay zero.
     expect(out.subarray(len - 64).some((b) => b !== 0)).toBe(true);
     expect(out.subarray(0, 64).some((b) => b !== 0)).toBe(true);
+  });
+});
+
+/**
+ * Two structural guards in `parseKeyBlock` that the corruption sweep above walks
+ * past.
+ *
+ * That sweep flips bytes inside a valid block, so it always hands the parser
+ * something of the right length. These are the guards for a block of the wrong
+ * length: one at the bottom of the fixed prefix, one where a declared payload
+ * length outruns the bytes that follow it. Both are parsing untrusted input,
+ * both could be deleted with the suite green.
+ */
+describe('key block length guards', () => {
+  const FIXED_PREFIX = 44; // magic 4 + ver 1 + iter 4 + mem 4 + par 1 + salt 16 + iv 12 + len 2
+
+  it('puts the too-short boundary exactly at the fixed prefix', async () => {
+    const { block } = await createKeyBlock('pw', FAST);
+    const real = serializeKeyBlock(block);
+
+    // One byte below the prefix cannot describe a block at all.
+    expect(() => parseKeyBlock(real.slice(0, FIXED_PREFIX - 1))).toThrow(/too short/);
+
+    // At the prefix it is no longer this guard's business. The block is still
+    // rejected, further down, for declaring a payload it does not carry: what
+    // matters here is that the refusal changes, so the boundary is where the
+    // code says it is rather than one byte off.
+    expect(() => parseKeyBlock(real.slice(0, FIXED_PREFIX))).not.toThrow(/too short/);
+  });
+
+  it('refuses a block whose declared payload runs past its bytes', async () => {
+    const { block } = await createKeyBlock('pw', FAST);
+    const real = serializeKeyBlock(block);
+
+    // The wrapped length is the last two bytes of the fixed prefix. Claim one
+    // byte more than the block actually carries.
+    const lying = real.slice();
+    const declared = (lying[FIXED_PREFIX - 2]! << 8) | lying[FIXED_PREFIX - 1]!;
+    lying[FIXED_PREFIX - 2] = ((declared + 1) >> 8) & 0xff;
+    lying[FIXED_PREFIX - 1] = (declared + 1) & 0xff;
+
+    expect(() => parseKeyBlock(lying)).toThrow(/truncated/);
+    // And the honest one still parses, so this is about the length field and not
+    // about the block.
+    expect(() => parseKeyBlock(real)).not.toThrow();
   });
 });
