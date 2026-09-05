@@ -30,6 +30,10 @@ import {
   encryptBytes,
   hasUserEntropy,
   installUserEntropy,
+  aeadOpen,
+  aeadSeal,
+  importAesGcmKey,
+  isSerializedKeyBlock,
   parseKeyBlock,
   randomBytes,
   serializeKeyBlock,
@@ -552,5 +556,66 @@ describe('AES-GCM shape and misuse rejection', () => {
     const { block } = await createKeyBlock('pw', FAST);
     expect(() => serializeKeyBlock({ ...block, salt: block.salt.slice(1) })).toThrow(RangeError);
     expect(() => serializeKeyBlock({ ...block, iv: block.iv.slice(1) })).toThrow(RangeError);
+  });
+});
+
+/**
+ * The §10 AEAD primitives' own argument checks, and the cheap structural test the
+ * stego layer leans on. Every one of these was reported as no coverage: the lines
+ * had never run at all, so each guard could have been deleted with the suite
+ * still green.
+ */
+describe('primitive argument guards', () => {
+  const EMPTY_AAD = new Uint8Array(0);
+
+  async function aesKey(): Promise<CryptoKey> {
+    return importAesGcmKey(randomBytes(DEK_LEN));
+  }
+
+  /**
+   * `aeadSeal` and `aeadOpen` exist as a separate pair from `encryptBytes` so the
+   * counter-nonce discipline of §10 is never crossed with the random-IV one. That
+   * separation is only worth anything if the nonce they are handed is the length
+   * they expect, since a short nonce is silently padded by some implementations
+   * and a repeated one is catastrophic for GCM.
+   */
+  it.each([11, 13, 0, 16])('refuses a %i-byte nonce on both seal and open', async (len) => {
+    const key = await aesKey();
+    const nonce = randomBytes(len);
+    await expect(aeadSeal(key, nonce, randomBytes(8), EMPTY_AAD)).rejects.toBeInstanceOf(
+      RangeError,
+    );
+    await expect(aeadOpen(key, nonce, randomBytes(32), EMPTY_AAD)).rejects.toBeInstanceOf(
+      RangeError,
+    );
+  });
+
+  it('accepts exactly the nonce length it documents, so the guard is not simply always on', async () => {
+    const key = await aesKey();
+    const nonce = randomBytes(IV_LEN);
+    const sealed = await aeadSeal(key, nonce, randomBytes(8), EMPTY_AAD);
+    expect(sealed.length).toBe(8 + GCM_TAG_LEN);
+    expect((await aeadOpen(key, nonce, sealed, EMPTY_AAD)).length).toBe(8);
+  });
+
+  /**
+   * The stego layer calls this on every de-whitened candidate to decide, without
+   * throwing, whether it is looking at a key block or at noise from a wrong
+   * password. A length check that answered `true` for the wrong length would turn
+   * "no key here" into a parse attempt on arbitrary bytes.
+   */
+  it('rejects a buffer that is not exactly a key block long', async () => {
+    for (const len of [0, 1, KEY_BLOCK_LEN - 1, KEY_BLOCK_LEN + 1, 1024]) {
+      expect(isSerializedKeyBlock(new Uint8Array(len)), `length ${len}`).toBe(false);
+    }
+
+    // Two controls, so this is a test of the length check rather than of a
+    // function that says no to everything: a real block passes, and a buffer of
+    // the right length with the wrong magic does not.
+    const { block } = await createKeyBlock('pw', FAST);
+    const real = serializeKeyBlock(block);
+    expect(real.length).toBe(KEY_BLOCK_LEN);
+    expect(isSerializedKeyBlock(real)).toBe(true);
+    expect(isSerializedKeyBlock(new Uint8Array(KEY_BLOCK_LEN))).toBe(false);
   });
 });
