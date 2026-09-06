@@ -25,17 +25,37 @@
  * The Sunday forced runs are the only ones whose score means anything (the other
  * nights are incremental; see .github/workflows/mutation.yml):
  *
- *                    23 Aug   30 Aug
- *   overall           83.58%   84.51%
- *   reed-solomon.ts   92.09%   99.44%
- *   codes shard       87.53%   91.13%
- *   stego.ts          85.45%   85.45%
- *   crypto.ts         82.29%   82.25%
- *   vault.ts          79.51%   79.51%   <- the weakest, and what `break` is set against
+ *                    23 Aug   30 Aug    6 Sep
+ *   overall           83.58%   84.51%   89.61%
+ *   crypto.ts         82.29%   82.25%   92.66%
+ *   reed-solomon.ts   92.09%   99.44%   92.66%   <- see the anomaly below
+ *   vault.ts          79.51%   79.51%   90.59%
+ *   codes shard       87.53%   91.13%   88.25%
+ *   gf256.ts               -        -   92.00%
+ *   erasure.ts             -        -  100.00%
+ *   access.ts              -        -   80.25%
+ *   stego.ts          85.45%   85.45%   85.76%   <- now the weakest shard
  *
- * access.ts measured 80.25% locally on 4 September. Note how still the three
- * unchanged files are across two independent cold runs: mutation testing is
- * deterministic given the same code and tests, so movement is a signal, not noise.
+ * The 6 September jump in crypto.ts and vault.ts, about ten points each, is the
+ * survivor work of 4 to 6 September landing. access.ts at 80.25% is the selection
+ * fix holding on the runner: it matches a local measurement to the digit, and
+ * without that fix the same file reads 70.37% with 33 mutants wrongly reported as
+ * uncovered.
+ *
+ * AN ANOMALY, unexplained, do not build on the 30 August reed-solomon figure.
+ *
+ * reed-solomon.ts reads 92.09%, then 99.44%, then 92.66%. Two of the three forced
+ * runs agree within half a point and 30 August does not: twelve mutants counted
+ * killed that night are not reproducibly killed, on identical code, since nothing
+ * touched reed-solomon.ts or its tests between those dates. Mutation testing is
+ * supposed to be deterministic given the same code and the same tests, so this is
+ * a hole in that assumption rather than a change in the project.
+ *
+ * That 99.44% went into the table above when it was written, which is the reason
+ * to leave the whole row visible rather than quietly replace it. If a fourth run
+ * lands near 92% again, treat 30 August as the outlier it looks like. If it lands
+ * near 99%, something in the harness varies between runs and is worth finding
+ * before any threshold is tightened.
  *
  * THE THRESHOLD, calibrated 4 September
  *
@@ -47,10 +67,16 @@
  *
  * It is set to 75, and it is a **regression alarm, not a quality target**. Stryker
  * applies `break` to whichever run it is in, and the nightly runs one shard at a
- * time, so the value has to clear the weakest shard rather than the average:
- * vault.ts at 79.51% is the binding one, leaving about four and a half points of
- * margin. That is enough to absorb a file legitimately gaining a few survivors and
- * not enough to sleep through a collapse.
+ * time, so the value has to clear the weakest shard rather than the average.
+ *
+ * When it was set, vault.ts at 79.51% was the binding one and 75 left four and a
+ * half points. After 6 September the weakest shard is stego at 85.76%, so the
+ * margin is now about eleven points, which is looser than intended.
+ *
+ * Deliberately left at 75 anyway, for one more forced run. The reed-solomon swing
+ * above is seven points on untouched code, and a threshold tightened against
+ * numbers that move that far would fail on a night when nothing was wrong. Raise
+ * it once a fourth run says the new levels are the levels.
  *
  * This gates no pull request. The workflow is scheduled only, so the effect is
  * that a score drop turns a nightly red instead of scrolling past in a summary
