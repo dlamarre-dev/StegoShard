@@ -18,13 +18,13 @@
 # their sum. Three forced runs have now been measured, the first sharded run on
 # 16 August and the two Sunday rebuilds since:
 #
-#            16 Aug   23 Aug   30 Aug   mutants
-#   crypto   69 min   60 min   74 min       463
-#   codes    49 min   50 min   30 min       417
-#   stego    42 min   32 min   34 min       323
-#   vault    30 min   33 min   32 min       405
-#   ------   ------   ------   ------
-#   wall     69 min   61 min   74 min
+#            16 Aug   23 Aug   30 Aug    6 Sep   mutants
+#   crypto   69 min   60 min   74 min   50 min       463
+#   codes    49 min   50 min   30 min   71 min       417
+#   stego    42 min   32 min   34 min   49 min       323
+#   vault    30 min   33 min   32 min   43 min       405
+#   ------   ------   ------   ------   ------
+#   wall     69 min   61 min   74 min   71 min
 #
 # Against 3h20 in sequence, so the shape of the decision holds. Two things in that
 # table are worth reading, though, because neither was visible from one run.
@@ -42,10 +42,21 @@
 # first run already suggested: what drives the cost is which tests cover a mutant,
 # not how many mutants there are.
 #
-# No rebalancing follows from any of it. crypto.ts is the binding constraint in
-# all three runs and is a single file, which Stryker cannot split, so moving work
-# between the other three changes nothing. Splitting it would mean splitting the
-# source file, which is not a reason to reshape production code.
+# **The binding shard changed on 6 September**, and the two halves of that move
+# are the clearest illustration of the paragraph above. codes went from 30 to 71
+# minutes because the selection fix gave it back `modes.test.ts`, which drives
+# access.ts end to end. crypto went from 74 to 50 because its survivors fell from
+# 73 to 31, and a killed mutant stops at the first failing test while a survivor
+# runs every test that covers it. More tests, less time.
+#
+# The wall clock barely moved, 74 to 71 minutes, which is the thing to watch: the
+# total says nothing about whether a shard is close to the timeout, because which
+# shard is largest is not stable. Read the column, not the last row.
+#
+# Still no rebalancing. codes is now the constraint, and its cost is concentrated
+# in access.ts, a single file Stryker cannot split. The same argument that applied
+# to crypto applies to it, and moving the other files between shards changes
+# nothing while one file is the tallest column.
 #
 # WHY THIS IS INCREMENTAL, AND WHAT THAT COSTS
 # Mutation testing is deterministic given the same code and the same tests, so
@@ -113,18 +124,22 @@ jobs:
     # on the same 463 mutants puts another bad Sunday within reach of 90 on
     # variance alone.
     #
-    # Two things make that worth paying for rather than riding. A cold run is not
-    # the exception here: Sunday forces one every week, by design, and it is the
-    # only run whose score means anything, so a timeout kill costs the week's one
-    # real measurement and leaves the incremental nights building on stale stored
-    # results. And both Sundays above predate the programmatic API, which added
-    # several hundred tests to the selection, a number of them paying a real
-    # Argon2id derivation each; more covering tests per mutant is exactly what took
-    # this suite from 40 minutes to 3h20 the first time, so the next forced run
-    # should be expected above 74 rather than at it.
+    # A cold run is not the exception here: Sunday forces one every week, by
+    # design, and it is the only run whose score means anything, so a timeout kill
+    # costs the week's one real measurement and leaves the incremental nights
+    # building on stale stored results.
     #
-    # 120 still catches a hang by a wide margin: an incremental night is 3 to 4
-    # minutes, and the slowest forced shard ever recorded is 74.
+    # The reasoning above also predicted the next forced run would put crypto past
+    # 74 minutes, because the programmatic API had added several hundred tests to
+    # the selection. That was wrong, and wrong in a way worth keeping. On
+    # 6 September crypto came in at 50, having got *faster* as its survivors fell,
+    # while codes went from 30 to 71 and became the tallest column. The headroom
+    # was needed; it was simply needed somewhere else.
+    #
+    # So the number to size against is not any one shard's history. It is whichever
+    # shard is currently largest, and which shard that is changes when the tests
+    # change. 120 still catches a hang by a wide margin: an incremental night is 3
+    # to 4 minutes, and the slowest forced shard ever recorded is 74.
     timeout-minutes: 120
     strategy:
       # One slow shard must not cancel the others: a partial table is still worth
