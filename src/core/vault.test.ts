@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, WrongPasswordError, createKeyBlock, serializeKeyBlock } from './crypto';
+import { CODEC_COLOR_GRID, CODEC_QR_GRID, PROFILE_DISK, PROFILE_PAPER } from './header';
 import {
   FileTooLargeError,
   MAX_FILE_BYTES,
@@ -162,5 +163,83 @@ describe('estimateImages (accurate)', () => {
     const content = new Uint8Array(20000).fill(65); // highly compressible
     const est = await estimateImages('big.txt', content);
     expect(est.images).toBeLessThan(estimateImageCount(content.length));
+  });
+});
+
+/**
+ * The estimates against reality, on options that are not the defaults.
+ *
+ * `estimateImages` promises in its own docstring that "the figure matches what
+ * `exportVault` produces", and one test above checks that. It calls both with no
+ * options, which is why every mutant on the default handling survived: with
+ * `options.profile` undefined, `options.profile ?? PROFILE_DISK` and the mutants'
+ * `options.profile && PROFILE_DISK` agree, and so do the counts.
+ *
+ * A default is only visibly a default when something else is passed.
+ */
+describe('image estimates match what export actually produces', () => {
+  // color-grid has no paper geometry, which is a property of the codec rather
+  // than of the estimate, so that pair is left out.
+  const combos: { profile: number; codecId: number; label: string }[] = [
+    { profile: PROFILE_DISK, codecId: CODEC_QR_GRID, label: 'disk + qr' },
+    { profile: PROFILE_DISK, codecId: CODEC_COLOR_GRID, label: 'disk + colour' },
+    { profile: PROFILE_PAPER, codecId: CODEC_QR_GRID, label: 'paper + qr' },
+  ];
+
+  for (const { profile, codecId, label } of combos) {
+    it(`is exact for ${label}`, async () => {
+      const key = await makeKey('pw');
+      const content = pseudoRandom(8192, 3); // incompressible, so nothing shrinks
+      const est = await estimateImages('x.bin', content, { profile, codecId });
+      const { imagePayloads } = await exportVault('x.bin', content, key, { profile, codecId });
+      expect(est.images).toBe(imagePayloads.length);
+      expect(est.k + est.m).toBe(est.images);
+    });
+  }
+
+  /**
+   * A key that travels separately is not in the images, so it changes the count.
+   * With `keyMode` omitted this is invisible, which is what let the default
+   * mutant live.
+   */
+  it('accounts for a key mode that does not embed the key block', async () => {
+    const key = await makeKey('pw');
+    const content = pseudoRandom(8192, 4);
+
+    const embedded = await estimateImages('x.bin', content, { keyMode: 'embedded' });
+    const keyfile = await estimateImages('x.bin', content, { keyMode: 'keyfile' });
+
+    const actual = await exportVault('x.bin', content, key, { keyMode: 'keyfile' });
+    expect(keyfile.images).toBe(actual.imagePayloads.length);
+    // And the two modes are actually being told apart, so the assertion above is
+    // not passing by coincidence.
+    expect(keyfile.images).toBeLessThanOrEqual(embedded.images);
+  });
+});
+
+/**
+ * The rough synchronous estimate, which promises a worst case rather than a
+ * figure. Two halves, and only one of them was checked.
+ */
+describe('the worst-case estimate is a bound, and a tight one', () => {
+  it('is exact when there is nothing to compress', async () => {
+    const key = await makeKey('pw');
+    for (const size of [1024, 8192, 40960]) {
+      const content = pseudoRandom(size, 9);
+      const rough = estimateImageCount(size);
+      const { imagePayloads } = await exportVault('x.bin', content, key);
+      // "Worst case, no compression assumed" and incompressible content are the
+      // same case, so the bound has nothing to spare here. That exactness is
+      // what makes this able to catch an estimate that is merely large.
+      expect(rough, `${size} bytes`).toBe(imagePayloads.length);
+    }
+  });
+
+  it('stays an upper bound when the content does compress', async () => {
+    const key = await makeKey('pw');
+    const content = new Uint8Array(40960); // all zeros
+    const rough = estimateImageCount(content.length);
+    const { imagePayloads } = await exportVault('x.bin', content, key);
+    expect(rough).toBeGreaterThan(imagePayloads.length);
   });
 });

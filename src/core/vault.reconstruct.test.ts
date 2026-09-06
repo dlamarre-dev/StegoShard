@@ -301,3 +301,121 @@ describe('the k-subset generator enumerates completely and in order', () => {
     ]).toEqual([]);
   });
 });
+
+/**
+ * What `reassembleBlob` does with a pile of images it did not curate.
+ *
+ * Restore is pointed at a folder, not at a manifest, so the payloads arriving
+ * here are whatever was in it: images from two different saves, files that are
+ * not vault images at all, and headers a forger controls. Three guards handle
+ * that and none of them had a test that could tell they were there.
+ */
+describe('reassembling from an uncurated pile of images', () => {
+  it('refuses an empty set, and says so', async () => {
+    await expect(importVault([], 'pw', {})).rejects.toThrow(/no images provided/);
+  });
+
+  /**
+   * Two vaults in one folder is an ordinary accident: a backup directory with
+   * last month's save still in it. The set with more images wins, and the other
+   * is ignored rather than mixed in, which would corrupt both.
+   *
+   * Both orderings are here because one of them proves nothing. The selection
+   * loop keeps the first set to beat the running best, so a fixture whose
+   * majority happens to come last is also satisfied by "take whichever was seen
+   * last", and the first version of this test did exactly that.
+   */
+  it.each([
+    ['majority first', true],
+    ['majority last', false],
+  ])('restores the larger set when two are mixed, %s', async (_label, majorityFirst) => {
+    const keyA = await makeKey();
+    const keyB = await makeKey();
+    const otherContent = noise(4 * 1024); // a smaller vault, so fewer images
+
+    const a = await exportVault(NAME, CONTENT, keyA);
+    const b = await exportVault('other.bin', otherContent, keyB);
+    expect(a.imagePayloads.length).toBeGreaterThan(b.imagePayloads.length);
+
+    const mixed = majorityFirst
+      ? [...a.imagePayloads, ...b.imagePayloads]
+      : [...b.imagePayloads, ...a.imagePayloads];
+
+    const out = await importVault(mixed, 'pw', { keyBlock: keyA.keyBlock });
+    expect(out.filename).toBe(NAME);
+    expect([...out.content]).toEqual([...CONTENT]);
+  });
+
+  /**
+   * An exact tie goes to the set seen first, which is arbitrary but has to be
+   * decided rather than left to whichever comparison someone writes next.
+   * Loosening `>` to `>=` hands the vault to the other set, and both are
+   * restorable here, so the wrong choice comes back as the wrong file rather
+   * than as a failure.
+   */
+  it('breaks a tie in favour of the set seen first', async () => {
+    const keyA = await makeKey();
+    const keyB = await makeKey();
+    const otherContent = noise(20 * 1024); // sized to give the same image count
+
+    const a = await exportVault(NAME, CONTENT, keyA);
+    const b = await exportVault('other.bin', otherContent, keyB);
+    expect(b.imagePayloads.length).toBe(a.imagePayloads.length);
+
+    const out = await importVault([...a.imagePayloads, ...b.imagePayloads], 'pw', {
+      keyBlock: keyA.keyBlock,
+    });
+    expect(out.filename).toBe(NAME);
+  });
+
+  /**
+   * A shard index past the end of the set, and the only forgery that reaches
+   * this guard.
+   *
+   * A payload that simply names a high index never gets here: `decodeHeader`
+   * rejects `shardIndex >= k + m` against the header's *own* k and m, and the
+   * payload is dropped as unreadable. My first version of this test forged only
+   * the index and passed with the guard deleted, because the decoder was doing
+   * the work.
+   *
+   * The gap is that the decoder checks each header against itself while
+   * `reassembleBlob` sizes the slot array from the set's first member. A header
+   * declaring larger k and m of its own is internally consistent, so it is
+   * accepted, and its index can still be past the real set's end. Then this
+   * bound is all there is: without it the write extends the slot array beyond
+   * k + m and every subset fails to reconstruct.
+   */
+  it.each([
+    ['exactly at the end', 0],
+    ['past the end', 4],
+  ])('ignores a forged shard index %s of the real set', async (_label, over) => {
+    const key = await makeKey();
+    const { imagePayloads } = await exportVault(NAME, CONTENT, key);
+    const { header, shard } = decodeImagePayload(imagePayloads[0]!);
+
+    // `over: 0` is the boundary the bound actually draws. Widening `<` to `<=`
+    // lets exactly that index through, and a fixture only ever a few past the
+    // end cannot tell the two apart.
+    const forged = encodeImagePayload(
+      { ...header, k: header.k + 12, m: header.m + 2, shardIndex: header.k + header.m + over },
+      shard,
+    );
+    // It really does survive the decoder: that is what makes it this guard's
+    // problem rather than the header's.
+    expect(decodeImagePayload(forged).header.shardIndex).toBeGreaterThanOrEqual(
+      header.k + header.m,
+    );
+
+    const out = await importVault([...imagePayloads, forged], 'pw', { keyBlock: key.keyBlock });
+    expect([...out.content]).toEqual([...CONTENT]);
+  });
+});
+
+/**
+ * One mutant here cannot be killed, recorded so it is not chased.
+ *
+ * `let bestSet = ''` can be seeded with any string at all. The counter beside it
+ * starts at -1, and the loop that follows runs over a map that is never empty,
+ * because `decoded.length === 0` is refused above it. So the first iteration
+ * always beats -1 and always overwrites the seed, whatever it was.
+ */
