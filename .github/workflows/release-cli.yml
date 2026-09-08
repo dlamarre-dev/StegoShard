@@ -77,11 +77,20 @@ jobs:
           ARCHIVE: ${{ matrix.archive }}
         shell: bash
         run: bash scripts/package-cli-binary.sh "$BIN" "$ARCHIVE"
+      # Handed to `publish` below, which attaches the archives to the GitHub
+      # release. That release copy is the durable one, so this is a ~85 MB
+      # relay and the default 90 days is just three of them per tag sitting in
+      # artifact storage after the thing a user downloads is already published.
+      #
+      # A week rather than a day, deliberately: it is the window in which
+      # `publish` can be re-run against an existing build if it fails at the
+      # attestation or upload step. Past that, re-tag and rebuild.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.archive }}
           path: ${{ matrix.archive }}
           if-no-files-found: error
+          retention-days: 7
 
   publish:
     needs: build
