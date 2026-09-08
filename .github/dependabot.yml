@@ -6,6 +6,33 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
+      # The test runner and everything peered to it, as one PR.
+      #
+      # This group exists because of a specific failure on 8 September.
+      # `@vitest/coverage-v8` declares `vitest` as an *exact* peer, so the two
+      # only move together. Dependabot opened the 4.1.11 -> 5.0.0 bump as two
+      # separate PRs (#162, #163) and neither could pass: each branch died at
+      # `npm ci` with ERESOLVE, taking eight checks down with it, before a
+      # single test ran. Both had to be closed and redone by hand as one
+      # lockfile (#165). Nothing about that was a real incompatibility; it was
+      # only the split.
+      #
+      # This group is listed first because a dependency joins the first group it
+      # matches, and it deliberately sets no `update-types`, so it takes majors
+      # too. `dev-dependencies` below covers only minor and patch, which is
+      # exactly why a major arrived ungrouped last time.
+      #
+      # `@stryker-mutator/*` is in here for the same reason one step out. It
+      # declares only `vitest >=2.0.0` -- a range too loose to fail a resolve
+      # and too loose to be reassuring -- so a vitest major can need a matching
+      # runner without npm ever saying so. The nightly mutation run is where
+      # that would surface, hours later and read as a score regression. Better
+      # to have both versions in one diff.
+      vitest:
+        patterns:
+          - vitest
+          - '@vitest/*'
+          - '@stryker-mutator/*'
       dev-dependencies:
         dependency-type: development
         update-types:

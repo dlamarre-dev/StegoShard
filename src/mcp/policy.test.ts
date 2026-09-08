@@ -7,13 +7,29 @@
  * out, and an output path that does not exist yet.
  */
 
-import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { PolicyError, makePolicy, readPassword, resolveInRoot } from './policy';
 
-const tmp = (prefix = 'ss-policy-') => mkdtempSync(join(tmpdir(), prefix));
+/**
+ * A temp directory, canonicalized.
+ *
+ * The `realpathSync` is the whole point and is not decoration. `makePolicy`
+ * resolves symlinks, so every assertion here that compares a returned root or
+ * path against one built from `tmp()` is comparing a canonical path to whatever
+ * `tmpdir()` happens to hand back. On Linux those are the same string and the
+ * tests pass either way; on macOS `tmpdir()` is `/var/folders/...`, a symlink to
+ * `/private/var/folders/...`, so three of them failed on a dev machine while CI
+ * stayed green. That is the worst shape for a failure: invisible to the runner
+ * and permanent for whoever is actually editing the file.
+ *
+ * The other `tmp()` helpers in this suite do not need this, because only the
+ * policy layer canonicalizes what it is given. If one of them ever starts
+ * comparing against a resolved path, it needs this too.
+ */
+const tmp = (prefix = 'ss-policy-') => realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 
 /** `expect(fn).toThrow(code)` for a PolicyError, checking the code not the prose. */
 function expectPolicy(fn: () => unknown, code: string): void {
