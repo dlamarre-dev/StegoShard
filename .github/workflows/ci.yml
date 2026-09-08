@@ -158,12 +158,17 @@ jobs:
             console.log("MCP OK:", init.result.protocolVersion, "|", names);
           '
 
+      # Consumed by `browser-e2e` below, in this run, and by nothing else. The
+      # default 90-day retention therefore kept 217 live copies of a 1.4 MB
+      # bundle for no reader: the largest live artifact count in the repo, and
+      # every one of them a build that was already validated and superseded.
       - name: Upload validated browser builds
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: validated-browser-builds
           path: dist-release
           if-no-files-found: error
+          retention-days: 1
 
   browser-e2e:
     name: Browser, accessibility, CSP, and extension smoke
@@ -222,6 +227,9 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: ignore
+          # Long enough to debug the failure that produced it. Nobody opens a
+          # Playwright trace from ten weeks ago.
+          retention-days: 14
 
   crypto-scan:
     name: Post-quantum crypto scan (QRAMM)
@@ -256,11 +264,25 @@ jobs:
       - name: cryptodeps, dependency report (informational)
         run: cryptodeps analyze . --fail-on none
 
+      # `continue-on-error` because of what this step is, not because it is
+      # flaky. The gate in this job is `cryptoscan scan .` above; the CBOM is a
+      # record for a human to read, kept out of the tree because it drifts. On
+      # 8 September the scan passed and this upload failed with a 403 from the
+      # artifact service ("Failed to FinalizeArtifact"), twice, which marked a
+      # required post-quantum crypto check as failing on a green commit. A
+      # blob-storage hiccup should not be able to say the crypto is unsafe.
+      #
+      # The step still runs and still turns the job's log red when it fails, so
+      # a *persistent* failure here stays visible; it just no longer votes on
+      # whether the scan found anything.
       - name: Upload CBOM
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        continue-on-error: true
         with:
           name: crypto-bom
           path: crypto-bom.json
+          # 356 live copies of a 1.9 KB drift record is nobody's intent.
+          retention-days: 14
 
   steganalysis:
     name: Steganalysis (zsteg, StegExpose)
@@ -493,6 +515,9 @@ jobs:
           name: python-runtime-sbom
           path: python-runtime.cdx.json
           if-no-files-found: error
+          # Same shape as the CBOM above: a record of what the runtime pulled
+          # in, read when something looks wrong, not an archive.
+          retention-days: 14
 
       # The golden corpus is committed and must not be regenerated to make a test
       # pass. Needs the full history from the checkout above; under CI the script
