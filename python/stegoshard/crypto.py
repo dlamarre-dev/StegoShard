@@ -9,8 +9,11 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from .aad import key_block_aad, slot_array_aad
 from .format import (
     IV_LEN,
+    KEY_BLOCK_VERSION,
+    KEY_MAGIC,
     REGION_COUNT,
     REGION_INDEX_OFF,
     SLOT_ARRAY_LEN,
@@ -52,14 +55,31 @@ def derive_kek(
     )
 
 
+def key_block_aad_for(key_block: KeyBlock) -> bytes:
+    """The §5.1 key block's AAD, from the header it is serialized with."""
+    return key_block_aad(
+        KEY_MAGIC,
+        KEY_BLOCK_VERSION,
+        key_block.iterations,
+        key_block.memory_kib,
+        key_block.parallelism,
+        key_block.salt,
+        key_block.iv,
+    )
+
+
 def unwrap_dek(key_block: KeyBlock, password: str) -> bytes:
-    """Recover the raw DEK from a key block and password."""
+    """Recover the raw DEK from a key block and password.
+
+    The block is bound to its own header, so an edited salt, IV or Argon2 cost
+    parameter now fails the tag by design rather than incidentally.
+    """
     kek = derive_kek(
         password, key_block.salt, key_block.iterations, key_block.memory_kib, key_block.parallelism
     )
     try:
         # WebCrypto AES-GCM output is ciphertext||tag, which AESGCM.decrypt expects.
-        return AESGCM(kek).decrypt(key_block.iv, key_block.wrapped, None)
+        return AESGCM(kek).decrypt(key_block.iv, key_block.wrapped, key_block_aad_for(key_block))
     except Exception as exc:  # noqa: BLE001 - normalize to a clear error
         raise WrongPasswordError("wrong password") from exc
 
@@ -73,8 +93,10 @@ def derive_content_key(dek: bytes, salt: bytes) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=DEK_LEN, salt=salt, info=CONTENT_INFO).derive(dek)
 
 
-def decrypt_content(cek: bytes, iv: bytes, ciphertext: bytes) -> bytes:
-    return AESGCM(cek).decrypt(iv, ciphertext, None)
+def decrypt_content(cek: bytes, iv: bytes, ciphertext: bytes, aad: bytes) -> bytes:
+    """AES-256-GCM open. `aad` is required for the reason given in aad.py: every
+    site has a context worth binding, and one that does not must say so."""
+    return AESGCM(cek).decrypt(iv, ciphertext, aad)
 
 
 # --- Access structures (SPEC §10): slot KEK, region key, constant-work unlock --
@@ -147,13 +169,19 @@ def derive_region_key(dek: bytes, salt: bytes, region_index: int) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=DEK_LEN, salt=salt, info=info).derive(dek)
 
 
-def try_open_slot(kek: bytes, slot: bytes) -> tuple[bytes, int] | None:
+def slot_aad_for(kind: int, vault_salt: bytes) -> bytes:
+    """The slot-array AAD for a container. Callers name the kind they decode as;
+    the geometry constants come from here."""
+    return slot_array_aad(kind, SLOT_COUNT, REGION_COUNT, vault_salt)
+
+
+def try_open_slot(kek: bytes, slot: bytes, aad: bytes) -> tuple[bytes, int] | None:
     """Try to open one 76-byte slot; None on any failure (wrong KEK or dead slot)."""
     if len(slot) != SLOT_SIZE:
         return None
     nonce, sealed = slot[:IV_LEN], slot[IV_LEN:]
     try:
-        pt = AESGCM(kek).decrypt(nonce, sealed, None)
+        pt = AESGCM(kek).decrypt(nonce, sealed, aad)
     except Exception:  # noqa: BLE001 - a bad tag just means "not this slot"
         return None
     if len(pt) != SLOT_PLAINTEXT_LEN:
@@ -164,7 +192,7 @@ def try_open_slot(kek: bytes, slot: bytes) -> tuple[bytes, int] | None:
     return pt[:DEK_LEN], region_index
 
 
-def open_slot_array(slot_array: bytes, keks: list[bytes]) -> tuple[bytes, int]:
+def open_slot_array(slot_array: bytes, keks: list[bytes], aad: bytes) -> tuple[bytes, int]:
     """Constant-work slot open (SPEC §10.4): try EVERY candidate KEK against EVERY
     slot with no early exit. Exactly one match is required; zero and >1 both raise
     the uniform WrongPasswordError, leaking nothing about which slot matched."""
@@ -174,7 +202,7 @@ def open_slot_array(slot_array: bytes, keks: list[bytes]) -> tuple[bytes, int]:
     matches = 0
     for kek in keks:
         for i in range(SLOT_COUNT):
-            opened = try_open_slot(kek, slot_array[i * SLOT_SIZE : (i + 1) * SLOT_SIZE])
+            opened = try_open_slot(kek, slot_array[i * SLOT_SIZE : (i + 1) * SLOT_SIZE], aad)
             if opened is not None:
                 matches += 1
                 if found is None:

@@ -29,7 +29,14 @@ from stegoshard.crypto import (
     derive_kek,
     unwrap_dek,
 )
-from stegoshard.format import parse_envelope, parse_key_block, parse_vault_blob
+from stegoshard.aad import vault_blob_aad
+from stegoshard.format import (
+    BLOB_MAGIC,
+    FORMAT_VERSION,
+    parse_envelope,
+    parse_key_block,
+    parse_vault_blob,
+)
 from stegoshard.pipeline import decode_multiregion_vault_blob
 from stegoshard.reedsolomon import reconstruct_data
 from stegoshard.segmented import decode_multiregion_segmented_blob
@@ -152,7 +159,12 @@ def test_vault_blob_decrypts_to_expected_content(v):
 
     dek = unwrap_dek(parse_key_block(key_block_bytes), v["password"])
     cek = derive_content_key(dek, content_salt)
-    filename, content, _ = parse_envelope(decrypt_content(cek, iv, ciphertext))
+    # The AAD binds the key *mode*: in keyfile mode the blob carries KB_LEN = 0
+    # and the external key block is deliberately not bound, so `embedded` is what
+    # goes into the AAD, never `key_block_bytes`.
+    embedded = b"" if v["mode"] == "keyfile" else key_block_bytes
+    aad = vault_blob_aad(BLOB_MAGIC, FORMAT_VERSION, embedded, content_salt, iv)
+    filename, content, _ = parse_envelope(decrypt_content(cek, iv, ciphertext, aad))
     assert filename == v["filename"]
     assert content == _hx(v["contentHex"])
 

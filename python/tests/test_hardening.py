@@ -5,14 +5,14 @@ from __future__ import annotations
 import struct
 
 import pytest
-from stegoshard.format import KEY_MAGIC, MAGIC, parse_header, parse_key_block
+from stegoshard.format import KEY_BLOCK_VERSION, KEY_MAGIC, MAGIC, parse_header, parse_key_block
 
 
 def _key_block(memory_kib: int) -> bytes:
     # magic(4)+ver(1)+iter(4)+mem(4)+par(1)+salt(16)+iv(12)+len(2)+wrapped(48)
     return (
         KEY_MAGIC
-        + bytes([1])
+        + bytes([KEY_BLOCK_VERSION])
         + struct.pack(">I", 3)
         + struct.pack(">I", memory_kib)
         + bytes([1])

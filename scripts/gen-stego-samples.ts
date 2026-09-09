@@ -82,7 +82,7 @@ async function realKeyBlock(): Promise<Uint8Array> {
   const salt = randomBytes(16);
   const kek = await deriveKEK(PASSWORD, salt, FAST_ARGON2);
   const dek = await generateDEK();
-  const { iv, wrapped } = await wrapDEK(dek, kek);
+  const { iv, wrapped } = await wrapDEK(dek, kek, salt, FAST_ARGON2);
   return serializeKeyBlock({ salt, params: FAST_ARGON2, iv, wrapped });
 }
 

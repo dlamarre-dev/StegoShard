@@ -26,6 +26,14 @@ export const de: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession erfordert --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore: Fotos/Verzeichnis fehlen',
   errCodecInvalid: 'ungültiges --codec „{value}“',
+  warnVaultRollback:
+    'Dieser Tresor ist Export #{got}, aufgezeichnet wurde auf diesem Rechner aber #{recorded}: Sie stellen möglicherweise eine ältere Kopie wieder her',
+  warnVaultUnknown:
+    'Tresor {vaultId} wurde auf diesem Rechner noch nie gesehen, es gibt also keinen Vergleichswert',
+  warnRegistryUnreadable:
+    'Die Datei der bekannten Tresore konnte nicht gelesen werden; es wurde keine Rollback-Prüfung durchgeführt',
+  errTrackNotDeniable:
+    '--track kann nicht mit {flags} verwendet werden: Ein abstreitbarer Tresor darf keine Spur seiner Existenz hinterlassen',
   errCodecColorPaper:
     '--codec color lässt sich nicht mit --paper verwenden (gedruckte Seiten nutzen QR)',
   errEntropyExclusive: '{flags} schließen sich gegenseitig aus (nur eine Entropiequelle)',
@@ -171,6 +179,10 @@ export const de: CliCatalog = {
     'Ein schwaches (aber >= 12 Zeichen langes) Passwort für einen neuen Tresor bestätigen. Das Minimum von 12 Zeichen selbst lässt sich damit nicht aufheben, und auch mit keiner anderen Option.',
   helpKey: 'Eine .key-Datei, ein Stego-Bild oder ein binärer Schlüsselcontainer',
   helpShare: 'Eine Anteilsdatei (wiederholbar) für einen nonpossession-Tresor',
+  helpTrack:
+    'Exporte dieses Tresors nummerieren, damit eine wiederhergestellte ältere Kopie auffällt (nie bei abstreitbarer Ausgabe)',
+  helpTrackFile:
+    'Speicherort der Datei bekannter Tresore (Standard: Statusverzeichnis der Plattform)',
   helpForce: 'Vorhandene Ausgabedateien überschreiben (Standard: verweigern)',
   helpQuiet: 'Die Fortschrittsanzeige auf stderr unterdrücken',
   helpJson: 'Ein JSON-Dokument auf stdout ausgeben; Fortschritt als NDJSON auf stderr',

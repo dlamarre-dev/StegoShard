@@ -7,11 +7,12 @@ import {
   decodeImagePayload,
   encodeHeader,
   encodeImagePayload,
+  FORMAT_VERSION,
 } from './header';
 
 function mkHeader(over: Partial<Header> = {}): Header {
   return {
-    version: 1,
+    version: FORMAT_VERSION,
     setId: new Uint8Array(8),
     shardIndex: 0,
     k: 2,
@@ -50,7 +51,10 @@ describe('decodeHeader guards', () => {
     expect(() => decodeHeader(bytes)).toThrow(/bad magic/);
   });
   it('rejects an unsupported version', () => {
-    expect(() => decodeHeader(encodeHeader(mkHeader({ version: 2 })))).toThrow(
+    // 0xff rather than "the next version up": this asserts that the reader
+    // refuses what it does not know, and pinning it to the current constant + 1
+    // would silently start testing the supported version on the next bump.
+    expect(() => decodeHeader(encodeHeader(mkHeader({ version: 0xff })))).toThrow(
       /unsupported version/,
     );
   });

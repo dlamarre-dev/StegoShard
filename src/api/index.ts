@@ -71,6 +71,11 @@ export type {
   ShareTextStyle,
   /** Machine-stable failure identifier; see {@link stegoErrorCode}. */
   StegoErrorCode,
+  /**
+   * A vault id plus its export counter, for rollback detection (SPEC §4.1).
+   * Accepted only on the open destinations; the deniable builders take none.
+   */
+  VaultIdentity,
   /** A DEK plus the serialized key block that unlocks it. */
   VaultKey,
 } from '../core';

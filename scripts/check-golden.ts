@@ -21,6 +21,10 @@ const CONSTANTS = [
   ['src/core/header.ts', 'FORMAT_VERSION'],
   ['src/core/crypto.ts', 'KEY_BLOCK_VERSION'],
   ['src/core/binary-container.ts', 'BINARY_VERSION'],
+  // Absent until the AAD work added it. Without this row a break in the
+  // segmented .db format could regenerate the corpus with no bump at all,
+  // which is the exact failure the guard exists to prevent.
+  ['src/core/segmented.ts', 'SEG_VERSION'],
   ['src/core/header.ts', 'CODEC_GALLERY'],
 ] as const;
 

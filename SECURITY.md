@@ -28,6 +28,9 @@ Security-relevant areas include, but are not limited to:
 - The self-describing image header and format parsing (malformed-input handling).
 - The erasure-coding reconstruction path.
 - Anything that could leak plaintext, filenames, or metadata.
+- The integrity of the published release artifacts and the build chain that produces
+  them: the release workflows, the pinned actions, the checksum and attestation steps,
+  and anything that could make a published binary differ from the source at its tag.
 
 ## Supported versions
 
@@ -50,8 +53,20 @@ Notes and limitations:
   are immutable and cannot be reliably wiped from memory.
 - **Session key scope.** While the vault is unlocked, a single DEK is held in
   `chrome.storage.session` (volatile, cleared on lock and on browser close) and is
-  reused across all vaults, so a compromise of that in-memory session would expose
-  every vault, not just one.
+  reused across all vaults **written with the managed vault key**, so a compromise of
+  that in-memory session would expose every such vault, not just one. Vaults using the
+  embedded or keyfile key modes are unaffected.
 - **Untrusted input.** On restore, the images / `.key` / `.zip` are untrusted: the
   decoders validate header and key-block parameters (including Argon2id cost) and
   cap decompression (gzip and zip) before doing significant work.
+- **Release integrity.** Archives carry SHA-256 checksums and a build-provenance
+  attestation; the binaries are unsigned and the builds are not reproducible. See
+  [Verify your download](docs/CLI.md#verify-your-download) and the [threat
+  model](docs/THREAT-MODEL.md#the-build-and-the-download) for what that does and does
+  not establish. Suspected tampering with a published artifact is in scope for a
+  private report, and is the one category worth reporting even when you are unsure — a
+  false alarm costs an hour.
+- **Rollback.** No part of the format can tell you that a vault is the _current_ one;
+  an older but valid export decrypts correctly. The opt-in `--track` registry detects
+  the silent case and is documented with its limits and its own privacy cost in the
+  [threat model](docs/THREAT-MODEL.md#rollback-tracking---track).

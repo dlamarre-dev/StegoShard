@@ -53,6 +53,13 @@ export type {
 } from './node/commands';
 
 /**
+ * The rollback identity a tracked export carries (SPEC §4.1). Re-exported here
+ * because it appears on `SaveOptions` and `RestoreResult`; see
+ * docs/THREAT-MODEL.md for what tracking is worth and what it costs.
+ */
+export type { VaultIdentity } from '../core';
+
+/**
  * Image adapters, for a consumer assembling its own pipeline out of the
  * env-neutral entry rather than using `save`/`restore`.
  */

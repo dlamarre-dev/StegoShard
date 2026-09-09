@@ -66,3 +66,34 @@ export function entropyArgError(src: EntropySources): string | null {
   }
   return null;
 }
+
+/**
+ * Reject `--track` on a destination whose whole point is that no record exists.
+ *
+ * The registry is a durable list of vault identifiers and access times in the
+ * user's home directory. On the deniable paths that is the most damaging thing
+ * the tool could write: it does not say where a vault is or what is in it, but
+ * it proves how many exist and when they were touched. Doing nothing quietly
+ * would be worse than refusing, because the user would carry on believing the
+ * protection was there.
+ *
+ * Tracking is also structurally impossible on these paths — the gallery and
+ * multi-region builders accept no identity parameter — so this check exists to
+ * say why, not to enforce it.
+ */
+export function trackingArgError(opts: {
+  track: boolean;
+  command?: string | undefined;
+  binary?: string | undefined;
+  mode?: string | undefined;
+}): string | null {
+  if (!opts.track) return null;
+  const deniable = [
+    opts.command === 'gallery-save' && 'gallery-save',
+    opts.binary === 'disguised' && '--binary --disguise',
+    opts.mode === 'duress' && '--duress',
+    opts.mode === 'nonpossession' && '--non-possession',
+  ].filter((s): s is string => typeof s === 'string');
+  if (deniable.length === 0) return null;
+  return t('errTrackNotDeniable', { flags: deniable.join(', ') });
+}

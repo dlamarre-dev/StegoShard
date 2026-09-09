@@ -35,6 +35,7 @@ import {
   clearUserEntropy,
   hkdf,
 } from '../src/core/crypto';
+import { EMPTY_AAD } from '../src/core/aad';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -131,7 +132,7 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
     case 'stego.decryptBytes': {
       const key = await aesKey(hex(req, 'key'), ['decrypt']);
       const combined = new Uint8Array([...hex(req, 'ct'), ...hex(req, 'tag')]);
-      const pt = await decryptBytes(key, hex(req, 'iv'), combined);
+      const pt = await decryptBytes(key, hex(req, 'iv'), combined, EMPTY_AAD);
       return { pt: toHex(pt) };
     }
 

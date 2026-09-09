@@ -197,6 +197,7 @@ export interface ExportOptions {
     bundle?: boolean | undefined;
     // (undocumented)
     codecId?: number | undefined;
+    identity?: VaultIdentity | undefined;
     keyMode?: KeyMode | undefined;
     // (undocumented)
     profile?: number | undefined;
@@ -225,6 +226,7 @@ export function exportVaultBinary(filename: string, content: Uint8Array, key: Va
     variant?: BinaryVariant;
     maxBytes?: number;
     bundle?: boolean | undefined;
+    identity?: VaultIdentity | undefined;
 }, onProgress?: OnProgress): Promise<{
     container: Uint8Array;
     keyMode: KeyMode;
@@ -283,7 +285,7 @@ export class FileTooLargeError extends Error {
 }
 
 // @public (undocumented)
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 
 // @public
 export function fromBase64(b64: string): Uint8Array;
@@ -460,6 +462,7 @@ export function importVault(payloads: Uint8Array[], password: string, opts?: {
     filename: string;
     content: Uint8Array;
     bundled: boolean;
+    identity?: VaultIdentity | undefined;
 }>;
 
 // @public
@@ -471,6 +474,7 @@ export function importVaultBinary(container: Uint8Array, password: string, opts?
     filename: string;
     content: Uint8Array;
     bundled: boolean;
+    identity?: VaultIdentity | undefined;
 }>;
 
 // @public
@@ -668,6 +672,12 @@ export function unwrapBinary(bytes: Uint8Array): {
     payload: Uint8Array;
     variant: BinaryVariant;
 } | null;
+
+// @public
+export interface VaultIdentity {
+    sequence: number;
+    vaultId: Uint8Array;
+}
 
 // @public
 export interface VaultKey {

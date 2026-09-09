@@ -26,6 +26,9 @@ import { decodeImagePayload } from './header';
 import { concatBytes, readU16 } from './bytes';
 import { type VaultKey, exportVault } from './vault';
 
+/** KB_LEN sits after the blob's own magic(4) and version(1). */
+const KB_LEN_OFF = 5;
+
 const TEST_PARAMS: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 const PASSWORD = 'isolation-test-password-longer-than-any-window';
 const WINDOW = 8; // a coincidental 8-byte (2^-64) match is effectively impossible
@@ -101,7 +104,7 @@ describe('keyfile mode: the key block is formally absent from every artifact', (
   it('produces KB_LEN = 0 and zero key-block bytes in blob and images', async () => {
     const a = await makeArtifacts('keyfile');
 
-    expect(readU16(a.blob, 0)).toBe(0);
+    expect(readU16(a.blob, KB_LEN_OFF)).toBe(0);
 
     // No 8-byte window of the serialized key block appears anywhere: not in
     // the blob, not in any single payload, not across the concatenation.
@@ -114,7 +117,7 @@ describe('keyfile mode: the key block is formally absent from every artifact', (
     // Proves leaksAnyWindow actually detects the key block when it is present,
     // guarding the keyfile assertions above against a vacuous scanner.
     const a = await makeArtifacts('embedded');
-    expect(readU16(a.blob, 0)).toBe(KEY_BLOCK_LEN);
+    expect(readU16(a.blob, KB_LEN_OFF)).toBe(KEY_BLOCK_LEN);
     expect(contains(a.blob, a.key.keyBlock)).toBe(true);
     expect(leaksAnyWindow(a.everything, a.key.keyBlock)).toBe(true);
   });
@@ -149,8 +152,11 @@ describe('both modes: raw key material never appears in any artifact', () => {
     const blobB = rebuildBlob(b.imagePayloads);
     // Same DEK + same plaintext, but a fresh random IV → entirely different
     // ciphertext. A shared 8-byte window would indicate IV/keystream reuse.
-    const ctA = blobA.slice(2 + 12); // [KB_LEN=0 u16][IV 12][ciphertext]
-    const ctB = blobB.slice(2 + 12);
+    // Skip the whole authenticated prefix; what is compared is ciphertext only.
+    // [magic 4][VER 1][KB_LEN=0 u16][contentSalt 16][IV 12][ciphertext]
+    const CT_OFF = KB_LEN_OFF + 2 + 16 + 12;
+    const ctA = blobA.slice(CT_OFF);
+    const ctB = blobB.slice(CT_OFF);
     expect(leaksAnyWindow(ctB, ctA)).toBe(false);
     expect([...a.setId]).not.toEqual([...b.setId]);
   });

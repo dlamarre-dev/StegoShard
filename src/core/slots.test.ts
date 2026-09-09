@@ -20,12 +20,23 @@ import {
   REGION_COUNT,
   serializeSlot,
   secureShuffle,
+  slotAadFor,
   tryOpenSlot,
   unlockSlotArray,
   WrongPasswordError,
 } from './crypto';
 import { BucketTooLargeError, DB_LADDER, GALLERY_LADDER, pickBucket } from './buckets';
 import { padRegionPlaintext, parseRegionPlaintext } from './regions';
+import { EMPTY_AAD } from './aad';
+
+/**
+ * Slots are sealed against their container kind and vault salt, so every build
+ * and every open in this file has to agree on both. `SALT` covers the cases
+ * whose salt is irrelevant to what is being asserted.
+ */
+const KIND = 'gallery-multiregion' as const;
+const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
+const SALT = new Uint8Array(16).fill(0x5a);
 
 const TEST_PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -68,8 +79,12 @@ describe('region plaintext framing (SPEC §10.4)', () => {
 
 describe('key-slot array (SPEC §10.3)', () => {
   it('is always the fixed size with all slots present', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
-    const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
+    const arr = await buildSlotArray(
+      [{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }],
+      SLOT_AAD(salt),
+    );
     expect(arr.length).toBe(SLOT_ARRAY_LEN);
     expect(SLOT_ARRAY_LEN).toBe(SLOT_COUNT * SLOT_SIZE);
   });
@@ -78,8 +93,8 @@ describe('key-slot array (SPEC §10.3)', () => {
     const salt = randomBytes(16);
     const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     const dek = randomBytes(DEK_LEN);
-    const arr = await buildSlotArray([{ kek, dek, regionIndex: 1 }]);
-    const got = await unlockSlotArray(arr, salt, 'pw', TEST_PARAMS);
+    const arr = await buildSlotArray([{ kek, dek, regionIndex: 1 }], SLOT_AAD(salt));
+    const got = await unlockSlotArray(arr, salt, 'pw', KIND, TEST_PARAMS);
     expect(got.regionIndex).toBe(1);
     expect([...got.dek]).toEqual([...dek]);
   });
@@ -87,8 +102,11 @@ describe('key-slot array (SPEC §10.3)', () => {
   it('rejects a wrong password with the uniform WrongPasswordError', async () => {
     const salt = randomBytes(16);
     const kek = await deriveKEK('right', salt, TEST_PARAMS);
-    const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
-    await expect(unlockSlotArray(arr, salt, 'wrong', TEST_PARAMS)).rejects.toBeInstanceOf(
+    const arr = await buildSlotArray(
+      [{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }],
+      SLOT_AAD(salt),
+    );
+    await expect(unlockSlotArray(arr, salt, 'wrong', KIND, TEST_PARAMS)).rejects.toBeInstanceOf(
       WrongPasswordError,
     );
   });
@@ -97,47 +115,64 @@ describe('key-slot array (SPEC §10.3)', () => {
     const salt = randomBytes(16);
     const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     const dek = randomBytes(DEK_LEN);
-    const arr = await buildSlotArray([{ kek, dek, regionIndex: 0 }]);
+    const arr = await buildSlotArray([{ kek, dek, regionIndex: 0 }], SLOT_AAD(salt));
     // Find the live slot and corrupt every byte of its sealed region until one flips;
     // any single-byte edit inside the authenticated region must fail the tag.
     let opened = -1;
     for (let i = 0; i < SLOT_COUNT; i++) {
       const slot = arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE);
-      if (await tryOpenSlot(kek, slot)) opened = i;
+      if (await tryOpenSlot(kek, slot, SLOT_AAD(salt))) opened = i;
     }
     expect(opened).toBeGreaterThanOrEqual(0);
     const tampered = arr.slice();
     tampered[opened * SLOT_SIZE + 12]! ^= 0xff; // first ciphertext byte (dek/region region)
-    await expect(unlockSlotArray(tampered, salt, 'pw', TEST_PARAMS)).rejects.toBeInstanceOf(
+    await expect(unlockSlotArray(tampered, salt, 'pw', KIND, TEST_PARAMS)).rejects.toBeInstanceOf(
       WrongPasswordError,
     );
   });
 
   it('dead slots never open', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     // A slot array with a single live entry has 3 dead (random) slots.
-    const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
+    const arr = await buildSlotArray(
+      [{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }],
+      SLOT_AAD(salt),
+    );
     let matches = 0;
     for (let i = 0; i < SLOT_COUNT; i++) {
-      if (await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE))) matches++;
+      if (await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE), SLOT_AAD(salt)))
+        matches++;
     }
     expect(matches).toBe(1);
   });
 
   it('fails closed (no match) via openSlotArray with an unrelated KEK', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
-    const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
+    const arr = await buildSlotArray(
+      [{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }],
+      SLOT_AAD(salt),
+    );
     const other = await importAesGcmKey(randomBytes(32));
-    await expect(openSlotArray(arr, [other])).rejects.toBeInstanceOf(WrongPasswordError);
+    await expect(openSlotArray(arr, [other], SLOT_AAD(salt))).rejects.toBeInstanceOf(
+      WrongPasswordError,
+    );
   });
 
   it('spreads the live slot across positions over many authorings', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     const positions = new Set<number>();
     for (let n = 0; n < 40; n++) {
-      const arr = await buildSlotArray([{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }]);
+      const arr = await buildSlotArray(
+        [{ kek, dek: randomBytes(DEK_LEN), regionIndex: 0 }],
+        SLOT_AAD(salt),
+      );
       for (let i = 0; i < SLOT_COUNT; i++) {
-        if (await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE)))
+        if (
+          await tryOpenSlot(kek, arr.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE), SLOT_AAD(salt))
+        )
           positions.add(i);
       }
     }
@@ -146,17 +181,60 @@ describe('key-slot array (SPEC §10.3)', () => {
   });
 });
 
+/**
+ * The slot AAD, isolated.
+ *
+ * These two are the cases the binding alone refuses. Everywhere else a wrong
+ * container means a wrong KEK, and the seal fails on the key rather than on the
+ * AAD; here the KEK is held fixed on purpose, so the only thing that can object
+ * is the bound context. Both would open before this change.
+ */
+describe('key-slot array: the AAD binds the container, not just the key', () => {
+  it('refuses a slot opened as the wrong container kind', async () => {
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
+    const dek = randomBytes(DEK_LEN);
+    const slot = await serializeSlot(kek, randomBytes(IV_LEN), dek, 0, SLOT_AAD(salt));
+
+    // Same KEK, same salt, same bytes: only the declared container differs. A
+    // gallery slot array transplanted into a .db container is refused.
+    expect(await tryOpenSlot(kek, slot, slotAadFor('gallery-multiregion', salt))).not.toBeNull();
+    expect(await tryOpenSlot(kek, slot, slotAadFor('segmented-multiregion', salt))).toBeNull();
+  });
+
+  it('refuses a slot moved under a different vault salt', async () => {
+    const saltA = randomBytes(16);
+    const saltB = randomBytes(16);
+    // One KEK for both, so the salt cannot influence the key. In production the
+    // KEK derives from the salt and this splice would fail on the key too; the
+    // point here is that it fails on the binding even when it does not.
+    const kek = await importAesGcmKey(randomBytes(32));
+    const slot = await serializeSlot(
+      kek,
+      randomBytes(IV_LEN),
+      randomBytes(DEK_LEN),
+      1,
+      SLOT_AAD(saltA),
+    );
+
+    expect(await tryOpenSlot(kek, slot, SLOT_AAD(saltA))).not.toBeNull();
+    expect(await tryOpenSlot(kek, slot, SLOT_AAD(saltB))).toBeNull();
+  });
+});
+
 describe('per-region key (independent DEK)', () => {
   it('derives distinct keys per region index and round-trips content', async () => {
     const dek = randomBytes(DEK_LEN);
     const salt = randomBytes(16);
     const k0 = await deriveRegionKey(dek, salt, 0);
-    const { iv, ciphertext } = await encryptBytes(k0, enc('region zero'));
+    const { iv, ciphertext } = await encryptBytes(k0, enc('region zero'), EMPTY_AAD);
     const again = await deriveRegionKey(dek, salt, 0);
-    expect(new TextDecoder().decode(await decryptBytes(again, iv, ciphertext))).toBe('region zero');
+    expect(new TextDecoder().decode(await decryptBytes(again, iv, ciphertext, EMPTY_AAD))).toBe(
+      'region zero',
+    );
     // A different region index yields a key that cannot open region 0's ciphertext.
     const k1 = await deriveRegionKey(dek, salt, 1);
-    await expect(decryptBytes(k1, iv, ciphertext)).rejects.toBeTruthy();
+    await expect(decryptBytes(k1, iv, ciphertext, EMPTY_AAD)).rejects.toBeTruthy();
   });
 });
 
@@ -167,8 +245,8 @@ describe('deriveKekBytes + secureShuffle helpers', () => {
     expect(raw.length).toBe(32);
     const viaBytes = await importAesGcmKey(raw);
     const direct = await deriveKEK('pw', salt, TEST_PARAMS);
-    const { iv, ciphertext } = await encryptBytes(direct, enc('same key?'));
-    expect(new TextDecoder().decode(await decryptBytes(viaBytes, iv, ciphertext))).toBe(
+    const { iv, ciphertext } = await encryptBytes(direct, enc('same key?'), EMPTY_AAD);
+    expect(new TextDecoder().decode(await decryptBytes(viaBytes, iv, ciphertext, EMPTY_AAD))).toBe(
       'same key?',
     );
   });
@@ -205,10 +283,11 @@ describe('slot layer argument guards', () => {
    * constant-work loop below it refuses to leak.
    */
   it('reports a wrong-length slot array as a wrong password, not as malformed', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     for (const len of [0, SLOT_ARRAY_LEN - 1, SLOT_ARRAY_LEN + 1]) {
       await expect(
-        openSlotArray(new Uint8Array(len), [kek]),
+        openSlotArray(new Uint8Array(len), [kek], SLOT_AAD(salt)),
         `length ${len}`,
       ).rejects.toBeInstanceOf(WrongPasswordError);
     }
@@ -233,15 +312,17 @@ describe('slot layer argument guards', () => {
     const salt = randomBytes(16);
     const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     const dek = randomBytes(DEK_LEN);
-    const arr = await buildSlotArray([{ kek, dek, regionIndex: 0 }]);
+    const arr = await buildSlotArray([{ kek, dek, regionIndex: 0 }], SLOT_AAD(salt));
 
     // The control: unmodified, it opens.
-    const ok = await openSlotArray(arr, [kek]);
+    const ok = await openSlotArray(arr, [kek], SLOT_AAD(salt));
     expect([...ok.dek]).toEqual([...dek]);
 
     const padded = new Uint8Array(arr.length + 1);
     padded.set(arr);
-    await expect(openSlotArray(padded, [kek])).rejects.toBeInstanceOf(WrongPasswordError);
+    await expect(openSlotArray(padded, [kek], SLOT_AAD(salt))).rejects.toBeInstanceOf(
+      WrongPasswordError,
+    );
   });
 
   // Same reasoning one layer up: whatever goes wrong while turning the password
@@ -252,7 +333,7 @@ describe('slot layer argument guards', () => {
       { iterations: 1, memoryKiB: 0, parallelism: 1 },
     ]) {
       await expect(
-        unlockSlotArray(new Uint8Array(SLOT_ARRAY_LEN), randomBytes(16), 'pw', params),
+        unlockSlotArray(new Uint8Array(SLOT_ARRAY_LEN), randomBytes(16), 'pw', KIND, params),
         JSON.stringify(params),
       ).rejects.toBeInstanceOf(WrongPasswordError);
     }
@@ -272,7 +353,8 @@ describe('slot layer argument guards', () => {
    * slot of the wrong size, rejected earlier, or builds a 48-byte one.
    */
   it('cannot reach its plaintext-length guard, by construction', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), TEST_PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, TEST_PARAMS);
     const acceptedSizes = new Set<number>();
 
     for (let ptLen = 0; ptLen <= 96; ptLen++) {
@@ -327,13 +409,13 @@ describe('the slot builders refuse malformed arguments', () => {
     ['nonce', 0],
   ])('refuses a %s of %i bytes', async (_what, len) => {
     await expect(
-      serializeSlot(await kek(), randomBytes(len), randomBytes(DEK_LEN), 0),
+      serializeSlot(await kek(), randomBytes(len), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT)),
     ).rejects.toThrow(/slot: bad nonce length/);
   });
 
   it.each([31, 33, 0])('refuses a DEK of %i bytes', async (len) => {
     await expect(
-      serializeSlot(await kek(), randomBytes(IV_LEN), randomBytes(len), 0),
+      serializeSlot(await kek(), randomBytes(IV_LEN), randomBytes(len), 0, SLOT_AAD(SALT)),
     ).rejects.toThrow(/slot: bad dek length/);
   });
 
@@ -343,23 +425,26 @@ describe('the slot builders refuse malformed arguments', () => {
     const k = await kek();
     const entry = { kek: k, dek: randomBytes(DEK_LEN), regionIndex: 0 };
 
-    await expect(buildSlotArray([])).rejects.toThrow(/0 live entries.*1\.\.4/);
+    await expect(buildSlotArray([], SLOT_AAD(SALT))).rejects.toThrow(/0 live entries.*1\.\.4/);
     const tooMany = Array.from({ length: SLOT_COUNT + 1 }, () => entry);
-    await expect(buildSlotArray(tooMany)).rejects.toThrow(
+    await expect(buildSlotArray(tooMany, SLOT_AAD(SALT))).rejects.toThrow(
       new RegExp(`${SLOT_COUNT + 1} live entries`),
     );
 
     // The bound is inclusive at both ends, so the refusals above are the bound
     // and not the whole range.
-    await expect(buildSlotArray([entry])).resolves.toHaveLength(SLOT_ARRAY_LEN);
+    await expect(buildSlotArray([entry], SLOT_AAD(SALT))).resolves.toHaveLength(SLOT_ARRAY_LEN);
     await expect(
-      buildSlotArray(Array.from({ length: SLOT_COUNT }, () => entry)),
+      buildSlotArray(
+        Array.from({ length: SLOT_COUNT }, () => entry),
+        SLOT_AAD(SALT),
+      ),
     ).resolves.toHaveLength(SLOT_ARRAY_LEN);
   });
 
   it.each([-1, REGION_COUNT, 99])('refuses region index %i, naming it', async (regionIndex) => {
     const entry = { kek: await kek(), dek: randomBytes(DEK_LEN), regionIndex };
-    await expect(buildSlotArray([entry])).rejects.toThrow(
+    await expect(buildSlotArray([entry], SLOT_AAD(SALT))).rejects.toThrow(
       new RegExp(`region index ${regionIndex} out of range`),
     );
   });
@@ -376,10 +461,10 @@ describe('the slot builders refuse malformed arguments', () => {
     const pt = new Uint8Array(SLOT_PLAINTEXT_LEN);
     pt.set(randomBytes(DEK_LEN), 0);
     pt[DEK_LEN] = REGION_COUNT; // one past the last real region
-    const forged = new Uint8Array([...nonce, ...(await aeadSeal(k, nonce, pt, new Uint8Array(0)))]);
+    const forged = new Uint8Array([...nonce, ...(await aeadSeal(k, nonce, pt, SLOT_AAD(SALT)))]);
 
     expect(forged.length).toBe(SLOT_SIZE); // it is a well-formed slot in every other way
-    expect(await tryOpenSlot(k, forged)).toBeNull();
+    expect(await tryOpenSlot(k, forged, SLOT_AAD(SALT))).toBeNull();
   });
 });
 

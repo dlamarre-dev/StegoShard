@@ -107,10 +107,13 @@ it failed.**
   (both implementations): exactly one byte sequence parses to a given block.
 - **Untrusted Argon2id parameters** (memory-exhaustion DoS): bounds are
   enforced _at parse time_, before any derivation, by `validateArgon2Params`
-  against `ARGON2_LIMITS`: `t ∈ [1,4]`, `m ∈ [8 KiB, 256 MiB]`, `p ∈ [1,4]`.
-  Memory and time are capped at the production candidate values rather than at a
-  generous ceiling; parallelism keeps a wider range only for compatibility with
-  the committed v1 vectors. A boundary matrix test covers min/max accepted, ±1
+  against `ARGON2_LIMITS`: `t ∈ [1,4]`, `m ∈ [8 KiB, 256 MiB]`, `p = 1`.
+  All three ceilings now sit exactly at the production values rather than at a
+  generous bound. Parallelism used to accept up to 4 purely so the committed v1
+  vectors stayed decodable; with no published vaults to stay compatible with,
+  that allowance bought nothing and is gone. The floors stay low deliberately: a
+  block asking for _less_ work attacks nobody but itself, and the suites derive
+  with cheap parameters. A boundary matrix test covers min/max accepted, ±1
   outside rejected, and `NaN`/`∞`/non-integers rejected.
 - **Seeded fuzzing** (reproducible): 2 000 random buffers and 150 multi-byte
   mutations of a valid block; a throw is the only accepted outcome.
@@ -781,12 +784,37 @@ has them.
 2. **Empty passwords cannot exist.** hash-wasm rejects an empty Argon2id
    password, so no key block can ever be created with one; on the unlock path
    an empty password is normalized to the uniform `WrongPasswordError`.
-3. **No AAD / no binding between key block and content ciphertext.** A
-   mix-and-match of key blocks and ciphertexts cannot produce silent wrong
-   plaintext, since decryption under the wrong DEK fails the GCM tag, but it is a
-   detectable-failure property, not an authenticated-vault property. An
-   attacker with write access to the images can always destroy or replace a
-   vault wholesale; the format does not claim otherwise.
+3. **Every AEAD site is now AAD-bound; rollback remains out of reach.** This
+   used to read "no AAD / no binding between key block and content ciphertext",
+   and the binding half of that is fixed: the §6 blob, the §10.6 region blocks,
+   the §10.1 slot array and the §9.2 gallery fragments all carry an AAD, joining
+   the segmented path that already did (SPEC §11.1 lists every label).
+
+   Be precise about what that bought. Most mix-and-match splices already failed
+   before, because substituting a key block, a salt or a region index also
+   changes the derived content key; the AAD makes those refusals _authenticated_
+   rather than incidental. Running the suite with every AAD builder stubbed out
+   leaves exactly three tests failing, and they are the honest evidence: a
+   **key-mode downgrade** (lifting the key block out of an embedded blob and
+   setting `KB_LEN = 0`, which would otherwise decrypt cleanly and turn a
+   self-contained vault into one whose `.key` the attacker supplies), a slot
+   array **transplanted between container kinds**, and a slot array **moved under
+   a different vault salt**. See `src/core/vault.binding.test.ts` and
+   `src/core/slots.test.ts`.
+
+   One binding is deliberately absent: in keyfile/stego mode the external key
+   block is _not_ bound, because a password change re-wraps the same DEK into
+   different bytes and binding it would make every earlier export silently
+   undecodable. That trade is pinned by a test that must keep passing.
+
+   **Rollback is still not addressed by the format, and cannot be.** An AEAD tag
+   authenticates a message, never the absence of a newer message, so nothing
+   inside a container distinguishes it from an older but entirely legitimate
+   export of the same vault. An attacker with write access can still destroy or
+   replace a vault wholesale. What exists now is an opt-in, off-by-default
+   detector built on state the container does not carry (SPEC §4.1 plus a local
+   registry); §7.7 says what it is worth.
+
 4. **The 4-byte truncated SHA-256 in the image header is an integrity _hint_**
    for fast triage of reconstruction errors. The security boundary is the GCM
    tag, never this hash.
@@ -794,6 +822,26 @@ has them.
 6. **DEK reuse across vaults** is decoupled from the IV bound by the per-export
    content key (§2): the shared DEK never encrypts content directly, so each
    export gets an independent AES-GCM key and the collision bound is per-export.
+7. **Rollback detection relocates trust; it does not create it.** The optional
+   `--track` registry records a vault id and an export counter locally, and warns
+   when a restore presents a lower counter than the one on file. It catches a
+   _silent_ replacement — a botched sync, a stale stick, an adversary with write
+   access to the vault. It catches nothing against an adversary who can also
+   write to the registry: they lower the number, or delete the file, and the
+   check reports an unknown vault or stays quiet. Trust moves from the vault file
+   to a local JSON file, and the threat models where those differ are real but
+   narrower than the feature invites a reader to assume.
+
+   It also has a cost the rest of the tool does not. The registry is a durable
+   cleartext list of vault identifiers and access times in the user's home
+   directory, and it is the first persistent state the command line has ever
+   kept. Against the coercive adversary it is the most damaging artifact the tool
+   can produce: not where a vault is or what is in it, but **how many exist and
+   when they were touched**, which is what deniability rests on denying. Hence
+   opt-in, off by default, and refused outright on every deniable destination
+   (`TRACKING_NOT_DENIABLE`). The file-free half — the `vault … · export #N` line
+   printed on save and restore — delivers most of the honest value with none of
+   that cost, and is the part worth relying on.
 
 ## 8. How to reproduce
 

@@ -99,6 +99,8 @@ const RESTORE_ROWS: Row[] = [
 ];
 
 const COMMON_ROWS: Row[] = [
+  ['--track <label>', 'helpTrack'],
+  ['--track-file <path>', 'helpTrackFile'],
   ['--force', 'helpForce'],
   ['--quiet', 'helpQuiet'],
   ['--json', 'helpJson'],

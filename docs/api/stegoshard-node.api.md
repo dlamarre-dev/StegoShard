@@ -158,6 +158,7 @@ export interface RestoreResult {
     // (undocumented)
     filename: string;
     files: string[];
+    identity?: VaultIdentity | undefined;
     outPath: string;
     // (undocumented)
     seen: number;
@@ -182,6 +183,7 @@ export interface SaveOptions {
     // (undocumented)
     fontPath?: string | undefined;
     force?: boolean | undefined;
+    identity?: VaultIdentity | undefined;
     inputs: string[];
     // (undocumented)
     instructions?: boolean | undefined;
@@ -236,6 +238,12 @@ export interface StegoKeyImage {
     bytes: Uint8Array;
     // (undocumented)
     ext: 'jpg' | 'png';
+}
+
+// @public
+export interface VaultIdentity {
+    sequence: number;
+    vaultId: Uint8Array;
 }
 
 // (No @packageDocumentation comment for this package)

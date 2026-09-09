@@ -30,6 +30,13 @@ export const ja: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession には --threshold k-of-n が必要です',
   errGalleryRestoreMissing: 'gallery-restore: 写真/フォルダーがありません',
   errCodecInvalid: '--codec「{value}」は無効です',
+  warnVaultRollback:
+    'この保管庫はエクスポート #{got} ですが、このマシンには #{recorded} が記録されています。古いコピーを復元している可能性があります',
+  warnVaultUnknown: '保管庫 {vaultId} はこのマシンで見たことがないため、比較対象がありません',
+  warnRegistryUnreadable:
+    '既知の保管庫ファイルを読めなかったため、ロールバックの確認は行われませんでした',
+  errTrackNotDeniable:
+    '--track は {flags} と併用できません（否認可能な保管庫は存在の痕跡を残してはなりません）',
   errCodecColorPaper: '--codec color は --paper と併用できません（印刷ページは QR を使います）',
   errEntropyExclusive: '{flags} は同時に指定できません（エントロピー源は 1 つだけ）',
   errEntropyFlagEmpty:
@@ -170,6 +177,9 @@ export const ja: CliCatalog = {
     '新しい保管庫に、弱い（ただし 12 文字以上の）パスワードを承知の上で使う。12 文字という下限そのものは、この指定でも他のどの指定でも解除できません。',
   helpKey: '.key ファイル、ステゴ画像、またはバイナリの鍵コンテナ',
   helpShare: 'nonpossession の保管庫用のシェアファイル（繰り返し指定可）',
+  helpTrack:
+    'この保管庫のエクスポートに番号を付け、古いコピーの復元を警告する（否認可能な出力では使えません）',
+  helpTrackFile: '既知の保管庫の記録を置く場所（既定: プラットフォームの状態ディレクトリ）',
   helpForce: '既存の出力ファイルを上書きする（既定: 拒否）',
   helpQuiet: 'stderr の進捗表示を出さない',
   helpJson: 'JSON ドキュメントを 1 件 stdout に出力し、進捗は NDJSON で stderr に出力します',

@@ -27,7 +27,8 @@ only the browser `storage` permission and no host access.
 The web app downloads executable JavaScript from its host. Although cryptographic
 processing remains local, a compromised or replaced deployment could change that
 code. Each release shows its version and commit; high-value use should prefer a
-reviewed extension, CLI binary, or checksum/provenance-verified offline web bundle.
+reviewed extension, CLI binary, or checksum/provenance-verified offline web bundle
+([how to verify](CLI.md#verify-your-download)).
 
 ## Your control
 

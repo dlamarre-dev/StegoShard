@@ -197,7 +197,8 @@ Two ways to install, depending on whether you already have Node:
   compressed archives: `stegoshard-<platform>.tar.gz` for Linux and macOS,
   `stegoshard-windows-x64.zip` for Windows. Unpack, then run the binary inside.
   `SHA256SUMS.txt` and the build-provenance attestation both cover the **archive**, since
-  that is what you download. Note that the executable itself is never compressed in place:
+  that is what you download; [Verify your download](#verify-your-download) is how to use
+  them. Note that the executable itself is never compressed in place:
   UPX is not usable on `deno compile` output: it breaks the macOS
   Gatekeeper signature, refuses the Linux binary outright, and, worst of all, packs the Windows
   binary successfully but leaves it aborting inside V8 on startup, because V8 re-protects
@@ -216,6 +217,163 @@ Two ways to install, depending on whether you already have Node:
   pipe is arguably the best place to run it. See [API.md](API.md) and the
   [threat model](THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp), which is
   worth reading first: a restore writes plaintext the agent can then read.
+
+## Numbering exports, to catch a rollback (`--track`)
+
+Off by default. It exists because nothing inside a vault can tell you it is the
+_current_ vault: an AEAD tag authenticates a message, never the absence of a newer
+one, so an older but perfectly valid export put back in place of a newer one
+decrypts exactly as it should.
+
+```bash
+stegoshard save notes.txt --out ./vault --binary --track notes
+# → vault 3f8a1c02 · export #1
+
+stegoshard save notes.txt --out ./vault2 --binary --track notes --force
+# → vault 3f8a1c02 · export #2
+
+stegoshard restore ./vault/stegoshard-vault.ssbn --out ./restored
+# → vault 3f8a1c02 · export #1
+#   this vault is export #1, but #2 was recorded on this machine:
+#   you may be restoring an older copy
+```
+
+The label (`notes`) is what ties successive saves to one logical vault; without it
+the tool has no way to know that two exports of the same file are related, and
+every export would be numbered 1 forever. `--track-file <path>` chooses where the
+record lives (default: your platform's state directory — never `~/.stegoshard`,
+which is a dotfile in the most-inspected directory on the machine).
+
+A rollback is a **warning, never a failure**, and the restore still writes the file:
+the older copy may be the only one that survived, and refusing it would turn a
+detection into a denial of service.
+
+**`--track` is refused on every deniable destination** — `gallery-save`,
+`--binary --disguise`, `--mode duress`, `--mode nonpossession`. That is an error,
+not a silent no-op, because the registry is a durable record that a vault exists,
+which is the one thing those paths are for not having. Read
+[the threat model](THREAT-MODEL.md#rollback-tracking---track) before turning it on:
+the file proves how many vaults you have and when you touched them.
+
+**The half worth relying on needs no file.** The `vault … · export #N` line prints
+whenever an export carries an identity, tracked or not. If you know you last wrote
+#5, a restore that says #4 has told you everything the registry would have and left
+nothing on disk.
+
+## Verify your download
+
+Every tagged release publishes three archives, a `SHA256SUMS.txt`, an SBOM, and a
+[build-provenance attestation](https://docs.github.com/actions/security-guides/using-artifact-attestations)
+minted by the `Release CLI binaries` workflow. Two checks use them, and they answer
+different questions. Do both, and do them **before the first run**: a check you perform
+after executing the file is a check you have already lost.
+
+**1. The bytes are the bytes that were published.**
+
+```bash
+# Linux
+sha256sum -c --ignore-missing SHA256SUMS.txt
+# macOS
+shasum -a 256 -c --ignore-missing SHA256SUMS.txt
+```
+
+`--ignore-missing` is not optional. `SHA256SUMS.txt` lists all three platforms plus the
+licence files, and you downloaded one of them; without it the command reports the five
+files you never asked for as failures and exits non-zero.
+
+Windows has no `sha256sum`. Compare the one line you care about:
+
+```powershell
+(Get-FileHash -Algorithm SHA256 .\stegoshard-windows-x64.zip).Hash.ToLower()
+Select-String stegoshard-windows-x64.zip .\SHA256SUMS.txt
+```
+
+**This check is weaker than it looks, and knowing why is the point.**
+`SHA256SUMS.txt` is served from the same release page as the archive and is not
+itself signed or attested. Anyone who could replace the archive could replace the
+list beside it. What it genuinely catches is a truncated or corrupted download, a
+stale mirror, and a CDN that touched one file and not the other. It is a transfer
+check, not a provenance check.
+
+**2. The archive came out of this repository's release workflow.** This is the one
+that is not circular, because the signature chains to a Sigstore transparency log
+rather than to a file sitting next to the download. It needs the
+[GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify stegoshard-linux-x64.tar.gz \
+  --repo dlamarre-dev/StegoShard \
+  --signer-workflow dlamarre-dev/StegoShard/.github/workflows/release-cli.yml
+```
+
+Substitute `stegoshard-macos-arm64.tar.gz` or `stegoshard-windows-x64.zip`; the same
+command works in PowerShell. Attesting the archive rather than the executable inside
+it is deliberate: the archive is what you downloaded, so it is what you can check
+without first unpacking something you have not yet verified. The SBOM
+(`stegoshard-npm.cdx.json`) is attested on the same terms. `SHA256SUMS.txt`,
+`LICENSE` and `THIRD_PARTY_NOTICES.txt` are **not** — which, for the checksum file
+itself, means it vouches for the archives and nothing vouches for it.
+
+`--signer-workflow` is worth typing. Without it, `gh` accepts an attestation from
+_any_ workflow in the repository. For the offline web bundle the corresponding
+workflow is `.github/workflows/pages.yml` and the checksum file is
+`SHA256SUMS-web.txt`.
+
+**What a passing attestation proves, exactly.** That these bytes were produced by a
+run of that workflow, at a named commit, in this repository, and have not changed
+since. It proves nothing whatsoever about whether that commit or that workflow is
+benign. A maintainer who ships a weakened key derivation, and an attacker who has
+taken the repository, both produce artifacts that verify perfectly. Provenance moves
+the question from "did someone swap this file in transit", which it answers, to "do I
+trust this repository and the people with write access to it", which it does not and
+cannot. This tool holds your secrets; that second question is yours, and the sources
+for it are the [claims register](CLAIMS.md), the [cryptographic review
+dossier](CRYPTO-REVIEW.md), the commit history and the CI logs — not a signature.
+The [threat model](THREAT-MODEL.md#the-build-and-the-download) sets out what a
+compromised build could still do to you.
+
+### The operating system will also object, and it is not wrong to
+
+The binaries carry **no code-signing identity**: no Apple Developer ID, no
+notarization, no Authenticode certificate.
+
+On macOS, `deno compile` ad-hoc signs the `aarch64` output because the platform
+refuses to execute an unsigned arm64 binary at all, but ad-hoc is not notarization.
+Depending on how you unpack the archive — Archive Utility propagates the quarantine
+flag, `tar` in a terminal does not — the first run may be refused with "Apple could
+not verify…". After, and only after, both checks above pass:
+
+```bash
+xattr -d com.apple.quarantine ./stegoshard-macos-arm64
+```
+
+On Windows, SmartScreen shows "Windows protected your PC" for an unsigned executable
+with no download reputation, and there is no download volume at which that stops
+being true for a project this size. `More info` → `Run anyway`, or `Unblock-File
+.\stegoshard-windows-x64.exe`.
+
+Telling you to click past a security prompt is exactly the instruction malware
+distributors give, which is why the order matters and why the checks come first.
+Signing certificates are a 1.0 question: they cost money and, more to the point, an
+Authenticode key or an Apple Developer identity in CI is a new secret to hold and a
+new thing to lose. Today the honest position is that the attestation is stronger
+evidence than a code-signing certificate would be, and that neither dialog is lying
+to you.
+
+### Builds are not reproducible, and that is a real gap
+
+Rebuilding a tag on your own machine will not give you a byte-identical archive, and
+nothing here claims otherwise. `deno compile` embeds a V8 snapshot and does not
+honour `SOURCE_DATE_EPOCH`; the `.tar.gz` records an mtime in its gzip header and the
+`.zip` its own timestamps. There is no rebuild-and-compare job, because there is
+nothing yet for it to compare.
+
+So the attestation is currently the _only_ link between the published binary and the
+source, and that link runs through GitHub's runners: it says the workflow produced
+the file, not that the file corresponds to the source you can read. A reproducible
+build is what would let anyone close that gap without trusting the runner. It is on
+the list; it is not done. Until it is, the strongest thing you can do beyond the two
+checks above is build from a clone.
 
 Paper mode renders Latin instruction text with pdf-lib's built-in Helvetica;
 CJK (`ja`/`ko`/`zh`) uses a `--font <.ttf/.otf>` or a system font, falling back to

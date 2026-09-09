@@ -27,6 +27,14 @@ export const fr: CliCatalog = {
   errGalleryThreshold: 'gallery-save : --mode nonpossession exige --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore : photos/dossier manquants',
   errCodecInvalid: '--codec « {value} » invalide',
+  warnVaultRollback:
+    'ce coffre est l’export n° {got}, alors que le n° {recorded} a été enregistré sur cette machine : vous restaurez peut-être une copie plus ancienne',
+  warnVaultUnknown:
+    'le coffre {vaultId} n’a jamais été vu sur cette machine ; il n’y a rien à quoi le comparer',
+  warnRegistryUnreadable:
+    'le fichier des coffres connus n’a pas pu être lu ; aucun contrôle de retour arrière n’a été fait',
+  errTrackNotDeniable:
+    '--track ne peut pas être utilisé avec {flags} : un coffre déniable ne doit laisser aucune trace de son existence',
   errCodecColorPaper:
     '--codec color est incompatible avec --paper (les pages imprimées utilisent le QR)',
   errEntropyExclusive:
@@ -171,6 +179,10 @@ export const fr: CliCatalog = {
     'Accepter un mot de passe faible (mais >= 12 caractères) pour un nouveau coffre. Le minimum de 12 caractères, lui, ne peut être levé par aucune option.',
   helpKey: 'Un fichier .key, une image stégo, ou un conteneur de clé binaire',
   helpShare: 'Un fichier de part (répétable) pour un coffre nonpossession',
+  helpTrack:
+    'numéroter les exports de ce coffre pour signaler la restauration d’une copie ancienne (jamais sur une sortie déniable)',
+  helpTrackFile:
+    'emplacement du fichier des coffres connus (par défaut : le répertoire d’état de la plateforme)',
   helpForce: 'Écraser les fichiers de sortie existants (par défaut : refuser)',
   helpQuiet: 'Masquer l’indicateur de progression sur stderr',
   helpJson: 'Émettre un document JSON sur stdout ; la progression en NDJSON sur stderr',

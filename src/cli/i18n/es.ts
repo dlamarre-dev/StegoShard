@@ -26,6 +26,14 @@ export const es: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession requiere --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore: faltan las fotos/carpeta',
   errCodecInvalid: '--codec «{value}» no válido',
+  warnVaultRollback:
+    'esta caja fuerte es la exportación n.º {got}, pero en esta máquina se registró la n.º {recorded}: puede que estés restaurando una copia más antigua',
+  warnVaultUnknown:
+    'la caja fuerte {vaultId} nunca se ha visto en esta máquina, así que no hay nada con qué compararla',
+  warnRegistryUnreadable:
+    'no se pudo leer el archivo de cajas fuertes conocidas, así que no se comprobó el retroceso',
+  errTrackNotDeniable:
+    '--track no se puede usar con {flags}: una caja fuerte negable no debe dejar rastro de que existe',
   errCodecColorPaper: '--codec color no se puede usar con --paper (las páginas impresas usan QR)',
   errEntropyExclusive: '{flags} son mutuamente excluyentes (elige una sola fuente de entropía)',
   errEntropyFlagEmpty: '--entropy estaba vacío (omite la opción si no quieres entropía extra)',
@@ -165,6 +173,10 @@ export const es: CliCatalog = {
     'Aceptar una contraseña débil (pero de >= 12 caracteres) para una caja fuerte nueva. El mínimo de 12 caracteres no se puede omitir con esta ni con ninguna otra opción.',
   helpKey: 'Un archivo .key, una imagen estego o un contenedor de clave binario',
   helpShare: 'Un archivo de fragmento (repetible) para una caja nonpossession',
+  helpTrack:
+    'numerar las exportaciones de esta caja fuerte para avisar si restauras una copia antigua (nunca en salida negable)',
+  helpTrackFile:
+    'dónde vive el registro de cajas fuertes conocidas (por defecto: el directorio de estado del sistema)',
   helpForce: 'Sobrescribir los archivos de salida existentes (por defecto: no)',
   helpQuiet: 'Ocultar el indicador de progreso en stderr',
   helpJson: 'Emitir un documento JSON en stdout; el progreso como NDJSON en stderr',

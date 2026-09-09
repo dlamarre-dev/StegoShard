@@ -43,6 +43,7 @@ import {
 } from './crypto';
 import { toHex } from './bytes';
 import { createHMAC, createSHA256 } from 'hash-wasm';
+import { EMPTY_AAD } from './aad';
 
 // Minimal-cost valid params: many tests below run hundreds of derivations.
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
@@ -92,7 +93,7 @@ describe('entropy audit', () => {
       expect(block.salt.length).toBe(SALT_LEN);
 
       spy.mockClear();
-      await encryptBytes(dek, new Uint8Array(8));
+      await encryptBytes(dek, new Uint8Array(8), EMPTY_AAD);
       expect(spy.mock.calls.some((c) => (c[0] as Uint8Array).length === IV_LEN)).toBe(true);
     } finally {
       spy.mockRestore();
@@ -106,7 +107,7 @@ describe('entropy audit', () => {
       const { dek } = await createKeyBlock('pw', FAST);
       const seen = new Set<string>();
       for (let i = 0; i < 2000; i++) {
-        const { iv } = await encryptBytes(dek, new Uint8Array(1));
+        const { iv } = await encryptBytes(dek, new Uint8Array(1), EMPTY_AAD);
         const hex = toHex(iv);
         expect(seen.has(hex)).toBe(false);
         seen.add(hex);
@@ -327,7 +328,10 @@ describe('exhaustive key block corruption', () => {
   it('rejects an unsupported version', async () => {
     const { block } = await createKeyBlock('pw', FAST);
     const bytes = serializeKeyBlock(block);
-    bytes[4] = 2;
+    // 0xff rather than "the next version up": this assertion is about rejecting
+    // what the reader does not know, and pinning it to the current constant + 1
+    // would silently start testing the supported version on the next bump.
+    bytes[4] = 0xff;
     expect(() => parseKeyBlock(bytes)).toThrow(/version/);
   });
 });
@@ -409,8 +413,9 @@ describe('Argon2id parameter boundaries', () => {
     { iterations: 4 },
     { memoryKiB: 8 },
     { memoryKiB: 256 * 1024 },
+    // Parallelism is pinned: min and max are both 1, so this single row is the
+    // whole accepted range and `{ parallelism: 2 }` below is its max + 1.
     { parallelism: 1 },
-    { parallelism: 4 },
   ];
   const rejected: Partial<Argon2Params>[] = [
     { iterations: 0 },
@@ -421,6 +426,7 @@ describe('Argon2id parameter boundaries', () => {
     { memoryKiB: 256 * 1024 + 1 },
     { memoryKiB: 0xffffffff },
     { parallelism: 0 },
+    { parallelism: 2 },
     { parallelism: 5 },
     { iterations: Number.NaN },
     { memoryKiB: Number.POSITIVE_INFINITY },
@@ -446,6 +452,7 @@ describe('Argon2id parameter boundaries', () => {
       { offset: 9, value: [0xff, 0xff, 0xff, 0xff], name: 'memoryKiB ~4TiB' },
       { offset: 9, value: [0, 0, 0, 7], name: 'memoryKiB 7' },
       { offset: 13, value: [0], name: 'parallelism 0' },
+      { offset: 13, value: [2], name: 'parallelism 2' },
       { offset: 13, value: [5], name: 'parallelism 5' },
     ];
     for (const p of patches) {
@@ -507,35 +514,37 @@ describe('AES-GCM shape and misuse rejection', () => {
     const { dek } = await createKeyBlock('pw', FAST);
     for (const size of [0, 1, 15, 16, 17, 1000]) {
       const pt = randomBytes(size);
-      const { iv, ciphertext } = await encryptBytes(dek, pt);
+      const { iv, ciphertext } = await encryptBytes(dek, pt, EMPTY_AAD);
       expect(iv.length).toBe(IV_LEN);
       expect(ciphertext.length).toBe(size + GCM_TAG_LEN);
-      const back = await decryptBytes(dek, iv, ciphertext);
+      const back = await decryptBytes(dek, iv, ciphertext, EMPTY_AAD);
       expect(toHex(back)).toBe(toHex(pt));
     }
   });
 
   it('rejects a wrong-length IV outright', async () => {
     const { dek } = await createKeyBlock('pw', FAST);
-    const { iv, ciphertext } = await encryptBytes(dek, new Uint8Array(4));
+    const { iv, ciphertext } = await encryptBytes(dek, new Uint8Array(4), EMPTY_AAD);
     for (const badIv of [iv.slice(0, 11), new Uint8Array(0), new Uint8Array(16)]) {
-      await expect(decryptBytes(dek, badIv, ciphertext)).rejects.toBeInstanceOf(RangeError);
+      await expect(decryptBytes(dek, badIv, ciphertext, EMPTY_AAD)).rejects.toBeInstanceOf(
+        RangeError,
+      );
     }
   });
 
   it('rejects ciphertext shorter than the tag, and the empty ciphertext', async () => {
     const { dek } = await createKeyBlock('pw', FAST);
-    const { iv } = await encryptBytes(dek, new Uint8Array(4));
+    const { iv } = await encryptBytes(dek, new Uint8Array(4), EMPTY_AAD);
     for (const bad of [new Uint8Array(0), new Uint8Array(GCM_TAG_LEN - 1)]) {
-      await expect(decryptBytes(dek, iv, bad)).rejects.toBeTruthy();
+      await expect(decryptBytes(dek, iv, bad, EMPTY_AAD)).rejects.toBeTruthy();
     }
   });
 
   it("rejects decryption under another message's IV", async () => {
     const { dek } = await createKeyBlock('pw', FAST);
-    const a = await encryptBytes(dek, new Uint8Array(32));
-    const b = await encryptBytes(dek, new Uint8Array(32));
-    await expect(decryptBytes(dek, b.iv, a.ciphertext)).rejects.toBeTruthy();
+    const a = await encryptBytes(dek, new Uint8Array(32), EMPTY_AAD);
+    const b = await encryptBytes(dek, new Uint8Array(32), EMPTY_AAD);
+    await expect(decryptBytes(dek, b.iv, a.ciphertext, EMPTY_AAD)).rejects.toBeTruthy();
   });
 
   it('rejects a swap of two wrapped DEKs between blocks (no mix-and-match)', async () => {

@@ -39,6 +39,13 @@ export type CliErrorCode =
   | 'ENTROPY_ARG'
   /** `stegoshard ui` has no web bundle to serve. */
   | 'UI_UNAVAILABLE'
+  /**
+   * `--track` was combined with a deniable destination. Refused loudly rather
+   * than ignored: silently doing nothing would leave the user believing they had
+   * rollback protection on the one path where believing anything extra is the
+   * mistake.
+   */
+  | 'TRACKING_NOT_DENIABLE'
   /** Anything not classified above. */
   | 'INTERNAL';
 

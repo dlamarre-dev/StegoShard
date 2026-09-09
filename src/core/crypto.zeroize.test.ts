@@ -38,10 +38,15 @@ import {
   installUserEntropy,
   randomBytes,
   serializeSlot,
+  slotAadFor,
   tryOpenSlot,
   unwrapDEK,
   wrapDEK,
 } from './crypto';
+
+const KIND = 'gallery-multiregion' as const;
+const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
+const SALT = new Uint8Array(16).fill(0x5a);
 
 const PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 
@@ -91,10 +96,11 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
   });
 
   it('wipes the exported DEK copy on the wrap path', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, PARAMS);
     const dek = await generateDEK();
     wipes = [];
-    await wrapDEK(dek, kek);
+    await wrapDEK(dek, kek, salt, PARAMS);
     expect(wiped(DEK_LEN), 'wrapDEK did not wipe the exported key copy').toBe(1);
   });
 
@@ -109,7 +115,8 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
     //
     // So the buffer `exportKey` hands back is captured and inspected directly.
     // Without the slice, `view.fill(0)` would scribble on exactly this buffer.
-    const kek = await deriveKEK('pw', randomBytes(16), PARAMS);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, PARAMS);
     const dek = await generateDEK();
 
     let exported: ArrayBuffer | null = null;
@@ -122,7 +129,7 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
         return out;
       });
     try {
-      await wrapDEK(dek, kek);
+      await wrapDEK(dek, kek, salt, PARAMS);
     } finally {
       exportSpy.mockRestore();
     }
@@ -146,9 +153,9 @@ describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
     const salt = randomBytes(16);
     const kek = await deriveKEK('pw', salt, PARAMS);
     const dek = await generateDEK();
-    const { iv, wrapped } = await wrapDEK(dek, kek);
+    const { iv, wrapped } = await wrapDEK(dek, kek, salt, PARAMS);
     wipes = [];
-    await unwrapDEK(wrapped, iv, kek);
+    await unwrapDEK(wrapped, iv, kek, salt, PARAMS);
     expect(wiped(DEK_LEN), 'unwrapDEK did not wipe the plaintext DEK').toBe(1);
   });
 
@@ -258,17 +265,17 @@ describe('slot plaintexts are wiped on both sides (SPEC §10.3)', () => {
     const kek = await kekFor();
     wipes = [];
 
-    await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0);
+    await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT));
 
     expect(wiped(SLOT_PLAINTEXT_LEN), 'serializeSlot left the raw DEK in its plaintext').toBe(1);
   });
 
   it('wipes the plaintext it opened, keeping only the DEK copy', async () => {
     const kek = await kekFor();
-    const slot = await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0);
+    const slot = await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT));
     wipes = [];
 
-    const opened = await tryOpenSlot(kek, slot);
+    const opened = await tryOpenSlot(kek, slot, SLOT_AAD(SALT));
 
     expect(opened).not.toBeNull();
     expect(wiped(SLOT_PLAINTEXT_LEN), 'tryOpenSlot left the opened plaintext behind').toBe(1);
@@ -286,13 +293,10 @@ describe('slot plaintexts are wiped on both sides (SPEC §10.3)', () => {
     const pt = new Uint8Array(SLOT_PLAINTEXT_LEN);
     pt.set(randomBytes(DEK_LEN), 0);
     pt[DEK_LEN] = 99; // far outside the two regions
-    const forged = new Uint8Array([
-      ...nonce,
-      ...(await aeadSeal(kek, nonce, pt, new Uint8Array(0))),
-    ]);
+    const forged = new Uint8Array([...nonce, ...(await aeadSeal(kek, nonce, pt, SLOT_AAD(SALT)))]);
     wipes = [];
 
-    expect(await tryOpenSlot(kek, forged)).toBeNull();
+    expect(await tryOpenSlot(kek, forged, SLOT_AAD(SALT))).toBeNull();
 
     expect(wiped(SLOT_PLAINTEXT_LEN), 'the refused slot plaintext was left in memory').toBe(1);
   });

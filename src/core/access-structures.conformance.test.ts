@@ -24,12 +24,16 @@ import {
   VAULT_SALT_LEN,
   WrongPasswordError,
   buildSlotArray,
+  slotAadFor,
   createKeyBlock,
   deriveKEK,
   openSlotArray,
   randomBytes,
   serializeKeyBlock,
 } from './crypto';
+
+const KIND = 'gallery-multiregion' as const;
+const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
 import { GALLERY_LADDER } from './buckets';
 import {
   type VaultKey,
@@ -42,6 +46,9 @@ import {
 } from './vault';
 import { buildDuressVaultBlob, buildNonPossessionVaultBlob } from './access';
 import { buildPayload } from './payload';
+
+/** KB_LEN sits after the blob's own magic(4) and version(1). */
+const KB_LEN_OFF = 5;
 
 const P: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -58,9 +65,10 @@ describe('§10.10 excluded paths carry no slot array (regression tripwire)', () 
     const key = await vaultKey();
     const content = small();
     const blob = await buildVaultBlob('f.txt', content, key, 'embedded');
-    // A single-region blob begins with KB_LEN = 92 (the embedded SSKY key block),
-    // NOT a 16-byte vault_salt + 304-byte slot array.
-    expect(readU16(blob, 0)).toBe(KEY_BLOCK_LEN);
+    // A single-region blob carries KB_LEN = 92 (the embedded SSKY key block)
+    // right after its own magic and version, NOT a 16-byte vault_salt + 304-byte
+    // slot array.
+    expect(readU16(blob, KB_LEN_OFF)).toBe(KEY_BLOCK_LEN);
     // And it stays the pre-§10 analytic size (doubling would betray a "unified" writer).
     const env = await buildPayload('f.txt', content);
     expect(blob.length).toBe(blobLenFor(env.length, true));
@@ -127,20 +135,26 @@ describe('§10.10 constant-work slot open: fail-closed and position-independent'
     const kek = await deriveKEK('pw', salt, P);
     for (let i = 0; i < 12; i++) {
       const dek = randomBytes(DEK_LEN);
-      const arr = await buildSlotArray([{ kek, dek, regionIndex: i & 1 }]);
-      const got = await openSlotArray(arr, [kek]);
+      const arr = await buildSlotArray([{ kek, dek, regionIndex: i & 1 }], SLOT_AAD(salt));
+      const got = await openSlotArray(arr, [kek], SLOT_AAD(salt));
       expect([...got.dek]).toEqual([...dek]); // found regardless of position (no early exit)
     }
   });
 
   it('fails closed when two slots open under the same KEK (malformed)', async () => {
-    const kek = await deriveKEK('pw', randomBytes(16), P);
+    const salt = randomBytes(16);
+    const kek = await deriveKEK('pw', salt, P);
     // Two live slots under the SAME kek → more than one match → fail closed.
-    const arr = await buildSlotArray([
-      { kek, dek: randomBytes(DEK_LEN), regionIndex: 0 },
-      { kek, dek: randomBytes(DEK_LEN), regionIndex: 1 },
-    ]);
-    await expect(openSlotArray(arr, [kek])).rejects.toBeInstanceOf(WrongPasswordError);
+    const arr = await buildSlotArray(
+      [
+        { kek, dek: randomBytes(DEK_LEN), regionIndex: 0 },
+        { kek, dek: randomBytes(DEK_LEN), regionIndex: 1 },
+      ],
+      SLOT_AAD(salt),
+    );
+    await expect(openSlotArray(arr, [kek], SLOT_AAD(salt))).rejects.toBeInstanceOf(
+      WrongPasswordError,
+    );
   });
 });
 

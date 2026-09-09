@@ -120,6 +120,13 @@ npm run cli -- ui                                 # the web app, served from you
 work: browsers block ES modules over `file://`. See the [command-line
 reference](docs/CLI.md).
 
+Or download a standalone binary from the [releases
+page](https://github.com/dlamarre-dev/StegoShard/releases): no Node, nothing to install,
+and compiled with no network permission at all. Before you run it, [verify the
+download](docs/CLI.md#verify-your-download) — the archives carry a SHA-256 list and a
+build-provenance attestation, and the binaries are unsigned, so macOS and Windows will
+both stop you on first launch.
+
 **4. From your own program.** StegoShard can be driven by software as well as by hand:
 
 - a **JavaScript / TypeScript library** (`stegoshard`, and `stegoshard/node` for files);
@@ -133,7 +140,10 @@ model](docs/THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp): driving a res
 an agent is a decision to show the agent your secret.
 
 > **Not on npm yet.** The package is deliberately unpublished pre-1.0, so `npx stegoshard`
-> and `npm i stegoshard` do not work today. Build from a clone; publication is a 1.0 gate.
+> and `npm i stegoshard` do not work today. Build from a clone. Publication is a 1.0 gate,
+> and so is publishing **with `npm publish --provenance` from the release workflow**: an
+> npm package without provenance would be a weaker artifact than the binaries already are,
+> and shipping one first would be a step backwards.
 
 ## How it works
 
@@ -180,6 +190,15 @@ Writing the limits down is a habit here rather than fine print. The full registe
   cost of the key derivation, in that order.
 - **Not audited yet.** The independent security audit is a 1.0 gate, not something already
   behind us.
+- **A signature is not a warrant of good behaviour.** Releases are checksummed and carry
+  a build-provenance attestation, which proves an archive came from this repository's
+  release workflow at a known commit. It does not prove that commit is benign, and the
+  builds are not yet reproducible, so nobody can rebuild a release and compare. [How to
+  verify, and what it is worth](docs/CLI.md#verify-your-download).
+- **Nothing detects a rollback on its own.** Every part of a vault is now bound to its
+  container, but an older, entirely valid export put back in place of a newer one still
+  decrypts correctly. `--track` catches the silent case using a local record, and that
+  record is itself a trace — off by default, and refused on deniable output.
 - **Not for big files.** Images carry up to 1 MiB with about 4× overhead; the binary path
   reaches 1 GiB in the CLI and 256 MiB in the browser. Multi-gigabyte files are out of
   scope.
