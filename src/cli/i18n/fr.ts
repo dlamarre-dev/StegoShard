@@ -35,6 +35,13 @@ export const fr: CliCatalog = {
     'le fichier des coffres connus n’a pas pu être lu ; aucun contrôle de retour arrière n’a été fait',
   errTrackNotDeniable:
     '--track ne peut pas être utilisé avec {flags} : un coffre déniable ne doit laisser aucune trace de son existence',
+  errTrackWrongCommand: "--track n'a aucun effet sur {command} (seul save numérote un export)",
+  errTrackEmpty:
+    "--track était vide (l'étiquette est ce qui indique de quel coffre cette sauvegarde est une autre version)",
+  errTrackRegistryUnreadable:
+    "le fichier des coffres connus ({path}) n'a pas pu être lu, cet export ne peut donc pas être numéroté : déplacez-le ou utilisez --track-file",
+  warnRegistryUnwritable:
+    "le coffre a été enregistré, mais le fichier des coffres connus n'a pas pu être mis à jour : le prochain export de cette étiquette réutilisera ce numéro",
   errCodecColorPaper:
     '--codec color est incompatible avec --paper (les pages imprimées utilisent le QR)',
   errEntropyExclusive:

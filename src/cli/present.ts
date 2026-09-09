@@ -57,7 +57,14 @@ export type WarningCode =
    */
   | 'VAULT_UNKNOWN'
   /** The registry could not be read. Rollback detection is off for this run. */
-  | 'VAULT_REGISTRY_UNREADABLE';
+  | 'VAULT_REGISTRY_UNREADABLE'
+  /**
+   * The vault was written, but the registry could not be. A warning rather than
+   * a failure because the artifact the user asked for exists: reporting the save
+   * as failed would invite a caller to retry, or to clean up a real vault. The
+   * cost is that the next export of this label reuses the number.
+   */
+  | 'VAULT_REGISTRY_UNWRITABLE';
 
 export interface CliWarning {
   code: WarningCode;

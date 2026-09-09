@@ -45,6 +45,13 @@ export const en = {
   warnRegistryUnreadable: 'the known-vaults file could not be read, so no rollback check was made',
   errTrackNotDeniable:
     '--track cannot be used with {flags}: a deniable vault must leave no record that it exists',
+  errTrackWrongCommand: '--track has no effect on {command} (only save numbers an export)',
+  errTrackEmpty:
+    '--track was empty (a label is how a save says which vault this is another version of)',
+  errTrackRegistryUnreadable:
+    'the known-vaults file at {path} could not be read, so this export cannot be numbered; move it aside or pass --track-file',
+  warnRegistryUnwritable:
+    'the vault was saved, but the known-vaults record could not be updated, so the next export of this label will reuse this number',
   errCodecColorPaper: '--codec color cannot be used with --paper (printed pages use QR)',
   errEntropyExclusive: '{flags} are mutually exclusive (pick one entropy source)',
   errEntropyFlagEmpty: '--entropy was empty (omit the flag if you do not want extra entropy)',

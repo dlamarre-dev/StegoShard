@@ -34,6 +34,13 @@ export const es: CliCatalog = {
     'no se pudo leer el archivo de cajas fuertes conocidas, así que no se comprobó el retroceso',
   errTrackNotDeniable:
     '--track no se puede usar con {flags}: una caja fuerte negable no debe dejar rastro de que existe',
+  errTrackWrongCommand: '--track no tiene efecto en {command} (solo save numera una exportación)',
+  errTrackEmpty:
+    '--track estaba vacío (la etiqueta es lo que indica de qué caja fuerte es otra versión este guardado)',
+  errTrackRegistryUnreadable:
+    'no se pudo leer el archivo de cajas conocidas en {path}, así que esta exportación no se puede numerar: apártelo o use --track-file',
+  warnRegistryUnwritable:
+    'la caja fuerte se guardó, pero no se pudo actualizar el archivo de cajas conocidas, así que la próxima exportación de esta etiqueta reusará este número',
   errCodecColorPaper: '--codec color no se puede usar con --paper (las páginas impresas usan QR)',
   errEntropyExclusive: '{flags} son mutuamente excluyentes (elige una sola fuente de entropía)',
   errEntropyFlagEmpty: '--entropy estaba vacío (omite la opción si no quieres entropía extra)',

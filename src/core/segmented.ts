@@ -265,13 +265,31 @@ async function decryptChunks(
 /**
  * Decode a segmented blob with a password (unlocks the key block, embedded or
  * supplied). Mirrors `decodeVaultBlob` for the single-shot image path.
+ *
+ * `identity` is declared because it is genuinely returned: this is the branded
+ * single-region path, the one place a segmented container may carry one, and
+ * `importVaultBinary` reads it for rollback detection. Leaving it off the
+ * signature while `parsePayload`'s object was passed through un-destructured
+ * made the type a lie in the direction that breaks quietly — narrowing the
+ * return to match the declaration would look like a tidy-up and would silently
+ * turn rollback detection off on the branded path.
+ *
+ * The multi-region decoders next door do the opposite deliberately: they
+ * destructure to (filename, content, bundled) so a real and a decoy unlock
+ * cannot be told apart from the shape of the result. That asymmetry is the
+ * point, so both halves now say so in their types.
  */
 export async function decodeSegmentedBlob(
   blob: Uint8Array,
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+): Promise<{
+  filename: string;
+  content: Uint8Array;
+  bundled: boolean;
+  identity?: VaultIdentity | undefined;
+}> {
   const parsed = parseHeader(blob);
   const kbBytes = parsed.keyBlock.length > 0 ? parsed.keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();

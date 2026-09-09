@@ -36,6 +36,14 @@ export const ko: CliCatalog = {
   warnRegistryUnreadable: '알려진 보관함 파일을 읽을 수 없어 롤백 검사를 하지 못했습니다',
   errTrackNotDeniable:
     '--track 는 {flags} 와 함께 쓸 수 없습니다(부인 가능한 보관함은 존재의 흔적을 남기면 안 됩니다)',
+  errTrackWrongCommand:
+    '--track 는 {command} 에서 아무 효과가 없습니다(내보내기에 번호를 붙이는 것은 save 뿐입니다)',
+  errTrackEmpty:
+    '--track 가 비어 있었습니다(라벨은 이 저장이 어느 보관함의 다른 버전인지 알려 줍니다)',
+  errTrackRegistryUnreadable:
+    '{path} 의 알려진 보관함 파일을 읽을 수 없어 이 내보내기에 번호를 붙일 수 없습니다. 파일을 옮기거나 --track-file 을 쓰세요',
+  warnRegistryUnwritable:
+    '보관함은 저장되었지만 알려진 보관함 기록을 갱신하지 못했습니다. 이 라벨의 다음 내보내기는 같은 번호를 다시 씁니다',
   errCodecColorPaper: '--codec color 는 --paper 와 함께 쓸 수 없습니다(인쇄 페이지는 QR 을 씁니다)',
   errEntropyExclusive: '{flags} 는 함께 쓸 수 없습니다(엔트로피 원본을 하나만 고르세요)',
   errEntropyFlagEmpty:

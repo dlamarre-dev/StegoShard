@@ -34,6 +34,13 @@ export const pt: CliCatalog = {
     'não foi possível ler o ficheiro de cofres conhecidos, por isso não se fez qualquer verificação de retrocesso',
   errTrackNotDeniable:
     '--track não pode ser usado com {flags}: um cofre negável não deve deixar rastro de que existe',
+  errTrackWrongCommand: '--track não tem efeito em {command} (só save numera uma exportação)',
+  errTrackEmpty:
+    '--track estava vazio (o rótulo é o que diz de qual cofre este salvamento é outra versão)',
+  errTrackRegistryUnreadable:
+    'o arquivo de cofres conhecidos em {path} não pôde ser lido, então esta exportação não pode ser numerada: mova-o ou use --track-file',
+  warnRegistryUnwritable:
+    'o cofre foi salvo, mas o arquivo de cofres conhecidos não pôde ser atualizado, então a próxima exportação deste rótulo reusará este número',
   errCodecColorPaper: '--codec color não pode ser usado com --paper (as páginas impressas usam QR)',
   errEntropyExclusive: '{flags} são mutuamente exclusivos (escolha uma só fonte de entropia)',
   errEntropyFlagEmpty: '--entropy estava vazio (omita a opção se não quiser entropia adicional)',

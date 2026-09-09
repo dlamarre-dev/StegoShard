@@ -86,6 +86,22 @@ describe('identity rejection', () => {
     ).rejects.toThrow(/vault id/);
   });
 
+  /**
+   * The parse side has to agree with the build side, or the registry's
+   * arithmetic runs on a range the builder never promised. Only a container
+   * this code wrote wrong can carry a 0 — the identity block sits inside the
+   * AEAD, so it is not an attacker's edit.
+   */
+  it('rejects a sequence of zero on the way back in', async () => {
+    const env = await buildPayload('a.txt', enc('x'), { identity: identity(1) });
+    // The sequence is the u32 at the end of the 20-byte identity block, which
+    // begins right after the 3-byte header and the filename.
+    const seqAt = 3 + 'a.txt'.length + 16;
+    const zeroed = Uint8Array.from(env);
+    zeroed.fill(0, seqAt, seqAt + 4);
+    await expect(parsePayload(zeroed, MAX)).rejects.toThrow(/sequence out of range \(0\)/);
+  });
+
   it('refuses a sequence outside the u32 range or below one', async () => {
     for (const sequence of [0, -1, 1.5, 0x1_0000_0000, Number.NaN]) {
       await expect(

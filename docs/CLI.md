@@ -255,6 +255,32 @@ which is the one thing those paths are for not having. Read
 [the threat model](THREAT-MODEL.md#rollback-tracking---track) before turning it on:
 the file proves how many vaults you have and when you touched them.
 
+It is refused the same way in three other cases, all for the same reason — a
+`--track` that quietly did nothing would leave you believing the numbering had
+happened:
+
+- **on any command but `save`**, which is the only one that writes an identity into
+  an envelope (`--track-file` remains valid everywhere, since it only says where
+  the record a restore _reads_ lives);
+- **with an empty label** (`--track ""`), which is not "no label" but a label the
+  registry can never match, so every export would be #1 forever;
+- **when the record exists but cannot be parsed.** The empty registry a failed read
+  produces is not evidence that you have never tracked anything, so building on it
+  would mint a new vault id at #1 and write a one-entry file over your real records.
+  Move the file aside, or point `--track-file` elsewhere. (On a _restore_ an
+  unreadable record is only a warning: losing the check is bad, losing the secret is
+  worse.)
+
+If a save succeeds but the record cannot be _written_, that is a warning and the
+exit code stays 0 — the vault is already on disk, and reporting the save as failed
+would invite a caller to retry or clean up a real file. The cost is that the next
+export of that label reuses the number.
+
+**A restore never creates the record.** The rollback check runs on every restore of
+a vault that carries an identity, but it only _writes_ to a record you already have;
+a restore on a machine that has never tracked anything leaves nothing behind, the
+same as every other command.
+
 **The half worth relying on needs no file.** The `vault … · export #N` line prints
 whenever an export carries an identity, tracked or not. If you know you last wrote
 #5, a restore that says #4 has told you everything the registry would have and left

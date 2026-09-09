@@ -37,6 +37,13 @@ export const ja: CliCatalog = {
     '既知の保管庫ファイルを読めなかったため、ロールバックの確認は行われませんでした',
   errTrackNotDeniable:
     '--track は {flags} と併用できません（否認可能な保管庫は存在の痕跡を残してはなりません）',
+  errTrackWrongCommand:
+    '--track は {command} では効果がありません（エクスポートに番号を付けるのは save だけです）',
+  errTrackEmpty: '--track が空でした（ラベルはこの保存がどの保管庫の別バージョンかを示すものです）',
+  errTrackRegistryUnreadable:
+    '{path} の既知の保管庫ファイルを読めなかったため、このエクスポートに番号を付けられません。ファイルを移動するか --track-file を使ってください',
+  warnRegistryUnwritable:
+    '保管庫は保存されましたが、既知の保管庫の記録を更新できませんでした。このラベルの次のエクスポートは同じ番号を使い直します',
   errCodecColorPaper: '--codec color は --paper と併用できません（印刷ページは QR を使います）',
   errEntropyExclusive: '{flags} は同時に指定できません（エントロピー源は 1 つだけ）',
   errEntropyFlagEmpty:

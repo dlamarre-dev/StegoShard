@@ -25,6 +25,13 @@ import { join } from 'node:path';
  * the bytes were handed over and never durably landed.
  */
 const failFsync: { error: Error | null } = { error: null };
+/**
+ * `writeSync` is allowed to accept fewer bytes than it was given. It almost
+ * never does on a local file, which is exactly why a caller that ignores the
+ * return value looks correct for years and then silently truncates a vault, so
+ * the short write is forced here rather than waited for.
+ */
+const shortWrite: { limit: number | null } = { limit: null };
 vi.mock('node:fs', async (importOriginal) => {
   const real = await importOriginal<typeof import('node:fs')>();
   return {
@@ -33,10 +40,16 @@ vi.mock('node:fs', async (importOriginal) => {
       if (failFsync.error) throw failFsync.error;
       return real.fsyncSync(fd);
     },
+    writeSync: (fd: number, data: Uint8Array, offset?: number, length?: number) => {
+      const off = offset ?? 0;
+      const len = length ?? data.length - off;
+      const capped = shortWrite.limit === null ? len : Math.min(len, shortWrite.limit);
+      return real.writeSync(fd, data, off, capped);
+    },
   };
 });
 
-const { runSave } = await import('./commands');
+const { runSave, runRestore } = await import('./commands');
 
 const dirs: string[] = [];
 function scratch(): string {
@@ -47,10 +60,12 @@ function scratch(): string {
 
 beforeEach(() => {
   failFsync.error = null;
+  shortWrite.limit = null;
 });
 
 afterEach(() => {
   failFsync.error = null;
+  shortWrite.limit = null;
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
@@ -139,5 +154,42 @@ describe('the overwrite guard still holds', () => {
     const after = readFileSync(second.files[0]!);
     // A fresh export uses a fresh IV, so the bytes must differ.
     expect(Buffer.compare(Buffer.from(after), Buffer.from(before))).not.toBe(0);
+  });
+});
+
+describe('a short write is finished rather than trusted', () => {
+  it('writes every byte when the kernel accepts them a chunk at a time', async () => {
+    const out = scratch();
+    // Whole bytes first, as the reference to compare against.
+    const reference = readFileSync((await saveInto(out)).files[0]!);
+    const chunk = 64;
+    expect(reference.length).toBeGreaterThan(chunk);
+
+    const chunked = scratch();
+    shortWrite.limit = chunk;
+    const res = await saveInto(chunked);
+    const written = readFileSync(res.files[0]!);
+
+    // A single unchecked `writeSync` would stop at `chunk` bytes here, and the
+    // fsync and rename below it would install that stump as the finished vault:
+    // a vault missing its tail is a secret you no longer have.
+    expect(written.length, 'the vault was truncated at the first short write').toBe(
+      reference.length,
+    );
+    // Not a byte comparison: each save draws a fresh salt and nonce, so two
+    // vaults of the same secret differ everywhere but in length. The length is
+    // the claim — and the round trip below is what proves it is a whole vault
+    // rather than merely a file of the right size.
+    const restored = scratch();
+    await runRestore({ inputs: [res.files[0]!], outDir: restored, password: PASSWORD });
+    expect(readFileSync(join(restored, 'secret.txt'), 'utf-8')).toBe('the actual secret');
+    expect(readdirSync(chunked).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('fails loudly rather than looping forever when the write stalls', async () => {
+    const out = scratch();
+    shortWrite.limit = 0;
+    await expect(saveInto(out)).rejects.toThrow(/write stalled at 0 of \d+ bytes/);
+    expect(readdirSync(out)).toEqual([]);
   });
 });

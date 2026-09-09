@@ -34,6 +34,13 @@ export const it: CliCatalog = {
     'non è stato possibile leggere il file dei caveau noti, quindi non è stato fatto alcun controllo di rollback',
   errTrackNotDeniable:
     '--track non si può usare con {flags}: un caveau negabile non deve lasciare traccia della propria esistenza',
+  errTrackWrongCommand: '--track non ha effetto su {command} (solo save numera un export)',
+  errTrackEmpty:
+    "--track era vuoto (l'etichetta è ciò che dice di quale caveau questo salvataggio è un'altra versione)",
+  errTrackRegistryUnreadable:
+    'il file dei caveau noti in {path} non è stato leggibile, quindi questo export non può essere numerato: spostalo o usa --track-file',
+  warnRegistryUnwritable:
+    'il caveau è stato salvato, ma il file dei caveau noti non è stato aggiornato, quindi il prossimo export di questa etichetta riuserà questo numero',
   errCodecColorPaper: '--codec color non si può usare con --paper (le pagine stampate usano il QR)',
   errEntropyExclusive: '{flags} si escludono a vicenda (scegli una sola fonte di entropia)',
   errEntropyFlagEmpty: '--entropy era vuoto (ometti l’opzione se non vuoi entropia aggiuntiva)',

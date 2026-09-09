@@ -206,6 +206,53 @@ describe('the file', () => {
     }
   });
 
+  /**
+   * Shape alone is not enough: the fields are arithmetic inputs. A `sequence` of
+   * `"5"` used to survive the read, make `recordExport` compute `"5" + 1`, and
+   * reach `buildPayload` as `"51"` — which then failed every later save of that
+   * vault with `sequence out of range`. A damaged file should cost the rollback
+   * check, not the ability to save.
+   */
+  it('reports a damaged entry as corrupt rather than passing it on', () => {
+    const path = join(scratch(), 'known-vaults.json');
+    const key = vaultIdHex(ID_A);
+    const good = {
+      sequence: 5,
+      firstSeen: '2026-01-01T00:00:00Z',
+      lastSeen: '2026-01-02T00:00:00Z',
+    };
+    const bad: unknown[] = [
+      { ...good, sequence: '5' }, // the string that broke the arithmetic
+      { ...good, sequence: 1.5 },
+      { ...good, sequence: 0 }, // buildPayload never emits one
+      { ...good, sequence: -1 },
+      { ...good, sequence: 0x1_0000_0000 },
+      { ...good, firstSeen: 0 },
+      { ...good, lastSeen: null },
+      { ...good, label: 3 },
+      null,
+      'nope',
+    ];
+    for (const entry of bad) {
+      writeFileSync(path, JSON.stringify({ schema: REGISTRY_SCHEMA, vaults: { [key]: entry } }));
+      const r = readRegistry(path);
+      expect(r.corrupt, `${JSON.stringify(entry)} was accepted`).toBe(true);
+      expect(Object.keys(r.registry.vaults)).toEqual([]);
+    }
+
+    // A key that is not a vault id is damage too: `parseVaultId` would throw on
+    // it the moment a label matched.
+    writeFileSync(path, JSON.stringify({ schema: REGISTRY_SCHEMA, vaults: { 'not-hex': good } }));
+    expect(readRegistry(path).corrupt).toBe(true);
+
+    // And the good entry still reads back, so the check is not simply refusing
+    // everything.
+    writeFileSync(path, JSON.stringify({ schema: REGISTRY_SCHEMA, vaults: { [key]: good } }));
+    const ok = readRegistry(path);
+    expect(ok.corrupt).toBe(false);
+    expect(ok.registry.vaults[key]!.sequence).toBe(5);
+  });
+
   it('refuses to write through a symlink', async () => {
     if (process.platform === 'win32') return;
     const dir = scratch();

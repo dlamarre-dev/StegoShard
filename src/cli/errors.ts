@@ -46,6 +46,13 @@ export type CliErrorCode =
    * mistake.
    */
   | 'TRACKING_NOT_DENIABLE'
+  /**
+   * `--track` was asked for but cannot be honoured: an empty label, a command
+   * that does not record anything, or a known-vaults file that could not be
+   * read. Same reasoning as above — the one thing not to do is proceed quietly
+   * and let the user believe the numbering happened.
+   */
+  | 'TRACKING_UNAVAILABLE'
   /** Anything not classified above. */
   | 'INTERNAL';
 

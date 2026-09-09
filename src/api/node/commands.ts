@@ -115,7 +115,15 @@ type WriteTarget = { outDir: string; force?: boolean | undefined };
  * file that reached the disk.
  *
  * `rename` is atomic only within a filesystem, hence the temporary alongside the
- * target rather than in the system temp directory.
+ * target rather than in the system temp directory. The rename itself is durable
+ * only once the *directory* entry is flushed, so the containing directory is
+ * fsynced after it; without that a crash can leave the target missing entirely
+ * even though the data was flushed.
+ *
+ * The temporary is created `0600`, so the artifact ends up `0600` rather than
+ * the `0644` a plain `writeFileSync` would have produced. That is deliberate:
+ * these files are vaults and restored plaintext, and neither wants group or
+ * world read.
  *
  * The overwrite guard is still a check-then-act and still racy in principle. It
  * is kept because the alternative — an exclusive create of the target itself —
@@ -136,7 +144,16 @@ function writeOut(target: WriteTarget, name: string, bytes: Uint8Array): string 
   let fd: number | undefined;
   try {
     fd = openSync(tmp, 'wx', 0o600);
-    writeSync(fd, bytes);
+    // `writeSync` is allowed to write fewer bytes than it was given, so the
+    // return value has to drive a loop. Issuing it once and trusting it is the
+    // partial write this whole function exists to prevent, moved one layer down:
+    // a short write here produces a truncated temporary that the fsync and
+    // rename below then install as the finished vault.
+    for (let off = 0; off < bytes.length;) {
+      const n = writeSync(fd, bytes, off, bytes.length - off);
+      if (n <= 0) throw new Error(`write stalled at ${off} of ${bytes.length} bytes`);
+      off += n;
+    }
     // Flush before the rename: without it the rename can land while the data is
     // still only in the page cache, which is the same lost write one directory
     // entry further on.
@@ -148,6 +165,20 @@ function writeOut(target: WriteTarget, name: string, bytes: Uint8Array): string 
     // place; it exists only under --force, where the user asked for a replace.
     if (process.platform === 'win32' && existsSync(path)) unlinkSync(path);
     renameSync(tmp, path);
+    // Make the new directory entry durable too. Best-effort: some platforms
+    // (Windows) refuse to open a directory for fsync, and a file that is on disk
+    // but whose rename is not yet flushed is still better than failing a save
+    // that worked.
+    try {
+      const dirFd = openSync(target.outDir, 'r');
+      try {
+        fsyncSync(dirFd);
+      } finally {
+        closeSync(dirFd);
+      }
+    } catch {
+      // Directory fsync is unsupported here; the data itself is already flushed.
+    }
   } catch (e) {
     if (fd !== undefined) {
       try {

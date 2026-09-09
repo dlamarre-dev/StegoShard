@@ -90,6 +90,7 @@ const SAVE_ROWS: Row[] = [
   ['--key-location <t>', 'helpKeyLocation'],
   ['--font <path>', 'helpFont'],
   ['--allow-weak-password', 'helpAllowWeakPassword'],
+  ['--track <label>', 'helpTrack'],
 ];
 
 const RESTORE_ROWS: Row[] = [
@@ -99,7 +100,10 @@ const RESTORE_ROWS: Row[] = [
 ];
 
 const COMMON_ROWS: Row[] = [
-  ['--track <label>', 'helpTrack'],
+  // `--track` is NOT here: only `save` numbers an export, and listing it under
+  // "Common" advertised it on restore and gallery-restore, which refuse it.
+  // `--track-file` is genuinely common — it only says where the record a restore
+  // reads lives.
   ['--track-file <path>', 'helpTrackFile'],
   ['--force', 'helpForce'],
   ['--quiet', 'helpQuiet'],

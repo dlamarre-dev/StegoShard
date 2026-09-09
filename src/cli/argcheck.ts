@@ -68,25 +68,32 @@ export function entropyArgError(src: EntropySources): string | null {
 }
 
 /**
- * Reject `--track` on a destination whose whole point is that no record exists.
+ * Reject a `--track` that cannot be honoured, and say which way it fails.
  *
- * The registry is a durable list of vault identifiers and access times in the
- * user's home directory. On the deniable paths that is the most damaging thing
- * the tool could write: it does not say where a vault is or what is in it, but
- * it proves how many exist and when they were touched. Doing nothing quietly
- * would be worse than refusing, because the user would carry on believing the
- * protection was there.
+ * Three ways, all reported rather than absorbed:
  *
- * Tracking is also structurally impossible on these paths — the gallery and
- * multi-region builders accept no identity parameter — so this check exists to
- * say why, not to enforce it.
+ *   - A DENIABLE DESTINATION. The registry is a durable list of vault
+ *     identifiers and access times in the user's home directory. On the deniable
+ *     paths that is the most damaging thing the tool could write: it does not say
+ *     where a vault is or what is in it, but it proves how many exist and when
+ *     they were touched. Tracking is also structurally impossible there — the
+ *     gallery and multi-region builders accept no identity parameter — so this
+ *     check exists to say why, not to enforce it.
+ *   - A COMMAND THAT NUMBERS NOTHING. Only `save` writes an identity into an
+ *     envelope. `restore --track notes` used to be accepted and do nothing.
+ *   - AN EMPTY LABEL. `--track ""` is not "no label"; it is a label the registry
+ *     cannot match, so the export would be numbered #1 forever.
+ *
+ * In every case doing nothing quietly would be worse than refusing, because the
+ * user would carry on believing the protection was there.
  */
 export function trackingArgError(opts: {
   track: boolean;
+  label?: string | undefined;
   command?: string | undefined;
   binary?: string | undefined;
   mode?: string | undefined;
-}): string | null {
+}): { message: string; code: 'TRACKING_NOT_DENIABLE' | 'TRACKING_UNAVAILABLE' } | null {
   if (!opts.track) return null;
   const deniable = [
     opts.command === 'gallery-save' && 'gallery-save',
@@ -94,6 +101,22 @@ export function trackingArgError(opts: {
     opts.mode === 'duress' && '--duress',
     opts.mode === 'nonpossession' && '--non-possession',
   ].filter((s): s is string => typeof s === 'string');
-  if (deniable.length === 0) return null;
-  return t('errTrackNotDeniable', { flags: deniable.join(', ') });
+  // Deniability first: a user who asked for both has made a mistake about what
+  // the tool is for, and the narrower complaints would answer the wrong question.
+  if (deniable.length > 0) {
+    return {
+      message: t('errTrackNotDeniable', { flags: deniable.join(', ') }),
+      code: 'TRACKING_NOT_DENIABLE',
+    };
+  }
+  if (opts.command !== undefined && opts.command !== 'save') {
+    return {
+      message: t('errTrackWrongCommand', { command: opts.command }),
+      code: 'TRACKING_UNAVAILABLE',
+    };
+  }
+  if (opts.label === '') {
+    return { message: t('errTrackEmpty'), code: 'TRACKING_UNAVAILABLE' };
+  }
+  return null;
 }

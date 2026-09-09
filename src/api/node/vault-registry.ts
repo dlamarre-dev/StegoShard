@@ -107,10 +107,35 @@ export function vaultIdHex(vaultId: Uint8Array): string {
 }
 
 /**
+ * Is this a usable entry? Checked per entry rather than trusting the file's
+ * outer shape, because the fields are arithmetic inputs. A `sequence` of `"5"`
+ * survives a shape-only check and then makes `recordExport` compute `"5" + 1`,
+ * which reaches `buildPayload` as `"51"` and hard-fails every subsequent save of
+ * that vault. A hand-edit or a sync artifact should cost the rollback check, not
+ * the ability to save.
+ */
+function isEntry(value: unknown): value is RegistryEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const e = value as Partial<RegistryEntry>;
+  return (
+    Number.isInteger(e.sequence) &&
+    (e.sequence as number) >= 1 &&
+    (e.sequence as number) <= 0xffffffff &&
+    typeof e.firstSeen === 'string' &&
+    typeof e.lastSeen === 'string' &&
+    (e.label === undefined || typeof e.label === 'string')
+  );
+}
+
+/**
  * Read the registry. A missing file is an empty registry; a corrupt one is
  * reported rather than thrown, because a damaged registry must never stop a
  * restore — losing the ability to detect a rollback is bad, losing the secret
  * is worse.
+ *
+ * `corrupt` is the caller's cue that the returned (empty) registry is not
+ * evidence of anything. A caller that writes must not treat it as a starting
+ * point, or the write destroys records it merely failed to read.
  */
 export function readRegistry(path: string): { registry: Registry; corrupt: boolean } {
   if (!existsSync(path)) return { registry: { ...EMPTY, vaults: {} }, corrupt: false };
@@ -120,11 +145,17 @@ export function readRegistry(path: string): { registry: Registry; corrupt: boole
       typeof parsed !== 'object' ||
       parsed === null ||
       typeof (parsed as Registry).vaults !== 'object' ||
-      (parsed as Registry).vaults === null
+      (parsed as Registry).vaults === null ||
+      Array.isArray((parsed as Registry).vaults)
     ) {
       return { registry: { ...EMPTY, vaults: {} }, corrupt: true };
     }
     const registry = parsed as Registry;
+    for (const [key, entry] of Object.entries(registry.vaults)) {
+      if (!/^[0-9a-f]{32}$/.test(key) || !isEntry(entry)) {
+        return { registry: { ...EMPTY, vaults: {} }, corrupt: true };
+      }
+    }
     return {
       registry: { schema: registry.schema ?? REGISTRY_SCHEMA, vaults: registry.vaults },
       corrupt: false,
@@ -152,7 +183,9 @@ export function writeRegistry(path: string, registry: Registry): void {
   if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
     throw new Error(`registry: refusing to write through a symlink at ${path}`);
   }
-  const tmp = `${path}.${process.pid.toString(36)}.tmp`;
+  // pid *and* timestamp, so a second write in the same process cannot collide
+  // with a temporary a previous one left behind and fail on the 'wx'.
+  const tmp = `${path}.${process.pid.toString(36)}${Date.now().toString(36)}.tmp`;
   try {
     writeFileSync(tmp, `${JSON.stringify(registry, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
     if (platform() === 'win32' && existsSync(path)) unlinkSync(path);

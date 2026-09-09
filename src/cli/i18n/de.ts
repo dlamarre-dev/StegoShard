@@ -34,6 +34,14 @@ export const de: CliCatalog = {
     'Die Datei der bekannten Tresore konnte nicht gelesen werden; es wurde keine Rollback-Prüfung durchgeführt',
   errTrackNotDeniable:
     '--track kann nicht mit {flags} verwendet werden: Ein abstreitbarer Tresor darf keine Spur seiner Existenz hinterlassen',
+  errTrackWrongCommand:
+    '--track hat bei {command} keine Wirkung (nur save nummeriert einen Export)',
+  errTrackEmpty:
+    '--track war leer (die Bezeichnung sagt, von welchem Tresor diese Sicherung eine weitere Version ist)',
+  errTrackRegistryUnreadable:
+    'die Datei der bekannten Tresore unter {path} konnte nicht gelesen werden, dieser Export kann daher nicht nummeriert werden: verschieben Sie sie oder verwenden Sie --track-file',
+  warnRegistryUnwritable:
+    'der Tresor wurde gespeichert, aber die Datei der bekannten Tresore konnte nicht aktualisiert werden; der nächste Export dieser Bezeichnung verwendet dieselbe Nummer erneut',
   errCodecColorPaper:
     '--codec color lässt sich nicht mit --paper verwenden (gedruckte Seiten nutzen QR)',
   errEntropyExclusive: '{flags} schließen sich gegenseitig aus (nur eine Entropiequelle)',

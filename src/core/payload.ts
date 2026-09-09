@@ -114,10 +114,13 @@ export async function parsePayload(
   let identity: VaultIdentity | undefined;
   if (flags & FLAG_IDENTITY) {
     if (bytes.length < o + IDENTITY_LEN) throw new Error('payload: truncated identity');
-    identity = {
-      vaultId: bytes.slice(o, o + VAULT_ID_LEN),
-      sequence: readU32(bytes, o + VAULT_ID_LEN),
-    };
+    const sequence = readU32(bytes, o + VAULT_ID_LEN);
+    // `buildPayload` will not emit a sequence below 1, so 0 here is not an older
+    // export — it is a container this code did not write correctly. Rejecting it
+    // rather than passing it on keeps the registry's arithmetic on the range the
+    // builder guarantees; the AAD binding means it cannot be an attacker's edit.
+    if (sequence < 1) throw new Error(`payload: sequence out of range (${sequence})`);
+    identity = { vaultId: bytes.slice(o, o + VAULT_ID_LEN), sequence };
     o += IDENTITY_LEN;
   }
 

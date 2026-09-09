@@ -16,6 +16,7 @@ import {
   looksLikeSegmented,
 } from './segmented';
 import { MissingKeyError, type VaultKey } from './vault';
+import type { VaultIdentity } from './payload';
 
 const TEST_PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
 const MAX = 100 * 1024 * 1024;
@@ -47,6 +48,48 @@ describe('segmented blob round-trip', () => {
       expect([...out.content]).toEqual([...content]);
     });
   }
+
+  /**
+   * The branded segmented path is the one segmented container that may carry a
+   * rollback identity, and `importVaultBinary` reads it. This pins both halves:
+   * the value survives the round trip, and the declared return type admits it —
+   * a narrowing of `decodeSegmentedBlob` back to (filename, content, bundled)
+   * would fail to compile here rather than silently switching rollback
+   * detection off.
+   */
+  it('carries a vault identity back out, and says so in its type', async () => {
+    const key = await makeKey('pw');
+    const identity = { vaultId: new Uint8Array(16).fill(0xc3), sequence: 9 };
+    const blob = await buildSegmentedBlob(
+      'x',
+      randomContent(9000),
+      key,
+      'embedded',
+      undefined,
+      CHUNK,
+      false,
+      identity,
+    );
+    const out = await decodeSegmentedBlob(blob, 'pw', { maxContentBytes: MAX });
+    const got: VaultIdentity | undefined = out.identity;
+    expect(got?.sequence).toBe(9);
+    expect([...(got?.vaultId ?? [])]).toEqual([...identity.vaultId]);
+  });
+
+  it('leaves identity undefined when none was written', async () => {
+    const key = await makeKey('pw');
+    const blob = await buildSegmentedBlob(
+      'x',
+      randomContent(100),
+      key,
+      'embedded',
+      undefined,
+      CHUNK,
+    );
+    expect(
+      (await decodeSegmentedBlob(blob, 'pw', { maxContentBytes: MAX })).identity,
+    ).toBeUndefined();
+  });
 
   it('decodes with an already-unlocked DEK (verify path, no password)', async () => {
     const key = await makeKey('pw');

@@ -13,7 +13,7 @@
  * one the extension, the web app and the Python decoder use.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   type AccessMode,
@@ -282,7 +282,15 @@ async function beginTracking(
   trackFile: string | undefined,
 ): Promise<{ identity: { vaultId: Uint8Array; sequence: number }; commit: () => void }> {
   const path = registryPath(trackFile);
-  const { registry } = readRegistry(path);
+  const { registry, corrupt } = readRegistry(path);
+  // A registry that could not be read is NOT an empty one. Building on the empty
+  // value `readRegistry` returns would mint a fresh vault id at #1 and then
+  // rename a one-entry file over the original, destroying every record it merely
+  // failed to parse — and every earlier export of this vault would read as
+  // `unknown` from then on, which is rollback detection silently dead. On a
+  // restore losing the check is the lesser harm and the read is only advisory;
+  // here the user asked for numbering, so refuse and let them look at the file.
+  if (corrupt) fail(t('errTrackRegistryUnreadable', { path }), 'TRACKING_UNAVAILABLE');
   const {
     registry: next,
     vaultId,
@@ -313,6 +321,13 @@ function reportRollback(
   present.note(identityLine(identity.vaultId, identity.sequence));
 
   const path = registryPath(trackFile);
+  // Recording requires that the user has already opted in, which here means a
+  // registry that exists. Without this a single restore of a tracked vault
+  // creates the file — the durable list of vault identifiers and access times
+  // that docs/THREAT-MODEL.md calls the most damaging artifact the tool can
+  // produce — on a command that was never given `--track`. The identity line
+  // above is the part worth relying on and it needs no file at all.
+  if (!existsSync(path)) return;
   const { registry, corrupt } = readRegistry(path);
   if (corrupt) {
     present.warn({ code: 'VAULT_REGISTRY_UNREADABLE', message: t('warnRegistryUnreadable') });
@@ -427,6 +442,20 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     fail(t('errEntropyWrongCommand', { command }));
   }
 
+  // Only `save` writes an identity into an envelope, so `--track` means nothing
+  // anywhere else. `save` and `gallery-save` run this check inside their own
+  // branches, where the destination is known and deniability is the better
+  // complaint. (`--track-file` stays common: it only says where the record a
+  // restore *reads* lives.)
+  if (command !== 'save' && command !== 'gallery-save') {
+    const wrongCommand = trackingArgError({
+      track: values.track !== undefined,
+      label: values.track as string | undefined,
+      command,
+    });
+    if (wrongCommand) fail(wrongCommand.message, wrongCommand.code);
+  }
+
   const force = Boolean(values.force);
 
   const outDir = (values.out as string) ?? '.';
@@ -457,11 +486,12 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     const trackLabel = values.track as string | undefined;
     const trackError = trackingArgError({
       track: trackLabel !== undefined,
+      label: trackLabel,
       command,
       binary,
       mode,
     });
-    if (trackError) fail(trackError);
+    if (trackError) fail(trackError.message, trackError.code);
     if (mode !== 'plain' && binary !== 'disguised') {
       fail(t('errSaveModeNeedsDisguise', { mode }));
     }
@@ -483,9 +513,13 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // generated.
     await installEntropy(io, present, values);
 
-    const tracking = trackLabel
-      ? await beginTracking(trackLabel, values['track-file'] as string | undefined)
-      : undefined;
+    // `!== undefined`, matching the guard above. Truthiness let `--track ""`
+    // fall through to no tracking at all, so the user got an unnumbered vault
+    // and a zero exit; an empty label is now refused by `trackingArgError`.
+    const tracking =
+      trackLabel !== undefined
+        ? await beginTracking(trackLabel, values['track-file'] as string | undefined)
+        : undefined;
 
     const opts: SaveOptions = {
       inputs,
@@ -524,8 +558,26 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     progress.done();
     // Committed only once the artifact exists, so a failed save does not burn a
     // sequence number and make the next real one look like a rollback.
-    tracking?.commit();
-    if (tracking) present.note(identityLine(tracking.identity.vaultId, tracking.identity.sequence));
+    //
+    // Guarded because the vault is already on disk by this point. `writeRegistry`
+    // throws on the symlink refusal and on any filesystem error, and unguarded
+    // that turned a completed save into `{"ok":false,"code":"INTERNAL"}` and exit
+    // 1 — a scripted caller would retry, or clean up a real vault. The lost
+    // record is a warning: the next export of this label reuses the sequence, so
+    // the two share a number, which is the same known limit as a concurrent save.
+    if (tracking) {
+      try {
+        tracking.commit();
+      } catch {
+        present.warn({
+          code: 'VAULT_REGISTRY_UNWRITABLE',
+          message: t('warnRegistryUnwritable'),
+        });
+      }
+    }
+    if (tracking) {
+      present.note(identityLine(tracking.identity.vaultId, tracking.identity.sequence));
+    }
     // Both of these are English-only at the source (paper.ts and commands.ts
     // build them from literals; only the `warnPrefix` wrapper was localized), so
     // JSON callers key on the code and read the message as a hint.
@@ -575,9 +627,10 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // asking for cover photos first would be answering the wrong question.
     const galleryTrackError = trackingArgError({
       track: values.track !== undefined,
+      label: values.track as string | undefined,
       command,
     });
-    if (galleryTrackError) fail(galleryTrackError);
+    if (galleryTrackError) fail(galleryTrackError.message, galleryTrackError.code);
 
     const secretFile = positionals[0];
     if (!secretFile) fail(t('errGalleryMissingFile'));
