@@ -12,8 +12,8 @@ bumps may include behavioural changes; there is no stability promise until 1.0.
 ## 2. On-disk format version (the real compatibility contract)
 
 The bytes StegoShard writes are a **versioned pre-1.0 interface** so independent
-decoders can recover a vault. The current v1 candidate is documented in
-[SPEC.md](../SPEC.md); its compatibility promise begins at the public 1.0 release.
+decoders can recover a vault. The current candidate, format version 2, is documented
+in [SPEC.md](../SPEC.md); its compatibility promise begins at the public 1.0 release.
 The format carries several independent version tags:
 
 | Constant            | Where                          | Meaning                                    |
@@ -37,15 +37,20 @@ it.
 
 ### Path-intrinsic geometry (access structures, SPEC §10)
 
-`FORMAT_VERSION` stays `1`, but on two paths, **Gallery Mode** and the **disguised
-`.db`** binary variant, a v1 container carries the mandatory multi-region access
-structure (a 4-slot key array over 2 payload regions). This geometry is a function of the
-**output path**, not of a version byte: every gallery / disguised-`.db` vault has it, and
-the excluded paths (single image, PDF, QR, branded `.ssbn`) never do. That is deliberate:
-a version bit that appeared only when a hidden alternative existed would itself be the
-distinguisher (SPEC §10). Because StegoShard is pre-1.0 with no shipped vaults, this was
-folded into v1 in place rather than introduced as a parallel v2; the fixed test vectors
-and fixtures are regenerated accordingly.
+The access structure has **no version tag at all**. On two paths, **Gallery Mode** and
+the **disguised `.db`** binary variant, every container carries the mandatory
+multi-region geometry (a 4-slot key array over 2 payload regions). That geometry is a
+function of the **output path**, not of a version byte: every gallery / disguised-`.db`
+vault has it, and the excluded paths (single image, PDF, QR, branded `.ssbn`) never do.
+That is deliberate: a version bit that appeared only when a hidden alternative existed
+would itself be the distinguisher (SPEC §10).
+
+Because StegoShard is pre-1.0 with no shipped vaults, it was folded into the format
+version current at the time rather than introduced alongside it, and the fixed test
+vectors and fixtures were regenerated accordingly. Note that this is **not** what later
+moved `FORMAT_VERSION` to `2` — that was the AAD binding and the identity block (SPEC
+§4.1, §11.1), which do change how a decoder parses. The geometry above still announces
+itself nowhere, under version 2 as under version 1.
 
 ### Rules for a format change
 
