@@ -22,6 +22,7 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from stegoshard import gf256
+from stegoshard.aad import vault_blob_aad
 from stegoshard.crypto import (
     WrongPasswordError,
     decrypt_content,
@@ -29,7 +30,6 @@ from stegoshard.crypto import (
     derive_kek,
     unwrap_dek,
 )
-from stegoshard.aad import vault_blob_aad
 from stegoshard.format import (
     BLOB_MAGIC,
     FORMAT_VERSION,

@@ -15,10 +15,9 @@ import io
 from argon2.low_level import ARGON2_VERSION, Type, hash_secret_raw
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-from .aad import gallery_frag_aad
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from .aad import gallery_frag_aad
 from .crypto import normalize_password
 from .format import split_payload
 from .pipeline import RestoredFile, decode_vault

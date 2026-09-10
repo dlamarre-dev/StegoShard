@@ -11,25 +11,25 @@ from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from .binary_container import unwrap_binary
-from .crypto import (
-    decrypt_content,
-    slot_aad_for,
-    derive_content_key,
-    derive_region_key,
-    open_slot_array,
-    slot_kek_candidates,
-    unwrap_dek,
-)
 from .aad import (
     KIND_GALLERY,
     region_block_aad,
     vault_blob_aad,
 )
+from .binary_container import unwrap_binary
+from .crypto import (
+    decrypt_content,
+    derive_content_key,
+    derive_region_key,
+    open_slot_array,
+    slot_aad_for,
+    slot_kek_candidates,
+    unwrap_dek,
+)
 from .format import (
     BLOB_MAGIC,
-    FORMAT_VERSION,
     CONTENT_SALT_LEN,
+    FORMAT_VERSION,
     IV_LEN,
     MAX_CONTENT_BYTES,
     MAX_CONTENT_BYTES_BINARY,
@@ -135,9 +135,8 @@ def _decode_vault_blob(
     # block: in keyfile/stego mode `embedded_kb` is empty and only the zero length
     # field is bound. Binding the external key would break a password change,
     # which re-serializes it while keeping the same DEK.
-    envelope = decrypt_content(
-        cek, iv, ciphertext, vault_blob_aad(BLOB_MAGIC, FORMAT_VERSION, embedded_kb, content_salt, iv)
-    )
+    aad = vault_blob_aad(BLOB_MAGIC, FORMAT_VERSION, embedded_kb, content_salt, iv)
+    envelope = decrypt_content(cek, iv, ciphertext, aad)
     filename, content, bundled = parse_envelope(envelope, max_content_bytes)
     return RestoredFile(filename, content, bundled)
 

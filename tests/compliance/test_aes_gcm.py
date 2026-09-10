@@ -338,8 +338,18 @@ def test_python_framing_decrypt() -> None:
 
     The mirror of ``ts-framing-decrypt``: it is the decoder's own wrapper that an
     independent recovery runs, not the raw binding underneath it. Its envelope is
-    tighter still, because it hard-codes ``aad=None``, so only empty-AAD vectors
-    with a 12-byte IV and a full tag are reachable.
+    tighter still: only vectors with a 12-byte IV, a full tag, and an empty AAD are
+    reachable, which is what keeps the reachable set at the 33 counted in
+    :data:`FORGERIES`.
+
+    ``decrypt_content`` takes ``aad`` as a REQUIRED argument (see ``aad.py``: every
+    site has a context worth binding, and one that does not must say so), so the
+    empty AAD is passed explicitly here. It used to be omitted and defaulted, which
+    made this shim raise ``TypeError`` the moment the argument became required —
+    booked upstream as "declined before authenticating", so every one of the 3,919
+    forgeries moved from ``rejected`` to ``refused`` and the target stopped
+    authenticating anything at all. That is precisely the silent weakening the
+    ``FORGERIES`` assertion exists to catch, and it caught it.
     """
     from stegoshard.crypto import decrypt_content
 
@@ -347,9 +357,9 @@ def test_python_framing_decrypt() -> None:
         if not iv or len(iv) != FRAMING_IV_LEN or mac is None or len(mac) != FRAMING_TAG_LEN:
             raise ValueError("outside the decrypt_content envelope")
         if aad:
-            raise ValueError("decrypt_content passes aad=None")
+            raise ValueError("outside the envelope: this target covers the empty AAD")
         try:
-            return decrypt_content(key, iv, ciphertext + mac), True
+            return decrypt_content(key, iv, ciphertext + mac, b""), True
         except InvalidTag:
             return None, False
 
