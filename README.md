@@ -48,17 +48,33 @@ promise](#what-it-does-not-promise) says how much narrower.
 
 Four output forms. Pick the guarantee you want, then what it should look like on disk.
 
-| Form                             |    Model    | What it is                                                                                                                          |
-| -------------------------------- | :---------: | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Coded images** (disk or paper) | 🛡 Resilient | Openly artificial images built to survive recompression and printing. Colour grid by default, plain QR one click away. Up to 1 MiB. |
-| **Opaque file** (`.ssbn`)        | 🛡 Resilient | One compact file, no image-count ceiling: up to 1 GiB in the CLI, 256 MiB in the browser. Clearly a StegoShard vault.               |
-| **Decoy database** (`.db`)       | 🎭 Deniable | The same bytes, at the same sizes, behind a valid SQLite header, so file-type triage reads it as an ordinary database.              |
-| **Ordinary photos**              | 🎭 Deniable | The secret, or just the key, hidden inside real photos. Blends in completely, dies if the photo is recompressed. A few KB.          |
+| Form                               |    Model    | What it is                                                                                                                          |
+| ---------------------------------- | :---------: | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Coded images** (disk or paper)   | 🛡 Resilient | Openly artificial images built to survive recompression and printing. Colour grid by default, plain QR one click away. Up to 1 MiB. |
+| **Opaque file** (`.ssbn`)          | 🛡 Resilient | One compact file, no image-count ceiling: up to 1 GiB in the CLI, 256 MiB in the browser. Clearly a StegoShard vault.               |
+| **Decoy database** (`.db`)         | 🎭 Deniable | The same bytes, at the same sizes, behind a valid SQLite header, so file-type triage reads it as an ordinary database.              |
+| **Ordinary photos** (Gallery Mode) | 🎭 Deniable | The secret, or just the key, hidden inside real photos. Blends in completely, dies if the photo is recompressed. A few KB.          |
 
 The two deniable forms can add an **access structure** (SPEC §10). **Non-possession** puts
 the real payload behind threshold shares you deliberately do not keep, and works on both.
 **Duress**, where a second password opens a plausible decoy instead of the real thing, is
 `.db` only.
+
+**Gallery Mode** is the photo form when the carrier is a _folder_ rather than one image
+(SPEC §9). The secret is erasure-coded and scattered across the photos you supply, at most
+2 KB per photo, so losing or recompressing some of them still restores — the same
+`k`-of-`n` bargain as the resilient paths, bought inside carriers that do not look coded.
+Some of the photos are filled with random bytes instead, so the set carries no signal about
+how many of them are real. Restore is **blind**: every photo is trial-decrypted, whatever
+authenticates is used, and a wrong password simply yields nothing that opens, which looks
+exactly like a folder with no gallery in it. It needs **at least 5 photos**, and the secret
+has to compress into 64 KiB, so this is the path for a key, a seed phrase or a note — not
+an archive.
+
+The limit worth knowing before you use it: Gallery Mode modifies **every** photo it
+touches, so an adversary holding your untouched originals can diff them and see that all of
+them changed. Single-image stego gives that adversary one file to compare; a gallery gives
+them the whole album.
 
 ### The same 40 KB file, saved three ways
 
@@ -208,7 +224,7 @@ Writing the limits down is a habit here rather than fine print. The full registe
 🧪 **Beta, under security and physical-recovery validation.** Every major workflow is
 built, tested and cross-validated against an independent [Python
 decoder](python/README.md) that runs in CI. What is not settled is the external
-validation: the format candidate ([SPEC.md](SPEC.md), `FORMAT_VERSION = 1`) is versioned
+validation: the format candidate ([SPEC.md](SPEC.md), `FORMAT_VERSION = 2`) is versioned
 but not frozen, and pre-1.0 compatibility is not promised.
 
 Built and tested: the crypto core (Argon2id, AES-256-GCM, Reed-Solomon, two image codecs);
@@ -248,7 +264,7 @@ works without the extension.
 | [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                       |
 | [Machine interfaces](docs/API.md)                                                                      | Driving StegoShard from a program: the JS/TS library, the `--json` envelope, and the MCP server. |
 | [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                      |
-| [Format specification](SPEC.md)                                                                        | The beta on-disk / on-image format candidate (`FORMAT_VERSION = 1`).                             |
+| [Format specification](SPEC.md)                                                                        | The beta on-disk / on-image format candidate (`FORMAT_VERSION = 2`).                             |
 | [Cryptographic review dossier](docs/CRYPTO-REVIEW.md)                                                  | Claims → where enforced → which test proves it, for auditors.                                    |
 | [Claims register](docs/CLAIMS.md)                                                                      | Every security and resilience claim, its evidence, and the limits it does **not** cover.         |
 | [Python reference decoder](python/README.md)                                                           | Restore a vault without the extension: install, CLI, and the library API.                        |

@@ -1,14 +1,15 @@
-# StegoShard format specification, v1
+# StegoShard format specification, v2
 
 This document is the **pre-1.0 versioned candidate** for the StegoShard on-image
 format. It describes everything needed to decode a vault **without the extension**,
 so the data survives even if the extension disappears. Any conforming
 implementation (including the Python reference decoder, Phase 3) must interoperate
-with images produced by format version 1.
+with images produced by format version 2.
 
-> **Status:** beta candidate for format version 1 (`FORMAT_VERSION = 1`). Audit-driven
-> breaking changes may still be folded into this candidate. The compatibility freeze
-> begins with the public 1.0 release.
+> **Status:** beta candidate for format version 2 (`FORMAT_VERSION = 2`). Audit-driven
+> breaking changes may still be folded into this candidate — version 2 is itself one of
+> them, and no reader for version 1 is kept (see [docs/VERSIONING.md](docs/VERSIONING.md)).
+> The compatibility freeze begins with the public 1.0 release.
 
 All multi-byte integers are **big-endian**. All lengths are in bytes.
 
@@ -46,7 +47,7 @@ one extra attempt, never a failure.
 
 ### 2.1 `qr-grid` (`CODEC_ID = 0`)
 
-Each image carries one **standard QR code** (a 1×1 grid in v1). The QR payload is
+Each image carries one **standard QR code** (a 1×1 grid in this version). The QR payload is
 the per-image payload of §3, placed in **byte mode**. QR's built-in Reed-Solomon
 provides intra-image error correction; the cross-image erasure coding of §7 is
 separate and additional.
@@ -835,12 +836,13 @@ paths: **Gallery Mode (§9)** and the **disguised `.db`** binary variant (§8). 
 the substrate for the duress and non-possession product modes; this section defines
 only the geometry those modes share.
 
-**Folded into `FORMAT_VERSION = 1`, not a new version.** The geometry is intrinsic to
-these two paths: every gallery and every disguised `.db` vault carries it, so no field
-distinguishes a plain vault from one with a hidden alternative, and there is no version
-byte to leak the feature. The **excluded** paths (single cover image §5, PDF/paper,
-QR-grid §2, branded `.ssbn` §8) keep the single-slot / single-region geometry of §5.1
-and §6 unchanged, byte-for-byte.
+**Carries no version of its own, on purpose.** The geometry is intrinsic to these two
+paths: every gallery and every disguised `.db` vault carries it, so no field distinguishes
+a plain vault from one with a hidden alternative, and there is no version byte to leak the
+feature. It was folded into the then-current `FORMAT_VERSION` rather than given a number
+of its own, and the same reasoning holds under every later one. The **excluded** paths
+(single cover image §5, PDF/paper, QR-grid §2, branded `.ssbn` §8) keep the single-slot /
+single-region geometry of §5.1 and §6 unchanged, byte-for-byte.
 
 ### 10.1 Key slot array
 
