@@ -40,6 +40,7 @@ import {
   normalizePassword,
   randomBytes,
 } from './crypto';
+import { galleryFragAad } from './aad';
 import { buildPayload } from './payload';
 import type { KeyMode } from './types';
 import { decodeBlob, encodeShards, parityCount } from './erasure';
@@ -52,6 +53,7 @@ import {
   decodeImagePayload,
   encodeImagePayload,
 } from './header';
+import { FORMAT_VERSION } from './header';
 import {
   GALLERY_SALT,
   StegoCapacityError,
@@ -427,7 +429,7 @@ export async function galleryEncode(
     let slot: Uint8Array;
     if (i < carriers) {
       const header: Header = {
-        version: 1,
+        version: FORMAT_VERSION,
         setId,
         shardIndex: i,
         k,
@@ -441,7 +443,7 @@ export async function galleryEncode(
       // header||shard, zero-padded to the fixed fragment length, then sealed.
       const frag = new Uint8Array(GALLERY_FRAG_LEN);
       frag.set(encodeImagePayload(header, shards[i]!), 0);
-      const { iv, ciphertext } = await encryptBytes(aeadKey, frag);
+      const { iv, ciphertext } = await encryptBytes(aeadKey, frag, galleryFragAad());
       slot = concatBytes(iv, ciphertext);
     } else {
       slot = randomBytes(GALLERY_SLOT_BYTES);
@@ -511,7 +513,12 @@ export async function galleryDecode(
     if (!slot) continue;
     let frag: Uint8Array;
     try {
-      frag = await decryptBytes(aeadKey, slot.subarray(0, IV_LEN), slot.subarray(IV_LEN));
+      frag = await decryptBytes(
+        aeadKey,
+        slot.subarray(0, IV_LEN),
+        slot.subarray(IV_LEN),
+        galleryFragAad(),
+      );
     } catch {
       continue; // failed tag → decoy, destroyed carrier, or foreign image
     }

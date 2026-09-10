@@ -43,7 +43,28 @@ export type WarningCode =
   /** A CJK font could not be found, so the PDF fell back. */
   | 'FONT_FALLBACK'
   /** The secret is large enough that the image count is worth mentioning. */
-  | 'LARGE_SECRET';
+  | 'LARGE_SECRET'
+  /**
+   * The restored vault is OLDER than the newest export this machine recorded.
+   * A warning, never a failure: the older copy may be the only one that survived,
+   * and refusing to restore it would turn a detection into a denial of service.
+   */
+  | 'VAULT_ROLLBACK'
+  /**
+   * The vault carries an identity this machine has never seen, while others are
+   * recorded. Informational: a first restore on a new machine looks exactly the
+   * same as a substituted vault, and the registry cannot tell them apart.
+   */
+  | 'VAULT_UNKNOWN'
+  /** The registry could not be read. Rollback detection is off for this run. */
+  | 'VAULT_REGISTRY_UNREADABLE'
+  /**
+   * The vault was written, but the registry could not be. A warning rather than
+   * a failure because the artifact the user asked for exists: reporting the save
+   * as failed would invite a caller to retry, or to clean up a real vault. The
+   * cost is that the next export of this label reuses the number.
+   */
+  | 'VAULT_REGISTRY_UNWRITABLE';
 
 export interface CliWarning {
   code: WarningCode;
@@ -65,6 +86,13 @@ export interface EstimateResult {
 export interface Presenter {
   /** Record a non-fatal warning. Emitted immediately and, in JSON, again with the result. */
   warn(warning: CliWarning): void;
+  /**
+   * A short factual line that is neither a warning nor part of the result: the
+   * vault identity counter, today. Human output prints it; JSON collects it into
+   * an additive `notes` array, which per docs/VERSIONING.md §3 does not bump the
+   * schema.
+   */
+  note(text: string): void;
   progress(quiet: boolean): { onProgress?: OnProgress; done: () => void };
   save(res: SaveResult): void;
   restore(res: RestoreResult): void;
@@ -144,6 +172,10 @@ export function humanPresenter(io: CliIo): Presenter {
   return {
     warn(warning) {
       io.err(`${warning.message}\n`);
+    },
+
+    note(text) {
+      io.err(`${text}\n`);
     },
 
     /**

@@ -12,6 +12,7 @@ import {
   unlockKeyBlock,
   WrongPasswordError,
 } from './crypto';
+import { EMPTY_AAD } from './aad';
 
 // Cheap Argon2 params keep the suite fast; production uses DEFAULT_ARGON2.
 const TEST_PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
@@ -23,43 +24,43 @@ describe('AES-GCM content encryption', () => {
   it('round-trips arbitrary bytes', async () => {
     const { dek } = await createKeyBlock('pw', TEST_PARAMS);
     const data = enc('the quick brown fox');
-    const { iv, ciphertext } = await encryptBytes(dek, data);
-    expect(dec(await decryptBytes(dek, iv, ciphertext))).toBe('the quick brown fox');
+    const { iv, ciphertext } = await encryptBytes(dek, data, EMPTY_AAD);
+    expect(dec(await decryptBytes(dek, iv, ciphertext, EMPTY_AAD))).toBe('the quick brown fox');
   });
 
   it('uses a fresh IV per encryption', async () => {
     const { dek } = await createKeyBlock('pw', TEST_PARAMS);
-    const a = await encryptBytes(dek, enc('x'));
-    const b = await encryptBytes(dek, enc('x'));
+    const a = await encryptBytes(dek, enc('x'), EMPTY_AAD);
+    const b = await encryptBytes(dek, enc('x'), EMPTY_AAD);
     expect([...a.iv]).not.toEqual([...b.iv]);
   });
 
   it('rejects tampered ciphertext', async () => {
     const { dek } = await createKeyBlock('pw', TEST_PARAMS);
-    const { iv, ciphertext } = await encryptBytes(dek, enc('secret'));
+    const { iv, ciphertext } = await encryptBytes(dek, enc('secret'), EMPTY_AAD);
     ciphertext[0] = ciphertext[0]! ^ 0xff;
-    await expect(decryptBytes(dek, iv, ciphertext)).rejects.toBeTruthy();
+    await expect(decryptBytes(dek, iv, ciphertext, EMPTY_AAD)).rejects.toBeTruthy();
   });
 });
 
 describe('DEK raw export/import (session storage)', () => {
   it('round-trips a DEK through raw bytes and still decrypts', async () => {
     const { dek } = await createKeyBlock('pw', TEST_PARAMS);
-    const { iv, ciphertext } = await encryptBytes(dek, enc('session data'));
+    const { iv, ciphertext } = await encryptBytes(dek, enc('session data'), EMPTY_AAD);
     const raw = await exportDekRaw(dek);
     expect(raw.length).toBe(32);
     const dek2 = await importDek(raw);
-    expect(dec(await decryptBytes(dek2, iv, ciphertext))).toBe('session data');
+    expect(dec(await decryptBytes(dek2, iv, ciphertext, EMPTY_AAD))).toBe('session data');
   });
 });
 
 describe('KEK/DEK unlock', () => {
   it('unlocks with the correct password and decrypts content', async () => {
     const { dek, block } = await createKeyBlock('correct horse', TEST_PARAMS);
-    const { iv, ciphertext } = await encryptBytes(dek, enc('vault contents'));
+    const { iv, ciphertext } = await encryptBytes(dek, enc('vault contents'), EMPTY_AAD);
 
     const dek2 = await unlockKeyBlock(block, 'correct horse');
-    expect(dec(await decryptBytes(dek2, iv, ciphertext))).toBe('vault contents');
+    expect(dec(await decryptBytes(dek2, iv, ciphertext, EMPTY_AAD))).toBe('vault contents');
   });
 
   it('rejects a wrong password with a typed error', async () => {
@@ -104,13 +105,13 @@ describe('key block serialization', () => {
 describe('change password', () => {
   it('re-wraps the same DEK under a new password', async () => {
     const { dek, block } = await createKeyBlock('old', TEST_PARAMS);
-    const { iv, ciphertext } = await encryptBytes(dek, enc('data'));
+    const { iv, ciphertext } = await encryptBytes(dek, enc('data'), EMPTY_AAD);
 
     const newBlock = await rewrapKeyBlock(block, 'old', 'new', TEST_PARAMS);
 
     // Old password no longer works; new one recovers the same DEK.
     await expect(unlockKeyBlock(newBlock, 'old')).rejects.toBeTruthy();
     const dek2 = await unlockKeyBlock(newBlock, 'new');
-    expect(dec(await decryptBytes(dek2, iv, ciphertext))).toBe('data');
+    expect(dec(await decryptBytes(dek2, iv, ciphertext, EMPTY_AAD))).toBe('data');
   });
 });

@@ -222,12 +222,16 @@ AES-GCM, §5).
 ## 4. Payload envelope (plaintext, pre-encryption)
 
 ```
-[ FLAGS 1 ][ NAME_LEN u16 ][ FILENAME (UTF-8, NAME_LEN bytes) ][ CONTENT ]
+[ FLAGS 1 ][ NAME_LEN u16 ][ FILENAME (UTF-8, NAME_LEN bytes) ]
+[ VAULT_ID 16 ][ SEQUENCE u32 ]        (present iff FLAGS bit 2)
+[ CONTENT ]
 ```
 
 - `FLAGS` bit 0 (`0x01`): `CONTENT` is **gzip-compressed** (RFC 1952).
 - `FLAGS` bit 1 (`0x02`): `CONTENT` is a **.zip holding several files** (a
-  _bundle_). Composable with bit 0. Other bits reserved, zero.
+  _bundle_). Composable with bit 0.
+- `FLAGS` bit 2 (`0x04`): the envelope carries a **vault identity**. Other bits
+  reserved, zero.
 - `FILENAME`: original file name, UTF-8. Carried **inside** the encrypted envelope,
   so neither the name nor the file type leaks. For a bundle it is `bundle.zip`.
 - `CONTENT`: the original file bytes, gzip-compressed only when that is smaller
@@ -244,6 +248,44 @@ decrypted vault, but its entry names were chosen by whoever wrote that vault, so
 A decoder written before bit 1 existed masks only bit 0, so it hands back the
 `.zip` under the name `bundle.zip` instead of unpacking it. That is degraded, not
 wrong, and is why the bit could be added without a version bump.
+
+### 4.1 Vault identity (bit 2)
+
+```
+[ VAULT_ID 16 ][ SEQUENCE u32 ]      = 20 bytes, immediately after FILENAME
+```
+
+- `VAULT_ID`: 16 CSPRNG bytes, **stable across re-exports of the same logical
+  vault**. Never derived from the DEK: SPEC §6 reuses one DEK across vaults, so a
+  DEK-derived id would collide across every vault a keystore holds.
+- `SEQUENCE`: a per-vault export counter, starting at 1, strictly increasing.
+- Both are absent unless the writer is tracking, and a writer MUST NOT emit a
+  constant `SEQUENCE = 1`: a counter that never moves looks like a guarantee and
+  is not one.
+
+**Purpose, and its limit.** Together they make a _rollback_ detectable — an older
+but entirely legitimate export put back in place of a newer one. No AEAD can do
+this alone: a tag authenticates a message, never the absence of a newer message.
+Detection therefore requires state outside the container, and this block is only
+the half that travels with the artifact.
+
+**Why it lives here rather than in a header.** In any container header a cleartext
+`VAULT_ID` would publicly prove that two artifacts are re-exports of one vault, to
+an adversary who cannot decrypt either — a worse leak than the rollback it
+defends against, and on the deniable paths an outright distinguisher. Inside the
+envelope it is ciphertext, covered by GCM and by the §6 AAD above it, and readable
+only after unlock, which is exactly when the check is actionable.
+
+**Which paths MAY carry it.** The open ones only: images, PDF, and the branded
+`.ssbn` container. Gallery Mode (§9) and the disguised `.db` (§8, §10.7) MUST NOT,
+and a conforming writer should make that structural rather than conditional.
+Their region plaintexts are padded to a bucket (§10.5), so the 20 bytes would not
+change a length — but the reason is not size, it is that a deniable artifact must
+carry nothing that links it to another.
+
+A decoder that ignores bit 2 misparses the envelope, because the block sits before
+`CONTENT`. Unlike bit 1 this is **not** a compatible extension, which is why it
+arrived with a `FORMAT_VERSION` bump.
 
 ---
 
@@ -292,8 +334,21 @@ bytes after `wrappedDEK` (exactly `44 + wrappedLen` bytes total).
   encode it (e.g. precomposed `é` vs. `e` + combining accent), so a vault created
   on one device unlocks on another. Every conforming decoder MUST normalize
   identically.
-- **Wrapping:** `wrappedDEK = AES-256-GCM(KEK, rawDEK)` using `wrapIv`. The GCM tag
-  is included in `wrappedDEK`, so a wrong password fails to unwrap (authenticated).
+- **Wrapping:** `wrappedDEK = AES-256-GCM(KEK, rawDEK)` using `wrapIv`, with
+
+  ```
+  AAD = "stegoshard/v2/aad/key-block" ‖ MAGIC ‖ VER ‖ iterations ‖ memoryKiB
+        ‖ parallelism ‖ salt ‖ wrapIv
+  ```
+
+  The GCM tag is included in `wrappedDEK`, so a wrong password fails to unwrap
+  (authenticated). The AAD binds the block to **its own header and nothing else**:
+  the cost parameters, salt and IV were previously protected only incidentally
+  (editing them changes the derived KEK, so the unwrap failed anyway), which gave
+  the wrong diagnosis — "wrong password" for a block that had been edited. Binding
+  anything outside the block would destroy keyfile mode (§5.2), where it travels
+  alone and may serve several vaults.
+
 - **salt:** 16 random bytes for the KDF.
 
 Recovery requires **the password _and_ this key block**.
@@ -455,11 +510,52 @@ The blob is what gets erasure-coded and split across images. It bundles everythi
 needed (besides the password) to decrypt:
 
 ```
-[ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1) ][ contentSalt 16 ][ IV 12 ][ ciphertext (§5) ]
+[ MAGIC 4 = "SSVB" = 53 53 56 42 ][ VER 1 = 2 ]
+[ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1) ][ contentSalt 16 ][ IV 12 ]
+[ ciphertext (§5) ]
 ```
 
 `KB_LEN` is `0` for the keyfile/stego modes (§5.2); the key block is then
 supplied externally at restore time.
+
+The blob is **self-describing**. It used to begin at `KB_LEN` and take its format
+version from the SSHD image header (§3) — which is not authenticated, its 4-byte
+hash being a triage hint rather than a security boundary (§7.4). Carrying the
+magic and version here puts the version under the §6.1 AAD and lets a blob be
+identified outside whatever image happened to hold it. A decoder MUST reject an
+unknown `VER`, and MUST bound `KB_LEN` against the remaining length before
+slicing: it is attacker-controlled and read before anything is authenticated.
+
+### 6.1 Additional authenticated data
+
+`ciphertext` is sealed with
+
+```
+AAD = "stegoshard/v2/aad/vault-blob" ‖ MAGIC ‖ VER ‖ KB_LEN ‖ key block
+      ‖ contentSalt ‖ IV
+```
+
+that is, the label followed by every byte of the blob that precedes the
+ciphertext. Every conforming implementation MUST compute it from the **parsed**
+fields rather than by slicing the raw prefix, so a malformed length field cannot
+make the AAD agree by accident.
+
+What this buys, stated narrowly. Most splices an attacker might try — a foreign
+key block, another export's salt or IV — already failed before this AAD existed,
+because each of them changes the derived content key. The binding makes those
+refusals _authenticated_ rather than incidental. The one splice it refuses on its
+own is a **key-mode downgrade**: lifting the 92-byte key block out of an embedded
+blob and setting `KB_LEN = 0` leaves the DEK, salt, IV and ciphertext untouched,
+so the content would decrypt, and the self-contained vault would silently become
+one whose `.key` the attacker supplies.
+
+In keyfile/stego mode the AAD covers the zero `KB_LEN` and **not** the externally
+supplied key block. That is deliberate. A password change re-wraps the same DEK
+into different bytes (§5.1), so binding the external block would make every vault
+exported before that change permanently undecodable, silently, with a generic tag
+failure — a data-loss bug wearing the costume of a security feature. The gap it
+would close is negligible: substituting a different block wrapping the _same_ DEK
+requires already holding that DEK.
 
 The `ciphertext` is not encrypted under the DEK directly but under a **per-export
 content key** `CEK = HKDF-SHA256(DEK, salt = contentSalt, info =
@@ -666,6 +762,20 @@ nonce)` pair. A decoy image embeds `SLOT_BYTES` of CSPRNG bytes at the same
 `posKey`-selected carriers; without the password it is indistinguishable from a
 sealed fragment (both are uniform).
 
+Each fragment is sealed with the constant
+
+```
+AAD = "stegoshard/v2/aad/gallery-frag"
+```
+
+and nothing else can go in it. Blind winnowing (§9.5) trial-opens every photo with
+no prior knowledge, so `SET_ID` and `SHARD_INDEX` are recoverable only _after_ the
+tag verifies; an AAD depending on them would have to be guessed. They are already
+authenticated in any case, sitting inside the sealed plaintext. The cover bytes
+cannot be bound either, since carriers are lossy. The value here is therefore only
+domain separation — real, but smaller than at the other sites, and this one was
+never meaningfully unbound.
+
 ### 9.3 Carrier selection
 
 Identical to §5.3/§5.4: an AES-CTR keystream seeded by `posKey` drives
@@ -753,6 +863,27 @@ slot_plaintext (48) := dek[32] || region_index[1] || reserved[15]
   permutation; slot position carries no meaning.
 - The array is magicless: geometry is known from the decode entrypoint (a gallery decode,
   or the recovered `disguised` binary variant), never read from a byte.
+
+#### Slot AAD
+
+Each slot is sealed with
+
+```
+AAD = "stegoshard/v2/aad/slot-array" ‖ kind ‖ SLOT_COUNT ‖ REGION_COUNT ‖ vault_salt
+kind = 0x01 gallery (§10.6) | 0x02 segmented (§10.7)
+```
+
+`kind` is never stored: the decoder knows which container it entered by, so
+binding it costs no bytes and stops a slot array being transplanted between the
+gallery and `.db` containers under a shared vault salt. **One AAD serves all four
+slots** — slot position is meaningless by design (the writer shuffles, §10.1), so
+an index-dependent AAD would contradict that for no gain. Region blocks are
+deliberately excluded: their own AAD includes the slot array, and binding both
+ways would be circular.
+
+Dead slots remain `SLOT_SIZE` CSPRNG bytes, and the constant-work unlock (§10.4)
+is unchanged: the AAD is one value computed before the loop, so per-attempt work
+is byte-identical.
 
 ### 10.2 Slot KEK derivation
 
@@ -863,6 +994,19 @@ region block (R) := contentSalt[16] || IV[12] || AES-256-GCM_CEK(region_plaintex
 A dead region is exactly `R` CSPRNG bytes. Both blocks are the same length `R`, so which
 region is real is invisible. This blob replaces the §6 vault blob inside each gallery
 fragment.
+
+Each live region is sealed with
+
+```
+AAD = "stegoshard/v2/aad/vault-region" ‖ vault_salt ‖ slot_array
+      ‖ region_index ‖ R ‖ contentSalt ‖ IV
+```
+
+binding the block to its container, to its own index, and to its geometry. `R` is
+derivable from the blob length, but authenticating it makes the geometry a signed
+statement rather than an inference. Nothing here is stored, so the deniability
+invariant holds unchanged: a dead region is still `R` indistinguishable CSPRNG
+bytes and both blocks are still the same length.
 
 ### 10.7 Multi-region segmented blob (`.db`, chunked STREAM)
 
@@ -975,9 +1119,14 @@ trade gallery's core guarantee for a mode that already has a stronger home.
 
 | Name                  | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `FORMAT_VERSION`      | 1                                                                                                    |
+| `FORMAT_VERSION`      | 2                                                                                                    |
+| `KEY_BLOCK_VERSION`   | 2                                                                                                    |
+| `SEG_VERSION`         | 2                                                                                                    |
+| `BINARY_VERSION`      | 1                                                                                                    |
 | Header magic          | `"SSHD"`                                                                                             |
 | Key block magic       | `"SSKY"`                                                                                             |
+| Vault blob magic      | `"SSVB"` (§6); prefix magic(4) + version(1) + KB_LEN(2) = 7 bytes                                    |
+| Envelope identity     | FLAGS bit 2; `VAULT_ID` 16 ‖ `SEQUENCE` u32 = 20 bytes (§4.1); open paths only                       |
 | Binary magic          | `"SSBN"` (branded); SQLite DB, blob in `cache` table (disguised) (§8)                                |
 | Header length         | 33 bytes                                                                                             |
 | Codec IDs             | `0` qr-grid (§2.1); `1` gallery (§9); `2` color-grid (§2.2)                                          |
@@ -1002,6 +1151,25 @@ trade gallery's core guarantee for a mode that already has a stronger home.
 | `.db` ladder          | 64 KiB · 256 KiB · 1 MiB · 4 MiB · 16 MiB · 64 MiB (§10.5)                                           |
 | Gate label (Mode B)   | `"stegoshard/v1/slot-kek"` (§10.8)                                                                   |
 | Share (Mode B)        | 38 B: version 1 ‖ index 1 ‖ value 32 ‖ checksum 4; Shamir k-of-n GF(2^8) (§10.8)                     |
+
+### 11.1 AAD labels
+
+Every AEAD site binds its context. The labels are never stored, so they cost
+nothing on disk and make cross-site confusion impossible: a ciphertext sealed at
+one site cannot be opened at another even under an identical key.
+
+| Site                          | Label                            | Bound fields                                                                                                             |
+| ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Key block (§5.1)              | `stegoshard/v2/aad/key-block`    | magic ‖ ver ‖ Argon2 params ‖ salt ‖ iv                                                                                  |
+| Vault blob (§6.1)             | `stegoshard/v2/aad/vault-blob`   | magic ‖ ver ‖ KB_LEN ‖ key block ‖ contentSalt ‖ IV                                                                      |
+| Slot array (§10.1)            | `stegoshard/v2/aad/slot-array`   | kind ‖ SLOT_COUNT ‖ REGION_COUNT ‖ vault_salt                                                                            |
+| Region block (§10.6)          | `stegoshard/v2/aad/vault-region` | vault_salt ‖ slot_array ‖ index ‖ R ‖ contentSalt ‖ IV                                                                   |
+| Gallery fragment (§9.2)       | `stegoshard/v2/aad/gallery-frag` | (constant: domain separation only)                                                                                       |
+| Segmented chunk (§8.1, §10.7) | _(none)_                         | head ‖ region_index ‖ contentSalt ‖ noncePrefix — the head already opens with `"SSCS"` and a version, which separates it |
+
+Integers are big-endian and fixed-width; every variable-length field is either
+fixed by construction or immediately preceded by its length, so no two distinct
+field tuples can encode alike.
 
 ---
 

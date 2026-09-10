@@ -27,12 +27,13 @@ import {
   type SlotEntry,
   VAULT_SALT_LEN,
   buildSlotArray,
-  decryptBytes,
+  slotAadFor,
+  aeadSeal,
+  aeadOpen,
   deriveContentKey,
   deriveRegionKey,
   deriveSlotKek,
   slotKekCandidates,
-  encryptBytes,
   GCM_TAG_LEN,
   IV_LEN,
   KEY_BLOCK_LEN,
@@ -44,6 +45,7 @@ import {
   unlockKeyBlock,
   WrongPasswordError,
 } from './crypto';
+import { regionBlockAad, vaultBlobAad } from './aad';
 import { BucketTooLargeError, DB_LADDER, pickBucket } from './buckets';
 import { REGION_LEN_FIELD, padRegionPlaintext, parseRegionPlaintext } from './regions';
 import type { KeyMode } from './types';
@@ -58,7 +60,7 @@ import {
   decodeSegmentedBlob,
   decodeSegmentedBlobWithDek,
 } from './segmented';
-import { buildPayload, parsePayload } from './payload';
+import { buildPayload, parsePayload, type VaultIdentity } from './payload';
 import { decodeBlob, encodeShards, parityCount } from './erasure';
 import {
   CODEC_QR_GRID,
@@ -69,7 +71,7 @@ import {
   decodeImagePayload,
   encodeImagePayload,
 } from './header';
-import { SET_ID_LEN } from './header';
+import { FORMAT_VERSION, SET_ID_LEN } from './header';
 import { getCodec } from './codec';
 
 /** Hard limit on the source file for the image/PDF paths (plan §5). */
@@ -133,8 +135,16 @@ function dataPerShard(codecId: number, profile: number): number {
 
 /** Analytical vault blob length. `embedKey` includes the wrapped DEK block. */
 export function blobLenFor(envelopeLen: number, embedKey: boolean): number {
-  // [ KB_LEN u16 ][ key block? ][ contentSalt 16 ][ IV ][ ciphertext = envelope + GCM tag ]
-  return 2 + (embedKey ? KEY_BLOCK_LEN : 0) + CONTENT_SALT_LEN + IV_LEN + envelopeLen + GCM_TAG_LEN;
+  // [ magic 4 ][ VER 1 ][ KB_LEN u16 ][ key block? ][ contentSalt 16 ][ IV ]
+  // [ ciphertext = envelope + GCM tag ]
+  return (
+    BLOB_PREFIX_LEN +
+    (embedKey ? KEY_BLOCK_LEN : 0) +
+    CONTENT_SALT_LEN +
+    IV_LEN +
+    envelopeLen +
+    GCM_TAG_LEN
+  );
 }
 
 /** True when this key mode stores the wrapped DEK inside the images. */
@@ -158,6 +168,14 @@ export interface ExportOptions {
   keyMode?: KeyMode | undefined;
   /** CONTENT is a .zip of several files (SPEC §4 FLAGS bit1). */
   bundle?: boolean | undefined;
+  /**
+   * Vault identity, for rollback detection (SPEC §4 FLAGS bit2). Only the open
+   * paths accept one: the gallery and disguised-`.db` builders take no such
+   * parameter at all, so a deniable export cannot carry an identity even by
+   * mistake. Absent by default — a sequence that is always 1 for want of state
+   * would look like a guarantee without being one.
+   */
+  identity?: VaultIdentity | undefined;
 }
 
 export interface ExportResult {
@@ -184,16 +202,32 @@ export async function sha256Short(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(digest).slice(0, HASH_LEN);
 }
 
-/** vault blob = [ KB_LEN u16 ][ keyBlock ][ contentSalt 16 ][ IV 12 ][ ciphertext ] */
+/**
+ * The §6 vault blob is self-describing, like the segmented container.
+ *
+ *   [ MAGIC "SSVB" 4 ][ VER 1 ][ KB_LEN u16 ][ keyBlock ][ contentSalt 16 ]
+ *   [ IV 12 ][ ciphertext ]
+ *
+ * The magic and version used to be absent: the blob inherited its version from
+ * the SSHD image header, which is NOT authenticated (its 4-byte hash is a triage
+ * hint, never a security boundary), so the format version of a blob was covered
+ * by nothing at all. Carrying them here puts the version under the AAD and lets
+ * a blob be identified outside the image that happened to hold it.
+ */
+const BLOB_MAGIC = Uint8Array.from([0x53, 0x53, 0x56, 0x42]); // "SSVB" (StegoShard Vault Blob)
+/** magic(4) + version(1) + KB_LEN(2). */
+const BLOB_PREFIX_LEN = BLOB_MAGIC.length + 1 + 2;
+
 function serializeVaultBlob(
   keyBlock: Uint8Array,
   contentSalt: Uint8Array,
   iv: Uint8Array,
   ciphertext: Uint8Array,
 ): Uint8Array {
-  const lenField = new Uint8Array(2);
-  writeU16(lenField, 0, keyBlock.length);
-  return concatBytes(lenField, keyBlock, contentSalt, iv, ciphertext);
+  const head = new Uint8Array(1 + 2);
+  head[0] = FORMAT_VERSION;
+  writeU16(head, 1, keyBlock.length);
+  return concatBytes(BLOB_MAGIC, head, keyBlock, contentSalt, iv, ciphertext);
 }
 
 function parseVaultBlob(blob: Uint8Array): {
@@ -202,8 +236,22 @@ function parseVaultBlob(blob: Uint8Array): {
   iv: Uint8Array;
   ciphertext: Uint8Array;
 } {
-  const kbLen = readU16(blob, 0);
-  let o = 2;
+  if (blob.length < BLOB_PREFIX_LEN + CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN) {
+    throw new Error('vault blob: too short');
+  }
+  for (let i = 0; i < BLOB_MAGIC.length; i++) {
+    if (blob[i] !== BLOB_MAGIC[i]) throw new Error('vault blob: bad magic');
+  }
+  const version = blob[BLOB_MAGIC.length];
+  if (version !== FORMAT_VERSION) throw new Error(`vault blob: unsupported version ${version}`);
+  let o = BLOB_MAGIC.length + 1;
+  const kbLen = readU16(blob, o);
+  o += 2;
+  // Bound the declared length before slicing: it is attacker-controlled and is
+  // read before anything is authenticated.
+  if (o + kbLen + CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN > blob.length) {
+    throw new Error('vault blob: key block length out of range');
+  }
   const keyBlock = blob.slice(o, o + kbLen);
   o += kbLen;
   const contentSalt = blob.slice(o, o + CONTENT_SALT_LEN);
@@ -212,6 +260,15 @@ function parseVaultBlob(blob: Uint8Array): {
   o += IV_LEN;
   const ciphertext = blob.slice(o);
   return { keyBlock, contentSalt, iv, ciphertext };
+}
+
+/** The §6 blob's AAD: everything that precedes the ciphertext. */
+function vaultBlobAadFor(
+  keyBlock: Uint8Array,
+  contentSalt: Uint8Array,
+  iv: Uint8Array,
+): Uint8Array {
+  return vaultBlobAad(BLOB_MAGIC, FORMAT_VERSION, keyBlock, contentSalt, iv);
 }
 
 /**
@@ -271,17 +328,26 @@ export async function buildVaultBlob(
   key: VaultKey,
   keyMode: KeyMode,
   bundle = false,
+  identity?: VaultIdentity | undefined,
 ): Promise<Uint8Array> {
-  const envelope = await buildPayload(filename, content, { bundle });
+  const envelope = await buildPayload(filename, content, { bundle, identity });
   // Encrypt under a per-export subkey (CEK) derived from the DEK and a fresh
   // random salt, so the random-IV collision bound is per-export even though the
   // DEK is shared across vaults (SPEC §6).
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
   const cek = await deriveContentKey(key.dek, contentSalt);
-  const { iv, ciphertext } = await encryptBytes(cek, envelope);
   // Embed the key block, or leave it out (KB_LEN=0) so it can be delivered
-  // separately (keyfile/stego/binary-key modes).
+  // separately (keyfile/stego/binary-key modes). Decided before sealing, because
+  // the AAD binds the choice: an attacker cannot strip an embedded key block and
+  // re-present the vault as keyfile-mode.
   const embeddedKeyBlock = isEmbedded(keyMode) ? key.keyBlock : new Uint8Array(0);
+  const iv = randomBytes(IV_LEN);
+  const ciphertext = await aeadSeal(
+    cek,
+    iv,
+    envelope,
+    vaultBlobAadFor(embeddedKeyBlock, contentSalt, iv),
+  );
   return serializeVaultBlob(embeddedKeyBlock, contentSalt, iv, ciphertext);
 }
 
@@ -290,14 +356,23 @@ export async function decodeVaultBlob(
   blob: Uint8Array,
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
-): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+): Promise<{
+  filename: string;
+  content: Uint8Array;
+  bundled: boolean;
+  identity?: VaultIdentity | undefined;
+}> {
   const { keyBlock, contentSalt, iv, ciphertext } = parseVaultBlob(blob);
   // Embedded key block travels in the blob; otherwise the caller must supply it.
   const kbBytes = keyBlock.length > 0 ? keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
   const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
   const cek = await deriveContentKey(dek, contentSalt);
-  const envelope = await decryptBytes(cek, iv, ciphertext);
+  // The AAD uses the blob's own KB_LEN region, not the externally supplied key
+  // block: in keyfile/stego mode `keyBlock` is empty and only the zero length
+  // field is bound. Binding the external `.key` would break a password change,
+  // which re-serializes it while keeping the same DEK.
+  const envelope = await aeadOpen(cek, iv, ciphertext, vaultBlobAadFor(keyBlock, contentSalt, iv));
   return parsePayload(envelope, opts.maxContentBytes);
 }
 
@@ -324,8 +399,20 @@ export interface LiveRegion {
   envelope: Uint8Array;
 }
 
-/** Build the two equal-length region blocks; dead regions are filled from CSPRNG. */
+/**
+ * Build the two equal-length region blocks; dead regions are filled from CSPRNG.
+ *
+ * Each live block is bound to the container it belongs to (`vaultSalt` and the
+ * finished `slotArray`), to its own index, and to its geometry, so a region
+ * cannot be transplanted between containers or swapped with its neighbour. The
+ * IV is drawn here rather than inside `encryptBytes` because the AAD covers it.
+ *
+ * None of this is stored, so a dead region stays exactly `R` CSPRNG bytes and
+ * the two blocks remain the same length and shape.
+ */
 async function buildRegionBlocks(
+  vaultSalt: Uint8Array,
+  slotArray: Uint8Array,
   live: LiveRegion[],
   ladder: readonly number[],
 ): Promise<{ blocks: [Uint8Array, Uint8Array]; R: number }> {
@@ -336,8 +423,14 @@ async function buildRegionBlocks(
   const blocks: [Uint8Array | null, Uint8Array | null] = [null, null];
   for (const r of live) {
     const contentSalt = randomBytes(CONTENT_SALT_LEN);
+    const iv = randomBytes(IV_LEN);
     const cek = await deriveRegionKey(r.dek, contentSalt, r.regionIndex);
-    const { iv, ciphertext } = await encryptBytes(cek, padRegionPlaintext(r.envelope, bucket));
+    const ciphertext = await aeadSeal(
+      cek,
+      iv,
+      padRegionPlaintext(r.envelope, bucket),
+      regionBlockAad(vaultSalt, slotArray, r.regionIndex, R, contentSalt, iv),
+    );
     blocks[r.regionIndex] = concatBytes(contentSalt, iv, ciphertext);
   }
   for (let i = 0; i < REGION_COUNT; i++) if (!blocks[i]) blocks[i] = randomBytes(R);
@@ -356,10 +449,10 @@ export async function buildMultiRegionVaultBlob(
   ladder: readonly number[],
 ): Promise<Uint8Array> {
   if (vaultSalt.length !== VAULT_SALT_LEN) throw new RangeError('multi-region: bad vault salt');
-  const slotArray = await buildSlotArray(slotEntries);
+  const slotArray = await buildSlotArray(slotEntries, slotAadFor('gallery-multiregion', vaultSalt));
   const {
     blocks: [b0, b1],
-  } = await buildRegionBlocks(live, ladder);
+  } = await buildRegionBlocks(vaultSalt, slotArray, live, ladder);
   return concatBytes(vaultSalt, slotArray, b0, b1);
 }
 
@@ -442,6 +535,8 @@ function splitMultiRegionBlob(blob: Uint8Array): {
 
 /** Decrypt one region block with its independent DEK. */
 async function decodeRegion(
+  vaultSalt: Uint8Array,
+  slotArray: Uint8Array,
   regionArea: Uint8Array,
   R: number,
   regionIndex: number,
@@ -453,9 +548,20 @@ async function decodeRegion(
   const iv = block.subarray(CONTENT_SALT_LEN, CONTENT_SALT_LEN + IV_LEN);
   const ciphertext = block.subarray(CONTENT_SALT_LEN + IV_LEN);
   const cek = await deriveRegionKey(dek, contentSalt, regionIndex);
-  const plaintext = await decryptBytes(cek, iv, ciphertext);
+  const plaintext = await aeadOpen(
+    cek,
+    iv,
+    ciphertext,
+    regionBlockAad(vaultSalt, slotArray, regionIndex, R, contentSalt, iv),
+  );
   const envelope = parseRegionPlaintext(plaintext, maxContentBytes);
-  return parsePayload(envelope, maxContentBytes);
+  // Narrowed on purpose. The multi-region paths never write an identity (their
+  // builders take no such parameter), and the decode surface must not grow a key
+  // that could differ between a real and a decoy unlock: `access.duress.test.ts`
+  // asserts these results are exactly (filename, content, bundled) so that a
+  // caller cannot tell the two apart from the shape of what it gets back.
+  const { filename, content, bundled } = await parsePayload(envelope, maxContentBytes);
+  return { filename, content, bundled };
 }
 
 /**
@@ -488,8 +594,12 @@ export async function decodeMultiRegionVaultBlob(
   } catch {
     throw new WrongPasswordError();
   }
-  const { dek, regionIndex } = await openSlotArray(slotArray, candidates);
-  return decodeRegion(regionArea, R, regionIndex, dek, opts.maxContentBytes);
+  const { dek, regionIndex } = await openSlotArray(
+    slotArray,
+    candidates,
+    slotAadFor('gallery-multiregion', vaultSalt),
+  );
+  return decodeRegion(vaultSalt, slotArray, regionArea, R, regionIndex, dek, opts.maxContentBytes);
 }
 
 /**
@@ -502,8 +612,8 @@ export async function decodeMultiRegionVaultBlobWithDek(
   regionIndex: number,
   maxContentBytes = MAX_FILE_BYTES_BINARY,
 ): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
-  const { regionArea, R } = splitMultiRegionBlob(blob);
-  return decodeRegion(regionArea, R, regionIndex, dek, maxContentBytes);
+  const { vaultSalt, slotArray, regionArea, R } = splitMultiRegionBlob(blob);
+  return decodeRegion(vaultSalt, slotArray, regionArea, R, regionIndex, dek, maxContentBytes);
 }
 
 export async function exportVault(
@@ -519,7 +629,14 @@ export async function exportVault(
   const codecId = options.codecId ?? CODEC_QR_GRID;
   const keyMode = options.keyMode ?? 'embedded';
 
-  const blob = await buildVaultBlob(filename, content, key, keyMode, options.bundle);
+  const blob = await buildVaultBlob(
+    filename,
+    content,
+    key,
+    keyMode,
+    options.bundle,
+    options.identity,
+  );
 
   const k = Math.max(1, Math.ceil(blob.length / dataPerShard(codecId, profile)));
   const m = parityCount(k);
@@ -534,7 +651,7 @@ export async function exportVault(
 
   const imagePayloads = shards.map((shard, shardIndex) => {
     const header: Header = {
-      version: 1,
+      version: FORMAT_VERSION,
       setId,
       shardIndex,
       k,
@@ -559,7 +676,13 @@ export async function importVault(
   payloads: Uint8Array[],
   password: string,
   opts: { keyBlock?: Uint8Array | undefined } = {},
-): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+): Promise<{
+  filename: string;
+  content: Uint8Array;
+  bundled: boolean;
+  /** Present only when the export carried one; see payload.ts. */
+  identity?: VaultIdentity | undefined;
+}> {
   const blob = await reassembleBlob(payloads);
   return decodeVaultBlob(blob, password, {
     keyBlock: opts.keyBlock,
@@ -697,6 +820,8 @@ export async function exportVaultBinary(
     variant?: BinaryVariant;
     maxBytes?: number;
     bundle?: boolean | undefined;
+    /** Rollback identity (open paths only); see ExportOptions.identity. */
+    identity?: VaultIdentity | undefined;
   } = {},
   onProgress?: OnProgress,
 ): Promise<{ container: Uint8Array; keyMode: KeyMode; keyBlock: Uint8Array }> {
@@ -718,6 +843,7 @@ export async function exportVaultBinary(
     onProgress,
     undefined,
     options.bundle,
+    options.identity,
   );
   return { container: wrapBinary(blob, variant), keyMode, keyBlock: key.keyBlock };
 }
@@ -795,7 +921,13 @@ export async function importVaultBinary(
     secret?: Uint8Array | null;
   } = {},
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+): Promise<{
+  filename: string;
+  content: Uint8Array;
+  bundled: boolean;
+  /** Only the branded/bare (open) path can carry one; disguised never does. */
+  identity?: VaultIdentity | undefined;
+}> {
   const unwrapped = unwrapBinary(container);
   const blob = unwrapped?.payload ?? container;
   const maxContentBytes = opts.maxBytes ?? MAX_FILE_BYTES_BINARY;
@@ -848,9 +980,9 @@ export async function decodeVaultBlobWithDek(
   dek: CryptoKey,
   maxContentBytes = MAX_FILE_BYTES_BINARY,
 ): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
-  const { contentSalt, iv, ciphertext } = parseVaultBlob(blob);
+  const { keyBlock, contentSalt, iv, ciphertext } = parseVaultBlob(blob);
   const cek = await deriveContentKey(dek, contentSalt);
-  const envelope = await decryptBytes(cek, iv, ciphertext);
+  const envelope = await aeadOpen(cek, iv, ciphertext, vaultBlobAadFor(keyBlock, contentSalt, iv));
   return parsePayload(envelope, maxContentBytes);
 }
 

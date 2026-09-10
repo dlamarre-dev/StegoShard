@@ -24,12 +24,13 @@ the _second_ asset, observability, which is where the two models diverge.
 
 ## Adversaries
 
-| Adversary                | Capability                                                                                                                            |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Opportunistic finder** | Stumbles on the carrier (a lost USB stick, a shared drive, a folder listing). Glances, triages by file type, moves on.                |
-| **Cloud / platform**     | Stores or transmits the carrier and may **re-encode** it (a social network recompresses uploaded photos; a chat app strips metadata). |
-| **Forensic examiner**    | Has the file and dedicated tools; will open it, run steganalysis, and look for statistical tells.                                     |
-| **Coercive adversary**   | Can **compel** you to produce passwords or explain files ("rubber-hose"). Deniability, not cryptography, is your only lever here.     |
+| Adversary                | Capability                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Opportunistic finder** | Stumbles on the carrier (a lost USB stick, a shared drive, a folder listing). Glances, triages by file type, moves on.                                   |
+| **Cloud / platform**     | Stores or transmits the carrier and may **re-encode** it (a social network recompresses uploaded photos; a chat app strips metadata).                    |
+| **Forensic examiner**    | Has the file and dedicated tools; will open it, run steganalysis, and look for statistical tells.                                                        |
+| **Coercive adversary**   | Can **compel** you to produce passwords or explain files ("rubber-hose"). Deniability, not cryptography, is your only lever here.                        |
+| **Upstream compromise**  | Controls what you install: the release workflow, a build dependency, or the repository itself. Reaches every user at once, before any password is typed. |
 
 ## What each model defends against
 
@@ -151,6 +152,52 @@ it.
 at all, which is a guarantee worth more than the convenience; see
 [CLI.md](CLI.md#the-same-app-in-a-browser-from-your-own-machine).
 
+## The build and the download
+
+Every adversary above meets StegoShard _after_ it is installed. This one arrives
+before, and neither storage model helps: encryption you did not receive intact
+protects nothing.
+
+**What is done.** Third-party actions are pinned to full commit SHAs, with a
+weekly job checking each one still resolves upstream. `npm ci` and hash-pinned
+Python lockfiles fix the dependency tree; `npm audit` is gated by a wrapper that
+tells a real advisory from a registry outage without loosening the gate. CodeQL
+runs on every push, and a CBOM scan fails on any new HIGH crypto. `check-pack.ts`
+asserts the exact published file set against an allowlist and a denylist, and
+`.bundled/` is a committed manifest so a change to what a build inlines cannot
+land without regenerating the third-party notices. Every released archive carries
+a SHA-256 list and a Sigstore build-provenance attestation. The binaries hold no
+network permission at all.
+
+**What that is worth.** Each of those raises the cost of a _silent_ change. None
+of them establishes that the code is good. Together they mean a compromise has to
+be visible in the repository — as a commit, a lockfile change, a workflow edit —
+rather than injected between the repository and you.
+
+**What it costs you: you are trusting this repository and GitHub's runners.**
+Write access to the repository is sufficient to weaken the cryptography and ship a
+release that passes every check on this page. Provenance answers "did someone swap
+this file in transit"; it does not answer "is this commit benign", and it cannot.
+
+And **"no network permission" bounds exfiltration, not damage.** A compromised
+build needs no socket to hurt you: it can weaken the key derivation, bias the
+random draw, or encode key material into the output files. That last one is the
+specific risk for this tool, because a StegoShard output is a file you
+_deliberately_ hand to a cloud, a printer, or a photo album. The carrier is the
+channel.
+
+**What reduces it, for you.** Verify the download before you run it
+([CLI.md](CLI.md#verify-your-download)). Build from a clone and read the diff
+since the last tag. And restore with the [Python decoder](../python/README.md):
+it is an independent implementation on a separate dependency tree, running in CI
+against the same fixtures, so a compromised TypeScript build cannot make its
+output decode correctly under a decoder it did not produce. That cross-check is
+the closest thing this project has to a second opinion, and it is a large part of
+why the Python decoder exists.
+
+None of that is reproducible builds, and none of it is a second signer. Neither
+is promised before 1.0.
+
 ## Driving StegoShard from an agent (MCP)
 
 `stegoshard mcp` lets an AI agent call save, restore and estimate as tools. It is
@@ -194,6 +241,44 @@ deno run --allow-read=/path/to/vault --allow-write=/path/to/vault --allow-env \
 
 See [API.md](API.md) for the tool schemas and the error codes.
 
+## Rollback tracking (`--track`)
+
+Off by default, and the only feature here that writes a durable file of its own.
+
+**What it does.** A tracked save numbers each export of a vault you name, and a
+restore warns when the copy in front of you is older than the newest one this
+machine recorded. It catches a _silent_ replacement: a botched sync, a stale USB
+stick, an adversary with write access to the vault but not to your home
+directory. The restore still succeeds — the old copy may be the only one that
+survived, and refusing it would turn a detection into a denial of service.
+
+**What it does not do.** It stops nothing. And it stops nothing at all against an
+adversary who can also write to the registry: they lower the number, or delete the
+file, and the check reports an unknown vault or says nothing. It does not create
+trust; it moves it from the vault file to a local JSON file.
+
+**What it costs you, which is the part to read twice.** The registry is a durable,
+cleartext list of vault identifiers and access timestamps in your home directory,
+and it is the **first persistent state the command line has ever kept** — a real
+exception to "the command line leaves nothing behind but the files you asked for".
+Against the coercive adversary it is the most damaging artifact this tool can
+produce. It does not say where a vault is or what is in it. It proves **how many
+exist and when they were touched**, which is precisely the claim deniability rests
+on denying. That is the same category as an instruction sheet or a recovery
+label, one step worse.
+
+So it is opt-in, off by default, and **refused outright** on every deniable
+destination: `--track` with `gallery-save`, `--binary --disguise`, `--mode
+duress` or `--mode nonpossession` is an error, not a silent no-op. A no-op would
+be worse, because you would carry on believing the protection was there on the one
+path where believing anything extra is the mistake.
+
+**The version worth using needs no file.** Whenever an export carries an identity,
+both save and restore print `vault 3f8a1c02 · export #4`. If you know you last
+wrote #5, a restore that says #4 has told you everything the registry would have,
+and left nothing on disk. That is the same role a recovery sheet plays for
+resilient storage: the person is the trusted external state.
+
 ## Deliberate non-goals
 
 StegoShard does **not** claim, and you should not rely on:
@@ -208,13 +293,23 @@ StegoShard does **not** claim, and you should not rely on:
 - **Protection once you are compelled and the resilient vault is found.** Resilient Storage
   is openly a secret; against coercion, only the deniable models help, and only to the
   extent the carrier truly blends in.
-- **Authenticated-vault / anti-tampering guarantees.** An attacker with write access can
-  destroy or replace a vault wholesale; decryption under a wrong key _fails_ (GCM tag)
-  rather than yielding wrong plaintext, but the format does not bind key blocks to
-  ciphertext. See [CRYPTO-REVIEW.md §7](CRYPTO-REVIEW.md).
+- **Anti-rollback guarantees.** Every AEAD site now binds its context, so key
+  blocks, salts, region blocks and slot arrays cannot be spliced between
+  containers ([CRYPTO-REVIEW.md §7.3](CRYPTO-REVIEW.md)). What that does **not**
+  reach is replacement of a vault by an older, entirely legitimate export of
+  itself: a tag authenticates a message, never the absence of a newer one. An
+  attacker with write access can still destroy or replace a vault wholesale.
+  `--track` detects the silent case and is honest about the rest, below.
+- **Protection against a compromised build of StegoShard itself.** Releases are
+  attested and checksummed, which binds an artifact to a workflow and a commit;
+  that is an integrity property of the _distribution_, not a statement about the
+  commit. Builds are not reproducible and no second party signs them. If the
+  repository is compromised, nothing in this document helps you. See _The build
+  and the download_ above.
 - **Hiding metadata you supply.** Human-readable labels, PDF titles, and instruction
   sheets are conveniences for Resilient Storage; they are the opposite of deniable. Do not
-  use them in Deniable mode.
+  use them in Deniable mode. **`--track` belongs in this category**, and is the
+  strongest example of it: see _Rollback tracking_ below.
 - **Inventing cryptography.** The core is standard symmetric primitives only (Argon2id,
   AES-256-GCM, HKDF-SHA256); no asymmetric crypto, hence no Shor exposure. See
   [CRYPTO-REVIEW.md §9](CRYPTO-REVIEW.md).

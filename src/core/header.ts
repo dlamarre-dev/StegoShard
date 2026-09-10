@@ -15,7 +15,7 @@
 import { concatBytes, readU16, readU32, writeU16, writeU32 } from './bytes';
 
 export const MAGIC = Uint8Array.from([0x53, 0x53, 0x48, 0x44]); // "SSHD" (StegoShard)
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 export const SET_ID_LEN = 8;
 export const HASH_LEN = 4;
 export const HEADER_LEN = 33;

@@ -17,6 +17,7 @@
 
 import { argon2id, createHMAC, createSHA256, type IHasher } from 'hash-wasm';
 import { concatBytes, readU16, readU32, writeU16, writeU32 } from './bytes';
+import { keyBlockAad, slotArrayAad, type ContainerKind } from './aad';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -45,12 +46,19 @@ export interface Argon2Params {
  * memory-exhaustion DoS. Reject anything outside a generous-but-safe range.
  */
 const ARGON2_LIMITS = {
-  // These fields are attacker-controlled and consumed before authentication.
-  // Parallelism up to four remains accepted for compatibility with committed
-  // v1 vectors; memory and time stay capped at the production candidate values.
+  // These fields are attacker-controlled and consumed before authentication, so
+  // the ceilings are the real defence: they bound the work a hostile key block
+  // can force before anything is verified. All three now sit exactly at the
+  // production values. Parallelism used to allow up to four purely to keep the
+  // committed v1 vectors decodable; with no published vaults to stay compatible
+  // with, that allowance bought nothing and is gone.
+  //
+  // The floors stay low on purpose. A block that asks for *less* work attacks
+  // nobody but itself, and the test suites derive with deliberately cheap
+  // parameters; raising the floors would break them for no security gain.
   iterations: { min: 1, max: 4 },
   memoryKiB: { min: 8, max: 256 * 1024 }, // ≤ 256 MiB
-  parallelism: { min: 1, max: 4 },
+  parallelism: { min: 1, max: 1 },
 } as const;
 
 /** Validate Argon2id parameters against ARGON2_LIMITS; throw on anything absurd. */
@@ -269,14 +277,23 @@ export function importDek(raw: Uint8Array): Promise<CryptoKey> {
   ]);
 }
 
-/** AES-GCM encrypt. Returns iv + ciphertext(+tag) separately. */
+/**
+ * AES-GCM encrypt with a fresh random IV. Returns iv + ciphertext(+tag) separately.
+ *
+ * `aad` has no default on purpose. Every one of these call sites has a context
+ * worth binding, and the sites that genuinely do not must say so by passing
+ * `EMPTY_AAD`. A default would let the next one be added without anyone
+ * deciding, which is exactly how the format ended up with unbound paths beside
+ * bound ones. See ./aad.ts.
+ */
 export async function encryptBytes(
   key: CryptoKey,
   plaintext: Uint8Array,
+  aad: Uint8Array,
 ): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
   const iv = randomBytes(IV_LEN);
   const ct = await subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as BufferSource },
+    { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad as BufferSource },
     key,
     plaintext as BufferSource,
   );
@@ -322,17 +339,21 @@ export async function aeadOpen(
   return new Uint8Array(pt);
 }
 
-/** AES-GCM decrypt. Throws (OperationError) on a wrong key or tampering. */
+/**
+ * AES-GCM decrypt. Throws (OperationError) on a wrong key, a wrong AAD, or
+ * tampering. `aad` is required for the reason given on `encryptBytes`.
+ */
 export async function decryptBytes(
   key: CryptoKey,
   iv: Uint8Array,
   ciphertext: Uint8Array,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
   // GCM accepts any nonzero IV length, but this format only ever produces
   // 12-byte IVs; reject anything else instead of silently diverging.
   if (iv.length !== IV_LEN) throw new RangeError('decrypt: bad iv length');
   const pt = await subtle.decrypt(
-    { name: 'AES-GCM', iv: iv as BufferSource },
+    { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad as BufferSource },
     key,
     ciphertext as BufferSource,
   );
@@ -386,10 +407,22 @@ export async function deriveContentKey(dek: CryptoKey, salt: Uint8Array): Promis
   return key;
 }
 
-/** Wrap (encrypt) the DEK with the KEK. */
+/**
+ * Wrap (encrypt) the DEK with the KEK, binding the block to its own header.
+ *
+ * The IV is drawn here rather than inside `encryptBytes` because the AAD covers
+ * it: the nonce has to exist before the AAD can be built, so this path seals
+ * with an explicit nonce the way the slot path does.
+ *
+ * `salt` and `params` are the ones this block will be serialized with. They are
+ * inputs, not outputs, so a caller cannot wrap under one header and publish
+ * another.
+ */
 export async function wrapDEK(
   dek: CryptoKey,
   kek: CryptoKey,
+  salt: Uint8Array,
+  params: Argon2Params,
 ): Promise<{ iv: Uint8Array; wrapped: Uint8Array }> {
   // Copy into a private buffer before zeroizing. Per the Web Crypto spec
   // exportKey returns a fresh ArrayBuffer, but some runtimes (observed under
@@ -398,18 +431,38 @@ export async function wrapDEK(
   // the zeroization can never scribble on key material.
   const rawDek = (await subtle.exportKey('raw', dek)).slice(0);
   const view = new Uint8Array(rawDek);
-  const { iv, ciphertext } = await encryptBytes(kek, view);
+  const iv = randomBytes(IV_LEN);
+  const wrapped = await aeadSeal(kek, iv, view, keyBlockAadFor(salt, params, iv));
   view.fill(0); // zeroize the transient plaintext DEK (our private copy)
-  return { iv, wrapped: ciphertext };
+  return { iv, wrapped };
 }
 
-/** Unwrap (decrypt) the DEK with the KEK. Throws on a wrong password. */
+/** The §5.1 key block's AAD, from the fields it will be serialized with. */
+function keyBlockAadFor(salt: Uint8Array, params: Argon2Params, iv: Uint8Array): Uint8Array {
+  return keyBlockAad(
+    KEY_MAGIC,
+    KEY_BLOCK_VERSION,
+    params.iterations,
+    params.memoryKiB,
+    params.parallelism,
+    salt,
+    iv,
+  );
+}
+
+/**
+ * Unwrap (decrypt) the DEK with the KEK. Throws on a wrong password, and now
+ * also on an edited header: the Argon2 cost parameters, the salt and the IV are
+ * covered by the tag rather than merely feeding the derivation.
+ */
 export async function unwrapDEK(
   wrapped: Uint8Array,
   iv: Uint8Array,
   kek: CryptoKey,
+  salt: Uint8Array,
+  params: Argon2Params,
 ): Promise<CryptoKey> {
-  const rawDek = await decryptBytes(kek, iv, wrapped);
+  const rawDek = await aeadOpen(kek, iv, wrapped, keyBlockAadFor(salt, params, iv));
   const key = await subtle.importKey('raw', rawDek as BufferSource, { name: 'AES-GCM' }, true, [
     'encrypt',
     'decrypt',
@@ -421,7 +474,7 @@ export async function unwrapDEK(
 // --- Wrapped DEK block: self-contained, password-protected key artifact ------
 
 const KEY_MAGIC = Uint8Array.from([0x53, 0x53, 0x4b, 0x59]); // "SSKY" (StegoShard KeY)
-const KEY_BLOCK_VERSION = 1;
+export const KEY_BLOCK_VERSION = 2;
 
 export interface KeyBlock {
   salt: Uint8Array;
@@ -506,7 +559,7 @@ export async function createKeyBlock(
   const salt = randomBytes(SALT_LEN);
   const kek = await deriveKEK(password, salt, params);
   const dek = await generateDEK();
-  const { iv, wrapped } = await wrapDEK(dek, kek);
+  const { iv, wrapped } = await wrapDEK(dek, kek, salt, params);
   return { dek, block: { salt, params, iv, wrapped } };
 }
 
@@ -526,7 +579,7 @@ export async function unlockKeyBlock(block: KeyBlock, password: string): Promise
     // failures both surface as the same typed error: nothing about the cause
     // is leaked, and callers get one uniform "wrong password" signal.
     const kek = await deriveKEK(password, block.salt, block.params);
-    return await unwrapDEK(block.wrapped, block.iv, kek);
+    return await unwrapDEK(block.wrapped, block.iv, kek, block.salt, block.params);
   } catch {
     throw new WrongPasswordError();
   }
@@ -542,7 +595,7 @@ export async function rewrapKeyBlock(
   const dek = await unlockKeyBlock(block, oldPassword);
   const salt = randomBytes(SALT_LEN);
   const kek = await deriveKEK(newPassword, salt, params);
-  const { iv, wrapped } = await wrapDEK(dek, kek);
+  const { iv, wrapped } = await wrapDEK(dek, kek, salt, params);
   return { salt, params, iv, wrapped };
 }
 
@@ -568,7 +621,6 @@ export const SLOT_ARRAY_LEN = SLOT_COUNT * SLOT_SIZE; // 304
 /** Per-vault salt for the slot KEK(s). Reuses the 16-byte salt convention. */
 export const VAULT_SALT_LEN = SALT_LEN; // 16
 
-const EMPTY_AAD = new Uint8Array(0);
 const REGION_INFO_PREFIX = new TextEncoder().encode('stegoshard/vault/region');
 const KEYFILE_KEK_INFO = new TextEncoder().encode('stegoshard/v1/keyfile-kek');
 const SLOT_KEK_INFO = new TextEncoder().encode('stegoshard/v1/slot-kek');
@@ -772,13 +824,14 @@ export async function serializeSlot(
   nonce: Uint8Array,
   dek: Uint8Array,
   regionIndex: number,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
   if (nonce.length !== IV_LEN) throw new RangeError('slot: bad nonce length');
   if (dek.length !== DEK_LEN) throw new RangeError('slot: bad dek length');
   const pt = new Uint8Array(SLOT_PLAINTEXT_LEN); // reserved bytes stay zero
   pt.set(dek, 0);
   pt[REGION_INDEX_OFF] = regionIndex;
-  const sealed = await aeadSeal(kek, nonce, pt, EMPTY_AAD);
+  const sealed = await aeadSeal(kek, nonce, pt, aad);
   pt.fill(0); // zeroize the transient plaintext DEK
   return concatBytes(nonce, sealed);
 }
@@ -796,7 +849,7 @@ export interface SlotEntry {
  * block is indistinguishable from a live slot without the KEK); then ALL slots are
  * shuffled by an unbiased permutation, so slot position carries no meaning.
  */
-export async function buildSlotArray(entries: SlotEntry[]): Promise<Uint8Array> {
+export async function buildSlotArray(entries: SlotEntry[], aad: Uint8Array): Promise<Uint8Array> {
   if (entries.length < 1 || entries.length > SLOT_COUNT) {
     throw new RangeError(`slot array: ${entries.length} live entries (want 1..${SLOT_COUNT})`);
   }
@@ -805,7 +858,7 @@ export async function buildSlotArray(entries: SlotEntry[]): Promise<Uint8Array> 
     if (e.regionIndex < 0 || e.regionIndex >= REGION_COUNT) {
       throw new RangeError(`slot: region index ${e.regionIndex} out of range`);
     }
-    slots.push(await serializeSlot(e.kek, randomBytes(IV_LEN), e.dek, e.regionIndex));
+    slots.push(await serializeSlot(e.kek, randomBytes(IV_LEN), e.dek, e.regionIndex, aad));
   }
   while (slots.length < SLOT_COUNT) slots.push(randomBytes(SLOT_SIZE));
   secureShuffle(slots);
@@ -820,13 +873,14 @@ export async function buildSlotArray(entries: SlotEntry[]): Promise<Uint8Array> 
 export async function tryOpenSlot(
   kek: CryptoKey,
   slot: Uint8Array,
+  aad: Uint8Array,
 ): Promise<{ dek: Uint8Array; regionIndex: number } | null> {
   if (slot.length !== SLOT_SIZE) return null;
   const nonce = slot.subarray(0, IV_LEN);
   const sealed = slot.subarray(IV_LEN);
   let pt: Uint8Array;
   try {
-    pt = await aeadOpen(kek, nonce, sealed, EMPTY_AAD);
+    pt = await aeadOpen(kek, nonce, sealed, aad);
   } catch {
     return null;
   }
@@ -845,6 +899,15 @@ export async function tryOpenSlot(
 }
 
 /**
+ * The slot-array AAD for a container. Callers name the kind they are decoding
+ * as; the geometry constants come from here so a reader cannot be talked into a
+ * different slot or region count.
+ */
+export function slotAadFor(kind: ContainerKind, vaultSalt: Uint8Array): Uint8Array {
+  return slotArrayAad(kind, SLOT_COUNT, REGION_COUNT, vaultSalt);
+}
+
+/**
  * Constant-work slot open (SPEC §10.3.1). Attempts EVERY candidate KEK against
  * EVERY slot with no early exit, so total work depends only on the number of
  * candidate KEKs, never on which slot matched or whether any did. A well-formed
@@ -855,6 +918,7 @@ export async function tryOpenSlot(
 export async function openSlotArray(
   slotArray: Uint8Array,
   candidateKeks: CryptoKey[],
+  aad: Uint8Array,
 ): Promise<{ dek: Uint8Array; regionIndex: number }> {
   if (slotArray.length !== SLOT_ARRAY_LEN) throw new WrongPasswordError();
   let found: { dek: Uint8Array; regionIndex: number } | null = null;
@@ -862,7 +926,7 @@ export async function openSlotArray(
   for (const kek of candidateKeks) {
     for (let i = 0; i < SLOT_COUNT; i++) {
       const slot = slotArray.subarray(i * SLOT_SIZE, (i + 1) * SLOT_SIZE);
-      const opened = await tryOpenSlot(kek, slot); // never throws; no early exit
+      const opened = await tryOpenSlot(kek, slot, aad); // never throws; no early exit
       if (opened) {
         matches++;
         if (!found) found = opened;
@@ -886,6 +950,7 @@ export async function unlockSlotArray(
   slotArray: Uint8Array,
   vaultSalt: Uint8Array,
   password: string,
+  kind: ContainerKind,
   params: Argon2Params = DEFAULT_ARGON2,
 ): Promise<{ dek: Uint8Array; regionIndex: number }> {
   let kekBytes: Uint8Array;
@@ -896,7 +961,7 @@ export async function unlockSlotArray(
   }
   try {
     const kek = await importAesGcmKey(kekBytes);
-    return await openSlotArray(slotArray, [kek]);
+    return await openSlotArray(slotArray, [kek], slotAadFor(kind, vaultSalt));
   } finally {
     kekBytes.fill(0);
   }

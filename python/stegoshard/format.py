@@ -12,16 +12,24 @@ from pathlib import PurePosixPath
 from .reedsolomon import reconstruct_data
 
 MAGIC = b"SSHD"  # StegoShard
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 HEADER_LEN = 33
 
 KEY_MAGIC = b"SSKY"  # StegoShard KeY
-KEY_BLOCK_VERSION = 1
+BLOB_MAGIC = b"SSVB"  # StegoShard Vault Blob
+#: magic(4) + version(1) + KB_LEN(2)
+BLOB_PREFIX_LEN = 7
+KEY_BLOCK_VERSION = 2
 KEY_BLOCK_PREFIX_LEN = 44  # magic+ver+iter+mem+par+salt+iv+len (before wrapped)
 
 IV_LEN = 12
 FLAG_COMPRESSED = 0x01
 FLAG_BUNDLE = 0x02
+FLAG_IDENTITY = 0x04
+
+#: Vault identity block, present iff FLAG_IDENTITY: vault_id(16) || sequence(u32).
+VAULT_ID_LEN = 16
+IDENTITY_LEN = VAULT_ID_LEN + 4
 
 # Guards for untrusted input (mirror the TypeScript decoder).
 MAX_CONTENT_BYTES = 1024 * 1024  # image/PDF export cap; bounds gzip on that path
@@ -31,8 +39,11 @@ MAX_CONTENT_BYTES_BINARY = 1024 * 1024 * 1024  # 1 GiB
 ARGON2_LIMITS = {
     "iterations": (1, 4),
     "memory_kib": (8, 256 * 1024),  # <= 256 MiB
-    # Preserve v1 compatibility; committed vectors legitimately use 2 and 4.
-    "parallelism": (1, 4),
+    # Pinned. The wider range existed only so the committed vectors stayed
+    # decodable; with no published vaults to stay compatible with, it bought
+    # nothing. The floors stay low because the suites derive cheaply, and a block
+    # asking for *less* work attacks nobody but itself.
+    "parallelism": (1, 1),
 }
 
 
@@ -176,9 +187,28 @@ def split_multiregion_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, int]
 def parse_vault_blob(blob: bytes) -> tuple[bytes, bytes, bytes, bytes]:
     """Return (key_block_bytes, content_salt, iv, ciphertext). key_block_bytes is
     empty when the key is external (keyfile/stego modes). content_salt feeds the
-    per-export content-key derivation (SPEC §6)."""
-    (kb_len,) = struct.unpack(">H", blob[0:2])
-    o = 2
+    per-export content-key derivation (SPEC §6).
+
+    Layout: [ MAGIC "SSVB" 4 ][ VER 1 ][ KB_LEN u16 ][ keyBlock ]
+            [ contentSalt 16 ][ IV 12 ][ ciphertext ]
+
+    The magic and version are carried by the blob itself rather than inherited
+    from the (unauthenticated) SSHD image header, so the version is covered by
+    the AAD and a blob is identifiable outside the image that held it.
+    """
+    if len(blob) < BLOB_PREFIX_LEN + CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN:
+        raise ValueError("vault blob: too short")
+    if blob[0:4] != BLOB_MAGIC:
+        raise ValueError("vault blob: bad magic")
+    version = blob[4]
+    if version != FORMAT_VERSION:
+        raise ValueError(f"vault blob: unsupported version {version}")
+    (kb_len,) = struct.unpack(">H", blob[5:7])
+    o = BLOB_PREFIX_LEN
+    # Bound the declared length before slicing: it is attacker-controlled and is
+    # read before anything is authenticated.
+    if o + kb_len + CONTENT_SALT_LEN + IV_LEN + GCM_TAG_LEN > len(blob):
+        raise ValueError("vault blob: key block length out of range")
     key_block = blob[o : o + kb_len]
     o += kb_len
     content_salt = blob[o : o + CONTENT_SALT_LEN]
@@ -240,6 +270,23 @@ def unpack_bundle(
     return out
 
 
+def parse_identity(envelope: bytes) -> tuple[bytes, int] | None:
+    """The (vault_id, sequence) an envelope carries, or None when FLAGS bit 2 is
+    clear. Written only on the open paths; the deniable ones never carry one.
+
+    Exposed separately from `parse_envelope`, whose triple is the surface the
+    conformance suite pins.
+    """
+    if len(envelope) < 3 or not envelope[0] & FLAG_IDENTITY:
+        return None
+    (name_len,) = struct.unpack(">H", envelope[1:3])
+    o = 3 + name_len
+    if len(envelope) < o + IDENTITY_LEN:
+        raise ValueError("payload: truncated identity")
+    (sequence,) = struct.unpack(">I", envelope[o + VAULT_ID_LEN : o + IDENTITY_LEN])
+    return envelope[o : o + VAULT_ID_LEN], sequence
+
+
 def parse_envelope(
     envelope: bytes, max_content_bytes: int = MAX_CONTENT_BYTES
 ) -> tuple[str, bytes, bool]:
@@ -249,6 +296,10 @@ def parse_envelope(
     the content. A reader that ignores the bit entirely still recovers the .zip
     intact, which `test_bundle.py` asserts; that is the property that let the
     bit be added without a format version bump.
+
+    FLAGS bit 2 (vault identity) is skipped over here rather than returned, so
+    this triple stays the shape the conformance suite pins; read it with
+    `parse_identity` when you want it.
     """
     if len(envelope) < 3:
         raise ValueError("payload: too short")
@@ -258,7 +309,12 @@ def parse_envelope(
     if len(envelope) < name_end:
         raise ValueError("payload: truncated filename")
     filename = envelope[3:name_end].decode("utf-8")
-    stored = envelope[name_end:]
+    o = name_end
+    if flags & FLAG_IDENTITY:
+        if len(envelope) < o + IDENTITY_LEN:
+            raise ValueError("payload: truncated identity")
+        o += IDENTITY_LEN
+    stored = envelope[o:]
     if flags & FLAG_COMPRESSED:
         # Bounded inflate: read at most the cap + 1 byte to detect a gzip bomb
         # without materializing the whole (possibly huge) output.

@@ -30,6 +30,20 @@ export const ko: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession 에는 --threshold k-of-n 이 필요합니다',
   errGalleryRestoreMissing: 'gallery-restore: 사진/폴더가 없습니다',
   errCodecInvalid: '--codec "{value}" 는 올바르지 않습니다',
+  warnVaultRollback:
+    '이 보관함은 내보내기 #{got} 이지만 이 컴퓨터에는 #{recorded} 이 기록돼 있습니다. 더 오래된 사본을 복원하고 있을 수 있습니다',
+  warnVaultUnknown: '보관함 {vaultId} 은 이 컴퓨터에서 본 적이 없어 비교할 대상이 없습니다',
+  warnRegistryUnreadable: '알려진 보관함 파일을 읽을 수 없어 롤백 검사를 하지 못했습니다',
+  errTrackNotDeniable:
+    '--track 는 {flags} 와 함께 쓸 수 없습니다(부인 가능한 보관함은 존재의 흔적을 남기면 안 됩니다)',
+  errTrackWrongCommand:
+    '--track 는 {command} 에서 아무 효과가 없습니다(내보내기에 번호를 붙이는 것은 save 뿐입니다)',
+  errTrackEmpty:
+    '--track 가 비어 있었습니다(라벨은 이 저장이 어느 보관함의 다른 버전인지 알려 줍니다)',
+  errTrackRegistryUnreadable:
+    '{path} 의 알려진 보관함 파일을 읽을 수 없어 이 내보내기에 번호를 붙일 수 없습니다. 파일을 옮기거나 --track-file 을 쓰세요',
+  warnRegistryUnwritable:
+    '보관함은 저장되었지만 알려진 보관함 기록을 갱신하지 못했습니다. 이 라벨의 다음 내보내기는 같은 번호를 다시 씁니다',
   errCodecColorPaper: '--codec color 는 --paper 와 함께 쓸 수 없습니다(인쇄 페이지는 QR 을 씁니다)',
   errEntropyExclusive: '{flags} 는 함께 쓸 수 없습니다(엔트로피 원본을 하나만 고르세요)',
   errEntropyFlagEmpty:
@@ -162,6 +176,9 @@ export const ko: CliCatalog = {
     '새 금고에 약한(그래도 12자 이상) 비밀번호를 쓰겠다고 확인합니다. 12자라는 최소 길이 자체는 이 플래그로도 다른 어떤 플래그로도 면제할 수 없습니다.',
   helpKey: '.key 파일, 스테고 이미지, 또는 바이너리 키 컨테이너',
   helpShare: 'nonpossession 금고용 임계값 공유 파일(여러 번 지정 가능)',
+  helpTrack:
+    '이 보관함의 내보내기에 번호를 매겨 오래된 사본 복원을 알립니다(부인 가능한 출력에서는 쓸 수 없음)',
+  helpTrackFile: '알려진 보관함 기록의 위치(기본값: 플랫폼 상태 디렉터리)',
   helpForce: '기존 출력 파일 덮어쓰기(기본값: 덮어쓰지 않음)',
   helpQuiet: 'stderr 의 진행 표시 숨기기',
   helpJson: 'stdout에 JSON 문서 하나를 출력하고, 진행 상황은 NDJSON으로 stderr에 출력합니다',

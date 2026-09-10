@@ -25,9 +25,21 @@ tracked issues carry the detail. "Impact/Effort" are rough planning aids.
 - **Licensing decision**: keep 0.9 under MIT, then obtain legal advice and resolve the
   GPL/AGPL/dual-license and contribution-rights questions in `docs/LICENSING.md` before
   1.0 or the first non-trivial external contribution. _Impact: high · Effort: medium._
+- **npm publication with provenance**: the first publish must come from the release
+  workflow with `npm publish --provenance`, never from a workstation. An npm package
+  without provenance would be a weaker artifact than the binaries already are.
+  _Impact: medium · Effort: low._
 
 ## Later / exploratory
 
+- **Reproducible builds.** Today the build-provenance attestation is the only link
+  between a published binary and its source, and it runs through GitHub's runners.
+  Blocked upstream for now: `deno compile` embeds a V8 snapshot and honours no
+  `SOURCE_DATE_EPOCH`, and the archives stamp mtimes, so a rebuild-and-compare job
+  would be permanently red. Revisit when Deno supports it.
+- **Release signing beyond Sigstore** (macOS notarization, Authenticode). Named, not
+  promised: both cost money and add a long-lived secret to hold in CI, which is a worse
+  trade than the keyless attestation already in place.
 - Reduce the deniability content-tell further (e.g. cache values that better mimic
   a real application's data), acknowledging its limits.
 - Broaden fuzzing (structure-aware / longer nightly budgets).

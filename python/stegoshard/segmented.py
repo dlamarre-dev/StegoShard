@@ -20,10 +20,12 @@ import struct
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from .aad import KIND_SEGMENTED
 from .crypto import (
     derive_content_key,
     derive_region_key,
     open_slot_array,
+    slot_aad_for,
     slot_kek_candidates,
     unwrap_dek,
 )
@@ -39,7 +41,7 @@ from .format import (
 )
 
 SEG_MAGIC = b"SSCS"  # StegoShard Chunked Segments
-SEG_VERSION = 1
+SEG_VERSION = 2
 NONCE_PREFIX_LEN = 7
 GCM_TAG_LEN = 16
 MIN_CHUNK_SIZE = 4096
@@ -238,7 +240,9 @@ def decode_multiregion_segmented_blob(
     candidates = slot_kek_candidates(
         password, vault_salt, key_factor, secret, iterations, memory_kib, parallelism
     )
-    dek, region_index = open_slot_array(slot_array, candidates)
+    dek, region_index = open_slot_array(
+        slot_array, candidates, slot_aad_for(KIND_SEGMENTED, vault_salt)
+    )
     start = _MULTI_HEAD_LEN + region_index * stream_len
     stream = blob[start : start + stream_len]
     envelope = _decrypt_region_stream(

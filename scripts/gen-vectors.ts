@@ -28,9 +28,13 @@ import {
   hkdf,
   normalizePassword,
   serializeKeyBlock,
+  KEY_BLOCK_VERSION,
   type Argon2Params,
 } from '../src/core/crypto';
 import { buildPayload } from '../src/core/payload';
+import { keyBlockAad, regionBlockAad, slotArrayAad, vaultBlobAad } from '../src/core/aad';
+import { FORMAT_VERSION } from '../src/core/header';
+import { SEG_VERSION } from '../src/core/segmented';
 import { rsEncode } from '../src/core/reed-solomon';
 
 const subtle = globalThis.crypto.subtle;
@@ -239,7 +243,22 @@ async function makeKeyBlockVector(
   const iv = pattern(12, ivSeed);
   const dek = pattern(32, dekSeed);
   const kek = await kekHex(password, salt, params);
-  const wrappedHex = await gcmEncrypt(kek, toHex(iv), toHex(dek));
+  const wrappedHex = await gcmEncryptAad(
+    kek,
+    toHex(iv),
+    toHex(dek),
+    toHex(
+      keyBlockAad(
+        ENC('SSKY'),
+        KEY_BLOCK_VERSION,
+        params.iterations,
+        params.memoryKiB,
+        params.parallelism,
+        salt,
+        iv,
+      ),
+    ),
+  );
   const blockHex = toHex(serializeKeyBlock({ salt, params, iv, wrapped: fromHex(wrappedHex) }));
   return {
     name,
@@ -258,7 +277,7 @@ interface VaultBlobVector {
   name: string;
   mode: 'embedded' | 'keyfile';
   password: string;
-  /** SPEC §6 blob: [KB_LEN u16][key block][IV 12][ciphertext]. */
+  /** SPEC §6 blob: [MAGIC 4][VER 1][KB_LEN u16][key block][contentSalt 16][IV 12][ciphertext]. */
   blobHex: string;
   /** Serialized key block; external copy for keyfile mode (KB_LEN = 0). */
   keyBlockHex: string;
@@ -290,13 +309,19 @@ async function makeVaultBlobVector(
   const contentInfo = new TextEncoder().encode('stegoshard/vault/content');
   const cek = await hkdf(fromHex(kb.dekHex), contentInfo, 32, contentSalt);
   const contentIv = pattern(12, seeds.contentIv);
-  const ctHex = await gcmEncrypt(toHex(cek), toHex(contentIv), toHex(envelope));
-
   const keyBlock = fromHex(kb.blockHex);
   const embedded = mode === 'embedded' ? keyBlock : new Uint8Array(0);
-  const lenField = new Uint8Array(2);
-  writeU16(lenField, 0, embedded.length);
-  const blob = concatBytes(lenField, embedded, contentSalt, contentIv, fromHex(ctHex));
+  const ctHex = await gcmEncryptAad(
+    toHex(cek),
+    toHex(contentIv),
+    toHex(envelope),
+    toHex(vaultBlobAad(ENC('SSVB'), FORMAT_VERSION, embedded, contentSalt, contentIv)),
+  );
+
+  const head = new Uint8Array(1 + 2);
+  head[0] = FORMAT_VERSION;
+  writeU16(head, 1, embedded.length);
+  const blob = concatBytes(ENC('SSVB'), head, embedded, contentSalt, contentIv, fromHex(ctHex));
 
   return {
     name,
@@ -363,9 +388,10 @@ async function liveSlot(
   nonce: Uint8Array,
   dek: Uint8Array,
   regionIndex: number,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
   const pt = concatBytes(dek, Uint8Array.of(regionIndex), new Uint8Array(15));
-  const ct = fromHex(await gcmEncrypt(toHex(kek), toHex(nonce), toHex(pt)));
+  const ct = fromHex(await gcmEncryptAad(toHex(kek), toHex(nonce), toHex(pt), toHex(aad)));
   return concatBytes(nonce, ct);
 }
 
@@ -377,8 +403,9 @@ async function slotArray(
   livePos: number,
   nonceSeed: number,
   deadSeed: number,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
-  const live = await liveSlot(kek, pattern(12, nonceSeed), dek, regionIndex);
+  const live = await liveSlot(kek, pattern(12, nonceSeed), dek, regionIndex, aad);
   const slots: Uint8Array[] = [];
   for (let i = 0; i < 4; i++) slots.push(i === livePos ? live : pattern(76, deadSeed + i));
   return concatBytes(...slots);
@@ -413,7 +440,15 @@ async function makeMultiRegionVaultVector(
   const keyFactor = mode === 'keyfile' ? pattern(32, seeds.keyFactor!) : null;
   const kek = await slotKekBytes(password, vaultSalt, params, keyFactor);
   const dek = pattern(32, seeds.dek!);
-  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+  const arr = await slotArray(
+    kek,
+    dek,
+    regionIndex,
+    livePos,
+    seeds.slotNonce!,
+    seeds.dead!,
+    slotArrayAad('gallery-multiregion', 4, 2, vaultSalt),
+  );
 
   const contentSalt = pattern(16, seeds.contentSalt!);
   const iv = pattern(12, seeds.iv!);
@@ -422,7 +457,14 @@ async function makeMultiRegionVaultVector(
   const rp = new Uint8Array(bucket);
   writeU32(rp, 0, envelope.length);
   rp.set(envelope, 4);
-  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  const ct = fromHex(
+    await gcmEncryptAad(
+      toHex(cek),
+      toHex(iv),
+      toHex(rp),
+      toHex(regionBlockAad(vaultSalt, arr, regionIndex, 44 + bucket, contentSalt, iv)),
+    ),
+  );
   const live = concatBytes(contentSalt, iv, ct);
   const dead = pattern(44 + bucket, seeds.deadRegion!);
   const blob = concatBytes(
@@ -467,12 +509,20 @@ async function makeMultiRegionSegmentedVector(
   const keyFactor = mode === 'keyfile' ? pattern(32, seeds.keyFactor!) : null;
   const kek = await slotKekBytes(password, vaultSalt, params, keyFactor);
   const dek = pattern(32, seeds.dek!);
-  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+  const arr = await slotArray(
+    kek,
+    dek,
+    regionIndex,
+    livePos,
+    seeds.slotNonce!,
+    seeds.dead!,
+    slotArrayAad('segmented-multiregion', 4, 2, vaultSalt),
+  );
 
   // Container head: SSCS ver flags vault_salt slot_array chunkSize bucketLen.
   const head = new Uint8Array(6 + 16 + 304 + 4 + 8);
   head.set(ENC('SSCS'), 0);
-  head[4] = 1; // SEG_VERSION
+  head[4] = SEG_VERSION;
   head[5] = 0; // FLAGS reserved
   head.set(vaultSalt, 6);
   head.set(arr, 22);
@@ -548,7 +598,15 @@ async function makeGatedVaultVector(
   const argon = fromHex(await kekHex(password, vaultSalt, params));
   const kek = await hkdf(concatBytes(argon, secret), ENC('stegoshard/v1/slot-kek'), 32, vaultSalt);
   const dek = pattern(32, seeds.dek!);
-  const arr = await slotArray(kek, dek, regionIndex, livePos, seeds.slotNonce!, seeds.dead!);
+  const arr = await slotArray(
+    kek,
+    dek,
+    regionIndex,
+    livePos,
+    seeds.slotNonce!,
+    seeds.dead!,
+    slotArrayAad('gallery-multiregion', 4, 2, vaultSalt),
+  );
 
   const contentSalt = pattern(16, seeds.contentSalt!);
   const iv = pattern(12, seeds.iv!);
@@ -557,7 +615,14 @@ async function makeGatedVaultVector(
   const rp = new Uint8Array(bucket);
   writeU32(rp, 0, envelope.length);
   rp.set(envelope, 4);
-  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  const ct = fromHex(
+    await gcmEncryptAad(
+      toHex(cek),
+      toHex(iv),
+      toHex(rp),
+      toHex(regionBlockAad(vaultSalt, arr, regionIndex, 44 + bucket, contentSalt, iv)),
+    ),
+  );
   const live = concatBytes(contentSalt, iv, ct);
   const dead = pattern(44 + bucket, seeds.deadRegion!);
   const blob = concatBytes(
@@ -634,6 +699,8 @@ interface DuressVaultVector {
 
 /** Build one region block: contentSalt || IV || GCM_CEK(REGION_LEN || envelope || pad). */
 async function regionBlock(
+  vaultSalt: Uint8Array,
+  slots: Uint8Array,
   dek: Uint8Array,
   regionIndex: number,
   filename: string,
@@ -649,7 +716,14 @@ async function regionBlock(
   const rp = new Uint8Array(bucket);
   writeU32(rp, 0, envelope.length);
   rp.set(envelope, 4);
-  const ct = fromHex(await gcmEncrypt(toHex(cek), toHex(iv), toHex(rp)));
+  const ct = fromHex(
+    await gcmEncryptAad(
+      toHex(cek),
+      toHex(iv),
+      toHex(rp),
+      toHex(regionBlockAad(vaultSalt, slots, regionIndex, 44 + bucket, contentSalt, iv)),
+    ),
+  );
   return concatBytes(contentSalt, iv, ct);
 }
 
@@ -674,12 +748,20 @@ async function makeDuressVaultVector(
   const decoyRegionIndex = 1 - realRegionIndex;
 
   // Two live slots (real @ position 1, duress @ position 3), two dead slots.
-  const realSlot = await liveSlot(realKek, pattern(12, seeds.realNonce!), dekReal, realRegionIndex);
+  const slotAad = slotArrayAad('gallery-multiregion', 4, 2, vaultSalt);
+  const realSlot = await liveSlot(
+    realKek,
+    pattern(12, seeds.realNonce!),
+    dekReal,
+    realRegionIndex,
+    slotAad,
+  );
   const duressSlot = await liveSlot(
     duressKek,
     pattern(12, seeds.duressNonce!),
     dekDecoy,
     decoyRegionIndex,
+    slotAad,
   );
   const slotArray = concatBytes(
     pattern(76, seeds.dead0!),
@@ -689,6 +771,8 @@ async function makeDuressVaultVector(
   );
 
   const realBlock = await regionBlock(
+    vaultSalt,
+    slotArray,
     dekReal,
     realRegionIndex,
     realFilename,
@@ -698,6 +782,8 @@ async function makeDuressVaultVector(
     seeds.realIv!,
   );
   const decoyBlock = await regionBlock(
+    vaultSalt,
+    slotArray,
     dekDecoy,
     decoyRegionIndex,
     decoyFilename,
@@ -868,10 +954,14 @@ async function main() {
       102,
       PARAMS_FAST,
     ),
+    // parallelism stays 1: the parser now pins it there (the wider range existed
+    // only to keep these vectors decodable, and there are no vaults to stay
+    // compatible with). Iterations and memory still differ from PARAMS_FAST, so
+    // the vector keeps exercising non-default cost parameters.
     await makeKeyBlockVector('unicode-password', 'pâsswörd☕\u{1f511}', 103, 104, 105, {
       iterations: 2,
       memoryKiB: 512,
-      parallelism: 2,
+      parallelism: 1,
     }),
   ];
 

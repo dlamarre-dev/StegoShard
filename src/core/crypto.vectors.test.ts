@@ -38,6 +38,8 @@ import { parsePayload } from './payload';
 import { decodeMultiRegionVaultBlob } from './vault';
 import { decodeMultiRegionSegmentedBlob } from './segmented';
 import { shamirRecover } from './shamir';
+import { EMPTY_AAD, vaultBlobAad } from './aad';
+import { FORMAT_VERSION } from './header';
 
 interface Argon2Vector {
   name: string;
@@ -217,7 +219,7 @@ describe('frozen vectors: AES-256-GCM (ciphertext || tag layout)', () => {
       );
       expect(toHex(new Uint8Array(ct))).toBe(v.ciphertextHex);
       // And the inverse direction.
-      const pt = await decryptBytes(key, fromHex(v.ivHex), fromHex(v.ciphertextHex));
+      const pt = await decryptBytes(key, fromHex(v.ivHex), fromHex(v.ciphertextHex), EMPTY_AAD);
       expect(toHex(pt)).toBe(v.plaintextHex);
     });
   }
@@ -268,12 +270,18 @@ describe('frozen vectors: full vault blob decrypt', () => {
   for (const v of vectors.vaultBlob) {
     it(`decrypts ${v.name}`, async () => {
       const blob = fromHex(v.blobHex);
-      const kbLen = readU16(blob, 0);
+      // The blob is self-describing: [ MAGIC 4 ][ VER 1 ][ KB_LEN u16 ] ...
+      const BLOB_PREFIX_LEN = 7;
+      expect(new TextDecoder().decode(blob.slice(0, 4))).toBe('SSVB');
+      expect(blob[4]).toBe(FORMAT_VERSION);
+      const kbLen = readU16(blob, 5);
       if (v.mode === 'keyfile') expect(kbLen).toBe(0);
       else expect(kbLen).toBeGreaterThan(0);
 
-      const kbBytes = kbLen > 0 ? blob.slice(2, 2 + kbLen) : fromHex(v.keyBlockHex);
-      let o = 2 + kbLen;
+      let o = BLOB_PREFIX_LEN;
+      const embedded = blob.slice(o, o + kbLen);
+      const kbBytes = kbLen > 0 ? embedded : fromHex(v.keyBlockHex);
+      o += kbLen;
       const contentSalt = blob.slice(o, o + CONTENT_SALT_LEN);
       o += CONTENT_SALT_LEN;
       const iv = blob.slice(o, o + IV_LEN);
@@ -282,7 +290,14 @@ describe('frozen vectors: full vault blob decrypt', () => {
 
       const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), v.password);
       const cek = await deriveContentKey(dek, contentSalt);
-      const envelope = await decryptBytes(cek, iv, ciphertext);
+      // The AAD binds the mode: `embedded` is empty in keyfile mode, so the zero
+      // KB_LEN is what is authenticated, never the external key block.
+      const envelope = await decryptBytes(
+        cek,
+        iv,
+        ciphertext,
+        vaultBlobAad(new TextEncoder().encode('SSVB'), FORMAT_VERSION, embedded, contentSalt, iv),
+      );
       const { filename, content } = await parsePayload(envelope, 1024 * 1024);
       expect(filename).toBe(v.filename);
       expect(toHex(content)).toBe(v.contentHex);

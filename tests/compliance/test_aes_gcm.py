@@ -57,9 +57,16 @@ The assertions
 2. **How many forgeries each target actually authenticated**, frozen in
    :data:`FORGERIES`. Distinguishing "rejected after authenticating" from "declined
    before authenticating" matters: 3,919 CAVP vectors are marked invalid, but only
-   2,601 reach WebCrypto and only 33 reach the decoder's ``decrypt_content``. A
-   drop in that first number weakens the test while leaving it green, so it is
-   asserted rather than reported.
+   2,601 reach WebCrypto and only 191 reach either framing wrapper, whose 12-byte
+   nonce and 128-bit tag decline the rest. A drop in that first number weakens the
+   test while leaving it green, so it is asserted rather than reported.
+
+   Both framing targets pass each vector's own AAD through, so they are measured
+   over the same reachable slice and their counts are directly comparable — and
+   they agree exactly, on both sources and on both tuples. Two stacks written from
+   one specification agreeing is weak evidence on its own, which is the whole
+   reason this file exists; what the agreement is good for is the *next* change,
+   where one of them moving alone is a finding rather than a mystery.
 3. The full bucket table matches :data:`EXPECTED`. Freezing the counts follows the
    same philosophy as ``tests/vectors/crypto-vectors.json``: the committed numbers
    are the contract, and any drift - in crypto-condor's vectors, in Node, or in
@@ -101,8 +108,8 @@ EXPECTED: dict[str, tuple[int, int, int, int, int]] = {
     "py-platform-encrypt/wycheproof": (45, 1, 29, 2, 8),
     "py-platform-decrypt/cavp": (372, 3584, 3919, 0, 0),
     "py-platform-decrypt/wycheproof": (45, 1, 29, 2, 8),
-    "py-framing-decrypt/cavp": (42, 3914, 3919, 0, 0),
-    "py-framing-decrypt/wycheproof": (12, 34, 29, 0, 10),
+    "py-framing-decrypt/cavp": (184, 3772, 3919, 0, 0),
+    "py-framing-decrypt/wycheproof": (21, 25, 29, 0, 10),
 }
 
 #: Forgery accounting for the decrypt targets, as
@@ -116,7 +123,7 @@ FORGERIES: dict[str, tuple[int, int]] = {
     "ts-framing-decrypt/wycheproof": (27, 2),
     "py-platform-decrypt/cavp": (378, 3541),
     "py-platform-decrypt/wycheproof": (27, 2),
-    "py-framing-decrypt/cavp": (33, 3886),
+    "py-framing-decrypt/cavp": (191, 3728),
     "py-framing-decrypt/wycheproof": (27, 2),
 }
 
@@ -337,19 +344,26 @@ def test_python_framing_decrypt() -> None:
     """``stegoshard.crypto.decrypt_content``, the decoder's actual entry point.
 
     The mirror of ``ts-framing-decrypt``: it is the decoder's own wrapper that an
-    independent recovery runs, not the raw binding underneath it. Its envelope is
-    tighter still, because it hard-codes ``aad=None``, so only empty-AAD vectors
-    with a 12-byte IV and a full tag are reachable.
+    independent recovery runs, not the raw binding underneath it. Same envelope as
+    ``aeadOpen`` — a 12-byte IV and a full 128-bit tag — and, like it, every
+    vector's own AAD is passed through, so the two targets are measured over the
+    same reachable slice of each set and their numbers can be compared directly.
+
+    ``decrypt_content`` takes ``aad`` as a REQUIRED argument (see ``aad.py``: every
+    site has a context worth binding, and one that does not must say so). This shim
+    used to omit it and rely on a default, and it also refused every vector that
+    carried an AAD — which capped the target at 33 authenticated forgeries out of
+    the 3,919 CAVP marks. Both are gone: the AAD is now supplied from the vector,
+    which is what a real caller does, and the AAD-binding half of GCM is under test
+    on this stack rather than only on the TypeScript one.
     """
     from stegoshard.crypto import decrypt_content
 
     def decrypt(key, ciphertext, *, iv=None, aad=None, mac=None, mac_len=0):
         if not iv or len(iv) != FRAMING_IV_LEN or mac is None or len(mac) != FRAMING_TAG_LEN:
             raise ValueError("outside the decrypt_content envelope")
-        if aad:
-            raise ValueError("decrypt_content passes aad=None")
         try:
-            return decrypt_content(key, iv, ciphertext + mac), True
+            return decrypt_content(key, iv, ciphertext + mac, aad or b""), True
         except InvalidTag:
             return None, False
 

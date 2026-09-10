@@ -39,6 +39,20 @@ export type CliErrorCode =
   | 'ENTROPY_ARG'
   /** `stegoshard ui` has no web bundle to serve. */
   | 'UI_UNAVAILABLE'
+  /**
+   * `--track` was combined with a deniable destination. Refused loudly rather
+   * than ignored: silently doing nothing would leave the user believing they had
+   * rollback protection on the one path where believing anything extra is the
+   * mistake.
+   */
+  | 'TRACKING_NOT_DENIABLE'
+  /**
+   * `--track` was asked for but cannot be honoured: an empty label, a command
+   * that does not record anything, or a known-vaults file that could not be
+   * read. Same reasoning as above — the one thing not to do is proceed quietly
+   * and let the user believe the numbering happened.
+   */
+  | 'TRACKING_UNAVAILABLE'
   /** Anything not classified above. */
   | 'INTERNAL';
 

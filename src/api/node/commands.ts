@@ -8,13 +8,16 @@ import {
   closeSync,
   existsSync,
   fstatSync,
+  fsyncSync,
   mkdirSync,
   openSync,
   readFileSync,
   readSync,
+  renameSync,
   statSync,
+  unlinkSync,
   utimesSync,
-  writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { basename, join } from 'node:path';
 import { zipSync } from 'fflate';
@@ -65,6 +68,7 @@ import {
   type KeyMode,
   type ManifestEntry,
   type OnProgress,
+  type VaultIdentity,
 } from '../../core';
 import {
   embedKeyImage,
@@ -99,13 +103,97 @@ function read(path: string): Uint8Array {
  */
 type WriteTarget = { outDir: string; force?: boolean | undefined };
 
+/**
+ * Write a file atomically: a temporary in the same directory, flushed, then
+ * renamed over the target.
+ *
+ * The plain `writeFileSync` this replaces truncated the target and then filled
+ * it, so a crash, a full disk, or a pulled USB stick mid-write left a truncated
+ * file. On this format that is not a corrupted document you can partly read: a
+ * vault missing its tail is a secret you no longer have. Post-save verification
+ * does not catch it either, because it verifies the bytes in memory, not the
+ * file that reached the disk.
+ *
+ * `rename` is atomic only within a filesystem, hence the temporary alongside the
+ * target rather than in the system temp directory. The rename itself is durable
+ * only once the *directory* entry is flushed, so the containing directory is
+ * fsynced after it; without that a crash can leave the target missing entirely
+ * even though the data was flushed.
+ *
+ * The temporary is created `0600`, so the artifact ends up `0600` rather than
+ * the `0644` a plain `writeFileSync` would have produced. That is deliberate:
+ * these files are vaults and restored plaintext, and neither wants group or
+ * world read.
+ *
+ * The overwrite guard is still a check-then-act and still racy in principle. It
+ * is kept because the alternative — an exclusive create of the target itself —
+ * cannot be combined with rename-over semantics, and the race here is between a
+ * user and themselves. What is now impossible is the failure that actually
+ * happens: a partial file where a whole one used to be.
+ */
 function writeOut(target: WriteTarget, name: string, bytes: Uint8Array): string {
   mkdirSync(target.outDir, { recursive: true });
   const path = join(target.outDir, name);
   if (!target.force && existsSync(path)) {
     throw new StegoShardApiError('OUTPUT_EXISTS', `refusing to overwrite ${path}`, { path });
   }
-  writeFileSync(path, bytes);
+
+  // A unique name so two concurrent writes cannot collide on the temporary, and
+  // 'wx' so an existing one is never silently reused.
+  const tmp = `${path}.${process.pid.toString(36)}${Date.now().toString(36)}.tmp`;
+  let fd: number | undefined;
+  try {
+    fd = openSync(tmp, 'wx', 0o600);
+    // `writeSync` is allowed to write fewer bytes than it was given, so the
+    // return value has to drive a loop. Issuing it once and trusting it is the
+    // partial write this whole function exists to prevent, moved one layer down:
+    // a short write here produces a truncated temporary that the fsync and
+    // rename below then install as the finished vault.
+    for (let off = 0; off < bytes.length;) {
+      const n = writeSync(fd, bytes, off, bytes.length - off);
+      if (n <= 0) throw new Error(`write stalled at ${off} of ${bytes.length} bytes`);
+      off += n;
+    }
+    // Flush before the rename: without it the rename can land while the data is
+    // still only in the page cache, which is the same lost write one directory
+    // entry further on.
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    // Windows refuses rename onto an existing path, so clear it first. This is
+    // the one window where the target is gone and the new file is not yet in
+    // place; it exists only under --force, where the user asked for a replace.
+    if (process.platform === 'win32' && existsSync(path)) unlinkSync(path);
+    renameSync(tmp, path);
+    // Make the new directory entry durable too. Best-effort: some platforms
+    // (Windows) refuse to open a directory for fsync, and a file that is on disk
+    // but whose rename is not yet flushed is still better than failing a save
+    // that worked.
+    try {
+      const dirFd = openSync(target.outDir, 'r');
+      try {
+        fsyncSync(dirFd);
+      } finally {
+        closeSync(dirFd);
+      }
+    } catch {
+      // Directory fsync is unsupported here; the data itself is already flushed.
+    }
+  } catch (e) {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // already closed, or never opened cleanly
+      }
+    }
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // the temporary may not exist; the original error is the one to report
+    }
+    throw e;
+  }
   return path;
 }
 
@@ -218,6 +306,13 @@ export interface SaveOptions {
    * already caps at 64 MiB per region.
    */
   maxBytes?: number | undefined;
+  /**
+   * Rollback identity to embed (SPEC §4 FLAGS bit2). Accepted only on the open
+   * destinations — images, PDF and branded `.ssbn`. The gallery and disguised
+   * `.db` paths ignore no such option because they have none: their builders
+   * take no identity at all, so a deniable save cannot carry one.
+   */
+  identity?: VaultIdentity | undefined;
 }
 
 export interface SaveResult {
@@ -447,7 +542,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
       input.name,
       content,
       key,
-      { keyMode: opts.keyMode, variant, bundle: input.bundle, maxBytes },
+      { keyMode: opts.keyMode, variant, bundle: input.bundle, maxBytes, identity: opts.identity },
       onProgress,
     );
     await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
@@ -469,6 +564,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     codecId,
     keyMode: opts.keyMode,
     bundle: input.bundle,
+    identity: opts.identity,
   });
   // Read it back from the header rather than trusting the request, so the
   // rendered pixels and the recovery line can never disagree with the payload.
@@ -596,6 +692,13 @@ export interface RestoreResult {
   filename: string;
   seen: number;
   decoded: number;
+  /**
+   * The rollback identity the vault carried, when it carried one. Only the open
+   * paths ever write one, so a deniable restore always leaves this undefined —
+   * which is also why it can be surfaced at all: on those paths there is nothing
+   * for it to distinguish.
+   */
+  identity?: VaultIdentity | undefined;
 }
 
 const isKeyFile = (n: string) => /\.key$/i.test(n);
@@ -646,14 +749,14 @@ export async function runRestore(
     const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
     // Threshold shares (Mode B) recover the secret that gates the .db slot.
     const secret = await recoverSecret(opts.sharePaths);
-    const { filename, content, bundled } = await importVaultBinary(
+    const { filename, content, bundled, identity } = await importVaultBinary(
       read(binaryVaultPath),
       opts.password,
       { keyBlock, secret: secret ?? null, maxBytes: opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES },
       onProgress,
     );
     const written = writeRestored(opts, filename, content, bundled);
-    return { outPath: written[0]!, files: written, filename, seen: 1, decoded: 1 };
+    return { outPath: written[0]!, files: written, filename, seen: 1, decoded: 1, identity };
   }
 
   const gathered = await gatherInputs(opts.inputs);
@@ -664,12 +767,21 @@ export async function runRestore(
     throw new StegoShardApiError('NO_READABLE_IMAGES', 'no readable vault images among the inputs');
   }
 
-  const { filename, content, bundled } = await importVault(gathered.payloads, opts.password, {
-    keyBlock,
-  });
+  const { filename, content, bundled, identity } = await importVault(
+    gathered.payloads,
+    opts.password,
+    { keyBlock },
+  );
   const written = writeRestored(opts, filename, content, bundled);
   const outPath = written[0]!;
-  return { outPath, files: written, filename, seen: gathered.seen, decoded: gathered.decoded };
+  return {
+    outPath,
+    files: written,
+    filename,
+    seen: gathered.seen,
+    decoded: gathered.decoded,
+    identity,
+  };
 }
 
 // --- Gallery Mode (SPEC §9) --------------------------------------------------

@@ -18,12 +18,22 @@ The format carries several independent version tags:
 
 | Constant            | Where                          | Meaning                                    |
 | ------------------- | ------------------------------ | ------------------------------------------ |
-| `FORMAT_VERSION`    | `src/core/header.ts`           | Per-image header / overall on-image format |
+| `FORMAT_VERSION`    | `src/core/header.ts`           | Per-image header, §6 vault blob, envelope  |
 | `KEY_BLOCK_VERSION` | `src/core/crypto.ts`           | Serialized wrapped-DEK key block (§5.1)    |
-| `BINARY_VERSION`    | `src/core/binary-container.ts` | Branded binary container (§8)              |
+| `SEG_VERSION`       | `src/core/segmented.ts`        | Segmented `.ssbn` / `.db` container (§8.1) |
+| `BINARY_VERSION`    | `src/core/binary-container.ts` | Branded binary container framing (§8)      |
 | `CODEC_GALLERY`     | `src/core/header.ts`           | Gallery Mode codec id (§9)                 |
 
-All are `1` today.
+`FORMAT_VERSION`, `KEY_BLOCK_VERSION` and `SEG_VERSION` are `2`; `BINARY_VERSION`
+is `1` (its wrapper framing never changed) and `CODEC_GALLERY` is a codec
+identity rather than a version.
+
+`SEG_VERSION` was missing from this table, and from the `scripts/check-golden.ts`
+guard, until the change that first needed it. A break in the `.db` format could
+therefore have regenerated the golden corpus with no bump at all — exactly the
+failure the guard exists to prevent. Both are fixed; the lesson is that a new
+version constant has to be added to the guard in the same change that introduces
+it.
 
 ### Path-intrinsic geometry (access structures, SPEC §10)
 
@@ -43,8 +53,16 @@ A post-1.0 change is **breaking** if an existing artifact would no longer decode
 new artifact would not decode on an older reader. Before 1.0, audit-driven changes may
 replace the candidate in place but must still:
 
-1. Bump the relevant version constant (and add a new branch to the decoders,
-   keeping the old one until support is formally dropped).
+1. Bump the relevant version constant.
+
+   **Pre-1.0 carve-out.** Post-1.0 a bump must also add a new decode branch and
+   keep the old one until support is formally dropped. Before 1.0 it must not:
+   the format has no users, so a second branch would be dead code maintained
+   forever and exercised never. An artifact in an older format fails the ordinary
+   version check, and that is the whole of the migration story. The v2 AAD work
+   was done this way deliberately, and this rule was written down rather than
+   quietly bent.
+
 2. Update [SPEC.md](../SPEC.md), including the §11 constants table, and
    [docs/CRYPTO-REVIEW.md](../CRYPTO-REVIEW.md) where crypto is affected.
 3. Update the **Python reference decoder** (`python/stegoshard/`) in the same

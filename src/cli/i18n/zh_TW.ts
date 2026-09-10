@@ -30,6 +30,17 @@ export const zhTW: CliCatalog = {
   errGalleryThreshold: 'gallery-save：--mode nonpossession 需要 --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore：缺少照片/資料夾',
   errCodecInvalid: '--codec「{value}」無效',
+  warnVaultRollback:
+    '這個保險庫是第 {got} 次匯出，但這台機器記錄的是第 {recorded} 次：你可能正在還原較舊的副本',
+  warnVaultUnknown: '保險庫 {vaultId} 從未在這台機器上出現過，沒有可比對的紀錄',
+  warnRegistryUnreadable: '無法讀取已知保險庫檔案，因此未做回滾檢查',
+  errTrackNotDeniable: '--track 不能與 {flags} 並用（可否認的保險庫不得留下任何存在的紀錄）',
+  errTrackWrongCommand: '--track 對 {command} 沒有作用（只有 save 會為匯出編號）',
+  errTrackEmpty: '--track 是空的（標籤用來說明這次儲存是哪個保險庫的另一個版本）',
+  errTrackRegistryUnreadable:
+    '無法讀取 {path} 的已知保險庫檔案，因此這次匯出無法編號：請將它移開或改用 --track-file',
+  warnRegistryUnwritable:
+    '保險庫已儲存，但已知保險庫的紀錄無法更新，因此這個標籤的下一次匯出會重複使用這個編號',
   errCodecColorPaper: '--codec color 不能與 --paper 並用（列印頁面使用 QR）',
   errEntropyExclusive: '{flags} 不能同時指定（亂度來源只能選一個）',
   errEntropyFlagEmpty: '--entropy 是空的（若不需要額外亂度，請不要加這個選項）',
@@ -161,6 +172,8 @@ export const zhTW: CliCatalog = {
     '為新的保險庫確認使用弱密碼（但仍須 >= 12 個字元）。12 個字元的下限本身，無法用這個或任何其他選項略過。',
   helpKey: '一個 .key 檔、隱寫圖片，或二進位金鑰容器',
   helpShare: 'nonpossession 保險庫的分片檔（可重複指定）',
+  helpTrack: '為這個保險庫的匯出編號，還原較舊副本時提出警告（可否認的輸出不可使用）',
+  helpTrackFile: '已知保險庫紀錄的位置（預設：平台的狀態目錄）',
   helpForce: '覆寫既有的輸出檔（預設：拒絕）',
   helpQuiet: '不在 stderr 顯示進度',
   helpJson: '在 stdout 輸出一份 JSON 文件；進度以 NDJSON 輸出至 stderr',

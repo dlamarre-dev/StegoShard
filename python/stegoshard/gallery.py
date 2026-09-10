@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from .aad import gallery_frag_aad
 from .crypto import normalize_password
 from .format import split_payload
 from .pipeline import RestoredFile, decode_vault
@@ -103,7 +104,7 @@ def decode_gallery(
         try:
             # slot = nonce(12) || AES-GCM(header || shard || pad). A failed tag is
             # a decoy / destroyed carrier / foreign image / wrong password, so drop it.
-            frag = aead.decrypt(slot[:IV_LEN], slot[IV_LEN:], None)
+            frag = aead.decrypt(slot[:IV_LEN], slot[IV_LEN:], gallery_frag_aad())
         except Exception:  # noqa: BLE001 - any AEAD failure means "not a fragment"
             continue
         fragments.append(frag)

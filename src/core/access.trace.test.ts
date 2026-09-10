@@ -50,6 +50,7 @@ const {
   DEK_LEN,
   SLOT_COUNT,
   buildSlotArray,
+  slotAadFor,
   deriveKekBytes,
   gateKek,
   importAesGcmKey,
@@ -61,6 +62,9 @@ const {
 } = await import('./crypto');
 
 const PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
+
+const KIND = 'gallery-multiregion' as const;
+const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
 
 let decryptCalls = 0;
 let spy: ReturnType<typeof vi.spyOn>;
@@ -81,7 +85,7 @@ async function arrayWithOneLiveSlot(password: string, salt: Uint8Array) {
   const kekBytes = await deriveKekBytes(password, salt, PARAMS);
   const kek = await importAesGcmKey(kekBytes);
   const dek = randomBytes(DEK_LEN);
-  return { array: await buildSlotArray([{ kek, dek, regionIndex: 1 }]), dek };
+  return { array: await buildSlotArray([{ kek, dek, regionIndex: 1 }], SLOT_AAD(salt)), dek };
 }
 
 describe('unlock: Argon2 runs exactly once', () => {
@@ -90,11 +94,11 @@ describe('unlock: Argon2 runs exactly once', () => {
     const { array } = await arrayWithOneLiveSlot('right', salt);
 
     argon2Calls.n = 0;
-    await unlockSlotArray(array, salt, 'right', PARAMS);
+    await unlockSlotArray(array, salt, 'right', KIND, PARAMS);
     expect(argon2Calls.n, 'a successful unlock ran Argon2 more than once').toBe(1);
 
     argon2Calls.n = 0;
-    await expect(unlockSlotArray(array, salt, 'wrong', PARAMS)).rejects.toBeInstanceOf(
+    await expect(unlockSlotArray(array, salt, 'wrong', KIND, PARAMS)).rejects.toBeInstanceOf(
       WrongPasswordError,
     );
     expect(argon2Calls.n, 'a failed unlock ran Argon2 a different number of times').toBe(1);
@@ -131,11 +135,13 @@ describe('openSlotArray: every slot is attempted, with no early exit', () => {
     const wrong = await slotKekCandidates('wrong', salt, null, null, PARAMS);
 
     decryptCalls = 0;
-    await openSlotArray(array, right);
+    await openSlotArray(array, right, SLOT_AAD(salt));
     const onSuccess = decryptCalls;
 
     decryptCalls = 0;
-    await expect(openSlotArray(array, wrong)).rejects.toBeInstanceOf(WrongPasswordError);
+    await expect(openSlotArray(array, wrong, SLOT_AAD(salt))).rejects.toBeInstanceOf(
+      WrongPasswordError,
+    );
     const onFailure = decryptCalls;
 
     // Measured, so the split is on the record: an early exit *inside* the slot
@@ -162,7 +168,7 @@ describe('openSlotArray: every slot is attempted, with no early exit', () => {
       }
       decryptCalls = 0;
       try {
-        await openSlotArray(array, candidates);
+        await openSlotArray(array, candidates, SLOT_AAD(salt));
       } catch {
         // A gated candidate matches nothing; the count is what is under test.
       }
@@ -182,7 +188,7 @@ describe('openSlotArray: every slot is attempted, with no early exit', () => {
       const { array } = await arrayWithOneLiveSlot('right', salt);
       const candidates = await slotKekCandidates('right', salt, null, null, PARAMS);
       decryptCalls = 0;
-      await openSlotArray(array, candidates);
+      await openSlotArray(array, candidates, SLOT_AAD(salt));
       counts.add(decryptCalls);
     }
     expect([...counts], 'the attempt count varied with slot position').toEqual([SLOT_COUNT]);

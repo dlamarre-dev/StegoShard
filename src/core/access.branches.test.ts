@@ -17,8 +17,13 @@ import {
   secureShuffle,
   serializeKeyFactorBlock,
   serializeSlot,
+  slotAadFor,
   tryOpenSlot,
 } from './crypto';
+
+const KIND = 'gallery-multiregion' as const;
+const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
+const SALT = new Uint8Array(16).fill(0x5a);
 import { padRegionPlaintext, parseRegionPlaintext, REGION_LEN_FIELD } from './regions';
 import { BucketTooLargeError, GALLERY_LADDER, pickBucket } from './buckets';
 import {
@@ -60,38 +65,41 @@ describe('SSKF key-factor envelope guards (§10.3)', () => {
 describe('slot primitives guards (§10)', () => {
   it('serializeSlot rejects a bad nonce or dek length', async () => {
     const k = await key();
-    await expect(serializeSlot(k, randomBytes(11), randomBytes(DEK_LEN), 0)).rejects.toThrow(
-      RangeError,
-    );
-    await expect(serializeSlot(k, randomBytes(12), randomBytes(DEK_LEN - 1), 0)).rejects.toThrow(
-      RangeError,
-    );
+    await expect(
+      serializeSlot(k, randomBytes(11), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT)),
+    ).rejects.toThrow(RangeError);
+    await expect(
+      serializeSlot(k, randomBytes(12), randomBytes(DEK_LEN - 1), 0, SLOT_AAD(SALT)),
+    ).rejects.toThrow(RangeError);
   });
 
   it('buildSlotArray rejects an empty, oversized, or out-of-range entry set', async () => {
     const k = await key();
-    await expect(buildSlotArray([])).rejects.toThrow(RangeError);
+    await expect(buildSlotArray([], SLOT_AAD(SALT))).rejects.toThrow(RangeError);
     const entry = { kek: k, dek: randomBytes(DEK_LEN), regionIndex: 0 };
-    await expect(buildSlotArray(Array.from({ length: 5 }, () => entry))).rejects.toThrow(
-      RangeError,
-    );
     await expect(
-      buildSlotArray([{ kek: k, dek: randomBytes(DEK_LEN), regionIndex: 2 }]),
+      buildSlotArray(
+        Array.from({ length: 5 }, () => entry),
+        SLOT_AAD(SALT),
+      ),
+    ).rejects.toThrow(RangeError);
+    await expect(
+      buildSlotArray([{ kek: k, dek: randomBytes(DEK_LEN), regionIndex: 2 }], SLOT_AAD(SALT)),
     ).rejects.toThrow(RangeError);
   });
 
   it('tryOpenSlot returns null for a wrong-size slot and a random (dead) slot', async () => {
     const k = await key();
-    expect(await tryOpenSlot(k, randomBytes(SLOT_SIZE - 1))).toBeNull();
-    expect(await tryOpenSlot(k, randomBytes(SLOT_SIZE))).toBeNull(); // GCM auth fails
+    expect(await tryOpenSlot(k, randomBytes(SLOT_SIZE - 1), SLOT_AAD(SALT))).toBeNull();
+    expect(await tryOpenSlot(k, randomBytes(SLOT_SIZE), SLOT_AAD(SALT))).toBeNull(); // GCM auth fails
   });
 
   it('tryOpenSlot rejects a slot whose authenticated region index is out of range', async () => {
     const k = await key();
     // serializeSlot doesn't bound the index (buildSlotArray does); a slot that
     // decrypts cleanly but names region 2 ∉ {0,1} must still be rejected.
-    const slot = await serializeSlot(k, randomBytes(12), randomBytes(DEK_LEN), 2);
-    expect(await tryOpenSlot(k, slot)).toBeNull();
+    const slot = await serializeSlot(k, randomBytes(12), randomBytes(DEK_LEN), 2, SLOT_AAD(SALT));
+    expect(await tryOpenSlot(k, slot, SLOT_AAD(SALT))).toBeNull();
   });
 });
 

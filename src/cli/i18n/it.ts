@@ -26,6 +26,21 @@ export const it: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession richiede --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore: mancano foto/cartella',
   errCodecInvalid: '--codec «{value}» non valido',
+  warnVaultRollback:
+    'questo caveau è l’esportazione n. {got}, ma su questa macchina è stata registrata la n. {recorded}: potresti stare ripristinando una copia più vecchia',
+  warnVaultUnknown:
+    'il caveau {vaultId} non è mai stato visto su questa macchina, quindi non c’è nulla con cui confrontarlo',
+  warnRegistryUnreadable:
+    'non è stato possibile leggere il file dei caveau noti, quindi non è stato fatto alcun controllo di rollback',
+  errTrackNotDeniable:
+    '--track non si può usare con {flags}: un caveau negabile non deve lasciare traccia della propria esistenza',
+  errTrackWrongCommand: '--track non ha effetto su {command} (solo save numera un export)',
+  errTrackEmpty:
+    "--track era vuoto (l'etichetta è ciò che dice di quale caveau questo salvataggio è un'altra versione)",
+  errTrackRegistryUnreadable:
+    'il file dei caveau noti in {path} non è stato leggibile, quindi questo export non può essere numerato: spostalo o usa --track-file',
+  warnRegistryUnwritable:
+    'il caveau è stato salvato, ma il file dei caveau noti non è stato aggiornato, quindi il prossimo export di questa etichetta riuserà questo numero',
   errCodecColorPaper: '--codec color non si può usare con --paper (le pagine stampate usano il QR)',
   errEntropyExclusive: '{flags} si escludono a vicenda (scegli una sola fonte di entropia)',
   errEntropyFlagEmpty: '--entropy era vuoto (ometti l’opzione se non vuoi entropia aggiuntiva)',
@@ -164,6 +179,10 @@ export const it: CliCatalog = {
     'Accettare una password debole (ma di >= 12 caratteri) per un nuovo caveau. Il minimo di 12 caratteri non è aggirabile né con questa né con altre opzioni.',
   helpKey: 'Un file .key, un’immagine stego o un contenitore di chiave binario',
   helpShare: 'Un file di quota (ripetibile) per un caveau nonpossession',
+  helpTrack:
+    'numerare le esportazioni di questo caveau per segnalare il ripristino di una copia più vecchia (mai su output negabile)',
+  helpTrackFile:
+    'dove risiede il registro dei caveau noti (predefinito: la directory di stato della piattaforma)',
   helpForce: 'Sovrascrivere i file di uscita esistenti (predefinito: rifiuta)',
   helpQuiet: 'Nascondere l’indicatore di avanzamento su stderr',
   helpJson: 'Emette un documento JSON su stdout; l’avanzamento come NDJSON su stderr',

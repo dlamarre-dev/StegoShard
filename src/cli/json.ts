@@ -172,6 +172,7 @@ export function estimateResultJson(res: EstimateResult): Record<string, unknown>
 /** Build the JSON presenter for one invocation of `command`. */
 export function jsonPresenter(io: CliIo, command: string | null): Presenter {
   const warnings: ReturnType<typeof warningJson>[] = [];
+  const notes: string[] = [];
   const locale = cliLocale(io.env);
 
   const event = (obj: Record<string, unknown>) => {
@@ -189,7 +190,11 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
       ok: true,
       command,
       locale,
-      result: warnings.length > 0 ? { ...result, warnings } : result,
+      result: {
+        ...result,
+        ...(warnings.length > 0 ? { warnings } : {}),
+        ...(notes.length > 0 ? { notes } : {}),
+      },
     });
   };
 
@@ -198,6 +203,11 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
       const w = warningJson(warning);
       warnings.push(w);
       event({ event: 'warning', ...w });
+    },
+
+    note(text) {
+      notes.push(text);
+      event({ event: 'note', text });
     },
 
     progress(quiet) {

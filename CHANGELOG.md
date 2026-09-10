@@ -9,6 +9,112 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **Every AEAD site now binds its container context, and the format version constants
+  move with it (`FORMAT_VERSION`, `KEY_BLOCK_VERSION`, `SEG_VERSION` → 2).** The
+  segmented `.ssbn`/`.db` path already bound each chunk to its whole header; the §6
+  vault blob, the §10.6 gallery region blocks, the §10.1 slot array and the §9.2
+  gallery fragments did not, and passed an empty AAD. That inconsistency is gone: one
+  builder per site in `src/core/aad.ts`, mirrored byte-for-byte in
+  `python/stegoshard/aad.py`, with every label listed in SPEC §11.1. `encryptBytes` and
+  `decryptBytes` now take a **required** `aad`, so the compiler walks every call site
+  and a future one cannot be added without a decision.
+
+  **What that actually bought, measured rather than asserted.** Most mix-and-match
+  splices already failed, because substituting a key block, a salt or a region index
+  also changes the derived key; the binding makes those refusals authenticated rather
+  than incidental. Stubbing every AAD builder out leaves exactly three tests failing,
+  and they are the honest evidence: a **key-mode downgrade** (lift the key block out of
+  an embedded blob, set `KB_LEN = 0`, and the content would otherwise decrypt cleanly
+  while the self-contained vault silently becomes one whose `.key` the attacker
+  supplies), a slot array transplanted between container kinds, and a slot array moved
+  under a different vault salt. The claim in the docs is worded to match.
+
+  One binding was deliberately **not** added. Binding the external key block in
+  keyfile/stego mode is the obvious next step and would have been a data-loss bug:
+  `changePassword` re-wraps the same DEK into different bytes, so every vault exported
+  before a password change would have become permanently undecodable, silently, with a
+  generic tag failure. A test now pins that splice as one that must keep working.
+
+- **The §6 vault blob is self-describing** (`"SSVB"` + version, SPEC §6). It used to
+  take its format version from the SSHD image header, which is not authenticated — its
+  4-byte hash is a triage hint, not a security boundary — so the blob's version was
+  covered by nothing. It is now inside the AAD, and a blob can be identified outside
+  whatever image held it.
+
+- **`--track <label>`: opt-in rollback detection.** Nothing inside a vault can say it is
+  the _current_ vault, because an AEAD tag authenticates a message and never the absence
+  of a newer one. A tracked save numbers each export (a vault id and counter inside the
+  encrypted envelope, SPEC §4.1) and a restore warns when the copy in front of you is
+  older than the newest one this machine recorded. The restore still succeeds: the old
+  copy may be the only one that survived.
+
+  It is off by default and **refused outright** on `gallery-save`, `--binary
+--disguise`, `--mode duress` and `--mode nonpossession`, because the registry it keeps
+  is a durable record that vaults exist and when they were opened — the most damaging
+  artifact this tool can produce against a coercive adversary, and the first persistent
+  state the command line has ever kept. A silent no-op there would have been worse than
+  an error. The half worth relying on needs no file at all: `vault … · export #N` is
+  printed on every save and restore that carries an identity.
+
+### Changed
+
+- **Output files are written atomically** (temp in the same directory, `fsync`, then
+  rename). The previous `writeFileSync` truncated the target and then filled it, so a
+  crash or a full disk left a truncated file — and on this format a vault missing its
+  tail is not a partly-readable document, it is a secret you no longer have. Post-save
+  verification did not catch it either, because it verifies the bytes in memory rather
+  than the file that reached the disk.
+
+- **Argon2id `parallelism` is pinned to 1** in the parser bounds. The wider range existed
+  only so the committed v1 vectors stayed decodable; with no published vaults to stay
+  compatible with, it bought nothing. The floors stay low on purpose — a key block asking
+  for _less_ work attacks nobody but itself.
+
+- **No old-format decode branch was written, deliberately.** Pre-1.0 with no published
+  vaults, a second branch would be dead code maintained forever and exercised never. An
+  older artifact fails the ordinary version check. `docs/VERSIONING.md` now states this
+  carve-out instead of quietly bending the rule that says otherwise.
+
+### Fixed
+
+- **`SEG_VERSION` was missing from the `scripts/check-golden.ts` guard**, so a break in
+  the `.db` format could have regenerated the golden corpus with no version bump at all —
+  exactly the failure that guard exists to prevent. Found while adding the third bump
+  this change needed.
+
+- **Two image headers were built with a hard-coded `version: 1`** instead of
+  `FORMAT_VERSION`. Harmless while the constant was 1; the bump surfaced them.
+
+### Documentation
+
+- **How to verify a download, and what verification is worth**
+  ([docs/CLI.md](docs/CLI.md#verify-your-download)). The release workflow has produced
+  checksums and a Sigstore build-provenance attestation for some time, and nothing
+  anywhere told a reader how to use them. For a tool that holds secrets, producing an
+  attestation nobody knows how to check is close to not producing one.
+
+  Two things this turned up rather than fixed. `sha256sum -c SHA256SUMS.txt`, which is
+  what anyone would write first, **fails** on a normal single-platform download: the file
+  lists six entries and you fetched one, so `--ignore-missing` is not optional. And
+  `SHA256SUMS.txt` is itself **neither signed nor attested** while sitting on the same
+  page as the archives it vouches for — so on its own it is circular, and the attestation
+  is the load-bearing check, not the checksum.
+
+- **The threat model gained the adversary it was missing**: upstream compromise, plus a
+  section on the build and the download. The point it makes plainly is that "no network
+  permission" bounds exfiltration and not damage — a compromised build can weaken the key
+  derivation, bias the random draw, or encode key material into the output files, and
+  those files are ones you deliberately hand to a cloud, a printer, or a photo album. It
+  also names the cross-check that already exists and was never written down: the Python
+  reference decoder is an independent implementation on a separate dependency tree, so a
+  compromised TypeScript build cannot make its output decode correctly under a decoder it
+  did not produce.
+
+- Release integrity is now in scope in [SECURITY.md](SECURITY.md), has its own rows in
+  the [claims register](docs/CLAIMS.md) with the limits spelled out, and reproducible
+  builds and release signing are named on the roadmap as wanted rather than promised.
+  `npm publish --provenance` from the release workflow is written down as a 1.0 gate.
+
 - **The site can be found and described: sitemap, robots, `llms.txt`, and the metadata
   behind them.** `sitemap.xml` lists the three pages, `llms.txt` states what the tool is
   and, more usefully, what it does not claim, and every page now carries a description,

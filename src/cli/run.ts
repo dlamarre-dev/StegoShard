@@ -13,7 +13,7 @@
  * one the extension, the web app and the Python decoder use.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   type AccessMode,
@@ -25,7 +25,16 @@ import {
   type CodecChoice,
   type SaveOptions,
 } from '../api/node/commands';
-import { codecArgError, entropyArgError } from './argcheck';
+import { codecArgError, entropyArgError, trackingArgError } from './argcheck';
+import { randomBytes } from '../core';
+import {
+  checkRestore,
+  identityLine,
+  readRegistry,
+  recordLabelledExport,
+  registryPath,
+  writeRegistry,
+} from '../api/node/vault-registry';
 import { CliError, type CliErrorCode, toCliFailure } from './errors';
 import type { CliIo } from './io';
 import { humanPresenter, type Presenter } from './present';
@@ -258,6 +267,96 @@ async function runUi(io: CliIo, args: string[]): Promise<number> {
  * the same table `parseArgs` uses. Two copies of that list would drift the first
  * time an option was added, and the drift would be silent.
  */
+
+/**
+ * Reserve the next export number for a labelled vault.
+ *
+ * Split into "reserve" and "commit" so a save that fails after this point does
+ * not burn a sequence number. If it did, the next real export would land one
+ * above the record and every restore of the *previous* artifact would then read
+ * as a rollback, which is the worst kind of false alarm: the tool crying wolf
+ * about the file the user still has.
+ */
+async function beginTracking(
+  label: string,
+  trackFile: string | undefined,
+): Promise<{ identity: { vaultId: Uint8Array; sequence: number }; commit: () => void }> {
+  const path = registryPath(trackFile);
+  const { registry, corrupt } = readRegistry(path);
+  // A registry that could not be read is NOT an empty one. Building on the empty
+  // value `readRegistry` returns would mint a fresh vault id at #1 and then
+  // rename a one-entry file over the original, destroying every record it merely
+  // failed to parse — and every earlier export of this vault would read as
+  // `unknown` from then on, which is rollback detection silently dead. On a
+  // restore losing the check is the lesser harm and the read is only advisory;
+  // here the user asked for numbering, so refuse and let them look at the file.
+  if (corrupt) fail(t('errTrackRegistryUnreadable', { path }), 'TRACKING_UNAVAILABLE');
+  const {
+    registry: next,
+    vaultId,
+    sequence,
+  } = recordLabelledExport(registry, label, () => randomBytes(16));
+  return { identity: { vaultId, sequence }, commit: () => writeRegistry(path, next) };
+}
+
+/**
+ * Compare a restored vault against the known-vaults registry and say what it
+ * found.
+ *
+ * Never fatal. A rollback is a warning and the restore still succeeds: the older
+ * copy may be the only one that survived, and refusing it would convert a
+ * detection into a denial of service. A registry that cannot be read is likewise
+ * a warning — losing the check is bad, losing the secret is worse.
+ *
+ * The verdict is recorded only when it moves the high-water mark forward. A
+ * rollback deliberately does NOT write, or restoring the same stale copy twice
+ * would look current the second time.
+ */
+function reportRollback(
+  present: Presenter,
+  identity: { vaultId: Uint8Array; sequence: number } | undefined,
+  trackFile: string | undefined,
+): void {
+  if (!identity) return;
+  present.note(identityLine(identity.vaultId, identity.sequence));
+
+  const path = registryPath(trackFile);
+  // Recording requires that the user has already opted in, which here means a
+  // registry that exists. Without this a single restore of a tracked vault
+  // creates the file — the durable list of vault identifiers and access times
+  // that docs/THREAT-MODEL.md calls the most damaging artifact the tool can
+  // produce — on a command that was never given `--track`. The identity line
+  // above is the part worth relying on and it needs no file at all.
+  if (!existsSync(path)) return;
+  const { registry, corrupt } = readRegistry(path);
+  if (corrupt) {
+    present.warn({ code: 'VAULT_REGISTRY_UNREADABLE', message: t('warnRegistryUnreadable') });
+    return;
+  }
+  const { verdict, registry: next } = checkRestore(registry, identity);
+  if (verdict.kind === 'rollback') {
+    present.warn({
+      code: 'VAULT_ROLLBACK',
+      message: t('warnVaultRollback', { got: verdict.got, recorded: verdict.recorded }),
+      details: { vaultId: verdict.vaultId, got: verdict.got, recorded: verdict.recorded },
+    });
+    return;
+  }
+  if (verdict.kind === 'unknown') {
+    present.warn({
+      code: 'VAULT_UNKNOWN',
+      message: t('warnVaultUnknown', { vaultId: verdict.vaultId.slice(0, 8) }),
+      details: { vaultId: verdict.vaultId },
+    });
+  }
+  // Only reached for first / unknown / current, all of which advance the record.
+  try {
+    writeRegistry(path, next);
+  } catch {
+    // A registry we cannot update must not fail a restore that already worked.
+  }
+}
+
 const OPTIONS = {
   out: { type: 'string' },
   paper: { type: 'boolean' },
@@ -286,6 +385,8 @@ const OPTIONS = {
   'entropy-file': { type: 'string' },
   'entropy-prompt': { type: 'boolean' },
   force: { type: 'boolean' },
+  track: { type: 'string' },
+  'track-file': { type: 'string' },
   quiet: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
   json: { type: 'boolean' },
@@ -341,6 +442,20 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     fail(t('errEntropyWrongCommand', { command }));
   }
 
+  // Only `save` writes an identity into an envelope, so `--track` means nothing
+  // anywhere else. `save` and `gallery-save` run this check inside their own
+  // branches, where the destination is known and deniability is the better
+  // complaint. (`--track-file` stays common: it only says where the record a
+  // restore *reads* lives.)
+  if (command !== 'save' && command !== 'gallery-save') {
+    const wrongCommand = trackingArgError({
+      track: values.track !== undefined,
+      label: values.track as string | undefined,
+      command,
+    });
+    if (wrongCommand) fail(wrongCommand.message, wrongCommand.code);
+  }
+
   const force = Boolean(values.force);
 
   const outDir = (values.out as string) ?? '.';
@@ -362,6 +477,21 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // §10 access mode (supported only on the disguised .db path for now).
     const mode = ((values.mode as string | undefined) ?? 'plain') as AccessMode;
     if (!ACCESS_MODES.includes(mode)) fail(t('errSaveMode', { value: mode }));
+
+    // Refuse --track on a deniable destination BEFORE the mode's own
+    // requirements are checked. A user who asked for both has made a mistake
+    // about what the tool is for, and telling them "--duress needs --decoy"
+    // first would send them off to satisfy a requirement for a command that was
+    // never going to run.
+    const trackLabel = values.track as string | undefined;
+    const trackError = trackingArgError({
+      track: trackLabel !== undefined,
+      label: trackLabel,
+      command,
+      binary,
+      mode,
+    });
+    if (trackError) fail(trackError.message, trackError.code);
     if (mode !== 'plain' && binary !== 'disguised') {
       fail(t('errSaveModeNeedsDisguise', { mode }));
     }
@@ -382,6 +512,15 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // After the passwords (they get first claim on stdin), before anything is
     // generated.
     await installEntropy(io, present, values);
+
+    // `!== undefined`, matching the guard above. Truthiness let `--track ""`
+    // fall through to no tracking at all, so the user got an unnumbered vault
+    // and a zero exit; an empty label is now refused by `trackingArgError`.
+    const tracking =
+      trackLabel !== undefined
+        ? await beginTracking(trackLabel, values['track-file'] as string | undefined)
+        : undefined;
+
     const opts: SaveOptions = {
       inputs,
       outDir,
@@ -411,11 +550,34 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       // conservative 256 MiB figure for embedded callers, so this has to be said
       // out loud rather than inherited.
       maxBytes: MAX_FILE_BYTES_BINARY_CLI,
+      identity: tracking?.identity,
     };
 
     const progress = present.progress(Boolean(values.quiet));
     const res = await runSave(opts, progress.onProgress);
     progress.done();
+    // Committed only once the artifact exists, so a failed save does not burn a
+    // sequence number and make the next real one look like a rollback.
+    //
+    // Guarded because the vault is already on disk by this point. `writeRegistry`
+    // throws on the symlink refusal and on any filesystem error, and unguarded
+    // that turned a completed save into `{"ok":false,"code":"INTERNAL"}` and exit
+    // 1 — a scripted caller would retry, or clean up a real vault. The lost
+    // record is a warning: the next export of this label reuses the sequence, so
+    // the two share a number, which is the same known limit as a concurrent save.
+    if (tracking) {
+      try {
+        tracking.commit();
+      } catch {
+        present.warn({
+          code: 'VAULT_REGISTRY_UNWRITABLE',
+          message: t('warnRegistryUnwritable'),
+        });
+      }
+    }
+    if (tracking) {
+      present.note(identityLine(tracking.identity.vaultId, tracking.identity.sequence));
+    }
     // Both of these are English-only at the source (paper.ts and commands.ts
     // build them from literals; only the `warnPrefix` wrapper was localized), so
     // JSON callers key on the code and read the message as a hint.
@@ -449,11 +611,27 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       progress.onProgress,
     );
     progress.done();
+
+    // Rollback check. Runs whenever the vault carried an identity, whether or
+    // not this restore asked to track: the artifact is what decides, and there
+    // is no reason to withhold a finding the user can act on.
+    reportRollback(present, res.identity, values['track-file'] as string | undefined);
+
     present.restore(res);
     return 0;
   }
 
   if (command === 'gallery-save') {
+    // Before the positional requirements, for the same reason as on `save`:
+    // gallery is a deniable destination, so --track is a category error and
+    // asking for cover photos first would be answering the wrong question.
+    const galleryTrackError = trackingArgError({
+      track: values.track !== undefined,
+      label: values.track as string | undefined,
+      command,
+    });
+    if (galleryTrackError) fail(galleryTrackError.message, galleryTrackError.code);
+
     const secretFile = positionals[0];
     if (!secretFile) fail(t('errGalleryMissingFile'));
     const covers = positionals.slice(1);

@@ -35,6 +35,7 @@
  */
 
 import { concatBytes, readU16, readU32, readU64, writeU16, writeU32, writeU64 } from './bytes';
+import { segmentedRegionAad } from './aad';
 import {
   aeadOpen,
   aeadSeal,
@@ -55,13 +56,14 @@ import {
   SLOT_ARRAY_LEN,
   type SlotEntry,
   buildSlotArray,
+  slotAadFor,
   unlockKeyBlock,
   VAULT_SALT_LEN,
   WrongPasswordError,
 } from './crypto';
 import { DB_LADDER, pickBucket } from './buckets';
 import { REGION_LEN_FIELD, padRegionPlaintext, parseRegionPlaintext } from './regions';
-import { buildPayload, parsePayload } from './payload';
+import { buildPayload, parsePayload, type VaultIdentity } from './payload';
 import type { OnProgress } from './progress';
 import type { KeyMode } from './types';
 import type { LiveRegion, VaultKey } from './vault';
@@ -69,7 +71,7 @@ import { MissingKeyError } from './vault';
 
 /** "SSCS": StegoShard Chunked Segments. Distinct from SSBN/SSKY/SSHD. */
 export const SEG_MAGIC = Uint8Array.from([0x53, 0x53, 0x43, 0x53]);
-export const SEG_VERSION = 1;
+export const SEG_VERSION = 2;
 /** Random per-export nonce prefix; 7 + 4 (counter) + 1 (final) = 12-byte GCM IV. */
 export const NONCE_PREFIX_LEN = 7;
 /** Default chunk size: 1 MiB, ~0.0015% tag overhead, ~100 updates per 100 MiB. */
@@ -185,8 +187,9 @@ export async function buildSegmentedBlob(
   onProgress?: OnProgress,
   chunkSize: number = DEFAULT_CHUNK_SIZE,
   bundle = false,
+  identity?: VaultIdentity | undefined,
 ): Promise<Uint8Array> {
-  const envelope = await buildPayload(filename, content, { bundle });
+  const envelope = await buildPayload(filename, content, { bundle, identity });
   onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
 
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
@@ -262,13 +265,31 @@ async function decryptChunks(
 /**
  * Decode a segmented blob with a password (unlocks the key block, embedded or
  * supplied). Mirrors `decodeVaultBlob` for the single-shot image path.
+ *
+ * `identity` is declared because it is genuinely returned: this is the branded
+ * single-region path, the one place a segmented container may carry one, and
+ * `importVaultBinary` reads it for rollback detection. Leaving it off the
+ * signature while `parsePayload`'s object was passed through un-destructured
+ * made the type a lie in the direction that breaks quietly — narrowing the
+ * return to match the declaration would look like a tidy-up and would silently
+ * turn rollback detection off on the branded path.
+ *
+ * The multi-region decoders next door do the opposite deliberately: they
+ * destructure to (filename, content, bundled) so a real and a decoy unlock
+ * cannot be told apart from the shape of the result. That asymmetry is the
+ * point, so both halves now say so in their types.
  */
 export async function decodeSegmentedBlob(
   blob: Uint8Array,
   password: string,
   opts: { keyBlock?: Uint8Array | undefined; maxContentBytes: number },
   onProgress?: OnProgress,
-): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
+): Promise<{
+  filename: string;
+  content: Uint8Array;
+  bundled: boolean;
+  identity?: VaultIdentity | undefined;
+}> {
   const parsed = parseHeader(blob);
   const kbBytes = parsed.keyBlock.length > 0 ? parsed.keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
@@ -354,16 +375,6 @@ function buildMultiHead(
   return head;
 }
 
-/** AAD binding every chunk to the whole container, its region index, and its salt/prefix. */
-function regionAad(
-  head: Uint8Array,
-  regionIndex: number,
-  contentSalt: Uint8Array,
-  noncePrefix: Uint8Array,
-): Uint8Array {
-  return concatBytes(head, Uint8Array.of(regionIndex), contentSalt, noncePrefix);
-}
-
 /** Seal one region's padded plaintext into a chunked STREAM stream. */
 async function buildRegionStream(
   head: Uint8Array,
@@ -375,7 +386,7 @@ async function buildRegionStream(
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
   const noncePrefix = randomBytes(NONCE_PREFIX_LEN);
   const cek = await deriveRegionKey(region.dek, contentSalt, region.regionIndex);
-  const aad = regionAad(head, region.regionIndex, contentSalt, noncePrefix);
+  const aad = segmentedRegionAad(head, region.regionIndex, contentSalt, noncePrefix);
   const plaintext = padRegionPlaintext(region.envelope, bucket); // exactly `bucket` bytes
   const n = Math.max(1, Math.ceil(bucket / chunkSize));
   const parts: Uint8Array[] = [contentSalt, noncePrefix];
@@ -406,7 +417,10 @@ export async function buildMultiRegionSegmentedBlob(
   const lens: [number, number] = [0, 0];
   for (const r of live) lens[r.regionIndex] = REGION_LEN_FIELD + r.envelope.length;
   const bucket = pickBucket(lens[0], lens[1], ladder);
-  const slotArray = await buildSlotArray(slotEntries);
+  const slotArray = await buildSlotArray(
+    slotEntries,
+    slotAadFor('segmented-multiregion', vaultSalt),
+  );
   const head = buildMultiHead(vaultSalt, slotArray, chunkSize, bucket);
   const S = multiRegionStreamLen(bucket, chunkSize);
   const streams: [Uint8Array | null, Uint8Array | null] = [null, null];
@@ -520,7 +534,7 @@ async function decryptRegionStream(
   const contentSalt = stream.subarray(0, CONTENT_SALT_LEN);
   const noncePrefix = stream.subarray(CONTENT_SALT_LEN, REGION_PREFIX_LEN);
   const cek = await deriveRegionKey(dek, contentSalt, regionIndex);
-  const aad = regionAad(head, regionIndex, contentSalt, noncePrefix);
+  const aad = segmentedRegionAad(head, regionIndex, contentSalt, noncePrefix);
   const n = Math.max(1, Math.ceil(bucketLen / chunkSize));
   const lastSegLen = bucketLen - (n - 1) * chunkSize;
   const out = new Uint8Array(bucketLen);
@@ -575,7 +589,11 @@ export async function decodeMultiRegionSegmentedBlob(
   } catch {
     throw new WrongPasswordError();
   }
-  const { dek, regionIndex } = await openSlotArray(parsed.slotArray, candidates);
+  const { dek, regionIndex } = await openSlotArray(
+    parsed.slotArray,
+    candidates,
+    slotAadFor('segmented-multiregion', parsed.vaultSalt),
+  );
   onProgress?.({ phase: 'unlock', done: 1, total: 1 });
   const stream = parsed.regionArea.subarray(regionIndex * parsed.S, (regionIndex + 1) * parsed.S);
   const envelope = await decryptRegionStream(
@@ -588,7 +606,11 @@ export async function decodeMultiRegionSegmentedBlob(
     opts.maxContentBytes,
     onProgress,
   );
-  return parsePayload(envelope, opts.maxContentBytes);
+  // Narrowed like the gallery multi-region path: these builders never write an
+  // identity, and the decode surface must stay exactly (filename, content,
+  // bundled) so a real and a decoy unlock are indistinguishable to the caller.
+  const { filename, content, bundled } = await parsePayload(envelope, opts.maxContentBytes);
+  return { filename, content, bundled };
 }
 
 /** Decode a specific region with a known DEK (post-save verification). */
@@ -611,5 +633,9 @@ export async function decodeMultiRegionSegmentedBlobWithDek(
     maxContentBytes,
     onProgress,
   );
-  return parsePayload(envelope, maxContentBytes);
+  // Narrowed like the gallery multi-region path: these builders never write an
+  // identity, and the decode surface must stay exactly (filename, content,
+  // bundled) so a real and a decoy unlock are indistinguishable to the caller.
+  const { filename, content, bundled } = await parsePayload(envelope, maxContentBytes);
+  return { filename, content, bundled };
 }

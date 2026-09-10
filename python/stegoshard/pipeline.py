@@ -11,17 +11,25 @@ from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from .aad import (
+    KIND_GALLERY,
+    region_block_aad,
+    vault_blob_aad,
+)
 from .binary_container import unwrap_binary
 from .crypto import (
     decrypt_content,
     derive_content_key,
     derive_region_key,
     open_slot_array,
+    slot_aad_for,
     slot_kek_candidates,
     unwrap_dek,
 )
 from .format import (
+    BLOB_MAGIC,
     CONTENT_SALT_LEN,
+    FORMAT_VERSION,
     IV_LEN,
     MAX_CONTENT_BYTES,
     MAX_CONTENT_BYTES_BINARY,
@@ -123,7 +131,12 @@ def _decode_vault_blob(
 
     dek = unwrap_dek(parse_key_block(kb_bytes), password)
     cek = derive_content_key(dek, content_salt)
-    envelope = decrypt_content(cek, iv, ciphertext)
+    # The AAD uses the blob's own KB_LEN region, not the externally supplied key
+    # block: in keyfile/stego mode `embedded_kb` is empty and only the zero length
+    # field is bound. Binding the external key would break a password change,
+    # which re-serializes it while keeping the same DEK.
+    aad = vault_blob_aad(BLOB_MAGIC, FORMAT_VERSION, embedded_kb, content_salt, iv)
+    envelope = decrypt_content(cek, iv, ciphertext, aad)
     filename, content, bundled = parse_envelope(envelope, max_content_bytes)
     return RestoredFile(filename, content, bundled)
 
@@ -145,13 +158,19 @@ def decode_multiregion_vault_blob(
     candidates = slot_kek_candidates(
         password, vault_salt, key_factor, secret, iterations, memory_kib, parallelism
     )
-    dek, region_index = open_slot_array(slot_array, candidates)
+    dek, region_index = open_slot_array(
+        slot_array, candidates, slot_aad_for(KIND_GALLERY, vault_salt)
+    )
     block = region_area[region_index * r : (region_index + 1) * r]
     content_salt = block[:CONTENT_SALT_LEN]
     iv = block[CONTENT_SALT_LEN : CONTENT_SALT_LEN + IV_LEN]
     ciphertext = block[CONTENT_SALT_LEN + IV_LEN :]
     cek = derive_region_key(dek, content_salt, region_index)
-    plaintext = AESGCM(cek).decrypt(iv, ciphertext, None)
+    plaintext = AESGCM(cek).decrypt(
+        iv,
+        ciphertext,
+        region_block_aad(vault_salt, slot_array, region_index, r, content_salt, iv),
+    )
     envelope = parse_region_plaintext(plaintext, max_content_bytes)
     filename, content, bundled = parse_envelope(envelope, max_content_bytes)
     return RestoredFile(filename, content, bundled)

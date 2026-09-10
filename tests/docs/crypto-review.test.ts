@@ -59,24 +59,25 @@ describe('the dossier agrees with the code on Argon2id parser bounds', () => {
    */
   it('states exactly the range validateArgon2Params enforces', () => {
     const stated =
-      /`t ∈ \[(\d+),\s*(\d+)\]`, `m ∈ \[(\d+) KiB, (\d+) MiB\]`, `p ∈ \[(\d+),\s*(\d+)\]`/.exec(
+      // Parallelism is pinned to a single value, so the dossier states it as
+      // `p = 1` rather than a degenerate `p ∈ [1,1]`. Both forms are accepted
+      // here; a fixed value is simply the range whose ends coincide, and the
+      // assertions below still probe one step outside it in both directions.
+      /`t ∈ \[(\d+),\s*(\d+)\]`, `m ∈ \[(\d+) KiB, (\d+) MiB\]`, `p (?:∈ \[(\d+),\s*(\d+)\]|= (\d+))`/.exec(
         FLAT,
       );
     expect(stated, 'the dossier no longer states the Argon2 bounds in the expected form').not.toBe(
       null,
     );
-    const [tMin, tMax, mMinKiB, mMaxMiB, pMin, pMax] = stated!.slice(1).map(Number) as [
-      number,
-      number,
-      number,
-      number,
-      number,
-      number,
-    ];
+    const [tMin, tMax, mMinKiB, mMaxMiB, pRangeMin, pRangeMax, pFixed] = stated!
+      .slice(1)
+      .map((v) => (v === undefined ? undefined : Number(v)));
+    const pMin = pFixed ?? pRangeMin!;
+    const pMax = pFixed ?? pRangeMax!;
 
     const cases: [keyof Argon2Params, number, number][] = [
-      ['iterations', tMin, tMax],
-      ['memoryKiB', mMinKiB, mMaxMiB * 1024],
+      ['iterations', tMin!, tMax!],
+      ['memoryKiB', mMinKiB!, mMaxMiB! * 1024],
       ['parallelism', pMin, pMax],
     ];
 

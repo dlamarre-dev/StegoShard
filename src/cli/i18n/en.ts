@@ -38,6 +38,20 @@ export const en = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession requires --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore: missing photos/folder',
   errCodecInvalid: 'invalid --codec "{value}"',
+  warnVaultRollback:
+    'this vault is export #{got}, but #{recorded} was recorded on this machine: you may be restoring an older copy',
+  warnVaultUnknown:
+    'vault {vaultId} has not been seen on this machine, so there is nothing to compare it against',
+  warnRegistryUnreadable: 'the known-vaults file could not be read, so no rollback check was made',
+  errTrackNotDeniable:
+    '--track cannot be used with {flags}: a deniable vault must leave no record that it exists',
+  errTrackWrongCommand: '--track has no effect on {command} (only save numbers an export)',
+  errTrackEmpty:
+    '--track was empty (a label is how a save says which vault this is another version of)',
+  errTrackRegistryUnreadable:
+    'the known-vaults file at {path} could not be read, so this export cannot be numbered; move it aside or pass --track-file',
+  warnRegistryUnwritable:
+    'the vault was saved, but the known-vaults record could not be updated, so the next export of this label will reuse this number',
   errCodecColorPaper: '--codec color cannot be used with --paper (printed pages use QR)',
   errEntropyExclusive: '{flags} are mutually exclusive (pick one entropy source)',
   errEntropyFlagEmpty: '--entropy was empty (omit the flag if you do not want extra entropy)',
@@ -183,6 +197,9 @@ export const en = {
     'Acknowledge a weak (but >= 12 character) password for a new vault. The 12-character minimum itself cannot be waived by this or any other flag.',
   helpKey: 'A .key file, a stego image, or a binary key container',
   helpShare: 'A threshold share file (repeatable) for a nonpossession vault',
+  helpTrack:
+    'number exports of this vault so a restored older copy is flagged (never on deniable output)',
+  helpTrackFile: 'where the known-vaults record lives (default: your platform state directory)',
   helpForce: 'Overwrite existing output files (default: refuse)',
   helpQuiet: 'Suppress the progress indicator on stderr',
   helpJson: 'Emit one JSON document on stdout; progress as NDJSON on stderr',
