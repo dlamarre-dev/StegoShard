@@ -38,6 +38,37 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # Hold vitest at 4.x until `@stryker-mutator/vitest-runner` supports 5.
+      #
+      # The group above was built to keep these versions in one diff, and it did.
+      # What it could not do is supply a runner that did not exist: 10.0.0 is the
+      # newest release and still declares `vitest >=2.0.0`, so vitest 5.0.0
+      # resolved cleanly, installed without a warning, and went in alone (#165).
+      #
+      # Under vitest 5 the runner names each mutant's covering tests and then
+      # runs none of them -- `Ran 0.00 tests per mutant` -- so every mutant it
+      # measures is recorded as survived. Measured on one 15-mutant slice of
+      # crypto.ts, same source both times: 100.00% on 4.1.11, 0.00% on 5.0.0.
+      #
+      # It took two days to surface and did not look like a tooling fault when it
+      # did. The nightly is incremental, so the night after the bump reused every
+      # stored verdict and stayed green; the first code change to a mutated file
+      # invalidated those mutants, re-ran them through the broken runner, and the
+      # score collapsed -- reading exactly like a test regression in the change
+      # that happened to land. That is the failure mode the comment above
+      # predicted, and grouping was the wrong instrument for it.
+      #
+      # REMOVE THIS once a runner release declares support for vitest 5: drop the
+      # entry, let the group bring both across together, and confirm the next
+      # forced Sunday run reports a non-zero tests-per-mutant before trusting the
+      # score.
+      - dependency-name: vitest
+        update-types:
+          - version-update:semver-major
+      - dependency-name: '@vitest/*'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
