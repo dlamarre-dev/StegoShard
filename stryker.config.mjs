@@ -42,6 +42,32 @@
  * without that fix the same file reads 70.37% with 33 mutants wrongly reported as
  * uncovered.
  *
+ * 6 SEPTEMBER IS STILL THE LAST REAL MEASUREMENT. The nightlies of 10 and 11
+ * September reported crypto at 28.39% and vault at 74.27%; both numbers are
+ * garbage and neither is in the table above.
+ *
+ * vitest 5.0.0 arrived on 8 September (#165) against
+ * `@stryker-mutator/vitest-runner@10`, whose peer range (`vitest >=2.0.0`) is
+ * loose enough to install it and too loose to mean anything. Under vitest 5 the
+ * runner selects each mutant's covering tests and executes none of them, so every
+ * mutant it measures comes back survived. Measured on one 15-mutant slice of
+ * crypto.ts, identical source both times:
+ *
+ *   vitest 4.1.11   100.00%   10 killed + 5 timeout   4.27 tests per mutant
+ *   vitest 5.0.0      0.00%   15 survived             0.00 tests per mutant
+ *
+ * Confirmed independently of Stryker: hand-applying one of the reported
+ * survivors (dropping the `throw` from validateArgon2Params) fails 13 tests in
+ * crypto.hardening.test.ts. The suite kills it; the harness could not see that.
+ *
+ * vitest is pinned to 4.x with an `ignore` in .github/dependabot.yml until a
+ * runner release declares support for 5. The reason it took two days and looked
+ * like a code regression is in .github/workflows/mutation.yml; the short version
+ * is that a green incremental night means "nothing was re-measured".
+ *
+ * The reflex this should build: before quoting any score here, check the run's
+ * `Ran N tests per mutant`. At zero, the number below it is noise.
+ *
  * AN ANOMALY, unexplained, do not build on the 30 August reed-solomon figure.
  *
  * reed-solomon.ts reads 92.09%, then 99.44%, then 92.66%. Two of the three forced

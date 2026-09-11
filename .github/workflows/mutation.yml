@@ -87,9 +87,33 @@
 # everything. **The Sunday number is the measurement; the other nights are a fast
 # regression detector.** Read them differently.
 #
-# THIS STILL GATES NOTHING. See `break: null` in stryker.config.mjs and the note
-# there: the score has moved with every configuration change so far, so no
-# threshold can be set until a few forced runs agree.
+# THAT ASSUMPTION BROKE ON 8 SEPTEMBER, in the other direction, and it is worth
+# reading before trusting a green night here.
+#
+# vitest 5.0.0 landed (#165) against `@stryker-mutator/vitest-runner@10`, which
+# supports it only in the sense that `vitest >=2.0.0` does not exclude it. Under
+# vitest 5 the runner names each mutant's covering tests and then runs none of
+# them -- `Ran 0.00 tests per mutant` -- so every mutant it measures is written
+# down as survived.
+#
+# The night after the bump was GREEN. Nothing had changed in any mutated file, so
+# every verdict was reused and the broken runner was never asked a question. The
+# next change to touch crypto.ts and vault.ts invalidated their mutants, re-ran
+# them through the broken runner, and dropped crypto from 92.66% to 28.39% --
+# which read as a test regression in that change rather than as a measurement
+# that had been dead for two days. stego, whose file nobody touched, sat
+# unchanged at 85.76% throughout and was just as meaningless.
+#
+# So: a green incremental night means "nothing was re-measured", not "everything
+# still holds", and a score that moves only on the shards someone edited is a
+# signature worth suspecting the harness for. `Ran N tests per mutant` near zero
+# in the log is the direct tell.
+#
+# THE SCORE GATES THIS WORKFLOW, and nothing else. `break` is 75 in
+# stryker.config.mjs -- see "THE THRESHOLD" there for the calibration. It is a
+# regression alarm on a scheduled run, not a pull-request gate: no PR is blocked
+# by it, and a drop turns a nightly red rather than scrolling past in a summary
+# table nobody opens. It is what eventually caught the failure above.
 name: Mutation testing
 
 on:
@@ -182,12 +206,23 @@ jobs:
       # Rolling key with restore-keys, because a cache entry is immutable: the run
       # restores the most recent entry for its shard and writes a new one under a
       # key carrying this run's id.
+      #
+      # THE KEY CARRIES A GENERATION, and `v2` is not decoration. A stored result
+      # is only as trustworthy as the runner that produced it, and on 10 and 11
+      # September the runner produced false ones: vitest 5.0.0 against
+      # `@stryker-mutator/vitest-runner@10` ran no tests at all per mutant, so
+      # every mutant it measured was written down as survived. Pinning vitest back
+      # to 4.x fixes the runner but touches no mutated source, so the differ would
+      # have happily reused those verdicts and reported the same collapsed score
+      # against a working runner. Retiring the old prefix is what forces the
+      # rebuild. Bump the generation whenever a change makes stored results
+      # untrustworthy rather than merely stale.
       - name: Restore the incremental results
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/mutation/incremental-${{ matrix.shard }}.json
-          key: stryker-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: stryker-${{ matrix.shard }}-
+          key: stryker-v2-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: stryker-v2-${{ matrix.shard }}-
 
       - name: Install dependencies
         run: npm ci
@@ -211,7 +246,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/mutation/incremental-${{ matrix.shard }}.json
-          key: stryker-${{ matrix.shard }}-${{ github.run_id }}
+          key: stryker-v2-${{ matrix.shard }}-${{ github.run_id }}
 
       # Distinct names per shard. upload-artifact v4 and later refuse a second
       # upload under a name that already exists, so a shared name would fail the
