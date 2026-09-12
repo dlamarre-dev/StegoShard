@@ -256,24 +256,46 @@ wrong, and is why the bit could be added without a version bump.
 [ VAULT_ID 16 ][ SEQUENCE u32 ]      = 20 bytes, immediately after FILENAME
 ```
 
-- `VAULT_ID`: 16 CSPRNG bytes, **stable across re-exports of the same logical
-  vault**. Never derived from the DEK: SPEC §6 reuses one DEK across vaults, so a
-  DEK-derived id would collide across every vault a keystore holds.
-- `SEQUENCE`: a per-vault export counter, starting at 1, strictly increasing.
-- Both are absent unless the writer is tracking, and a writer MUST NOT emit a
-  constant `SEQUENCE = 1`: a counter that never moves looks like a guarantee and
-  is not one.
+- `VAULT_ID`: 16 CSPRNG bytes, **freshly generated for every export**. It is a
+  per-export tag, not a vault identifier: two exports of one logical vault carry
+  unrelated ids, and a reader **MUST NOT** use it to conclude that two artifacts
+  are versions of the same thing. It exists so the number has a short handle to be
+  printed beside, distinguishing two unrelated artifacts that both happen to be
+  `#4`; it carries no other meaning. Never derived from the DEK, the password, a
+  filename or a clock — SPEC §6 reuses one DEK across vaults, so a DEK-derived id
+  would collide across every vault a keystore holds, and **any** derived id would
+  quietly become the correlation handle this block must not provide.
+- `SEQUENCE`: the export number, `1 .. 2³²−1`, **supplied from outside the
+  writer**. This implementation takes it from the user (`--export-number`);
+  nothing in the format constrains where it comes from beyond the next bullet.
+- Both are absent unless a number was given, and a writer **MUST NOT synthesize
+  one**: no default, no constant `SEQUENCE = 1`, no counter derived from a clock,
+  a filename, or a local file. If no number arrives from outside the tool, bit 2
+  **MUST** be clear. A counter that never moves — or one the tool invents on your
+  behalf — looks like a guarantee and is not one.
 
 **Purpose, and its limit.** Together they make a _rollback_ detectable — an older
 but entirely legitimate export put back in place of a newer one. No AEAD can do
 this alone: a tag authenticates a message, never the absence of a newer message.
-Detection therefore requires state outside the container, and this block is only
-the half that travels with the artifact.
+Detection therefore requires a memory the container does not carry, and this block
+is only the half that travels with the artifact.
+
+In this implementation that memory is **the person**: they choose the number when
+they save and read it back when they restore, the same role a recovery sheet plays
+for resilient storage. No file is kept, and none should be — a local list of vault
+identifiers and access times would prove how many vaults exist and when they were
+touched, which is precisely what the deniable paths exist to avoid proving. Note
+what this does and does not buy: nothing compares the number for you, and an
+adversary who can rewrite the artifact rewrites the number with it. This is a
+legibility aid with a human in the loop, not an anti-tamper control.
 
 **Why it lives here rather than in a header.** In any container header a cleartext
 `VAULT_ID` would publicly prove that two artifacts are re-exports of one vault, to
 an adversary who cannot decrypt either — a worse leak than the rollback it
-defends against, and on the deniable paths an outright distinguisher. Inside the
+defends against, and on the deniable paths an outright distinguisher. Since the id
+is now fresh per export, that particular leak is impossible by construction as
+well as by placement; the placement argument stands on its own for `SEQUENCE`,
+which a header would expose in cleartext. Inside the
 envelope it is ciphertext, covered by GCM and by the §6 AAD above it, and readable
 only after unlock, which is exactly when the check is actionable.
 
