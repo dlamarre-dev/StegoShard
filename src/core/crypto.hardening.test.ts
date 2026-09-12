@@ -466,6 +466,12 @@ describe('Argon2id parameter boundaries', () => {
   // single mutation would weaken every KDF in the process at once. Frozen, the
   // attempt throws in strict mode (ES modules are always strict) instead of
   // silently succeeding.
+  //
+  // The three values below are pinned, and changing them to make this test pass is
+  // the wrong move: on the §5.3, §9.1 and §10.2 paths the cost is not stored in the
+  // container, so it is part of the format. Read "Argon2 cost is a format constant"
+  // in docs/VERSIONING.md before touching them. `npm run golden:check` refuses a
+  // change here that does not come with a FORMAT_VERSION bump.
   it('DEFAULT_ARGON2 cannot be weakened in place', () => {
     expect(Object.isFrozen(DEFAULT_ARGON2)).toBe(true);
     const mutable = DEFAULT_ARGON2 as Argon2Params;
