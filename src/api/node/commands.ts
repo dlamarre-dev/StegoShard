@@ -227,8 +227,9 @@ const asFiles = (outs: readonly OutFile[]) => ({
 function writeExternalKey(target: WriteTarget, ext: KeyArtifact): OutFile {
   const path = writeOut(target, ext.name, ext.bytes);
   // The artifact exists from here on, so the cover claim is real regardless of
-  // what else the save does afterwards.
-  ext.landed = true;
+  // what else the save does afterwards -- and other writes DO follow on some
+  // paths (recovery-N.txt on the non-possession and gallery paths).
+  ext.onLanded?.();
   if (ext.mimicPath) {
     try {
       const s = statSync(ext.mimicPath);
@@ -374,13 +375,8 @@ interface KeyArtifact {
   name: string;
   bytes: Uint8Array;
   mimicPath?: string;
-  claim?: CoverClaim | undefined;
-  landed?: boolean;
-}
-
-/** Drop a claim whose artifact never reached disk. Safe to call more than once. */
-function releaseIfUnwritten(ext: KeyArtifact | undefined): void {
-  if (ext && !ext.landed) ext.claim?.release();
+  /** Set by `externalKey`; called by `writeExternalKey` once the bytes are on disk. */
+  onLanded?: (() => void) | undefined;
 }
 
 async function externalKey(
@@ -393,6 +389,8 @@ async function externalKey(
   // multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
   variant: 'block' | 'factor' = 'block',
   opts?: StegoEmbedOptions,
+  hold?: (claim: CoverClaim) => void,
+  landed?: () => void,
 ): Promise<KeyArtifact | undefined> {
   if (keyMode === 'stego') {
     if (!cover) {
@@ -401,18 +399,14 @@ async function externalKey(
         'stego key mode needs a cover image to hide the key in',
       );
     }
-    let claim: CoverClaim | undefined;
-    const embedOpts: StegoEmbedOptions = {
-      ...opts,
-      onClaim: (c) => {
-        claim = c;
-      },
-    };
+    // `onClaim` forwards straight to the holder, so the claim is registered before
+    // anything else in this function can throw.
+    const embedOpts: StegoEmbedOptions = { ...opts, onClaim: hold };
     const key =
       variant === 'factor'
         ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password, embedOpts)
         : await embedKeyImage(read(cover), basename(cover), keyBlock, password, embedOpts);
-    return { name: basename(cover), bytes: key.bytes, mimicPath: cover, claim };
+    return { name: basename(cover), bytes: key.bytes, mimicPath: cover, onLanded: landed };
   }
   if (keyMode !== 'embedded') {
     return { name: `stegoshard-${setHex}.key`, bytes: keyBlock };
@@ -423,37 +417,48 @@ async function externalKey(
 /**
  * Run a save, and drop the stego cover claim if the artifact never reached disk.
  *
- * The claim is made during the embed, which happens well before the write. On
- * success it must stand; on failure it must go, or the retry is refused for an
- * artifact that never existed. `landed` (set inside `writeExternalKey`) is what
- * distinguishes the two, so a failure *after* the key image was written correctly
- * keeps the claim -- there is a real artifact out there, and releasing would let
- * the retry mint a second one from the same cover.
+ * `hold` is called from `onClaim`, the instant the guard makes the claim -- not
+ * when the embed returns. That distinction is load-bearing: `embedKeyImage`
+ * re-encodes the PNG after the embed succeeds, so a throw there would otherwise
+ * leave a claim nothing could release, which is the burned cover this exists to
+ * prevent.
  *
- * `hold` is threaded in rather than kept in module scope on purpose: two saves
- * running concurrently in one realm must not be able to release or confirm each
- * other's claims.
+ * `landed` is set by `writeExternalKey` itself. It is NOT inferred from where an
+ * exception was caught, because the stego image is not always the last write: the
+ * non-possession path writes recovery-N.txt afterwards, and so does
+ * `runGallerySaveImpl`. A failure in those must keep the claim -- a real artifact
+ * is on disk by then, and releasing would let a retry mint a second one from the
+ * same cover.
+ *
+ * Threaded as a parameter rather than kept in module scope, so two saves running
+ * concurrently in one realm cannot touch each other's claims.
  */
 async function withKeyClaim<T>(
-  run: (hold: (ext: KeyArtifact | undefined) => void) => Promise<T>,
+  run: (hold: (claim: CoverClaim) => void, landed: () => void) => Promise<T>,
 ): Promise<T> {
-  let pending: KeyArtifact | undefined;
+  let claim: CoverClaim | undefined;
+  let written = false;
   try {
-    return await run((ext) => {
-      pending = ext;
-    });
+    return await run(
+      (c) => {
+        claim = c;
+      },
+      () => {
+        written = true;
+      },
+    );
   } catch (err) {
-    releaseIfUnwritten(pending);
+    if (!written) claim?.release();
     throw err;
   }
 }
 
-/** Save the disguised .db vault in the requested access mode (§10). */
 async function runSaveDisguisedImpl(
   opts: SaveOptions,
   input: { name: string; content: Uint8Array; bundle: boolean },
   onProgress: OnProgress | undefined,
-  hold: (ext: KeyArtifact | undefined) => void,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
 ): Promise<SaveResult> {
   const content = input.content;
   const mode = opts.mode ?? 'plain';
@@ -482,8 +487,9 @@ async function runSaveDisguisedImpl(
       opts.cover,
       'factor',
       reuseOpt(opts),
+      hold,
+      landed,
     );
-    hold(ext);
     return ext ? [writeExternalKey(opts, ext)] : [];
   }
 
@@ -579,8 +585,9 @@ async function runSaveDisguisedImpl(
       opts.cover,
       'factor',
       reuseOpt(opts),
+      hold,
+      landed,
     );
-    hold(ext);
     if (ext) outs.push(writeExternalKey(opts, ext));
   }
   return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
@@ -619,7 +626,8 @@ function readSaveInputs(paths: string[]): {
 async function runSaveImpl(
   opts: SaveOptions,
   onProgress: OnProgress | undefined,
-  hold: (ext: KeyArtifact | undefined) => void,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
 ): Promise<SaveResult> {
   const input = readSaveInputs(opts.inputs);
   const content = input.content;
@@ -628,7 +636,7 @@ async function runSaveImpl(
   // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
   // region gets its own DEK; the managed key is not used on this supported path).
   if (opts.binary === 'disguised') {
-    return runSaveDisguisedImpl(opts, input, onProgress, hold);
+    return runSaveDisguisedImpl(opts, input, onProgress, hold, landed);
   }
   // A non-plain access mode is only meaningful on the supported .db path.
   if (opts.mode && opts.mode !== 'plain') {
@@ -662,8 +670,9 @@ async function runSaveImpl(
         opts.cover,
         'block',
         reuseOpt(opts),
+        hold,
+        landed,
       );
-      hold(ext);
       if (ext) outs.push(writeExternalKey(opts, ext));
     } else if (keyMode === 'keyfile') {
       outs.push(emit(opts, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'));
@@ -695,8 +704,9 @@ async function runSaveImpl(
     opts.cover,
     'block',
     reuseOpt(opts),
+    hold,
+    landed,
   );
-  hold(ext);
   // Large secrets sprawl into many images; nudge toward --binary before writing.
   const sizeWarning =
     content.length > WARN_FILE_BYTES
@@ -866,12 +876,12 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
 
 /** Save a vault. See {@link SaveOptions}. */
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
-  return withKeyClaim((hold) => runSaveImpl(opts, onProgress, hold));
+  return withKeyClaim((hold, landed) => runSaveImpl(opts, onProgress, hold, landed));
 }
 
 /** Save a gallery. See {@link GallerySaveOptions}. */
 export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
-  return withKeyClaim((hold) => runGallerySaveImpl(opts, hold));
+  return withKeyClaim((hold, landed) => runGallerySaveImpl(opts, hold, landed));
 }
 
 export async function runRestore(
@@ -961,7 +971,8 @@ export interface GallerySaveResult {
 
 async function runGallerySaveImpl(
   opts: GallerySaveOptions,
-  hold: (ext: KeyArtifact | undefined) => void,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
 ): Promise<GallerySaveResult> {
   const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
@@ -1022,8 +1033,9 @@ async function runGallerySaveImpl(
     opts.keyCover,
     'factor',
     reuseOpt(opts),
+    hold,
+    landed,
   );
-  hold(ext);
   if (ext) outs.push(writeExternalKey(opts, ext));
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {

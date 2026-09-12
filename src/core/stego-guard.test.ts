@@ -16,6 +16,8 @@ import {
   StegoCoverReuseError,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  embedKeyFactorStego,
+  embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
   resetStegoCoverGuard,
   type CoverClaim,
@@ -291,33 +293,54 @@ describe('a claim is owned by the call that made it', () => {
     ).rejects.toThrow(StegoCoverReuseError);
   });
 
-  it('reports capacity, not reuse, when a cover is too small (RGBA)', async () => {
-    // This pins the ORDER: the capacity check runs before the reuse check, so a
-    // cover that simply cannot hold the payload says so.
+  it('reports capacity, not reuse, on a cover that IS already claimed (RGBA)', async () => {
+    // A test that actually bites, unlike the two it replaces.
     //
-    // There is deliberately no assertion that the tiny cover was "not claimed".
-    // With fixed-size payloads a capacity failure implies a cover too small to
-    // have ever been claimed, so any such assertion would have to use a DIFFERENT
-    // cover and would pass whether or not the claim was made. An earlier version
-    // of this test did exactly that and proved nothing.
-    resetStegoCoverGuard();
-    await embedKeyBlockStego(makeCover(50), W, H, await keyBlock(PW), PW, FAST);
-    const tiny = new Uint8Array(8 * 8 * 4);
-    await expect(embedKeyBlockStego(tiny, 8, 8, await keyBlock(PW), PW, FAST)).rejects.toThrow(
-      StegoCapacityError,
-    );
+    // Those used a tiny cover whose fingerprint differed from the claimed one, so
+    // it derived a different guard tag and could never have reached the reuse
+    // branch no matter which order the checks ran in. Inverting the order left
+    // them green.
+    //
+    // 45x45 gives 45*45*3 = 6075 carrier bits: enough for the 37-byte key factor
+    // (37*8*16 = 4736) and not for the 92-byte key block (92*8*16 = 11776). So the
+    // SAME cover under the SAME password can be claimed by the factor and then
+    // fail on capacity for the block -- same fingerprint, same tag, different
+    // payload. If the reuse check ran first this would throw StegoCoverReuseError.
+    const side = 45;
+    const cover = new Uint8Array(side * side * 4);
+    let x = 77;
+    for (let i = 0; i < cover.length; i += 4) {
+      x ^= x << 13;
+      x ^= x >>> 17;
+      x ^= x << 5;
+      x >>>= 0;
+      cover[i] = x & 0xff;
+      cover[i + 1] = (x >> 8) & 0xff;
+      cover[i + 2] = (x >> 16) & 0xff;
+      cover[i + 3] = 255;
+    }
+    const claimed = cover.slice();
+    await embedKeyFactorStego(claimed, side, side, new Uint8Array(32).fill(7), PW, FAST);
+    await expect(
+      embedKeyBlockStego(claimed, side, side, await keyBlock(PW), PW, FAST),
+    ).rejects.toThrow(StegoCapacityError);
   });
 
-  it('reports capacity, not reuse, when a JPEG cover is too small', async () => {
+  it('reports capacity, not reuse, on a JPEG cover that IS already claimed', async () => {
     // The JPEG path checks capacity per branch, after the tag is derived, so its
-    // ordering is genuinely separate from the RGBA path's and was inverted until a
-    // review caught it: the reuse check ran first and a too-small cover reported a
-    // reuse it would never have made.
-    resetStegoCoverGuard();
-    await embedKeyBlockStegoJpeg(makeJpeg(51), await keyBlock(PW), PW, FAST);
-    await expect(
-      embedKeyBlockStegoJpeg(makeJpeg(52, 16, 16), await keyBlock(PW), PW, FAST),
-    ).rejects.toThrow(StegoCapacityError);
+    // ordering is genuinely separate -- and it was inverted until a review caught
+    // it. Same construction: claim with the 37-byte factor, then ask the same
+    // cover for the 92-byte block it cannot hold.
+    //
+    // 32x32 is the window, measured rather than guessed: it yields 1125 eligible
+    // AC coefficients, above the factor's 37*8*2 = 592 and below the block's
+    // 92*8*2 = 1472. At 64x64 there are 4387 and the block fits, so the reuse
+    // branch fires instead -- correct behaviour, but it tests nothing about order.
+    const cover = makeJpeg(53, 32, 32);
+    const claimed = await embedKeyFactorStegoJpeg(cover, new Uint8Array(32).fill(9), PW, FAST);
+    await expect(embedKeyBlockStegoJpeg(claimed, await keyBlock(PW), PW, FAST)).rejects.toThrow(
+      StegoCapacityError,
+    );
   });
 });
 

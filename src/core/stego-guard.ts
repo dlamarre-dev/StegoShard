@@ -49,6 +49,19 @@
  * landed released a claim for a cover that really was on disk, and two concurrent
  * saves released and confirmed each other's claims.
  *
+ * THE BROWSER KEEPS THE CONSERVATIVE DEFAULT, and that is a decision rather than
+ * an oversight. `src/ui/` passes no `onClaim`, so a claim it makes always stands.
+ * It has to: the UI hands bytes to a browser download, which is asynchronous and
+ * outside the page's control, so it genuinely cannot know whether the artifact
+ * reached the user's disk. Releasing on the assumption that it did not would risk
+ * permitting a second artifact from a cover whose first one downloaded fine --
+ * the leak, traded for a convenience. A throw *inside* the embed still releases,
+ * because that is the one case the core can see for itself.
+ *
+ * The cost is real and worth stating: abandon a save in the browser after the key
+ * image was produced, and retrying with that photo in the same page session is
+ * refused. Reloading clears it.
+ *
  * WHY IN MEMORY, AND NOT A FILE. A durable registry of used covers would catch
  * far more — the same photo tomorrow, on another machine, from a second pristine
  * copy. It would also be a file on disk proving that stego covers exist and
@@ -210,12 +223,23 @@ export async function reserveCoverUse(
   let spent = false;
   return {
     release: () => {
-      // Idempotent, and ownership-checked: if the entry is no longer exactly what
-      // this call wrote, something else claimed the cover in the meantime and this
-      // call has no business dropping it.
       if (spent) return;
       spent = true;
-      if (used.get(key) === digest) used.delete(key);
+      // Not `delete`. `used` holds ONE entry per cover, so deleting would drop
+      // whatever claim this call overwrote -- and a call CAN overwrite one, either
+      // with `allowCoverReuse` or with a byte-identical payload, which is
+      // explicitly permitted. An earlier version deleted here, which made this
+      // reachable: save 1 lands; save 2 overrides, fails before writing, and
+      // releases; save 3 is then accepted, producing a second artifact from one
+      // cover under one password. That is the §5.3 leak, restored by the very
+      // mechanism meant to prevent a false refusal.
+      //
+      // So release RESTORES what was there before this call, and only if the entry
+      // is still exactly what this call wrote -- otherwise something else has since
+      // claimed the cover and this handle no longer owns it.
+      if (used.get(key) !== digest) return;
+      if (prior === undefined) used.delete(key);
+      else used.set(key, prior);
     },
   };
 }
