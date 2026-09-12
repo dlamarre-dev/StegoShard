@@ -181,7 +181,15 @@ function main(): void {
     console.log(`${message} (skipping locally)`);
     return;
   }
-  const changed = status.map((l) => l.split('\t').slice(1).join('\t'));
+  // Every path a status line names, not the tail joined back together.
+  //
+  // `--name-status` emits `R097\told\tnew` for a rename, and joining the tail
+  // produced the single string "src/core/crypto.ts\tsrc/core/kdf.ts" -- so
+  // `changed.includes(COST_FILE)` was false and a change that MOVED crypto.ts
+  // while altering the cost skipped the guard entirely. That is the most likely
+  // way this constant ever moves, so it is the case the guard could least afford
+  // to miss.
+  const changed = status.flatMap((l) => l.split('\t').slice(1).filter(Boolean));
 
   // Read the constant's value on both sides and require it to have gone up.
   //
@@ -238,21 +246,44 @@ function main(): void {
       process.exit(1);
     };
 
-    /** Narrow the reader's three outcomes down to a value, exiting on the rest. */
+    /**
+     * Narrow the reader's three outcomes down to a value, exiting on the rest.
+     *
+     * `return unreadable(...)` rather than a cast: `unreadable` is annotated
+     * `never`, so this typechecks on its own. The cast that used to be here
+     * silenced the compiler on precisely the hazard this function exists to
+     * handle.
+     */
     const costAt = (where: string, blob: string): Record<string, number> => {
       const read = readArgon2(blob);
-      if (read === 'absent' || read === 'unparseable') unreadable(where, read);
-      return read as Record<string, number>;
+      if (read === 'absent' || read === 'unparseable') return unreadable(where, read);
+      return read;
     };
 
-    let costBefore: Record<string, number> | undefined;
+    // The try covers the `git show` and NOTHING else. It used to wrap `costAt` as
+    // well, so a throw from the reader was swallowed as "new file on this branch"
+    // and the comparison was skipped -- the opposite of what the comment below it
+    // promised.
+    let baseBlob: string | undefined;
     try {
-      const blob = git('show', `${base}:${COST_FILE}`);
-      costBefore = costAt(`${base}:${COST_FILE}`, blob);
+      baseBlob = git('show', `${base}:${COST_FILE}`);
     } catch {
-      costBefore = undefined; // new file on this branch; nothing to compare against
+      baseBlob = undefined; // not in the base tree: new here, or renamed into place
     }
-    const costNow = costAt(COST_FILE, git('show', `HEAD:${COST_FILE}`));
+    const costBefore =
+      baseBlob === undefined ? undefined : costAt(`${base}:${COST_FILE}`, baseBlob);
+
+    // A deleted COST_FILE reaches here too -- `D<TAB>path` puts it in `changed` --
+    // and `git show HEAD:<deleted>` throws. Reported as guidance rather than as a
+    // raw execFileSync stack trace, since the answer is to update COST_FILE.
+    const headBlob = ((): string => {
+      try {
+        return git('show', `HEAD:${COST_FILE}`);
+      } catch {
+        return unreadable(`HEAD:${COST_FILE}`, 'absent');
+      }
+    })();
+    const costNow = costAt(COST_FILE, headBlob);
     // An unreadable literal is a hard failure, not a skip (see `costAt` above).
     // `readArgon2` refuses to guess at a shape it does not recognise, and treating
     // that as "nothing changed" would turn the refusal into a silent bypass -- the
@@ -402,7 +433,16 @@ function isEntryModule(): boolean {
   // earlier version wrapped both resolutions in one try and returned false on any
   // failure, so a non-`file:` `import.meta.url` -- the bundled-runner case cited
   // as the reason for the try -- silently disabled the whole check.
-  const byName = (): boolean => basename(invokedAs) === basename(fileURLToPath(import.meta.url));
+  // Taken off the URL string, never through `fileURLToPath`. The previous fallback
+  // called that function again -- the very call whose throw put us in the catch --
+  // so the bundled-runner case it existed for was never reachable, and the check
+  // exited 0 having run nothing. A URL always has a last path segment, whatever
+  // its scheme.
+  //
+  // This fix was described in a commit message one round before it was actually
+  // made; the block was byte-identical to the version it claimed to change.
+  const ownName = import.meta.url.split('/').pop() ?? '';
+  const byName = (): boolean => basename(invokedAs) === ownName;
 
   let self: string;
   try {
