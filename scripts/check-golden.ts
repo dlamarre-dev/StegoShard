@@ -1,4 +1,52 @@
 /**
+ * Read `DEFAULT_ARGON2`'s three fields out of a source blob.
+ *
+ * Three outcomes, and conflating the last two is how a guard switches itself off:
+ * 'absent' means the constant is not in this blob at all (a rename, or a file that
+ * did not declare it yet), 'unparseable' means it is there in a shape this parser
+ * does not recognise. Only the second is a reason to refuse to guess, and the
+ * caller's message has to say which one happened.
+ *
+ * Exported, and at module scope, so it can be tested. It used to be a closure
+ * inside `main()` behind a "did crypto.ts change" branch, which meant a green
+ * `golden:check` had never once called it -- a parser nothing exercises is exactly
+ * the thing that silently rots.
+ */
+export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
+  // Comments come off the WHOLE blob first, before the literal is located. Doing
+  // it after the capture was not enough: the capture stops at the first `}`, so a
+  // block comment containing a brace -- `/* like {this} */` -- truncated the body
+  // and failed the parse. Stripping first means the capture never sees one.
+  const clean = blob.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(clean);
+  if (!body) return 'absent';
+
+  // Every non-empty fragment must be a recognised `key: value`. The matchAll below
+  // only *finds* pairs; on its own it silently ignores anything else in there -- a
+  // spread, a computed key, a trailing expression -- and would then report a
+  // confident parse of a literal it had not actually read.
+  const fragments = body[1]!
+    .split(',')
+    .map((f) => f.trim())
+    .filter(Boolean);
+  if (!fragments.every((f) => /^\w+\s*:\s*[^,]+$/.test(f))) return 'unparseable';
+
+  const out: Record<string, number> = {};
+  for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
+    // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather than
+    // guess, so an unreadable literal fails loudly instead of comparing two nulls
+    // and agreeing.
+    const product = /^\s*(\d+)\s*\*\s*(\d+)\s*$/.exec(expr!);
+    const plain = /^\s*(\d+)\s*$/.exec(expr!);
+    if (product) out[key!] = Number(product[1]) * Number(product[2]);
+    else if (plain) out[key!] = Number(plain[1]);
+    else return 'unparseable';
+  }
+  // And it must have produced the whole triple, not a subset.
+  return fragments.length === Object.keys(out).length ? out : 'unparseable';
+}
+
+/**
  * Refuse a change to the golden corpus that does not come with a format version
  * bump in the same change.
  *
@@ -16,6 +64,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const CONSTANTS = [
   ['src/core/header.ts', 'FORMAT_VERSION'],
@@ -97,40 +146,6 @@ function main(): void {
   // file that did not declare it yet), 'unparseable' means it is there in a shape
   // this parser does not recognise. Only the second is a reason to refuse to
   // guess, and the message has to say which one happened.
-  const readArgon2 = (blob: string): Record<string, number> | 'absent' | 'unparseable' => {
-    const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(blob);
-    if (!body) return 'absent';
-    const out: Record<string, number> = {};
-    // Comments are stripped ONCE, up front, and both passes below read the result.
-    // An earlier version stripped them for the shape check and not for the value
-    // scan, so the two disagreed about what the body said -- and since this literal
-    // already carries an inline `// 256 MiB`, a comment-only edit could have failed
-    // CI for no reason. Block comments are handled too, which the `//`-only version
-    // was not.
-    const body0 = body[1]!.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-
-    // Every non-empty fragment must be a recognised `key: value`. The matchAll
-    // below only *finds* pairs; on its own it silently ignores anything else in
-    // there -- a spread, a computed key, a trailing expression -- and would then
-    // report a confident parse of a literal it had not actually read.
-    const fragments = body0
-      .split(',')
-      .map((f) => f.trim())
-      .filter(Boolean);
-    if (!fragments.every((f) => /^\w+\s*:\s*[^,]+$/.test(f))) return 'unparseable';
-    for (const [, key, expr] of body0.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
-      // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather
-      // than guess, so an unreadable literal fails loudly instead of comparing
-      // two nulls and agreeing.
-      const product = /^\s*(\d+)\s*\*\s*(\d+)\s*$/.exec(expr!);
-      const plain = /^\s*(\d+)\s*$/.exec(expr!);
-      if (product) out[key!] = Number(product[1]) * Number(product[2]);
-      else if (plain) out[key!] = Number(plain[1]);
-      else return 'unparseable';
-    }
-    // And it must have produced the whole triple, not a subset.
-    return fragments.length === Object.keys(out).length ? out : 'unparseable';
-  };
 
   const COST_FILE = 'src/core/crypto.ts';
   const VERSION_FILE = 'src/core/header.ts';
@@ -283,4 +298,10 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+// Only when run as a script. `readArgon2` is imported by
+// tests/docs/check-golden-argon2.test.ts, and without this guard that import
+// would execute the whole check -- git subprocesses, and a `process.exit(1)` that
+// would take the test run down with it.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

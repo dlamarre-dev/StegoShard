@@ -192,9 +192,14 @@ describe('what it must NOT refuse', () => {
 
 describe('a failed embed does not poison the cover', () => {
   it('lets a retry succeed after a capacity failure', async () => {
-    // The tag is recorded only after the write succeeds. If it were recorded up
-    // front, a cover that was merely too small would be refused for the rest of
-    // the session, which is a worse failure than the one being prevented.
+    // What keeps a too-small cover clean is the ORDERING, not the timing of the
+    // record: `reserveCoverUse` inserts the moment the claim is made, well before
+    // any write, so the only reason a capacity failure leaves nothing behind is
+    // that the capacity check runs first.
+    //
+    // The comment here used to say the opposite -- that the tag was recorded only
+    // after the write succeeded -- which was inverted, and worse, it invited the
+    // very reorder that would break this test's premise.
     const tiny = new Uint8Array(8 * 8 * 4);
     await expect(embedKeyBlockStego(tiny, 8, 8, await keyBlock(PW), PW, FAST)).rejects.toThrow(
       StegoCapacityError,
@@ -321,6 +326,40 @@ describe('a claim is owned by the call that made it', () => {
     await expect(
       embedKeyBlockStego(makeCover(61), W, H, await keyBlock('b'), PW, FAST),
     ).resolves.toBeUndefined();
+  });
+
+  it("releases when the consumer's own onClaim callback throws", async () => {
+    // `onClaim` is consumer code doing real work -- the JSDoc tells it to, and the
+    // orchestration layer wires its holder straight in. If the callback throws and
+    // the hand-off sits outside the releasing try, the exception escapes past the
+    // release, the claim stands, and nothing holds a handle to drop it: the burned
+    // cover the hand-off exists to prevent, reachable through the hand-off itself.
+    await expect(
+      embedKeyBlockStego(makeCover(70), W, H, await keyBlock(PW), PW, FAST, {
+        onClaim: () => {
+          throw new Error('the consumer blew up');
+        },
+      }),
+    ).rejects.toThrow('the consumer blew up');
+
+    // The cover must be free: nothing was embedded and no artifact exists.
+    await expect(
+      embedKeyBlockStego(makeCover(70), W, H, await keyBlock('after'), PW, FAST),
+    ).resolves.toBeUndefined();
+  });
+
+  it('releases when onClaim throws on the JPEG path too', async () => {
+    const cover = makeJpeg(71);
+    await expect(
+      embedKeyBlockStegoJpeg(cover, await keyBlock(PW), PW, FAST, {
+        onClaim: () => {
+          throw new Error('boom');
+        },
+      }),
+    ).rejects.toThrow('boom');
+    await expect(
+      embedKeyBlockStegoJpeg(cover, await keyBlock('after'), PW, FAST),
+    ).resolves.toBeInstanceOf(Uint8Array);
   });
 
   it('is inert once the cover has been re-claimed by someone else', async () => {
