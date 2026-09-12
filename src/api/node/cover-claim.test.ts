@@ -74,13 +74,17 @@ describe('a claim made by a save that landed', () => {
 
 describe('a claim made by a save that failed', () => {
   it('is released when the failure came before the key image was written', SLOW, async () => {
-    // The stego image is written last on this path, so an OUTPUT_EXISTS on the
-    // vault means it never landed. Nothing is on disk from that cover, so the
-    // retry must be allowed -- a leak needs two artifacts to compare.
+    // The collision has to be on the KEY IMAGE, not the vault. On the branded path
+    // the vault is written BEFORE `externalKey` runs, so pre-creating it throws
+    // before any embed happens and before any claim exists -- which is what the
+    // first version of this test did, making it pass whether or not release
+    // worked. The key image is written after the embed and is named after the
+    // cover, so colliding on `cover.jpg` is the failure that actually has a claim
+    // outstanding.
     const f = fixture();
     const out = join(f.dir, 'out');
     mkdirSync(out, { recursive: true });
-    writeFileSync(join(out, 'stegoshard-vault.ssbn'), 'in the way');
+    writeFileSync(join(out, 'cover.jpg'), 'in the way');
 
     await expect(runSave(opts(f, out))).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
     await expect(runSave({ ...opts(f, out), force: true })).resolves.toBeTruthy();

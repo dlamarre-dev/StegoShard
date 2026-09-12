@@ -361,15 +361,19 @@ function reuseOpt(o: { allowCoverReuse?: boolean | undefined }): StegoEmbedOptio
 }
 
 /**
- * A stego claim riding along with the artifact it belongs to.
+ * The external key artifact, and the hook that says it reached disk.
  *
- * `writeExternalKey` is the LAST write on every save path, which is what makes
- * this tractable: if a save throws, the stego key image did not reach disk and the
- * claim must go. If it DID land, the claim stands even when something later fails
- * -- there is a real artifact out there, and releasing would let a retry mint a
+ * `writeExternalKey` is NOT the last write on every save path -- the
+ * non-possession and gallery paths write recovery-N.txt after it -- so a save can
+ * fail with the cover artifact already written. That case must KEEP its claim:
+ * there is a real artifact out there, and releasing would let a retry mint a
  * second one from the same cover under one password, which is the leak SPEC §5.3
- * forbids. `landed` is what tells those two apart, and it is set by the write
- * rather than inferred from where an exception was caught.
+ * forbids. An earlier version of this comment asserted the opposite invariant and
+ * was simply wrong.
+ *
+ * `onLanded` is why the design does not depend on that ordering at all: the write
+ * itself reports, rather than the outcome being inferred from where an exception
+ * surfaced.
  */
 interface KeyArtifact {
   name: string;

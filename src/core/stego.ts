@@ -325,25 +325,29 @@ async function embedFixedStego(
   // cover untouched, and a cover that is merely too small must say that rather
   // than report a reuse it would never have made.
   const claim = await reserveCoverUse(tag, payload, opts);
-  const pad = stream.subarray(0, len);
-  const reader = new StreamReader(stream.subarray(len));
-  const positions = pickPositions(reader, capacity, bits);
+  // Handed over immediately, not at the end. The orchestration layer's holder has
+  // to own this from the instant it exists: if it only arrived on success, a throw
+  // between here and the return would leave a claim nobody could release, which is
+  // the burned cover this exists to prevent. Release is idempotent, so the belt
+  // (here) and the braces (the holder) do not conflict.
+  opts?.onClaim?.(claim);
 
+  // Everything after the reservation is inside the try, `pickPositions` included:
+  // it throws when the keystream runs short, and it used to sit outside.
   try {
+    const pad = stream.subarray(0, len);
+    const reader = new StreamReader(stream.subarray(len));
+    const positions = pickPositions(reader, capacity, bits);
     for (let i = 0; i < bits; i++) {
       const bit = ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
       const byteIndex = channelByte(positions[i]!);
       rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
     }
   } catch (e) {
-    // Nothing here is expected to throw, but a claim outliving a failed embed is
-    // a burned cover: the retry would be refused for an artifact that never
-    // existed. Releasing is the safe direction.
     claim.release();
     throw e;
   }
   stream.fill(0);
-  opts?.onClaim?.(claim);
 }
 
 /**
@@ -495,42 +499,41 @@ async function embedFixedStegoJpeg(
     // the RGBA path above. Capacity on this path depends on which branch runs, so
     // there is no single earlier point that could hold the check for both.
     const claim = await reserveCoverUse(tag, payload, opts);
-    const reader = new StreamReader(stream.subarray(len));
-    const positions = pickPositions(reader, carriers.count, bits);
-    const toggles: number[] = [];
-    for (let i = 0; i < bits; i++) {
-      const p = positions[i]!;
-      if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
-    }
-    stream.fill(0);
-    let out: Uint8Array;
+    opts?.onClaim?.(claim);
+    opts?.onClaim?.(claim);
+    // The whole remainder, not just the encode: `pickPositions` and the carrier
+    // walk can both throw, and they used to sit outside this.
     try {
-      out = applyScanToggles(model, toggles);
+      const reader = new StreamReader(stream.subarray(len));
+      const positions = pickPositions(reader, carriers.count, bits);
+      const toggles: number[] = [];
+      for (let i = 0; i < bits; i++) {
+        const p = positions[i]!;
+        if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
+      }
+      stream.fill(0);
+      return applyScanToggles(model, toggles);
     } catch (e) {
       claim.release();
       throw e;
     }
-    opts?.onClaim?.(claim);
-    return out;
   }
 
   // Rare restart-marker files: fall back to a full re-encode of the scan.
   const carriers = eligibleCoefficients(model);
   if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
   const claim = await reserveCoverUse(tag, payload, opts);
-  const reader = new StreamReader(stream.subarray(len));
-  const positions = pickPositions(reader, carriers.count, bits);
-  for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
-  stream.fill(0);
-  let out: Uint8Array;
+  opts?.onClaim?.(claim);
   try {
-    out = encodeJpeg(model);
+    const reader = new StreamReader(stream.subarray(len));
+    const positions = pickPositions(reader, carriers.count, bits);
+    for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
+    stream.fill(0);
+    return encodeJpeg(model);
   } catch (e) {
     claim.release();
     throw e;
   }
-  opts?.onClaim?.(claim);
-  return out;
 }
 
 /** Recover a fixed-length de-whitened payload from a baseline JPEG, or null when
