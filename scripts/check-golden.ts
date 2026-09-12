@@ -17,75 +17,91 @@
 
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 /**
- * Read `DEFAULT_ARGON2`'s three fields out of a source blob.
+ * Read `DEFAULT_ARGON2`'s three fields out of a source blob, using TypeScript's
+ * own parser.
+ *
+ * THIS USED TO BE A REGEX, and it produced a fresh fail-open in every round of
+ * review it survived: stripping comments after the capture (a brace inside a
+ * comment truncated the body), then stripping the whole file (an unbalanced `/*`
+ * in any earlier string swallowed the declaration), then anchoring on the first
+ * mention of the name (a comment mentioning it was parsed instead of the
+ * constant), then anchoring on the first *declaration* -- which still lost,
+ * because the comment strip ran after the anchor, so a commented-out declaration
+ * matched first. That last one is the ordinary shape of a cost edit: comment the
+ * old line, write the new one. Both sides then parsed the old values and a real
+ * change would have shipped with no version bump.
+ *
+ * Every one of those bugs was in locating the declaration and deciding what was a
+ * comment. A lexer does both exactly, and `typescript` is already a dependency, so
+ * there is no reason to keep approximating one. What remains here is a walk to a
+ * named declaration and an evaluation of numeric literals -- no text scanning at
+ * all.
  *
  * Three outcomes, and conflating the last two is how a guard switches itself off:
  * 'absent' means this blob DECLARES no such constant (a rename, a move, or a file
  * that merely mentions or re-exports the name), 'unparseable' means a declaration
- * is there in a shape this parser does not recognise. Only the second is a reason
+ * is there in a shape this reader does not recognise. Only the second is a reason
  * to refuse to guess, and the caller's message has to say which one happened --
- * they send a contributor to different places, `COST_FILE` versus this parser.
- *
- * Exported, and at module scope, so it can be tested. It used to be a closure
- * inside `main()` behind a "did crypto.ts change" branch, which meant a green
- * `golden:check` had never once called it -- a parser nothing exercises is exactly
- * the thing that silently rots.
+ * they send a contributor to different places, `COST_FILE` versus this function.
  */
 export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
-  // Anchored on the DECLARATION, not on a mention of the name.
-  //
-  // Two earlier versions of this got it wrong in opposite directions, and the
-  // second was the dangerous one:
-  //
-  //   - stripping comments only from the captured body was not enough, because the
-  //     capture stops at the first `}` and `/* like {this} */` truncated it;
-  //   - anchoring the region on `indexOf('DEFAULT_ARGON2')` then started it at the
-  //     first *mention*, which can be inside a comment. The region began after that
-  //     comment's opener, so the strip below never removed it, and a doc block
-  //     illustrating the literal was parsed INSTEAD of the constant. That is
-  //     fail-open: a later cost change parses identically on both sides and ships
-  //     with no version bump.
-  //
-  // The justification given for that change was also wrong, and worth correcting
-  // here so it is not repeated: it claimed whole-blob stripping could turn a real
-  // cost change into a silent pass by reporting 'absent'. It could not -- 'absent'
-  // reaches `unreadable()` and exits 1, which is loud. The trade made was a loud
-  // false failure for a silent wrong parse, which is strictly worse.
-  const decl = /\b(?:export\s+)?const\s+DEFAULT_ARGON2\b/.exec(blob);
-  if (!decl) return 'absent';
-  const region = blob
-    .slice(decl.index)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '');
-  const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(region);
-  if (!body) return 'unparseable';
+  const source = ts.createSourceFile('crypto.ts', blob, ts.ScriptTarget.Latest, true);
 
-  // Every non-empty fragment must be a recognised `key: value`. The matchAll below
-  // only *finds* pairs; on its own it silently ignores anything else in there -- a
-  // spread, a computed key, a trailing expression -- and would then report a
-  // confident parse of a literal it had not actually read.
-  const fragments = body[1]!
-    .split(',')
-    .map((f) => f.trim())
-    .filter(Boolean);
-  if (!fragments.every((f) => /^\w+\s*:\s*[^,]+$/.test(f))) return 'unparseable';
+  let initializer: ts.Expression | undefined;
+  const find = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'DEFAULT_ARGON2' &&
+      node.initializer
+    ) {
+      initializer ??= node.initializer;
+    }
+    ts.forEachChild(node, find);
+  };
+  find(source);
+  if (!initializer) return 'absent';
+
+  // Unwrap `Object.freeze({...})`, `{...} as const`, and any combination.
+  let expr = initializer;
+  for (;;) {
+    if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) expr = expr.expression;
+    else if (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+    else if (ts.isCallExpression(expr) && expr.arguments.length === 1) expr = expr.arguments[0]!;
+    else break;
+  }
+  if (!ts.isObjectLiteralExpression(expr)) return 'unparseable';
+
+  /** Numeric literals and the products the real constant is written with. */
+  const value = (node: ts.Expression): number | undefined => {
+    if (ts.isNumericLiteral(node)) return Number(node.text);
+    if (ts.isParenthesizedExpression(node)) return value(node.expression);
+    if (ts.isBinaryExpression(node)) {
+      const l = value(node.left);
+      const r = value(node.right);
+      if (l === undefined || r === undefined) return undefined;
+      if (node.operatorToken.kind === ts.SyntaxKind.AsteriskToken) return l * r;
+      if (node.operatorToken.kind === ts.SyntaxKind.PlusToken) return l + r;
+    }
+    return undefined;
+  };
 
   const out: Record<string, number> = {};
-  for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
-    // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather than
-    // guess, so an unreadable literal fails loudly instead of comparing two nulls
-    // and agreeing.
-    const product = /^\s*(\d+)\s*\*\s*(\d+)\s*$/.exec(expr!);
-    const plain = /^\s*(\d+)\s*$/.exec(expr!);
-    if (product) out[key!] = Number(product[1]) * Number(product[2]);
-    else if (plain) out[key!] = Number(plain[1]);
-    else return 'unparseable';
+  for (const prop of expr.properties) {
+    // Anything that is not a plain `name: <number>` -- a spread, a computed key, a
+    // shorthand, a method -- means this reader has not understood the literal, and
+    // saying so is the whole point of the 'unparseable' outcome.
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) return 'unparseable';
+    const v = value(prop.initializer);
+    if (v === undefined) return 'unparseable';
+    out[prop.name.text] = v;
   }
-  // And it must have produced the whole triple, not a subset.
-  return fragments.length === Object.keys(out).length ? out : 'unparseable';
+  return Object.keys(out).length > 0 ? out : 'unparseable';
 }
 
 const CONSTANTS = [
@@ -333,17 +349,36 @@ function main(): void {
 // problem from the other direction.
 function isEntryModule(): boolean {
   const invokedAs = process.argv[1];
+  // No entry script at all: something imported this module.
   if (!invokedAs) return false;
+
+  // When identity cannot be established, RUN. A guard that skips itself reports
+  // green having checked nothing, which this file has already done once behind a
+  // symlink; a guard that runs when it should not merely prints a line. The
+  // earlier version wrapped both resolutions in one try and returned false on any
+  // failure, so a non-`file:` `import.meta.url` -- the bundled-runner case cited
+  // as the reason for the try -- silently disabled the whole check.
+  const byName = (): boolean => basename(invokedAs) === basename(fileURLToPath(import.meta.url));
+
+  let self: string;
   try {
-    return realpathSync(invokedAs) === realpathSync(fileURLToPath(import.meta.url));
+    self = realpathSync(fileURLToPath(import.meta.url));
   } catch {
-    // `realpathSync` throws (ENOENT, ELOOP, EACCES) rather than returning, and
-    // this runs at module top level on a value from outside -- a bundled runner or
-    // a loader that rewrites the entry path can hand over something that does not
-    // exist on disk. Throwing here would take down every importer, which is the
-    // class of failure this guard exists to avoid, so an unresolvable entry simply
-    // means "not invoked as this script".
-    return false;
+    // Our own location is unresolvable: a non-`file:` URL, or a permissions
+    // failure. Nothing to compare against, so fall back to the entry's name.
+    try {
+      return byName();
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return realpathSync(invokedAs) === self;
+  } catch {
+    // The entry path itself does not resolve -- a loader that rewrites it, or a
+    // deleted file. `realpathSync` throws rather than returning, which is why this
+    // is caught at all.
+    return basename(invokedAs) === basename(self);
   }
 }
 

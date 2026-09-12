@@ -45,24 +45,50 @@ describe('the shapes it must read', () => {
     ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
   });
 
-  it('parses the declaration, not an example of it in a comment above', () => {
-    // A fail-open regression, caught in review and reproduced before fixing.
-    // Anchoring the search region on the first *mention* of the name started it
-    // inside this doc block, after the comment's opener -- so the strip could not
-    // remove it and the example was parsed instead of the constant. The values
-    // below are deliberately a plausible "cheap profile" so a wrong parse looks
-    // entirely reasonable, which is what made it dangerous: a later cost change
-    // would then parse identically on both sides and ship with no version bump.
+  it('parses the declaration, not a commented-out one above it', () => {
+    // The shape that kept getting through, and the ordinary shape of a cost edit:
+    // comment the old line, write the new one. Every regex version of this parser
+    // read the commented line instead, so both sides of a diff parsed the OLD
+    // values and a real change would have shipped with no version bump.
+    //
+    // The earlier version of this test omitted `const` in the comment, which made
+    // it pin only one specific revert rather than the class -- a green test sitting
+    // on a live fail-open, which is worse than no test.
+    expect(
+      readArgon2(`
+        // export const DEFAULT_ARGON2 = Object.freeze({ iterations: 1, memoryKiB: 8, parallelism: 1 })
+        export const DEFAULT_ARGON2: Argon2Params = Object.freeze({
+          iterations: 4,
+          memoryKiB: 256 * 1024,
+          parallelism: 1,
+        });
+      `),
+    ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
+  });
+
+  it('parses the declaration, not a doc block illustrating it', () => {
     expect(
       readArgon2(`
         /**
-         *   DEFAULT_ARGON2 = Object.freeze({ iterations: 1, memoryKiB: 8, parallelism: 1 })
+         * The shape is:
+         *   export const DEFAULT_ARGON2 = Object.freeze({ iterations: 1, memoryKiB: 8, parallelism: 1 })
          */
-        export const DEFAULT_ARGON2: Argon2Params = Object.freeze({
+        export const DEFAULT_ARGON2 = Object.freeze({
           iterations: 4,
-          memoryKiB: 256 * 1024, // 256 MiB
+          memoryKiB: 256 * 1024,
           parallelism: 1,
         });
+      `),
+    ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
+  });
+
+  it('is unaffected by an unbalanced comment opener in an earlier string', () => {
+    // The whole-blob comment strip swallowed the declaration here and reported it
+    // absent. A lexer knows a string from a comment.
+    expect(
+      readArgon2(`
+        const PATTERN = "/*";
+        export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
       `),
     ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
   });
