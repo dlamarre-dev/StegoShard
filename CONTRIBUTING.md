@@ -121,6 +121,12 @@ The current format is a versioned pre-1.0 candidate, not a frozen compatibility 
 Breaking changes still require a version bump in the header and a spec update, and must
 keep the Python reference decoder in sync (it doubles as a conformance test in CI).
 
+Not everything that breaks the format looks like the format. The Argon2id cost
+(`DEFAULT_ARGON2`) is not stored in the container on three paths, so changing it is a
+breaking change even though no layout moves — and one that fails silently, as a wrong
+password rather than a version error. `docs/VERSIONING.md` explains which constants behave
+this way; `npm run spec:check` and `npm run golden:check` enforce it.
+
 ## Contribution licensing
 
 Contributions are currently accepted under the repository's MIT License. Before doing

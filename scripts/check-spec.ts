@@ -72,6 +72,7 @@ import { KEY_BLOCK_VERSION, KEY_FACTOR_BLOCK_VERSION } from '../src/core/crypto'
 import { SEG_VERSION } from '../src/core/segmented';
 import { BINARY_VERSION } from '../src/core/binary-container';
 import { SHARE_VERSION } from '../src/core/shamir';
+import { DEFAULT_ARGON2 } from '../src/core/crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -238,6 +239,50 @@ const RULES: Rule[] = [
     source: `${name} in ${file}`,
   })),
 
+  // --- The Argon2 cost, which SPEC states twice and Python mirrors ----------
+  //
+  // These are version claims in every sense that matters. On the §5.3, §9.1 and
+  // §10.2 paths the cost is not stored in the container, so it IS the format --
+  // see "Argon2 cost is a format constant" in docs/VERSIONING.md. A spec that
+  // names the wrong numbers there sends an implementer to derive the wrong seed,
+  // which surfaces as a wrong password and never as a version error.
+  {
+    id: 'kdf-constants-row',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /\| KDF defaults\s*\| iterations (\d+), memory (\d+) MiB, parallelism (\d+)/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.iterations,
+    source: 'DEFAULT_ARGON2.iterations in src/core/crypto.ts',
+  },
+  {
+    id: 'kdf-5.1-iterations',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /production defaults are `iterations = (\d+)`/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.iterations,
+    source: 'DEFAULT_ARGON2.iterations in src/core/crypto.ts',
+  },
+  {
+    id: 'kdf-5.1-memory',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /`memoryKiB = (\d+)`/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.memoryKiB,
+    source: 'DEFAULT_ARGON2.memoryKiB in src/core/crypto.ts',
+  },
+  {
+    id: 'kdf-5.1-parallelism',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /\(256 MiB\), `parallelism = (\d+)`/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.parallelism,
+    source: 'DEFAULT_ARGON2.parallelism in src/core/crypto.ts',
+  },
+
   // --- The Python reference decoder ----------------------------------------
   //
   // A mirror that drifts is worse than no mirror: the conformance suite would
@@ -260,6 +305,47 @@ const RULES: Rule[] = [
     count: 1,
     expected: KEY_BLOCK_VERSION,
     source: 'KEY_BLOCK_VERSION in src/core/crypto.ts',
+  },
+  {
+    // These ceilings are numerically equal to the defaults and coupled to them by
+    // nothing. Raise a default without raising them and the reference decoder
+    // rejects every key block this encoder writes -- on §5.1, the one path whose
+    // stored parameters were supposed to make it safe. Pairing them here is the
+    // only thing that ties the two numbers together.
+    id: 'python-argon2-iteration-ceiling',
+    file: PY_FORMAT,
+    scope: 'flat',
+    pattern: /"iterations": \(\d+, (\d+)\)/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.iterations,
+    source: 'DEFAULT_ARGON2.iterations in src/core/crypto.ts',
+  },
+  {
+    id: 'python-argon2-memory-ceiling',
+    file: PY_FORMAT,
+    scope: 'flat',
+    pattern: /"memory_kib": \(\d+, (\d+) \* 1024\)/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.memoryKiB / 1024,
+    source: 'DEFAULT_ARGON2.memoryKiB / 1024 in src/core/crypto.ts',
+  },
+  {
+    id: 'python-stego-memory-default',
+    file: 'python/stegoshard/stego.py',
+    scope: 'flat',
+    pattern: /memory_kib: int = (\d+) \* 1024/g,
+    count: 6,
+    expected: DEFAULT_ARGON2.memoryKiB / 1024,
+    source: 'DEFAULT_ARGON2.memoryKiB / 1024 in src/core/crypto.ts',
+  },
+  {
+    id: 'python-gallery-memory-default',
+    file: 'python/stegoshard/gallery.py',
+    scope: 'flat',
+    pattern: /memory_kib: int = (\d+) \* 1024/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.memoryKiB / 1024,
+    source: 'DEFAULT_ARGON2.memoryKiB / 1024 in src/core/crypto.ts',
   },
   {
     id: 'python-seg-version',

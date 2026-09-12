@@ -740,7 +740,9 @@ decoded blindly by trial-authentication ("winnowing").
 - `aeadKey` ← `info = "stegoshard/gallery/aead"`, seals fragments (AES-256-GCM).
 
 The gallery Argon2 cost is the format-defined v2-candidate `DEFAULT_ARGON2` and is **not stored**
-anywhere (like the §5.3 stego salt). Because `aeadKey` is password-only,
+anywhere (like the §5.3 stego salt); changing it is a format change, and an old gallery
+would simply yield no surviving fragment rather than report a version mismatch (see
+_Argon2 cost is a format constant_ in docs/VERSIONING.md). Because `aeadKey` is password-only,
 extraction is image-independent, so a decoder can trial-open every photo blindly.
 
 ### 9.2 Fragment and slot layout (all lengths fixed)
@@ -900,7 +902,10 @@ CEK_r     := HKDF-SHA256(ikm = dek_r, salt = region_contentSalt_r,
 is to defeat cross-vault precomputation; distinct passwords yield distinct KEKs
 regardless). Unlike the §5.1 key block, the slot KEK's **Argon2 parameters are the format-defined
 `DEFAULT_ARGON2` and are NOT stored** in the container; the geometry carries no cost
-field (as with the gallery/stego keys, §5.3, §9.1).
+field (as with the gallery/stego keys, §5.3, §9.1). Changing that constant is therefore a
+**format change** on this path, and one whose failure mode is silent: an old container
+derives a different KEK, no slot opens, and the result is indistinguishable from a wrong
+password. See _Argon2 cost is a format constant_ in docs/VERSIONING.md.
 
 ### 10.3 Keyfile / stego as a key factor
 
