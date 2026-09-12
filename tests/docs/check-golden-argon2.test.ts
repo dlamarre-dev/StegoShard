@@ -40,8 +40,30 @@ describe('the shapes it must read', () => {
   it('reads a plain integer as well as a product', () => {
     expect(
       readArgon2(
-        'DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, parallelism: 1 })',
+        'export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, parallelism: 1 })',
       ),
+    ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
+  });
+
+  it('parses the declaration, not an example of it in a comment above', () => {
+    // A fail-open regression, caught in review and reproduced before fixing.
+    // Anchoring the search region on the first *mention* of the name started it
+    // inside this doc block, after the comment's opener -- so the strip could not
+    // remove it and the example was parsed instead of the constant. The values
+    // below are deliberately a plausible "cheap profile" so a wrong parse looks
+    // entirely reasonable, which is what made it dangerous: a later cost change
+    // would then parse identically on both sides and ship with no version bump.
+    expect(
+      readArgon2(`
+        /**
+         *   DEFAULT_ARGON2 = Object.freeze({ iterations: 1, memoryKiB: 8, parallelism: 1 })
+         */
+        export const DEFAULT_ARGON2: Argon2Params = Object.freeze({
+          iterations: 4,
+          memoryKiB: 256 * 1024, // 256 MiB
+          parallelism: 1,
+        });
+      `),
     ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
   });
 
@@ -50,7 +72,7 @@ describe('the shapes it must read', () => {
     // literal left this truncated and reported unparseable -- failing CI for a
     // comment-only edit. Comments now come off the whole blob first.
     expect(
-      readArgon2(`DEFAULT_ARGON2 = Object.freeze({
+      readArgon2(`export const DEFAULT_ARGON2 = Object.freeze({
         /* calibrated 4 Sep {see the log} */
         iterations: 4,
         memoryKiB: 256 * 1024,
@@ -63,14 +85,28 @@ describe('the shapes it must read', () => {
 describe('the shapes it must refuse, rather than half-read', () => {
   it('tells an absent constant from an unparseable one', () => {
     // The distinction is the whole point: 'absent' is benign (a new file), while
-    // 'unparseable' means the guard cannot tell whether the cost changed.
+    // 'unparseable' means the guard cannot tell whether the cost changed. They also
+    // send a contributor to different places -- COST_FILE versus this parser.
     expect(readArgon2('export const SOMETHING_ELSE = 1;')).toBe('absent');
+  });
+
+  it('calls a mention or a re-export absent, not unparseable', () => {
+    // A bare substring search reported these 'unparseable', which told a
+    // contributor to go and fix the parser when the constant had simply moved.
+    expect(readArgon2('export { DEFAULT_ARGON2 } from "./kdf";')).toBe('absent');
+    expect(readArgon2('// DEFAULT_ARGON2 moved to kdf.ts')).toBe('absent');
+  });
+
+  it('calls a real declaration it cannot read unparseable', () => {
+    // The other side of that line: the constant IS declared here, so the parser
+    // not understanding it is the parser's problem, not a relocation.
+    expect(readArgon2('export const DEFAULT_ARGON2 = someFn();')).toBe('unparseable');
   });
 
   it('refuses a value it cannot evaluate', () => {
     expect(
       readArgon2(
-        'DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: MEM, parallelism: 1 })',
+        'export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: MEM, parallelism: 1 })',
       ),
     ).toBe('unparseable');
   });
@@ -80,7 +116,7 @@ describe('the shapes it must refuse, rather than half-read', () => {
     // confident about a literal it had not read.
     expect(
       readArgon2(
-        'DEFAULT_ARGON2 = Object.freeze({ ...BASE, iterations: 4, memoryKiB: 262144, parallelism: 1 })',
+        'export const DEFAULT_ARGON2 = Object.freeze({ ...BASE, iterations: 4, memoryKiB: 262144, parallelism: 1 })',
       ),
     ).toBe('unparseable');
   });
@@ -90,7 +126,9 @@ describe('the shapes it must refuse, rather than half-read', () => {
     // would have returned a confident two-field object for a three-field literal
     // and the caller would have compared triples that were never equal.
     expect(
-      readArgon2('DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, [k]: 1 })'),
+      readArgon2(
+        'export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, [k]: 1 })',
+      ),
     ).toBe('unparseable');
   });
 });
