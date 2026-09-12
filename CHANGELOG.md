@@ -9,6 +9,16 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **`npm run spec:check`: a guard that refuses a `SPEC.md` disagreeing with the code.**
+  It imports the version constants and compares them against every byte-layout diagram,
+  table row and prose assignment in the spec and its Python mirror, so the stale claims
+  fixed below cannot recur silently. Deliberately not marker-based: markers would only
+  check the claims that carry them, and the failure worth catching is a _new_ diagram
+  written with a stale number. Each rule pins how many times it must match, because a
+  regex that quietly stops matching passes forever while checking nothing — the same
+  reasoning `check-golden.ts` applies to an unreachable base ref. It runs second in
+  `ci:node`, before the slow checks.
+
 - **Every AEAD site now binds its container context, and the format version constants
   move with it (`FORMAT_VERSION`, `KEY_BLOCK_VERSION`, `SEG_VERSION` → 2).** The
   segmented `.ssbn`/`.db` path already bound each chunk to its whole header; the §6
@@ -76,6 +86,29 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   carve-out instead of quietly bending the rule that says otherwise.
 
 ### Fixed
+
+- **Three byte-layout diagrams in `SPEC.md` still said version `1`** after the constants
+  moved to `2`: the §3 image header table, the §5.1 key block, and the §8.1 segmented
+  blob. This is not a typo in documentation — `SPEC.md` ships in the package and is the
+  artifact an independent implementer decodes from, so anyone writing a second
+  implementation from those lines would have produced containers this one rejects, with
+  no way to know the document was wrong. A prose sweep a week earlier corrected the
+  version claims and missed all three, because they live in tables and fenced diagrams
+  rather than in sentences.
+
+- **`SHARE_VERSION` and `KEY_FACTOR_BLOCK_VERSION` were missing from the
+  `scripts/check-golden.ts` guard**, the same omission recorded below for `SEG_VERSION`,
+  twice more. `KEY_FACTOR_BLOCK_VERSION` is now exported rather than module-private; it
+  is an on-the-wire constant that SPEC states in two places.
+
+- **`SHA256SUMS.txt` was excluded from the release attestation.** The subject glob
+  matched only `stegoshard-*`, leaving the file that establishes every archive's
+  integrity as the one file on the release page with none of its own — which
+  `docs/CLI.md` already said, in as many words. It is now attested alongside the
+  archives, and the same applies to `SHA256SUMS-web.txt`. The distinction between a
+  transfer check and a provenance check is unchanged and still documented; what changes
+  is that verifying the list once now lets the cheap hash comparison carry weight for
+  the rest.
 
 - **`SEG_VERSION` was missing from the `scripts/check-golden.ts` guard**, so a break in
   the `.db` format could have regenerated the golden corpus with no version bump at all —
