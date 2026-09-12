@@ -87,4 +87,4 @@ export type { GatheredInputs } from './node/inputs';
  * per-call cover-reuse override; see src/core/stego-guard.ts for why it is a
  * per-call option and not a global switch.
  */
-export type { StegoEmbedOptions } from '../core';
+export type { StegoEmbedOptions, CoverClaim } from '../core';

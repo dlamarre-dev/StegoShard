@@ -116,9 +116,14 @@ export function toCliFailure(err: unknown): CliFailure {
   if (err instanceof WrongPasswordError) return { message: t('errWrongPassword'), exitCode: 1 };
   if (err instanceof GalleryRestoreError) return { message: t('errNoGallery'), exitCode: 1 };
   if (err instanceof MissingKeyError) return { message: t('errNeedsKey'), exitCode: 1 };
-  // Localized rather than left to the core's English, because this message names
-  // a CLI flag and tells the user what to do instead.
-  if (err instanceof StegoCoverReuseError) return { message: t('errCoverReused'), exitCode: 1 };
+  // Localized, and the flag hint is appended HERE rather than baked into the
+  // catalog string. `toCliFailure` also builds the MCP error text
+  // (src/mcp/server.ts), and MCP deliberately exposes no such knob -- a message
+  // naming it there would be telling an agent to reach for something it does not
+  // have. The hint belongs to the surface that offers the flag.
+  if (err instanceof StegoCoverReuseError) {
+    return { message: `${t('errCoverReused')} ${t('hintAllowCoverReuse')}`, exitCode: 1 };
+  }
   if (err instanceof CredentialsNotIndependentError) {
     return { message: t('errDuressTooSimilar', { reason: err.reason }), exitCode: 1 };
   }

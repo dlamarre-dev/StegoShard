@@ -112,11 +112,30 @@ function main(): void {
   const COST_FILE = 'src/core/crypto.ts';
   const VERSION_FILE = 'src/core/header.ts';
   if (changed.includes(COST_FILE)) {
-    let costBefore: Record<string, number> | null;
+    // Two different reasons the base side can be absent, and only one of them is
+    // benign. `git show` throwing means the file is new on this branch, so there
+    // is genuinely nothing to compare against. `readArgon2` returning null means
+    // the literal was there and could not be parsed -- and treating THAT as
+    // "nothing to compare" is the same silent bypass the costNow check below
+    // refuses. Hardening one side and not the other left the hole open.
+    let costBefore: Record<string, number> | null = null;
+    let baseExists = true;
     try {
       costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
     } catch {
-      costBefore = null; // new file; nothing to compare against
+      baseExists = false; // new file; nothing to compare against
+    }
+    if (baseExists && costBefore === null) {
+      console.error(
+        [
+          `golden:check: cannot read DEFAULT_ARGON2 from ${base}:${COST_FILE}.`,
+          '',
+          'The literal exists on the base side but is not a shape this guard can',
+          'parse, so it cannot tell whether the cost changed. Update readArgon2 in',
+          'this file -- do not remove the rule. See docs/VERSIONING.md.',
+        ].join('\n'),
+      );
+      process.exit(1);
     }
     const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
     // An unreadable literal is a hard failure, not a skip. `readArgon2` refuses to

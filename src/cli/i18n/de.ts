@@ -32,6 +32,8 @@ export const de: CliCatalog = {
     'Dieses Foto hat in dieser Sitzung bereits ein Geheimnis unter diesem Passwort getragen. Es erneut zu verwenden würde beide Verstecke schwächen (SPEC §5.3). Wählen Sie ein anderes Foto oder ein anderes Passwort.',
   errCoverReuseWrongCommand:
     '--allow-cover-reuse hat bei {command} keine Wirkung (nur save bettet in ein Trägerbild ein)',
+  hintAllowCoverReuse:
+    'Mit --allow-cover-reuse setzen Sie sich darüber hinweg, wenn Sie es so wollen.',
   helpAllowCoverReuse:
     'Erlauben, dass ein Trägerfoto ein zweites Geheimnis unter demselben Passwort trägt (schwächt beide; siehe docs/CLI.md)',
   errExportNumberInvalid:

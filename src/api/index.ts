@@ -278,6 +278,7 @@ export {
   StegoCoverFormatError,
   StegoCoverReuseError,
   type StegoEmbedOptions,
+  type CoverClaim,
   TooManyFilesError,
   TooManyImagesError,
   VerificationError,

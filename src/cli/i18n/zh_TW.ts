@@ -36,6 +36,7 @@ export const zhTW: CliCatalog = {
     '這張照片在本次工作階段中已經以這個密碼藏過一個祕密。再次使用會同時削弱兩個藏匿處（SPEC §5.3）。請換一張照片或換一個密碼。',
   errCoverReuseWrongCommand:
     '--allow-cover-reuse 對 {command} 沒有作用（只有 save 會嵌入封面圖片）',
+  hintAllowCoverReuse: '若確實有意，可加上 --allow-cover-reuse 覆寫。',
   helpAllowCoverReuse: '允許一張封面照片以相同密碼攜帶第二個祕密（兩者都會被削弱；見 docs/CLI.md）',
   errExportNumberInvalid: '--export-number 必須是 1 到 4294967295 之間的整數（收到「{value}」）',
   errExportNumberWrongCommand: '--export-number 對 {command} 沒有作用（只有 save 會為匯出編號）',

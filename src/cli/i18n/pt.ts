@@ -32,6 +32,7 @@ export const pt: CliCatalog = {
     'Esta foto já levou um segredo com esta senha nesta sessão. Reutilizá-la enfraqueceria os dois esconderijos (SPEC §5.3). Escolha outra foto ou outra senha.',
   errCoverReuseWrongCommand:
     '--allow-cover-reuse não tem efeito em {command} (só save incorpora numa capa)',
+  hintAllowCoverReuse: 'Use --allow-cover-reuse para ignorar isto se for intencional.',
   helpAllowCoverReuse:
     'Permitir que uma foto de capa leve um segundo segredo com a mesma senha (enfraquece ambos; veja docs/CLI.md)',
   errExportNumberInvalid:
