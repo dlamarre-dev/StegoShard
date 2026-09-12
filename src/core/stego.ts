@@ -325,16 +325,19 @@ async function embedFixedStego(
   // cover untouched, and a cover that is merely too small must say that rather
   // than report a reuse it would never have made.
   const claim = await reserveCoverUse(tag, payload, opts);
-  // Handed over immediately, not at the end. The orchestration layer's holder has
-  // to own this from the instant it exists: if it only arrived on success, a throw
-  // between here and the return would leave a claim nobody could release, which is
-  // the burned cover this exists to prevent. Release is idempotent, so the belt
-  // (here) and the braces (the holder) do not conflict.
-  opts?.onClaim?.(claim);
 
-  // Everything after the reservation is inside the try, `pickPositions` included:
-  // it throws when the keystream runs short, and it used to sit outside.
+  // Everything after the reservation is inside the try -- `pickPositions`, which
+  // throws when the keystream runs short, and the `onClaim` hand-off itself.
+  //
+  // `onClaim` is handed over first, not at the end: the orchestration layer's
+  // holder has to own the claim from the instant it exists, or a throw in between
+  // leaves it held by nobody. But the call belongs INSIDE the try, because the
+  // callback is consumer code doing real work -- the JSDoc tells it to -- and a
+  // throw from it escaping past the release would strand the claim in exactly the
+  // way the hand-off exists to prevent. Release is idempotent, so the belt (here)
+  // and the braces (the holder) do not conflict.
   try {
+    opts?.onClaim?.(claim);
     const pad = stream.subarray(0, len);
     const reader = new StreamReader(stream.subarray(len));
     const positions = pickPositions(reader, capacity, bits);
@@ -499,10 +502,9 @@ async function embedFixedStegoJpeg(
     // the RGBA path above. Capacity on this path depends on which branch runs, so
     // there is no single earlier point that could hold the check for both.
     const claim = await reserveCoverUse(tag, payload, opts);
-    opts?.onClaim?.(claim);
-    // The whole remainder, not just the encode: `pickPositions` and the carrier
-    // walk can both throw, and they used to sit outside this.
+    // The whole remainder, the `onClaim` hand-off included: see embedFixedStego.
     try {
+      opts?.onClaim?.(claim);
       const reader = new StreamReader(stream.subarray(len));
       const positions = pickPositions(reader, carriers.count, bits);
       const toggles: number[] = [];
@@ -522,8 +524,8 @@ async function embedFixedStegoJpeg(
   const carriers = eligibleCoefficients(model);
   if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
   const claim = await reserveCoverUse(tag, payload, opts);
-  opts?.onClaim?.(claim);
   try {
+    opts?.onClaim?.(claim);
     const reader = new StreamReader(stream.subarray(len));
     const positions = pickPositions(reader, carriers.count, bits);
     for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
