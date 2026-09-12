@@ -626,9 +626,10 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
     return await runCommand(argv, quiet, present);
   } catch (err) {
     const failure = toCliFailure(err);
-    // The flag hint is appended on both CLI exits, because there are two: this one
-    // (which renders the `--json` envelope as well as the human failure) and the
-    // bootstrap's in main.ts. Putting it only in main.ts dropped it from `--json`,
+    // The flag hint is appended at both CLI exits, and there are exactly two: this
+    // one, which is reached ONLY under `--json` (the human path returns above,
+    // before this try, and leaves its failure to the bootstrap), and main.ts for
+    // everything else. Appending it only in main.ts dropped it from `--json`,
     // which is still the command line. It stays out of `toCliFailure` itself
     // because MCP shares that classifier and offers no such flag.
     const hint = coverReuseHint(err);
