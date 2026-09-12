@@ -116,16 +116,26 @@ export function toCliFailure(err: unknown): CliFailure {
   if (err instanceof WrongPasswordError) return { message: t('errWrongPassword'), exitCode: 1 };
   if (err instanceof GalleryRestoreError) return { message: t('errNoGallery'), exitCode: 1 };
   if (err instanceof MissingKeyError) return { message: t('errNeedsKey'), exitCode: 1 };
-  // Localized, and the flag hint is appended HERE rather than baked into the
-  // catalog string. `toCliFailure` also builds the MCP error text
-  // (src/mcp/server.ts), and MCP deliberately exposes no such knob -- a message
-  // naming it there would be telling an agent to reach for something it does not
-  // have. The hint belongs to the surface that offers the flag.
-  if (err instanceof StegoCoverReuseError) {
-    return { message: `${t('errCoverReused')} ${t('hintAllowCoverReuse')}`, exitCode: 1 };
-  }
+  // No flag hint here. `toCliFailure` also builds the MCP tool-error text
+  // (src/mcp/server.ts), and MCP deliberately exposes no such knob, so naming the
+  // flag would tell an agent to reach for something it does not have. The hint is
+  // appended by the CLI bootstrap, which is the only surface that offers it --
+  // see `coverReuseHint` below and its use in main.ts.
+  if (err instanceof StegoCoverReuseError) return { message: t('errCoverReused'), exitCode: 1 };
   if (err instanceof CredentialsNotIndependentError) {
     return { message: t('errDuressTooSimilar', { reason: err.reason }), exitCode: 1 };
   }
   return { message: err instanceof Error ? err.message : String(err), exitCode: 1 };
+}
+
+/**
+ * The `--allow-cover-reuse` hint, for the command line only.
+ *
+ * Kept out of `toCliFailure` deliberately: that classifier is shared with the MCP
+ * server, which exposes no such flag. A previous attempt put the hint in the
+ * catalog string (wrong: MCP saw it) and then inside the classifier (wrong for the
+ * same reason). It belongs where the flag exists.
+ */
+export function coverReuseHint(err: unknown): string | undefined {
+  return err instanceof StegoCoverReuseError ? t('hintAllowCoverReuse') : undefined;
 }

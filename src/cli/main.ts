@@ -14,7 +14,7 @@
 
 import { run } from './run';
 import { nodeIo } from './io';
-import { toCliFailure } from './errors';
+import { coverReuseHint, toCliFailure } from './errors';
 
 const io = nodeIo();
 
@@ -22,6 +22,9 @@ run(process.argv.slice(2), io)
   .then((code) => process.exit(code))
   .catch((err: unknown) => {
     const { message, exitCode } = toCliFailure(err);
-    io.err(`${message}\n`);
+    // The flag hint is appended here rather than in the classifier, because that
+    // classifier also builds the MCP tool-error text and MCP offers no such flag.
+    const hint = coverReuseHint(err);
+    io.err(`${message}${hint ? ` ${hint}` : ''}\n`);
     process.exit(exitCode);
   });

@@ -92,9 +92,14 @@ function main(): void {
   // decided?"; a cost change that did *not* regenerate the corpus would take the
   // `touched.length === 0` exit and never be looked at, which is precisely the
   // change most worth catching.
-  const readArgon2 = (blob: string): Record<string, number> | null => {
+  // Three outcomes, and conflating the last two is how a guard switches itself
+  // off: 'absent' means the constant is not in this blob at all (a rename, or a
+  // file that did not declare it yet), 'unparseable' means it is there in a shape
+  // this parser does not recognise. Only the second is a reason to refuse to
+  // guess, and the message has to say which one happened.
+  const readArgon2 = (blob: string): Record<string, number> | 'absent' | 'unparseable' => {
     const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(blob);
-    if (!body) return null;
+    if (!body) return 'absent';
     const out: Record<string, number> = {};
     for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
       // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather
@@ -104,7 +109,7 @@ function main(): void {
       const plain = /^\s*(\d+)\s*$/.exec(expr!);
       if (product) out[key!] = Number(product[1]) * Number(product[2]);
       else if (plain) out[key!] = Number(plain[1]);
-      else return null;
+      else return 'unparseable';
     }
     return out;
   };
@@ -118,25 +123,33 @@ function main(): void {
     // the literal was there and could not be parsed -- and treating THAT as
     // "nothing to compare" is the same silent bypass the costNow check below
     // refuses. Hardening one side and not the other left the hole open.
-    let costBefore: Record<string, number> | null = null;
-    let baseExists = true;
-    try {
-      costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
-    } catch {
-      baseExists = false; // new file; nothing to compare against
-    }
-    if (baseExists && costBefore === null) {
+    const unreadable = (where: string, why: 'absent' | 'unparseable'): never => {
       console.error(
         [
-          `golden:check: cannot read DEFAULT_ARGON2 from ${base}:${COST_FILE}.`,
+          `golden:check: cannot read DEFAULT_ARGON2 from ${where}.`,
           '',
-          'The literal exists on the base side but is not a shape this guard can',
-          'parse, so it cannot tell whether the cost changed. Update readArgon2 in',
-          'this file -- do not remove the rule. See docs/VERSIONING.md.',
+          why === 'absent'
+            ? 'The constant is not declared there at all. If it was renamed or moved,'
+            : 'The literal is there but is not a shape this guard can parse, so it',
+          why === 'absent'
+            ? 'update COST_FILE and readArgon2 in this file -- do not remove the rule.'
+            : 'cannot tell whether the cost changed. Update readArgon2 -- do not remove it.',
+          '',
+          'On the stego, gallery and slot-KEK paths the cost IS the format; see',
+          'docs/VERSIONING.md.',
         ].join('\n'),
       );
       process.exit(1);
+    };
+
+    let costBefore: Record<string, number> | 'absent' | 'unparseable' | undefined;
+    try {
+      costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
+    } catch {
+      costBefore = undefined; // new file on this branch; nothing to compare against
     }
+    if (costBefore === 'unparseable') unreadable(`${base}:${COST_FILE}`, 'unparseable');
+    if (costBefore === 'absent') unreadable(`${base}:${COST_FILE}`, 'absent');
     const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
     // An unreadable literal is a hard failure, not a skip. `readArgon2` refuses to
     // guess at an expression it does not recognise, and treating that as "nothing
@@ -144,21 +157,8 @@ function main(): void {
     // switch itself off for exactly the edit most likely to have rewritten the
     // literal. `costBefore === null` is different and legitimate: the file is new
     // on this branch, so there is nothing to compare against.
-    if (costNow === null) {
-      console.error(
-        [
-          `golden:check: cannot read DEFAULT_ARGON2 from ${COST_FILE}.`,
-          '',
-          'The literal is no longer a plain `Object.freeze({ ... })` of integers or',
-          '`a * b` products, so this guard cannot tell whether the cost changed.',
-          'Update readArgon2 in this file to match the new shape -- do not remove the',
-          'rule. On the stego, gallery and slot-KEK paths the cost IS the format; see',
-          'docs/VERSIONING.md.',
-        ].join('\n'),
-      );
-      process.exit(1);
-    }
-    if (costBefore && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
+    if (costNow === 'absent' || costNow === 'unparseable') unreadable(COST_FILE, costNow);
+    if (costBefore !== undefined && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
       let versionBumped: boolean;
       try {
         const was = readVersion(git('show', `${base}:${VERSION_FILE}`), 'FORMAT_VERSION');
