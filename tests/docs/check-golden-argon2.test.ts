@@ -83,8 +83,8 @@ describe('the shapes it must read', () => {
   });
 
   it('is unaffected by an unbalanced comment opener in an earlier string', () => {
-    // The whole-blob comment strip swallowed the declaration here and reported it
-    // absent. A lexer knows a string from a comment.
+    // A whole-blob comment strip swallowed the declaration here and reported it
+    // absent. A lexer knows a string from a comment, so this too is free now.
     expect(
       readArgon2(`
         const PATTERN = "/*";
@@ -94,9 +94,9 @@ describe('the shapes it must read', () => {
   });
 
   it('survives a block comment containing a brace', () => {
-    // The capture stops at the first `}`, so stripping comments AFTER locating the
-    // literal left this truncated and reported unparseable -- failing CI for a
-    // comment-only edit. Comments now come off the whole blob first.
+    // A brace inside a comment truncated the old regex's capture. The lexer gives
+    // this for free -- it is kept because it is the shape that first exposed the
+    // whole comment-versus-code class, and a future reader should see it pass.
     expect(
       readArgon2(`export const DEFAULT_ARGON2 = Object.freeze({
         /* calibrated 4 Sep {see the log} */
@@ -121,6 +121,57 @@ describe('the shapes it must refuse, rather than half-read', () => {
     // contributor to go and fix the parser when the constant had simply moved.
     expect(readArgon2('export { DEFAULT_ARGON2 } from "./kdf";')).toBe('absent');
     expect(readArgon2('// DEFAULT_ARGON2 moved to kdf.ts')).toBe('absent');
+  });
+
+  it('refuses a wrapper that is not Object.freeze', () => {
+    // Accepting any single-argument call was a fail-open: the wrapper's argument
+    // was read as the constant's value, so changing the wrapper left both sides of
+    // a diff reading the same inner literal. Refusing is also the right answer on
+    // its own terms -- this constant IS the format on three paths, so it has to
+    // stay a plain literal rather than something computed.
+    expect(
+      readArgon2(
+        'export const DEFAULT_ARGON2 = tuneForHost({ iterations: 4, memoryKiB: 262144, parallelism: 1 });',
+      ),
+    ).toBe('unparseable');
+    expect(
+      readArgon2(
+        'export const DEFAULT_ARGON2 = Object.freeze(scale({ iterations: 4, memoryKiB: 262144, parallelism: 1 }));',
+      ),
+    ).toBe('unparseable');
+  });
+
+  it('reads the module-level declaration, not one inside a function', () => {
+    // A pre-order walk took the first `DEFAULT_ARGON2` anywhere in the file, so a
+    // helper above the real export won and both sides parsed the helper -- the same
+    // shape as the commented-out declaration this parser was already caught by.
+    expect(
+      readArgon2(`
+        function fixture() {
+          const DEFAULT_ARGON2 = Object.freeze({ iterations: 1, memoryKiB: 8, parallelism: 1 });
+          return DEFAULT_ARGON2;
+        }
+        export const DEFAULT_ARGON2 = Object.freeze({
+          iterations: 4,
+          memoryKiB: 256 * 1024,
+          parallelism: 1,
+        });
+      `),
+    ).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
+  });
+
+  it('refuses a literal missing one of the three fields', () => {
+    // The regex required the whole triple and the first AST version did not, so a
+    // partial literal parsed confidently. If a field were ever extracted into its
+    // own constant, later changes to it would compare equal forever.
+    expect(readArgon2('export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4 });')).toBe(
+      'unparseable',
+    );
+    expect(
+      readArgon2(
+        'export const DEFAULT_ARGON2 = Object.freeze({ iterations: 4, memoryKiB: 262144, parallelism: 1, extra: 2 });',
+      ),
+    ).toBe('unparseable');
   });
 
   it('calls a real declaration it cannot read unparseable', () => {

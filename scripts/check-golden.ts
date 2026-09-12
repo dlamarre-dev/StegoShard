@@ -52,27 +52,49 @@ import ts from 'typescript';
 export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
   const source = ts.createSourceFile('crypto.ts', blob, ts.ScriptTarget.Latest, true);
 
+  // The MODULE-LEVEL declaration, not the first one in pre-order. A walk over the
+  // whole tree would take a `DEFAULT_ARGON2` inside a function body -- a test
+  // helper above the real export, say -- and both sides of a diff would then read
+  // the helper. That is the same shape as the commented-out declaration this file
+  // has already been caught by, so it is excluded structurally rather than by
+  // hoping the real one comes first.
   let initializer: ts.Expression | undefined;
-  const find = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === 'DEFAULT_ARGON2' &&
-      node.initializer
-    ) {
-      initializer ??= node.initializer;
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.name.text === 'DEFAULT_ARGON2' && decl.initializer) {
+        initializer ??= decl.initializer;
+      }
     }
-    ts.forEachChild(node, find);
-  };
-  find(source);
+  }
   if (!initializer) return 'absent';
 
-  // Unwrap `Object.freeze({...})`, `{...} as const`, and any combination.
+  // Unwrap `Object.freeze({...})`, `{...} as const`, and parentheses -- and
+  // NOTHING else.
+  //
+  // Accepting any single-argument call was a fail-open: `tuneForHost({...})` or
+  // `Object.freeze(scaleMemory({...}))` would have been read as the constant's
+  // value, so changing the wrapper left both sides reading the same inner literal.
+  // The regex this replaced required a literal `Object.freeze(`, and that was the
+  // stricter behaviour.
+  //
+  // Refusing rather than evaluating is deliberate, and it is why this reads the
+  // AST instead of importing the module and taking the value. On the §5.3, §9.1
+  // and §10.2 paths this constant IS the format; it has to stay a plain literal
+  // anyone can read off the page, in TypeScript and in the Python mirror. A
+  // computed one should fail loudly here, not be quietly evaluated into agreement.
+  const isObjectFreeze = (call: ts.CallExpression): boolean =>
+    ts.isPropertyAccessExpression(call.expression) &&
+    ts.isIdentifier(call.expression.expression) &&
+    call.expression.expression.text === 'Object' &&
+    call.expression.name.text === 'freeze' &&
+    call.arguments.length === 1;
+
   let expr = initializer;
   for (;;) {
     if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) expr = expr.expression;
     else if (ts.isParenthesizedExpression(expr)) expr = expr.expression;
-    else if (ts.isCallExpression(expr) && expr.arguments.length === 1) expr = expr.arguments[0]!;
+    else if (ts.isCallExpression(expr) && isObjectFreeze(expr)) expr = expr.arguments[0]!;
     else break;
   }
   if (!ts.isObjectLiteralExpression(expr)) return 'unparseable';
@@ -101,7 +123,16 @@ export function readArgon2(blob: string): Record<string, number> | 'absent' | 'u
     if (v === undefined) return 'unparseable';
     out[prop.name.text] = v;
   }
-  return Object.keys(out).length > 0 ? out : 'unparseable';
+  // Exactly the three fields, no more and no fewer. The regex this replaced
+  // required the full set and the first AST version did not, so
+  // `Object.freeze({ iterations: 4 })` parsed confidently -- and if a field were
+  // ever extracted into its own constant, later changes to it would compare equal
+  // forever.
+  const EXPECTED = ['iterations', 'memoryKiB', 'parallelism'];
+  const found = Object.keys(out).sort();
+  return EXPECTED.every((k) => found.includes(k)) && found.length === EXPECTED.length
+    ? out
+    : 'unparseable';
 }
 
 const CONSTANTS = [
@@ -207,23 +238,36 @@ function main(): void {
       process.exit(1);
     };
 
-    let costBefore: Record<string, number> | 'absent' | 'unparseable' | undefined;
+    /** Narrow the reader's three outcomes down to a value, exiting on the rest. */
+    const costAt = (where: string, blob: string): Record<string, number> => {
+      const read = readArgon2(blob);
+      if (read === 'absent' || read === 'unparseable') unreadable(where, read);
+      return read as Record<string, number>;
+    };
+
+    let costBefore: Record<string, number> | undefined;
     try {
-      costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
+      const blob = git('show', `${base}:${COST_FILE}`);
+      costBefore = costAt(`${base}:${COST_FILE}`, blob);
     } catch {
       costBefore = undefined; // new file on this branch; nothing to compare against
     }
-    if (costBefore === 'unparseable') unreadable(`${base}:${COST_FILE}`, 'unparseable');
-    if (costBefore === 'absent') unreadable(`${base}:${COST_FILE}`, 'absent');
-    const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
-    // An unreadable literal is a hard failure, not a skip. `readArgon2` refuses to
-    // guess at an expression it does not recognise, and treating that as "nothing
-    // changed" would turn the refusal into a silent bypass -- the check would
-    // switch itself off for exactly the edit most likely to have rewritten the
-    // literal. `costBefore === null` is different and legitimate: the file is new
-    // on this branch, so there is nothing to compare against.
-    if (costNow === 'absent' || costNow === 'unparseable') unreadable(COST_FILE, costNow);
-    if (costBefore !== undefined && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
+    const costNow = costAt(COST_FILE, git('show', `HEAD:${COST_FILE}`));
+    // An unreadable literal is a hard failure, not a skip (see `costAt` above).
+    // `readArgon2` refuses to guess at a shape it does not recognise, and treating
+    // that as "nothing changed" would turn the refusal into a silent bypass -- the
+    // check would switch itself off for exactly the edit most likely to have
+    // rewritten the literal. A `git show` that THROWS is different and legitimate:
+    // the file is new on this branch, so there is nothing to compare against.
+    // Compared field by field. `JSON.stringify` preserves insertion order and `out`
+    // is built in AST property order, so reordering the three keys with no value
+    // change would have failed CI as a cost change. (The messages below still use
+    // stringify, which is fine: they are for a human to read.)
+    const sameCost = (a: Record<string, number>, b: Record<string, number>): boolean => {
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+      return keys.every((k) => a[k] === b[k]);
+    };
+    if (costBefore !== undefined && !sameCost(costBefore, costNow)) {
       let versionBumped: boolean;
       try {
         const was = readVersion(git('show', `${base}:${VERSION_FILE}`), 'FORMAT_VERSION');
