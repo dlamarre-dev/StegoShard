@@ -7,11 +7,19 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resetStegoCoverGuard } from '@core';
 import { encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
 import { runEstimate, runRestore, runSave, codecIdForSave } from './commands';
 import { CODEC_COLOR_GRID, CODEC_QR_GRID, clearUserEntropy, installUserEntropy } from '@core';
+
+// The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
+// without this one test's covers would refuse the next test's embeds. That is
+// pollution between independent scenarios rather than the behaviour under test:
+// each `it` here is its own session. A test that deliberately reuses a cover
+// says so with `allowCoverReuse`, which is the honest way to express it.
+beforeEach(resetStegoCoverGuard);
 
 // Production Argon2 (64 MiB) runs on every save; give these room under CI.
 const SLOW = { timeout: 60_000 };

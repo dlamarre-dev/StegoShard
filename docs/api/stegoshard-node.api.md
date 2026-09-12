@@ -25,10 +25,10 @@ export function decodePixelsToPayload(img: ImageDataLike): Uint8Array | null;
 export const DEFAULT_MAX_BINARY_BYTES: number;
 
 // @public
-export function embedKeyFactorImage(coverBytes: Uint8Array, coverName: string, factor: Uint8Array, password: string): Promise<StegoKeyImage>;
+export function embedKeyFactorImage(coverBytes: Uint8Array, coverName: string, factor: Uint8Array, password: string, opts?: StegoEmbedOptions): Promise<StegoKeyImage>;
 
 // @public
-export function embedKeyImage(coverBytes: Uint8Array, coverName: string, keyBlock: Uint8Array, password: string): Promise<StegoKeyImage>;
+export function embedKeyImage(coverBytes: Uint8Array, coverName: string, keyBlock: Uint8Array, password: string, opts?: StegoEmbedOptions): Promise<StegoKeyImage>;
 
 // @public (undocumented)
 export function estimate(inputFile: string, paper: boolean, codec?: CodecChoice): Promise<{
@@ -78,6 +78,7 @@ export function gallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult
 
 // @public (undocumented)
 export interface GallerySaveOptions {
+    allowCoverReuse?: boolean | undefined;
     covers: string[];
     force?: boolean | undefined;
     keyCover?: string | undefined;
@@ -138,6 +139,7 @@ export function restore(opts: RestoreOptions, onProgress?: OnProgress): Promise<
 
 // @public (undocumented)
 export interface RestoreOptions {
+    allowCoverReuse?: boolean | undefined;
     force?: boolean | undefined;
     // (undocumented)
     inputs: string[];
@@ -169,6 +171,7 @@ export function save(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveRe
 
 // @public (undocumented)
 export interface SaveOptions {
+    allowCoverReuse?: boolean | undefined;
     // Warning: (ae-forgotten-export) The symbol "BinaryVariant" needs to be exported by the entry point node.d.ts
     binary?: BinaryVariant | undefined;
     codec?: CodecChoice | undefined;
@@ -230,6 +233,11 @@ export interface SaveResult {
     // (undocumented)
     setId: string;
     sizeWarning?: string;
+}
+
+// @public
+export interface StegoEmbedOptions {
+    allowCoverReuse?: boolean | undefined;
 }
 
 // @public

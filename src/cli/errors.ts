@@ -16,6 +16,7 @@ import {
   CredentialsNotIndependentError,
   GalleryRestoreError,
   MissingKeyError,
+  StegoCoverReuseError,
   WrongPasswordError,
 } from '../core';
 import { type ApiErrorCode, StegoShardApiError } from '../api/errors';
@@ -115,6 +116,9 @@ export function toCliFailure(err: unknown): CliFailure {
   if (err instanceof WrongPasswordError) return { message: t('errWrongPassword'), exitCode: 1 };
   if (err instanceof GalleryRestoreError) return { message: t('errNoGallery'), exitCode: 1 };
   if (err instanceof MissingKeyError) return { message: t('errNeedsKey'), exitCode: 1 };
+  // Localized rather than left to the core's English, because this message names
+  // a CLI flag and tells the user what to do instead.
+  if (err instanceof StegoCoverReuseError) return { message: t('errCoverReused'), exitCode: 1 };
   if (err instanceof CredentialsNotIndependentError) {
     return { message: t('errDuressTooSimilar', { reason: err.reason }), exitCode: 1 };
   }

@@ -401,6 +401,9 @@
     "message": "Titelbild nicht unterstützt. Verwenden Sie ein Baseline-JPEG oder ein PNG (progressives JPEG und HEIC werden nicht unterstützt).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "Dieses Foto wurde bereits mit diesem Passwort verwendet. Es erneut zu verwenden würde beide Verstecke schwächen. Wählen Sie ein anderes Foto oder ein anderes Passwort."
+  },
   "destBinary": {
     "message": "Datei",
     "description": "Popup: binary (single file) destination."

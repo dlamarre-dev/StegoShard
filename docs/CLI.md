@@ -25,6 +25,14 @@ Key modes and paper output mirror the apps:
 # the cover, so restore points --key at that file. If the cover photo is later
 # recompressed, only the key is lost; the resilient archive survives.
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
+#
+# One photo, one password, one save. The cover's CONTENT keys the hiding place, so
+# saving twice into the same photo under the same password produces two key images
+# that differ at exactly the bits their two keys differ at — handing anyone who
+# holds both the distance between them and much of the secret layout (SPEC §5.3).
+# A second save into the same cover in the same run is refused; a save tomorrow
+# cannot be, so that one is yours to keep. Use another photo, or another password.
+# --allow-cover-reuse overrides the refusal if you mean it.
 npm run cli -- restore ./vault --key ./vault/cat.jpg --out ./restored
 
 # Image code: 'color' (default) is an 8-colour grid, about 3x the bytes per

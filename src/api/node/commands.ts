@@ -69,6 +69,7 @@ import {
   type ManifestEntry,
   type OnProgress,
   type VaultIdentity,
+  type StegoEmbedOptions,
 } from '../../core';
 import {
   embedKeyImage,
@@ -298,6 +299,15 @@ export interface SaveOptions {
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
   /**
+   * Embed into a cover that already carried a different payload under this
+   * password in this realm.
+   *
+   * Separate from `force` on purpose: `force` overwrites an output file, this
+   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
+   * other. See src/core/stego-guard.ts.
+   */
+  allowCoverReuse?: boolean | undefined;
+  /**
    * Ceiling on the binary path's payload, and on its decompression (a gzip-bomb
    * guard). Defaults to {@link DEFAULT_MAX_BINARY_BYTES}; pass
    * `MAX_FILE_BYTES_BINARY_CLI` for the 1 GiB terminal budget. Ignored on the
@@ -336,6 +346,18 @@ export interface SaveResult {
  * cover's format and reuses its **filename** (to blend into a photo library);
  * `mimicPath` is the cover whose mtime/atime the output should copy.
  */
+/**
+ * Lift the caller's cover-reuse decision into the shape the stego layer takes.
+ *
+ * Kept as a helper rather than inlined so there is one place asserting that this
+ * is the ONLY thing forwarded: `force` must never end up here. `--force` means
+ * "overwrite an existing output file", and letting a file-overwrite convenience
+ * waive a cryptographic constraint would be a category error.
+ */
+function reuseOpt(o: { allowCoverReuse?: boolean | undefined }): StegoEmbedOptions {
+  return { allowCoverReuse: o.allowCoverReuse };
+}
+
 async function externalKey(
   keyMode: KeyMode,
   keyBlock: Uint8Array,
@@ -345,6 +367,7 @@ async function externalKey(
   // Single-region paths (branded .ssbn, disk, paper) hide a 92-byte key block;
   // multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
   variant: 'block' | 'factor' = 'block',
+  opts?: StegoEmbedOptions,
 ): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
   if (keyMode === 'stego') {
     if (!cover) {
@@ -355,8 +378,8 @@ async function externalKey(
     }
     const key =
       variant === 'factor'
-        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password)
-        : await embedKeyImage(read(cover), basename(cover), keyBlock, password);
+        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password, opts)
+        : await embedKeyImage(read(cover), basename(cover), keyBlock, password, opts);
     return { name: basename(cover), bytes: key.bytes, mimicPath: cover };
   }
   if (keyMode !== 'embedded') {
@@ -390,7 +413,15 @@ async function runSaveDisguised(
         emit(opts, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised'), 'keyfile'),
       ];
     }
-    const ext = await externalKey('stego', keyFactor, '', opts.password, opts.cover, 'factor');
+    const ext = await externalKey(
+      'stego',
+      keyFactor,
+      '',
+      opts.password,
+      opts.cover,
+      'factor',
+      reuseOpt(opts),
+    );
     return ext ? [writeExternalKey(opts, ext)] : [];
   }
 
@@ -478,7 +509,15 @@ async function runSaveDisguised(
   } else if (keyMode === 'stego') {
     // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
     // cover, keyed by the same per-save password that derives the slot KEK.
-    const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover, 'factor');
+    const ext = await externalKey(
+      'stego',
+      keyBlock,
+      '',
+      opts.password,
+      opts.cover,
+      'factor',
+      reuseOpt(opts),
+    );
     if (ext) outs.push(writeExternalKey(opts, ext));
   }
   return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
@@ -548,7 +587,15 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
     const outs = [emit(opts, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
-      const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
+      const ext = await externalKey(
+        'stego',
+        keyBlock,
+        '',
+        opts.password,
+        opts.cover,
+        'block',
+        reuseOpt(opts),
+      );
       if (ext) outs.push(writeExternalKey(opts, ext));
     } else if (keyMode === 'keyfile') {
       outs.push(emit(opts, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'));
@@ -572,7 +619,15 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   await verifyImageExport(imagePayloads, key.dek, input.name, content);
   const setHex = toHex(setId);
   const outs: OutFile[] = [];
-  const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
+  const ext = await externalKey(
+    keyMode,
+    keyBlock,
+    setHex,
+    opts.password,
+    opts.cover,
+    'block',
+    reuseOpt(opts),
+  );
   // Large secrets sprawl into many images; nudge toward --binary before writing.
   const sizeWarning =
     content.length > WARN_FILE_BYTES
@@ -661,6 +716,15 @@ export interface RestoreOptions {
   sharePaths?: string[] | undefined;
   /** Overwrite an existing output file instead of refusing. */
   force?: boolean | undefined;
+  /**
+   * Embed into a cover that already carried a different payload under this
+   * password in this realm.
+   *
+   * Separate from `force` on purpose: `force` overwrites an output file, this
+   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
+   * other. See src/core/stego-guard.ts.
+   */
+  allowCoverReuse?: boolean | undefined;
   /**
    * Ceiling on a binary container's decrypted payload, and on its decompression
    * (a gzip-bomb guard on bytes an adversary may have written). Defaults to
@@ -802,6 +866,15 @@ export interface GallerySaveOptions {
   threshold?: { k: number; n: number } | undefined;
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
+  /**
+   * Embed into a cover that already carried a different payload under this
+   * password in this realm.
+   *
+   * Separate from `force` on purpose: `force` overwrites an output file, this
+   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
+   * other. See src/core/stego-guard.ts.
+   */
+  allowCoverReuse?: boolean | undefined;
 }
 
 export interface GallerySaveResult {

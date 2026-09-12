@@ -291,6 +291,7 @@ const OPTIONS = {
   'export-number': { type: 'string' },
   quiet: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
+  'allow-cover-reuse': { type: 'boolean' },
   json: { type: 'boolean' },
 } as const;
 
@@ -440,6 +441,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       keyLocation: values['key-location'] as string | undefined,
       fontPath: values.font as string | undefined,
       force,
+      allowCoverReuse: Boolean(values['allow-cover-reuse']),
       // The terminal is headless and bounded only by the machine's RAM, so it
       // asks for the full 1 GiB budget. The orchestration layer defaults to the
       // conservative 256 MiB figure for embedded callers, so this has to be said
@@ -543,6 +545,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       mode: gMode as 'plain' | 'nonpossession',
       threshold: gThreshold,
       force,
+      allowCoverReuse: Boolean(values['allow-cover-reuse']),
     });
     present.gallerySave(res);
     return 0;

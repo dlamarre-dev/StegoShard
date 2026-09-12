@@ -401,6 +401,9 @@
     "message": "不支援的封面圖像。請使用 baseline JPEG 或 PNG(不支援漸進式 JPEG 與 HEIC)。",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "這張照片已經以這個密碼使用過了。再次使用會同時削弱兩個藏匿處。請換一張照片或換一個密碼。"
+  },
   "destBinary": {
     "message": "檔案",
     "description": "Popup: binary (single file) destination."

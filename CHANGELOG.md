@@ -9,6 +9,40 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **A reused stego cover is now refused instead of silently leaking.** SPEC §5.3 always
+  said a cover's content carries at most one payload per password — but it said it as a
+  bold sentence with no MUST, in a section that uses MUST freely for everything else, so a
+  conforming implementation could not be said to violate it. It is a **MUST NOT** now, and
+  `src/core/stego-guard.ts` enforces it on every embedding path: CLI, extension, web app,
+  MCP server and library.
+
+  The leak it prevents is real and measured: the derivation has no nonce, so a second
+  payload into one cover under one password reuses both the whitening pad and the carrier
+  positions, and the two images differ at exactly the carriers where the payloads differ.
+  One payload bit flipped moves exactly one image bit, against 763 under a different
+  password (`src/core/stego.binding.test.ts`).
+
+  The guard keys on a tag derived from the **per-cover key**, not the fingerprint. That
+  distinction is the whole design: identical tag ⟺ identical pad and identical positions,
+  so the same cover under a different password — or under different Argon2 parameters — is
+  allowed, as it must be, since those derive independent keystreams. A byte-identical
+  re-embed is allowed too, because it provably moves nothing.
+
+  **It is in memory and realm-scoped, and that is deliberate rather than a shortcut.** A
+  durable registry of used covers would catch the same photo tomorrow, on another machine,
+  from a second pristine copy — and would be a file on disk proving stego covers exist,
+  which is exactly the artifact `--export-number` is refused for on every deniable path. So
+  this catches reuse within one run or one batch, which is the realistic footgun (a script
+  looping over a folder, an agent looping a save tool over one cover), and the constraint
+  otherwise remains the operator's to keep. `docs/CLAIMS.md` says so rather than implying
+  more.
+
+  Refused, not warned: the damage is the written artifact, so a warning you could only act
+  on by deleting a file is a refusal with extra steps. The override is
+  `--allow-cover-reuse`, never `--force` — `--force` overwrites an output file, and letting
+  a file convenience waive a cryptographic constraint would be a category error. The MCP
+  server never sets it, for the same reason it never sets `force`.
+
 - **The Argon2id cost is documented as a format constant, and guarded as one.**
   `DEFAULT_ARGON2` looks like a tuning knob, and on the §5.1 key block it is one — those
   parameters are stored. On the stego (§5.3), Gallery Mode (§9.1) and slot-KEK (§10.2)
