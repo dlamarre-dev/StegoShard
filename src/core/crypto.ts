@@ -643,7 +643,13 @@ export const KEY_FACTOR_LEN = 32;
 // on disk a magic would be a distinguisher; under stego the whole envelope is
 // whitened, so its structure never appears on the wire.)
 const KEY_FACTOR_MAGIC = Uint8Array.from([0x53, 0x53, 0x4b, 0x46]); // "SSKF"
-const KEY_FACTOR_BLOCK_VERSION = 1;
+/**
+ * Version byte inside the SSKF envelope (SPEC §10.3). Exported because it is an
+ * on-the-wire format constant that SPEC states in two places, and
+ * `scripts/check-spec.ts` compares those statements against this declaration.
+ * It was private only because it had had a single caller.
+ */
+export const KEY_FACTOR_BLOCK_VERSION = 1;
 /** Fixed length of the SSKF envelope: magic(4) + version(1) + factor(32) = 37. */
 export const KEY_FACTOR_BLOCK_LEN = KEY_FACTOR_MAGIC.length + 1 + KEY_FACTOR_LEN;
 

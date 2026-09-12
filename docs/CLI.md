@@ -314,12 +314,18 @@ Windows has no `sha256sum`. Compare the one line you care about:
 Select-String stegoshard-windows-x64.zip .\SHA256SUMS.txt
 ```
 
-**This check is weaker than it looks, and knowing why is the point.**
-`SHA256SUMS.txt` is served from the same release page as the archive and is not
-itself signed or attested. Anyone who could replace the archive could replace the
-list beside it. What it genuinely catches is a truncated or corrupted download, a
-stale mirror, and a CDN that touched one file and not the other. It is a transfer
-check, not a provenance check.
+**On its own this is still a transfer check, and knowing why is the point.**
+`SHA256SUMS.txt` is served from the same release page as the archive, so reading
+both and comparing them proves only that the two agree — which they would also do
+if someone replaced both. What it genuinely catches on its own is a truncated or
+corrupted download, a stale mirror, and a CDN that touched one file and not the
+other.
+
+What makes it worth more than that is check 2 below: the checksum file is itself
+attested, so you can establish it once and then use the cheap hash comparison for
+every archive without running `gh attestation verify` on each. Verify the list
+first, then trust it. Verified in the other order, it tells you nothing an
+attacker could not have arranged.
 
 **2. The archive came out of this repository's release workflow.** This is the one
 that is not circular, because the signature chains to a Sigstore transparency log
@@ -336,9 +342,20 @@ Substitute `stegoshard-macos-arm64.tar.gz` or `stegoshard-windows-x64.zip`; the 
 command works in PowerShell. Attesting the archive rather than the executable inside
 it is deliberate: the archive is what you downloaded, so it is what you can check
 without first unpacking something you have not yet verified. The SBOM
-(`stegoshard-npm.cdx.json`) is attested on the same terms. `SHA256SUMS.txt`,
-`LICENSE` and `THIRD_PARTY_NOTICES.txt` are **not** — which, for the checksum file
-itself, means it vouches for the archives and nothing vouches for it.
+(`stegoshard-npm.cdx.json`) and **`SHA256SUMS.txt`** are attested on the same
+terms, the latter so that the file establishing everyone else's integrity is not
+the only one on the page without any of its own. `LICENSE` and
+`THIRD_PARTY_NOTICES.txt` are not: they carry no integrity claim about anything,
+so attesting them would only blur what an attestation means.
+
+Verify the checksum file the same way, then check 1 becomes a real check rather
+than a self-referential one:
+
+```bash
+gh attestation verify SHA256SUMS.txt \
+  --repo dlamarre-dev/StegoShard \
+  --signer-workflow dlamarre-dev/StegoShard/.github/workflows/release-cli.yml
+```
 
 `--signer-workflow` is worth typing. Without it, `gh` accepts an attestation from
 _any_ workflow in the repository. For the offline web bundle the corresponding
