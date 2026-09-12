@@ -401,6 +401,9 @@
     "message": "対応していないカバー画像です。ベースライン JPEG または PNG を使用してください(プログレッシブ JPEG と HEIC は非対応)。",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "この写真はこのパスワードで既に使われています。再利用すると両方の隠し場所が弱くなります。別の写真か別のパスワードを選んでください。"
+  },
   "destBinary": {
     "message": "ファイル",
     "description": "Popup: binary (single file) destination."

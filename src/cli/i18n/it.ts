@@ -28,6 +28,13 @@ export const it: CliCatalog = {
   errCodecInvalid: '--codec «{value}» non valido',
   errExportNumberNotDeniable:
     '--export-number non si può usare con {flags}: un caveau negabile non deve portare nulla che lo colleghi a un altro export',
+  errCoverReused:
+    "Questa foto ha già portato un segreto con questa password in questa sessione. Riusarla indebolirebbe entrambi i nascondigli (SPEC §5.3). Scegli un'altra foto o un'altra password.",
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse non ha effetto su {command} (solo save inserisce in una copertura)',
+  hintAllowCoverReuse: 'Usa --allow-cover-reuse per forzare l’operazione se è voluta.',
+  helpAllowCoverReuse:
+    'Consenti a una foto di copertura di portare un secondo segreto con la stessa password (indebolisce entrambi; vedi docs/CLI.md)',
   errExportNumberInvalid:
     '--export-number deve essere un numero intero da 1 a 4294967295 (ricevuto «{value}»)',
   errExportNumberWrongCommand:

@@ -401,6 +401,9 @@
     "message": "Imagem de capa não suportada. Use um JPEG baseline ou um PNG (JPEG progressivo e HEIC não são suportados).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "Esta foto já foi usada com esta senha. Reutilizá-la enfraqueceria os dois esconderijos. Escolha outra foto ou outra senha."
+  },
   "destBinary": {
     "message": "Ficheiro",
     "description": "Popup: binary (single file) destination."

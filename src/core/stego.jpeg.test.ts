@@ -5,8 +5,17 @@
  * format all fail safely.
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resetStegoCoverGuard } from '@core';
 import jpeg from 'jpeg-js';
+
+// The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
+// without this one test's covers would refuse the next test's embeds. That is
+// pollution between independent scenarios rather than the behaviour under test:
+// each `it` here is its own session. A test that deliberately reuses a cover
+// says so with `allowCoverReuse`, which is the honest way to express it.
+beforeEach(resetStegoCoverGuard);
+
 import {
   type Argon2Params,
   StegoCapacityError,

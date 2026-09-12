@@ -81,3 +81,10 @@ export type { StegoKeyImage } from './node/image-io';
 /** Expand paths, folders, `.zip` and `.pdf` inputs into decodable payloads. */
 export { gatherInputs } from './node/inputs';
 export type { GatheredInputs } from './node/inputs';
+
+/**
+ * Options accepted by the stego embedding entry points. Currently just the
+ * per-call cover-reuse override; see src/core/stego-guard.ts for why it is a
+ * per-call option and not a global switch.
+ */
+export type { StegoEmbedOptions, CoverClaim } from '../core';

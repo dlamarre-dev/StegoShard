@@ -246,14 +246,36 @@ const RULES: Rule[] = [
   // see "Argon2 cost is a format constant" in docs/VERSIONING.md. A spec that
   // names the wrong numbers there sends an implementer to derive the wrong seed,
   // which surfaces as a wrong password and never as a version error.
+  // One rule per field. A single rule capturing all three would only ever have its
+  // first group compared -- the comparison below reads `m[1]` -- so memory and
+  // parallelism would sit in the table unchecked, which is how they were until a
+  // review noticed.
   {
-    id: 'kdf-constants-row',
+    id: 'kdf-constants-row-iterations',
     file: SPEC,
     scope: 'flat',
-    pattern: /\| KDF defaults\s*\| iterations (\d+), memory (\d+) MiB, parallelism (\d+)/g,
+    pattern: /\| KDF defaults\s*\| iterations (\d+),/g,
     count: 1,
     expected: DEFAULT_ARGON2.iterations,
     source: 'DEFAULT_ARGON2.iterations in src/core/crypto.ts',
+  },
+  {
+    id: 'kdf-constants-row-memory',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /\| KDF defaults\s*\| iterations \d+, memory (\d+) MiB/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.memoryKiB / 1024,
+    source: 'DEFAULT_ARGON2.memoryKiB / 1024 in src/core/crypto.ts',
+  },
+  {
+    id: 'kdf-constants-row-parallelism',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /\| KDF defaults\s*\| iterations \d+, memory \d+ MiB, parallelism (\d+)/g,
+    count: 1,
+    expected: DEFAULT_ARGON2.parallelism,
+    source: 'DEFAULT_ARGON2.parallelism in src/core/crypto.ts',
   },
   {
     id: 'kdf-5.1-iterations',

@@ -16,6 +16,7 @@ import {
   CredentialsNotIndependentError,
   GalleryRestoreError,
   MissingKeyError,
+  StegoCoverReuseError,
   WrongPasswordError,
 } from '../core';
 import { type ApiErrorCode, StegoShardApiError } from '../api/errors';
@@ -115,8 +116,29 @@ export function toCliFailure(err: unknown): CliFailure {
   if (err instanceof WrongPasswordError) return { message: t('errWrongPassword'), exitCode: 1 };
   if (err instanceof GalleryRestoreError) return { message: t('errNoGallery'), exitCode: 1 };
   if (err instanceof MissingKeyError) return { message: t('errNeedsKey'), exitCode: 1 };
+  // No flag hint here. `toCliFailure` also builds the MCP tool-error text
+  // (src/mcp/server.ts), and MCP deliberately exposes no such knob, so naming the
+  // flag would tell an agent to reach for something it does not have. The hint is
+  // appended by the two CLI exits instead -- `run()`'s catch under `--json`, and
+  // the bootstrap in main.ts for the human path -- via `coverReuseHint` below.
+  if (err instanceof StegoCoverReuseError) return { message: t('errCoverReused'), exitCode: 1 };
   if (err instanceof CredentialsNotIndependentError) {
     return { message: t('errDuressTooSimilar', { reason: err.reason }), exitCode: 1 };
   }
   return { message: err instanceof Error ? err.message : String(err), exitCode: 1 };
+}
+
+/**
+ * The `--allow-cover-reuse` hint, for the command line only.
+ *
+ * Kept out of `toCliFailure` deliberately: that classifier is shared with the MCP
+ * server, which exposes no such flag. A previous attempt put the hint in the
+ * catalog string (wrong: MCP saw it) and then inside the classifier (wrong for the
+ * same reason). It belongs where the flag exists -- which is BOTH CLI exits, not
+ * just the bootstrap: `run()` renders the `--json` envelope itself and returns, so
+ * a hint only in main.ts is absent from `--json`. `run.export-number.test.ts`
+ * pins that.
+ */
+export function coverReuseHint(err: unknown): string | undefined {
+  return err instanceof StegoCoverReuseError ? t('hintAllowCoverReuse') : undefined;
 }

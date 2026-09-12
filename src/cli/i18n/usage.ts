@@ -90,6 +90,7 @@ const SAVE_ROWS: Row[] = [
   ['--key-location <t>', 'helpKeyLocation'],
   ['--font <path>', 'helpFont'],
   ['--allow-weak-password', 'helpAllowWeakPassword'],
+  ['--allow-cover-reuse', 'helpAllowCoverReuse'],
   ['--export-number <n>', 'helpExportNumber'],
 ];
 
