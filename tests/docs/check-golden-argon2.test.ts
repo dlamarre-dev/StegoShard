@@ -13,21 +13,28 @@
  * content that is not a `key: value` pair, and a subset of the three fields.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { DEFAULT_ARGON2 } from '../../src/core/crypto';
 import { readArgon2 } from '../../scripts/check-golden';
 
-/** The literal as it actually appears in src/core/crypto.ts. */
-const REAL = `
-export const DEFAULT_ARGON2: Argon2Params = Object.freeze({
-  iterations: 4,
-  memoryKiB: 256 * 1024, // 256 MiB
-  parallelism: 1,
-});
-`;
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 describe('the shapes it must read', () => {
-  it('reads the real literal, evaluating the product', () => {
-    expect(readArgon2(REAL)).toEqual({ iterations: 4, memoryKiB: 262144, parallelism: 1 });
+  it('reads the constant as it is actually written today', () => {
+    // Reads src/core/crypto.ts from disk rather than a hand-copied string. A
+    // duplicate here would drift silently: reshape the real literal and this test
+    // stays green while `golden:check` breaks, which is the opposite of what a
+    // guard's test is for. Compared against the imported constant, so the expected
+    // values cannot drift either.
+    const source = readFileSync(join(ROOT, 'src/core/crypto.ts'), 'utf-8');
+    expect(readArgon2(source)).toEqual({
+      iterations: DEFAULT_ARGON2.iterations,
+      memoryKiB: DEFAULT_ARGON2.memoryKiB,
+      parallelism: DEFAULT_ARGON2.parallelism,
+    });
   });
 
   it('reads a plain integer as well as a product', () => {

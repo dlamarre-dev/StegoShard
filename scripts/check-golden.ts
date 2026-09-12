@@ -1,4 +1,25 @@
 /**
+ * Refuse a change to the golden corpus that does not come with a format version
+ * bump in the same change.
+ *
+ * The corpus in `tests/golden/` is only worth its bytes if regenerating it is
+ * hard to do by reflex. Without this check, a contributor whose change broke the
+ * format would see the golden tests fail, run `npm run golden`, watch them pass,
+ * and ship a silent format break. That is precisely the failure the corpus
+ * exists to prevent, so the corpus needs a guard of its own.
+ *
+ * The rule is a pairing, not a prohibition. A deliberate format change is
+ * expected to bump a constant, update SPEC.md, and regenerate. What is refused
+ * is regenerating *instead of* deciding.
+ *
+ * Run with: npm run golden:check   (CI passes --base=<ref>)
+ */
+
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+/**
  * Read `DEFAULT_ARGON2`'s three fields out of a source blob.
  *
  * Three outcomes, and conflating the last two is how a guard switches itself off:
@@ -13,13 +34,23 @@
  * the thing that silently rots.
  */
 export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
-  // Comments come off the WHOLE blob first, before the literal is located. Doing
-  // it after the capture was not enough: the capture stops at the first `}`, so a
-  // block comment containing a brace -- `/* like {this} */` -- truncated the body
-  // and failed the parse. Stripping first means the capture never sees one.
-  const clean = blob.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(clean);
-  if (!body) return 'absent';
+  // Absence is decided on the RAW blob, before any stripping. Comments are then
+  // removed only from the declaration onwards.
+  //
+  // Both halves of that matter. Stripping after the capture was not enough -- the
+  // capture stops at the first `}`, so `/* like {this} */` truncated the body --
+  // but stripping the whole file was worse: an unbalanced `/*` in a string or
+  // regex literal ANYWHERE earlier would swallow the declaration and report it as
+  // "not declared there at all", which is the benign outcome and would have turned
+  // a real cost change into a silent pass.
+  const at = blob.indexOf('DEFAULT_ARGON2');
+  if (at < 0) return 'absent';
+  const region = blob
+    .slice(at)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(region);
+  if (!body) return 'unparseable';
 
   // Every non-empty fragment must be a recognised `key: value`. The matchAll below
   // only *finds* pairs; on its own it silently ignores anything else in there -- a
@@ -45,26 +76,6 @@ export function readArgon2(blob: string): Record<string, number> | 'absent' | 'u
   // And it must have produced the whole triple, not a subset.
   return fragments.length === Object.keys(out).length ? out : 'unparseable';
 }
-
-/**
- * Refuse a change to the golden corpus that does not come with a format version
- * bump in the same change.
- *
- * The corpus in `tests/golden/` is only worth its bytes if regenerating it is
- * hard to do by reflex. Without this check, a contributor whose change broke the
- * format would see the golden tests fail, run `npm run golden`, watch them pass,
- * and ship a silent format break. That is precisely the failure the corpus
- * exists to prevent, so the corpus needs a guard of its own.
- *
- * The rule is a pairing, not a prohibition. A deliberate format change is
- * expected to bump a constant, update SPEC.md, and regenerate. What is refused
- * is regenerating *instead of* deciding.
- *
- * Run with: npm run golden:check   (CI passes --base=<ref>)
- */
-
-import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
 
 const CONSTANTS = [
   ['src/core/header.ts', 'FORMAT_VERSION'],
@@ -141,12 +152,6 @@ function main(): void {
   // decided?"; a cost change that did *not* regenerate the corpus would take the
   // `touched.length === 0` exit and never be looked at, which is precisely the
   // change most worth catching.
-  // Three outcomes, and conflating the last two is how a guard switches itself
-  // off: 'absent' means the constant is not in this blob at all (a rename, or a
-  // file that did not declare it yet), 'unparseable' means it is there in a shape
-  // this parser does not recognise. Only the second is a reason to refuse to
-  // guess, and the message has to say which one happened.
-
   const COST_FILE = 'src/core/crypto.ts';
   const VERSION_FILE = 'src/core/header.ts';
   if (changed.includes(COST_FILE)) {
@@ -299,9 +304,23 @@ function main(): void {
 }
 
 // Only when run as a script. `readArgon2` is imported by
-// tests/docs/check-golden-argon2.test.ts, and without this guard that import
-// would execute the whole check -- git subprocesses, and a `process.exit(1)` that
-// would take the test run down with it.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// tests/docs/check-golden-argon2.test.ts, and without this guard that import would
+// execute the whole check -- git subprocesses, and a `process.exit(1)` that would
+// take the test run down with it.
+//
+// Compared through realpath on BOTH sides, which is the whole fix. The first
+// version compared `import.meta.url` against `pathToFileURL(process.argv[1])`, and
+// ESM resolves symlinks while argv does not -- so running the script through a
+// symlinked checkout matched nothing, skipped main(), and exited 0 having printed
+// and checked nothing at all. A guard that silently becomes a no-op is worse than
+// no guard.
+//
+// With realpath on both sides that case now matches and runs, so the non-matching
+// branch is only ever "something imported this module" -- a test, or a future
+// caller of `readArgon2`. Staying quiet there is correct; an earlier attempt made
+// it exit(1), which killed the test run on import, reintroducing the same class of
+// problem from the other direction.
+const invokedAs = process.argv[1];
+if (invokedAs && realpathSync(invokedAs) === realpathSync(fileURLToPath(import.meta.url))) {
   main();
 }
