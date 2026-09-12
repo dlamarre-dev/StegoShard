@@ -67,20 +67,34 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   covered by nothing. It is now inside the AAD, and a blob can be identified outside
   whatever image held it.
 
-- **`--track <label>`: opt-in rollback detection.** Nothing inside a vault can say it is
-  the _current_ vault, because an AEAD tag authenticates a message and never the absence
-  of a newer one. A tracked save numbers each export (a vault id and counter inside the
-  encrypted envelope, SPEC §4.1) and a restore warns when the copy in front of you is
-  older than the newest one this machine recorded. The restore still succeeds: the old
-  copy may be the only one that survived.
+- **`--export-number <n>`: number your own exports.** Nothing inside a vault can say it
+  is the _current_ vault, because an AEAD tag authenticates a message and never the
+  absence of a newer one. You give a save a number; it goes into the encrypted envelope
+  (SPEC §4.1) and both save and restore print `tag 3f8a1c02 · export #4`. If you know you
+  last wrote #5, a restore that says #4 has told you it is an older copy.
 
   It is off by default and **refused outright** on `gallery-save`, `--binary
---disguise`, `--mode duress` and `--mode nonpossession`, because the registry it keeps
-  is a durable record that vaults exist and when they were opened — the most damaging
-  artifact this tool can produce against a coercive adversary, and the first persistent
-  state the command line has ever kept. A silent no-op there would have been worse than
-  an error. The half worth relying on needs no file at all: `vault … · export #N` is
-  printed on every save and restore that carries an identity.
+--disguise`, `--mode duress` and `--mode nonpossession`, because a number is itself a
+  link between artifacts: `#7` asserts that six others exist, to anyone who unlocks the
+  vault. A silent no-op there would be worse than an error.
+
+  **This shipped in a different shape than it was first built, and the reason is worth
+  recording.** The first version kept a local registry of vault identifiers and access
+  times so the tool could do the comparing, and warn on a rollback by itself. A security
+  review pointed out that the registry is a durable cleartext record of how many vaults
+  exist and when they were touched — the claim deniability rests on denying, and by the
+  feature's own documentation the most damaging artifact the tool can produce against a
+  coercive adversary. It was removed before it ever shipped, and with it the ability to
+  catch a rollback the user had _forgotten_ about, which nothing stateless replaces. The
+  tool now compares nothing; the person who chose the number is the memory. Because none
+  of this had been released, the flag, both error codes and four warning codes were
+  renamed or deleted outright with no deprecation path — which is not a precedent for
+  renaming released codes.
+
+  The tag printed beside the number is fresh on **every** export and is deliberately not
+  called a vault id: a tag that persisted across exports would be a handle proving two
+  artifacts are versions of one thing, readable by anyone who unlocks either. With
+  `--json`, a numbered restore now carries `export` and `tag` as fields.
 
 ### Changed
 

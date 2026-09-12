@@ -40,19 +40,20 @@ export type CliErrorCode =
   /** `stegoshard ui` has no web bundle to serve. */
   | 'UI_UNAVAILABLE'
   /**
-   * `--track` was combined with a deniable destination. Refused loudly rather
-   * than ignored: silently doing nothing would leave the user believing they had
-   * rollback protection on the one path where believing anything extra is the
-   * mistake.
+   * `--export-number` was combined with a deniable destination. Refused loudly
+   * rather than ignored, because a number is itself a link between artifacts:
+   * `#7` asserts six others exist, to anyone who unlocks the vault. Doing nothing
+   * quietly would leave the user believing they had numbering on the one path
+   * where believing anything extra is the mistake.
    */
-  | 'TRACKING_NOT_DENIABLE'
+  | 'EXPORT_NUMBER_NOT_DENIABLE'
   /**
-   * `--track` was asked for but cannot be honoured: an empty label, a command
-   * that does not record anything, or a known-vaults file that could not be
-   * read. Same reasoning as above — the one thing not to do is proceed quietly
-   * and let the user believe the numbering happened.
+   * `--export-number` was asked for but cannot be honoured: a value that is not a
+   * whole number in 1..2³²−1, or a command that writes no envelope. Same
+   * reasoning as above — the one thing not to do is proceed quietly and let the
+   * user believe the numbering happened.
    */
-  | 'TRACKING_UNAVAILABLE'
+  | 'EXPORT_NUMBER_INVALID'
   /** Anything not classified above. */
   | 'INTERNAL';
 

@@ -26,7 +26,7 @@
  */
 
 import { resolve } from 'node:path';
-import { stegoErrorCode, stegoErrorDetails, type OnProgress } from '@core';
+import { stegoErrorCode, stegoErrorDetails, toHex, type OnProgress } from '@core';
 import { CliError, type CliFailure } from './errors';
 import { StegoShardApiError } from '../api/errors';
 import type { CliIo } from './io';
@@ -141,6 +141,16 @@ export function restoreResultJson(res: RestoreResult): Record<string, unknown> {
     filename: res.filename,
     seen: res.seen,
     decoded: res.decoded,
+    // Present only when the vault was saved with `--export-number`. The human
+    // surface prints this as `tag 3f8a1c02 · export #4`, and a scripted caller
+    // had to scrape that line out of `notes[]` to get at it. Since nothing
+    // compares the number for you, a caller that wants to act on it needs it as
+    // a value. Additive, so the `stegoshard.cli/1` schema does not move.
+    //
+    // `tag` rather than `vaultId`: it is fresh per export and identifies this
+    // artifact, not the vault. A consumer that correlates on it is reading it
+    // wrong, and the field name is the cheapest place to say so.
+    ...(res.identity ? { export: res.identity.sequence, tag: toHex(res.identity.vaultId) } : {}),
   };
 }
 

@@ -68,33 +68,35 @@ export function entropyArgError(src: EntropySources): string | null {
 }
 
 /**
- * Reject a `--track` that cannot be honoured, and say which way it fails.
+ * Reject an `--export-number` that cannot be honoured, and say which way it fails.
  *
  * Three ways, all reported rather than absorbed:
  *
- *   - A DENIABLE DESTINATION. The registry is a durable list of vault
- *     identifiers and access times in the user's home directory. On the deniable
- *     paths that is the most damaging thing the tool could write: it does not say
- *     where a vault is or what is in it, but it proves how many exist and when
- *     they were touched. Tracking is also structurally impossible there — the
- *     gallery and multi-region builders accept no identity parameter — so this
- *     check exists to say why, not to enforce it.
+ *   - A DENIABLE DESTINATION. A number is itself a link between artifacts: `#7`
+ *     asserts that six other exports exist, readable by anyone who unlocks the
+ *     vault. On the deniable paths that is the one thing an artifact must not
+ *     carry, since those paths exist for the case where someone has the file and
+ *     is asking what else there is. Tracking is also structurally impossible
+ *     there -- the gallery and multi-region builders accept no identity parameter
+ *     -- so this check exists to say why, not to enforce it.
  *   - A COMMAND THAT NUMBERS NOTHING. Only `save` writes an identity into an
- *     envelope. `restore --track notes` used to be accepted and do nothing.
- *   - AN EMPTY LABEL. `--track ""` is not "no label"; it is a label the registry
- *     cannot match, so the export would be numbered #1 forever.
+ *     envelope. `restore --export-number 4` used to be accepted and do nothing.
+ *   - A VALUE THAT IS NOT AN EXPORT NUMBER. Empty, zero, negative, fractional, or
+ *     past the u32 the envelope field holds.
  *
  * In every case doing nothing quietly would be worse than refusing, because the
- * user would carry on believing the protection was there.
+ * user would carry on believing the numbering had happened.
  */
-export function trackingArgError(opts: {
-  track: boolean;
-  label?: string | undefined;
+export function exportNumberArgError(opts: {
+  value?: string | undefined;
   command?: string | undefined;
   binary?: string | undefined;
   mode?: string | undefined;
-}): { message: string; code: 'TRACKING_NOT_DENIABLE' | 'TRACKING_UNAVAILABLE' } | null {
-  if (!opts.track) return null;
+}): { message: string; code: 'EXPORT_NUMBER_NOT_DENIABLE' | 'EXPORT_NUMBER_INVALID' } | null {
+  // `!== undefined`, never truthiness: `--export-number ""` and `--export-number 0`
+  // must both be refused rather than silently meaning "no number". The truthiness
+  // version of this guard is what let `--track ""` disable tracking in silence.
+  if (opts.value === undefined) return null;
   const deniable = [
     opts.command === 'gallery-save' && 'gallery-save',
     opts.binary === 'disguised' && '--binary --disguise',
@@ -105,18 +107,25 @@ export function trackingArgError(opts: {
   // the tool is for, and the narrower complaints would answer the wrong question.
   if (deniable.length > 0) {
     return {
-      message: t('errTrackNotDeniable', { flags: deniable.join(', ') }),
-      code: 'TRACKING_NOT_DENIABLE',
+      message: t('errExportNumberNotDeniable', { flags: deniable.join(', ') }),
+      code: 'EXPORT_NUMBER_NOT_DENIABLE',
     };
   }
   if (opts.command !== undefined && opts.command !== 'save') {
     return {
-      message: t('errTrackWrongCommand', { command: opts.command }),
-      code: 'TRACKING_UNAVAILABLE',
+      message: t('errExportNumberWrongCommand', { command: opts.command }),
+      code: 'EXPORT_NUMBER_INVALID',
     };
   }
-  if (opts.label === '') {
-    return { message: t('errTrackEmpty'), code: 'TRACKING_UNAVAILABLE' };
+  // One message for every malformed shape. `/^\d+$/` first, because `Number()`
+  // alone accepts "1e3", "0x10", " 1" and "" -- the last as 0, which would sail
+  // past a range check and land as a falsy sequence. Leading zeros are allowed
+  // (`007` is 7): harmless, and refusing them would need a message about notation.
+  if (!/^\d+$/.test(opts.value) || Number(opts.value) < 1 || Number(opts.value) > 0xffffffff) {
+    return {
+      message: t('errExportNumberInvalid', { value: opts.value }),
+      code: 'EXPORT_NUMBER_INVALID',
+    };
   }
   return null;
 }
