@@ -500,7 +500,6 @@ async function embedFixedStegoJpeg(
     // there is no single earlier point that could hold the check for both.
     const claim = await reserveCoverUse(tag, payload, opts);
     opts?.onClaim?.(claim);
-    opts?.onClaim?.(claim);
     // The whole remainder, not just the encode: `pickPositions` and the carrier
     // walk can both throw, and they used to sit outside this.
     try {

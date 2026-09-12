@@ -167,7 +167,16 @@ export interface StegoEmbedOptions {
    */
   allowCoverReuse?: boolean | undefined;
   /**
-   * Receives the claim this embed made, once it has succeeded.
+   * Receives the claim this embed made, **as soon as it is made** -- before the
+   * carrier selection, the write and the encode, and therefore also on an embed
+   * that then throws.
+   *
+   * That timing is the point, and getting it wrong is what burns a cover: if the
+   * claim only arrived on success, a throw in between would leave it held by
+   * nobody and the cover refused for an artifact that never existed. A consumer
+   * must therefore treat the handle as "a claim now exists", not as "the embed
+   * worked", and release it if its own work fails. Releasing is idempotent and the
+   * embed also releases on its own failure, so the two cannot conflict.
    *
    * An out-parameter rather than a return value, because the four public embed
    * functions return `void` or the new bytes and changing that would be a breaking
@@ -258,9 +267,7 @@ export async function reserveCoverUse(
       // mechanism meant to prevent a false refusal. `stego-guard.test.ts` pins it.
       //
       // So release RESTORES what this call displaced -- but only while this call
-      // is still the owner. `spent` is set inside that check, not before it: a
-      // release that finds someone else owning the cover has done nothing, and
-      // must not count as this handle's one use.
+      // is still the owner.
       // The token also makes this idempotent, with no separate "already released"
       // flag: after a successful release the entry holds `prior`'s token or is
       // gone, so a second call finds no match and does nothing. An earlier version
