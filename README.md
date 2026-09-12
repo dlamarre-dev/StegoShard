@@ -213,8 +213,9 @@ Writing the limits down is a habit here rather than fine print. The full registe
   verify, and what it is worth](docs/CLI.md#verify-your-download).
 - **Nothing detects a rollback on its own.** Every part of a vault is now bound to its
   container, but an older, entirely valid export put back in place of a newer one still
-  decrypts correctly. `--track` catches the silent case using a local record, and that
-  record is itself a trace — off by default, and refused on deniable output.
+  decrypts correctly. `--export-number` lets you number an export so a restore can show
+  you it is an older copy. The tool keeps no record of its own — you are the one who
+  remembers the number. Off by default, refused on deniable output.
 - **Not for big files.** Images carry up to 1 MiB with about 4× overhead; the binary path
   reaches 1 GiB in the CLI and 256 MiB in the browser. Multi-gigabyte files are out of
   scope.

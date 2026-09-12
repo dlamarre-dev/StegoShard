@@ -241,43 +241,41 @@ deno run --allow-read=/path/to/vault --allow-write=/path/to/vault --allow-env \
 
 See [API.md](API.md) for the tool schemas and the error codes.
 
-## Rollback tracking (`--track`)
+## Numbering exports (`--export-number`)
 
-Off by default, and the only feature here that writes a durable file of its own.
+Off by default, and it writes no file of its own — which is the whole of what
+changed about it.
 
-**What it does.** A tracked save numbers each export of a vault you name, and a
-restore warns when the copy in front of you is older than the newest one this
-machine recorded. It catches a _silent_ replacement: a botched sync, a stale USB
-stick, an adversary with write access to the vault but not to your home
-directory. The restore still succeeds — the old copy may be the only one that
+**What it does.** You give a save a number; it goes into the encrypted envelope,
+and both save and restore print `tag 3f8a1c02 · export #4`. If you know you last
+wrote #5, a restore that says #4 has told you it is an older copy. That catches a
+_silent_ replacement: a botched sync, a stale USB stick, a restore from the wrong
+folder. The restore still succeeds — the old copy may be the only one that
 survived, and refusing it would turn a detection into a denial of service.
 
-**What it does not do.** It stops nothing. And it stops nothing at all against an
-adversary who can also write to the registry: they lower the number, or delete the
-file, and the check reports an unknown vault or says nothing. It does not create
-trust; it moves it from the vault file to a local JSON file.
+**What it does not do.** It stops nothing, and it compares nothing: **you** are the
+memory this needs, because an AEAD tag authenticates a message and never the
+absence of a newer one. An adversary who can rewrite the vault rewrites the number
+with it, so this is a legibility aid for the honest-but-stale case, not an
+anti-tamper control. Nothing prevents you reusing a number either.
 
-**What it costs you, which is the part to read twice.** The registry is a durable,
-cleartext list of vault identifiers and access timestamps in your home directory,
-and it is the **first persistent state the command line has ever kept** — a real
-exception to "the command line leaves nothing behind but the files you asked for".
-Against the coercive adversary it is the most damaging artifact this tool can
-produce. It does not say where a vault is or what is in it. It proves **how many
-exist and when they were touched**, which is precisely the claim deniability rests
-on denying. That is the same category as an instruction sheet or a recovery
-label, one step worse.
+**A design that was tried and removed, because losing it silently would be worse
+than saying so.** An earlier version kept a local registry of vault identifiers and
+access times, so the machine could do the comparing. It could catch a rollback you
+had _forgotten about_ — restore an old copy months later and the machine remembers
+when the person does not — and **no stateless design replaces that**. It was
+removed anyway: against the coercive adversary that file was the most damaging
+artifact the tool could produce, proving how many vaults exist and when they were
+touched, which is precisely the claim deniability rests on denying. The trade was
+deliberate, and the capability lost is real.
 
-So it is opt-in, off by default, and **refused outright** on every deniable
-destination: `--track` with `gallery-save`, `--binary --disguise`, `--mode
-duress` or `--mode nonpossession` is an error, not a silent no-op. A no-op would
-be worse, because you would carry on believing the protection was there on the one
-path where believing anything extra is the mistake.
-
-**The version worth using needs no file.** Whenever an export carries an identity,
-both save and restore print `vault 3f8a1c02 · export #4`. If you know you last
-wrote #5, a restore that says #4 has told you everything the registry would have,
-and left nothing on disk. That is the same role a recovery sheet plays for
-resilient storage: the person is the trusted external state.
+**What it costs now.** Before unlock, nothing: the block is ciphertext inside the
+envelope, covered by GCM. After unlock, `#7` asserts that six other exports exist
+to whoever just opened it. That is why it is **refused outright** on every deniable
+destination — `gallery-save`, `--binary --disguise`, `--mode duress`, `--mode
+nonpossession` — rather than quietly ignored. A no-op would be worse: you would
+carry on believing the numbering had happened on the one path where believing
+anything extra is the mistake.
 
 ## Deliberate non-goals
 
@@ -299,7 +297,8 @@ StegoShard does **not** claim, and you should not rely on:
   reach is replacement of a vault by an older, entirely legitimate export of
   itself: a tag authenticates a message, never the absence of a newer one. An
   attacker with write access can still destroy or replace a vault wholesale.
-  `--track` detects the silent case and is honest about the rest, below.
+  `--export-number` makes the silent case legible and is honest about the rest,
+  below.
 - **Protection against a compromised build of StegoShard itself.** Releases are
   attested and checksummed, which binds an artifact to a workflow and a commit;
   that is an integrity property of the _distribution_, not a statement about the
@@ -308,8 +307,10 @@ StegoShard does **not** claim, and you should not rely on:
   and the download_ above.
 - **Hiding metadata you supply.** Human-readable labels, PDF titles, and instruction
   sheets are conveniences for Resilient Storage; they are the opposite of deniable. Do not
-  use them in Deniable mode. **`--track` belongs in this category**, and is the
-  strongest example of it: see _Rollback tracking_ below.
+  use them in Deniable mode. An instruction sheet or a printed label is the strongest
+  example, because it is readable without any password at all. `--export-number` belongs
+  in this category too but sits below them: it leaks only after unlock, and it is refused
+  on every deniable path — see _Numbering exports_ above.
 - **Availability on memory-constrained devices.** Every unlock runs Argon2id at 256 MiB.
   That figure is a deliberate defence against offline guessing, and it has **no
   fallback**: there is no low-memory profile, no device detection, and no degraded mode,

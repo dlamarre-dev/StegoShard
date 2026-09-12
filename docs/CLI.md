@@ -218,73 +218,67 @@ Two ways to install, depending on whether you already have Node:
   [threat model](THREAT-MODEL.md#driving-stegoshard-from-an-agent-mcp), which is
   worth reading first: a restore writes plaintext the agent can then read.
 
-## Numbering exports, to catch a rollback (`--track`)
+## Numbering exports, to catch a rollback (`--export-number`)
 
 Off by default. It exists because nothing inside a vault can tell you it is the
 _current_ vault: an AEAD tag authenticates a message, never the absence of a newer
 one, so an older but perfectly valid export put back in place of a newer one
 decrypts exactly as it should.
 
+You supply the number. The tool writes it into the encrypted envelope and prints it
+on the way in and on the way out.
+
 ```bash
-stegoshard save notes.txt --out ./vault --binary --track notes
-# → vault 3f8a1c02 · export #1
+stegoshard save notes.txt --out ./v1 --binary --export-number 1
+# → tag 3f8a1c02 · export #1
 
-stegoshard save notes.txt --out ./vault2 --binary --track notes --force
-# → vault 3f8a1c02 · export #2
+stegoshard save notes.txt --out ./v2 --binary --export-number 2
+# → tag 9d41b7e5 · export #2      the tag differs: see below
 
-stegoshard restore ./vault/stegoshard-vault.ssbn --out ./restored
-# → vault 3f8a1c02 · export #1
-#   this vault is export #1, but #2 was recorded on this machine:
-#   you may be restoring an older copy
+stegoshard restore ./v1/stegoshard-vault.ssbn --out ./restored
+# → tag 3f8a1c02 · export #1      you last wrote #2
 ```
 
-The label (`notes`) is what ties successive saves to one logical vault; without it
-the tool has no way to know that two exports of the same file are related, and
-every export would be numbered 1 forever. `--track-file <path>` chooses where the
-record lives (default: your platform's state directory — never `~/.stegoshard`,
-which is a dotfile in the most-inspected directory on the machine).
+**The eight hex characters change on every export, by design.** They are a _tag_ for
+one artifact, not an identifier for the vault, which is why the line does not say
+"vault". Two exports of the same file carry unrelated tags; only the **number** is
+comparable between them. A tag that persisted across exports would be a handle
+proving two artifacts are versions of one thing, readable by anyone who unlocks
+either — the leak this format specifically avoids (SPEC §4.1).
 
-A rollback is a **warning, never a failure**, and the restore still writes the file:
-the older copy may be the only one that survived, and refusing it would turn a
-detection into a denial of service.
+**Nothing compares the number for you, and that is the design rather than a gap.**
+You are the memory: if you know you last wrote #5, a restore that says #4 has told
+you everything. An earlier version of this feature kept a local registry of vault
+identifiers and access times so the machine could compare — and that file proved how
+many vaults you had and when you touched them, which is exactly the claim
+deniability rests on denying. It was built, reviewed and removed before it shipped.
 
-**`--track` is refused on every deniable destination** — `gallery-save`,
+Two things follow from there being no record, and both are yours to keep:
+
+- **Nothing stops you reusing a number.** `--export-number 4` twice produces two
+  artifacts that both say `#4`. Keeping count is the part you own.
+- **An adversary who can rewrite the vault rewrites the number with it.** This makes
+  an honest mistake legible — a stale sync, an old USB stick, a restore from the
+  wrong folder. It is not an anti-tamper control.
+
+**`--export-number` is refused on every deniable destination** — `gallery-save`,
 `--binary --disguise`, `--mode duress`, `--mode nonpossession`. That is an error,
-not a silent no-op, because the registry is a durable record that a vault exists,
-which is the one thing those paths are for not having. Read
-[the threat model](THREAT-MODEL.md#rollback-tracking---track) before turning it on:
-the file proves how many vaults you have and when you touched them.
+not a silent no-op, because a number is itself a link between artifacts: `#7`
+asserts that six others exist, to anyone who unlocks the vault. Those paths exist
+for the case where someone has the file and is asking what else there is. Read
+[the threat model](THREAT-MODEL.md#numbering-exports---export-number) before using
+it anywhere.
 
-It is refused the same way in three other cases, all for the same reason — a
-`--track` that quietly did nothing would leave you believing the numbering had
-happened:
+It is refused the same way in two other cases, for the same reason — a flag that
+quietly did nothing would leave you believing the numbering had happened:
 
-- **on any command but `save`**, which is the only one that writes an identity into
-  an envelope (`--track-file` remains valid everywhere, since it only says where
-  the record a restore _reads_ lives);
-- **with an empty label** (`--track ""`), which is not "no label" but a label the
-  registry can never match, so every export would be #1 forever;
-- **when the record exists but cannot be parsed.** The empty registry a failed read
-  produces is not evidence that you have never tracked anything, so building on it
-  would mint a new vault id at #1 and write a one-entry file over your real records.
-  Move the file aside, or point `--track-file` elsewhere. (On a _restore_ an
-  unreadable record is only a warning: losing the check is bad, losing the secret is
-  worse.)
+- **on any command but `save`**, the only one that writes an identity into an
+  envelope;
+- **on a value that is not an export number**: empty, zero, negative, fractional,
+  or past 4294967295, which is the largest the envelope field holds.
 
-If a save succeeds but the record cannot be _written_, that is a warning and the
-exit code stays 0 — the vault is already on disk, and reporting the save as failed
-would invite a caller to retry or clean up a real file. The cost is that the next
-export of that label reuses the number.
-
-**A restore never creates the record.** The rollback check runs on every restore of
-a vault that carries an identity, but it only _writes_ to a record you already have;
-a restore on a machine that has never tracked anything leaves nothing behind, the
-same as every other command.
-
-**The half worth relying on needs no file.** The `vault … · export #N` line prints
-whenever an export carries an identity, tracked or not. If you know you last wrote
-#5, a restore that says #4 has told you everything the registry would have and left
-nothing on disk.
+With `--json`, a numbered restore carries `export` and `tag` alongside the usual
+fields, so a script can read the number without scraping it out of the notes.
 
 ## Verify your download
 
