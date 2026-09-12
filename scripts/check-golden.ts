@@ -23,10 +23,11 @@ import { fileURLToPath } from 'node:url';
  * Read `DEFAULT_ARGON2`'s three fields out of a source blob.
  *
  * Three outcomes, and conflating the last two is how a guard switches itself off:
- * 'absent' means the constant is not in this blob at all (a rename, or a file that
- * did not declare it yet), 'unparseable' means it is there in a shape this parser
- * does not recognise. Only the second is a reason to refuse to guess, and the
- * caller's message has to say which one happened.
+ * 'absent' means this blob DECLARES no such constant (a rename, a move, or a file
+ * that merely mentions or re-exports the name), 'unparseable' means a declaration
+ * is there in a shape this parser does not recognise. Only the second is a reason
+ * to refuse to guess, and the caller's message has to say which one happened --
+ * they send a contributor to different places, `COST_FILE` versus this parser.
  *
  * Exported, and at module scope, so it can be tested. It used to be a closure
  * inside `main()` behind a "did crypto.ts change" branch, which meant a green
@@ -34,19 +35,29 @@ import { fileURLToPath } from 'node:url';
  * the thing that silently rots.
  */
 export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
-  // Absence is decided on the RAW blob, before any stripping. Comments are then
-  // removed only from the declaration onwards.
+  // Anchored on the DECLARATION, not on a mention of the name.
   //
-  // Both halves of that matter. Stripping after the capture was not enough -- the
-  // capture stops at the first `}`, so `/* like {this} */` truncated the body --
-  // but stripping the whole file was worse: an unbalanced `/*` in a string or
-  // regex literal ANYWHERE earlier would swallow the declaration and report it as
-  // "not declared there at all", which is the benign outcome and would have turned
-  // a real cost change into a silent pass.
-  const at = blob.indexOf('DEFAULT_ARGON2');
-  if (at < 0) return 'absent';
+  // Two earlier versions of this got it wrong in opposite directions, and the
+  // second was the dangerous one:
+  //
+  //   - stripping comments only from the captured body was not enough, because the
+  //     capture stops at the first `}` and `/* like {this} */` truncated it;
+  //   - anchoring the region on `indexOf('DEFAULT_ARGON2')` then started it at the
+  //     first *mention*, which can be inside a comment. The region began after that
+  //     comment's opener, so the strip below never removed it, and a doc block
+  //     illustrating the literal was parsed INSTEAD of the constant. That is
+  //     fail-open: a later cost change parses identically on both sides and ships
+  //     with no version bump.
+  //
+  // The justification given for that change was also wrong, and worth correcting
+  // here so it is not repeated: it claimed whole-blob stripping could turn a real
+  // cost change into a silent pass by reporting 'absent'. It could not -- 'absent'
+  // reaches `unreadable()` and exits 1, which is loud. The trade made was a loud
+  // false failure for a silent wrong parse, which is strictly worse.
+  const decl = /\b(?:export\s+)?const\s+DEFAULT_ARGON2\b/.exec(blob);
+  if (!decl) return 'absent';
   const region = blob
-    .slice(at)
+    .slice(decl.index)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/[^\n]*/g, '');
   const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(region);
@@ -320,7 +331,22 @@ function main(): void {
 // caller of `readArgon2`. Staying quiet there is correct; an earlier attempt made
 // it exit(1), which killed the test run on import, reintroducing the same class of
 // problem from the other direction.
-const invokedAs = process.argv[1];
-if (invokedAs && realpathSync(invokedAs) === realpathSync(fileURLToPath(import.meta.url))) {
+function isEntryModule(): boolean {
+  const invokedAs = process.argv[1];
+  if (!invokedAs) return false;
+  try {
+    return realpathSync(invokedAs) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    // `realpathSync` throws (ENOENT, ELOOP, EACCES) rather than returning, and
+    // this runs at module top level on a value from outside -- a bundled runner or
+    // a loader that rewrites the entry path can hand over something that does not
+    // exist on disk. Throwing here would take down every importer, which is the
+    // class of failure this guard exists to avoid, so an unresolvable entry simply
+    // means "not invoked as this script".
+    return false;
+  }
+}
+
+if (isEntryModule()) {
   main();
 }
