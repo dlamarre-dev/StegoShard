@@ -105,7 +105,22 @@ const MAX_TRACKED = 4096;
  * digest first and then reads and writes this map with no `await` in between, so
  * two overlapping embeds into one cover cannot both pass the check.
  */
-const used = new Map<string, string>();
+interface Entry {
+  /** SHA-256 of the payload embedded under this cover key. */
+  digest: string;
+  /**
+   * Identifies the call that wrote this entry.
+   *
+   * Ownership cannot be inferred from the digest: a byte-identical re-embed is
+   * permitted, so two different calls can write the same digest, and either one's
+   * release would then look like the owner's. The token makes "did I write what
+   * is here now" answerable without ambiguity.
+   */
+  token: number;
+}
+
+const used = new Map<string, Entry>();
+let nextToken = 1;
 
 /**
  * A single cover claim, owned by the call that made it.
@@ -118,10 +133,20 @@ const used = new Map<string, string>();
  * forbids -- and two concurrent saves in one realm would release and confirm each
  * other's claims.
  *
- * A claim stands from the moment it is made. `release` is the only undo, it is
- * idempotent, and it removes the entry ONLY if the map still holds exactly what
- * this call put there: if anything else has since claimed that cover, this call no
- * longer owns it and must not touch it.
+ * A claim stands from the moment it is made. `release` is the only undo and it is
+ * idempotent. It does not simply remove the entry: because a call can legitimately
+ * overwrite an earlier claim (with `allowCoverReuse`, or with a byte-identical
+ * payload), removing would drop whatever it displaced and re-open the leak. It
+ * RESTORES what this call displaced, and only while this call still owns the
+ * entry -- ownership being the token it wrote, not the digest, since two calls can
+ * write the same digest.
+ *
+ * Out-of-order releases between overlapping saves on one cover are resolved
+ * conservatively rather than perfectly: releasing an older claim after a newer one
+ * has already been released can leave the older entry standing with no artifact
+ * behind it, which refuses a future save that would have been allowed. That
+ * direction is a false refusal, never a leak, and concurrent saves into one cover
+ * in one realm are not a workflow this is built for.
  */
 export interface CoverClaim {
   /** Undo this claim, because the artifact it covers never reached storage. */
@@ -211,20 +236,18 @@ export async function reserveCoverUse(
   const digest = await digestOf(payload);
 
   const prior = used.get(key);
-  if (prior !== undefined && prior !== digest && !opts?.allowCoverReuse) {
+  if (prior !== undefined && prior.digest !== digest && !opts?.allowCoverReuse) {
     throw new StegoCoverReuseError();
   }
   if (used.size >= MAX_TRACKED && !used.has(key)) {
     const oldest = used.keys().next();
     if (!oldest.done) used.delete(oldest.value);
   }
-  used.set(key, digest);
+  const token = nextToken++;
+  used.set(key, { digest, token });
 
-  let spent = false;
   return {
     release: () => {
-      if (spent) return;
-      spent = true;
       // Not `delete`. `used` holds ONE entry per cover, so deleting would drop
       // whatever claim this call overwrote -- and a call CAN overwrite one, either
       // with `allowCoverReuse` or with a byte-identical payload, which is
@@ -232,12 +255,20 @@ export async function reserveCoverUse(
       // reachable: save 1 lands; save 2 overrides, fails before writing, and
       // releases; save 3 is then accepted, producing a second artifact from one
       // cover under one password. That is the §5.3 leak, restored by the very
-      // mechanism meant to prevent a false refusal.
+      // mechanism meant to prevent a false refusal. `stego-guard.test.ts` pins it.
       //
-      // So release RESTORES what was there before this call, and only if the entry
-      // is still exactly what this call wrote -- otherwise something else has since
-      // claimed the cover and this handle no longer owns it.
-      if (used.get(key) !== digest) return;
+      // So release RESTORES what this call displaced -- but only while this call
+      // is still the owner. `spent` is set inside that check, not before it: a
+      // release that finds someone else owning the cover has done nothing, and
+      // must not count as this handle's one use.
+      // The token also makes this idempotent, with no separate "already released"
+      // flag: after a successful release the entry holds `prior`'s token or is
+      // gone, so a second call finds no match and does nothing. An earlier version
+      // kept a `spent` flag and set it BEFORE this check, which meant a release
+      // that found someone else owning the cover -- and therefore did nothing --
+      // still burned this handle's one use.
+      const current = used.get(key);
+      if (current?.token !== token) return;
       if (prior === undefined) used.delete(key);
       else used.set(key, prior);
     },

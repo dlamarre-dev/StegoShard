@@ -280,6 +280,49 @@ describe('a claim is owned by the call that made it', () => {
     ).rejects.toThrow(StegoCoverReuseError);
   });
 
+  it('restores the displaced claim rather than deleting it', async () => {
+    // THE regression test for this guard, and it was missing until a review asked
+    // for it. `used` holds one entry per cover, so a release that deletes drops
+    // whatever claim the releasing call overwrote -- and a call can legitimately
+    // overwrite one, with `allowCoverReuse` or with a byte-identical payload.
+    //
+    // Save 1 lands and claims the cover. Save 2 overrides, embeds a different
+    // payload, then fails before writing and releases. If release deletes, save 3
+    // is accepted and there are now two artifacts from one cover under one
+    // password: the §5.3 leak, re-opened by the mechanism meant to prevent a false
+    // refusal. Reverting release to an unconditional delete must fail this test.
+    await embedKeyBlockStego(makeCover(60), W, H, await keyBlock('one'), PW, FAST);
+
+    let second: CoverClaim | undefined;
+    await embedKeyBlockStego(makeCover(60), W, H, await keyBlock('two'), PW, FAST, {
+      allowCoverReuse: true,
+      onClaim: (c) => {
+        second = c;
+      },
+    });
+    second!.release(); // save 2 failed before its artifact landed
+
+    await expect(
+      embedKeyBlockStego(makeCover(60), W, H, await keyBlock('three'), PW, FAST),
+      'the first, landed claim was dropped when the second was released',
+    ).rejects.toThrow(StegoCoverReuseError);
+  });
+
+  it('lets the owner of the only claim release it completely', async () => {
+    // The other half: when there was nothing to displace, release must remove the
+    // entry outright, or a failed first save would burn the cover forever.
+    let only: CoverClaim | undefined;
+    await embedKeyBlockStego(makeCover(61), W, H, await keyBlock('a'), PW, FAST, {
+      onClaim: (c) => {
+        only = c;
+      },
+    });
+    only!.release();
+    await expect(
+      embedKeyBlockStego(makeCover(61), W, H, await keyBlock('b'), PW, FAST),
+    ).resolves.toBeUndefined();
+  });
+
   it('is inert once the cover has been re-claimed by someone else', async () => {
     // `release` removes the entry only if it is still exactly what this call
     // wrote. Otherwise a stale handle could drop a claim it no longer owns.

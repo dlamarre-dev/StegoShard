@@ -101,6 +101,15 @@ function main(): void {
     const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(blob);
     if (!body) return 'absent';
     const out: Record<string, number> = {};
+    // Every non-empty fragment of the body must be a recognised `key: value`. The
+    // matchAll below only *finds* pairs; on its own it silently ignores anything
+    // else in there -- a spread, a computed key, a trailing expression -- and would
+    // then report a confident parse of a literal it had not actually read.
+    const fragments = body[1]!
+      .split(',')
+      .map((f) => f.replace(/\/\/[^\n]*/g, '').trim())
+      .filter(Boolean);
+    if (!fragments.every((f) => /^\w+\s*:\s*[^,]+$/.test(f))) return 'unparseable';
     for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
       // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather
       // than guess, so an unreadable literal fails loudly instead of comparing
@@ -111,7 +120,8 @@ function main(): void {
       else if (plain) out[key!] = Number(plain[1]);
       else return 'unparseable';
     }
-    return out;
+    // And it must have produced the whole triple, not a subset.
+    return fragments.length === Object.keys(out).length ? out : 'unparseable';
   };
 
   const COST_FILE = 'src/core/crypto.ts';

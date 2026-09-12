@@ -27,7 +27,7 @@ import {
 } from '../api/node/commands';
 import { codecArgError, entropyArgError, exportNumberArgError } from './argcheck';
 import { identityLine, mintVaultId } from './identity';
-import { CliError, type CliErrorCode, toCliFailure } from './errors';
+import { CliError, type CliErrorCode, coverReuseHint, toCliFailure } from './errors';
 import type { CliIo } from './io';
 import { humanPresenter, type Presenter } from './present';
 import { jsonPresenter } from './json';
@@ -626,7 +626,13 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
     return await runCommand(argv, quiet, present);
   } catch (err) {
     const failure = toCliFailure(err);
-    present.failure(failure, err);
+    // The flag hint is appended on both CLI exits, because there are two: this one
+    // (which renders the `--json` envelope as well as the human failure) and the
+    // bootstrap's in main.ts. Putting it only in main.ts dropped it from `--json`,
+    // which is still the command line. It stays out of `toCliFailure` itself
+    // because MCP shares that classifier and offers no such flag.
+    const hint = coverReuseHint(err);
+    present.failure(hint ? { ...failure, message: `${failure.message} ${hint}` } : failure, err);
     return failure.exitCode;
   }
 }
