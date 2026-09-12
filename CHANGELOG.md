@@ -37,6 +37,14 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   otherwise remains the operator's to keep. `docs/CLAIMS.md` says so rather than implying
   more.
 
+  A claim is owned by the call that made it and is undone only by that call, through a
+  handle the embed hands back. The orchestration layer takes it, because it is the only
+  thing that knows whether the artifact reached storage: a save that fails **before** the
+  stego image is written releases the claim, so the retry is not refused for an artifact
+  that never existed; once the image has landed the claim stands, even if a later write
+  fails, because a real artifact is out there and dropping it would let a retry mint a
+  second one from the same cover.
+
   Refused, not warned: the damage is the written artifact, so a warning you could only act
   on by deleting a file is a refusal with extra steps. The override is
   `--allow-cover-reuse`, never `--force` — `--force` overwrites an output file, and letting

@@ -33,6 +33,22 @@
  * other use of that key, and it does not permit recomputation of the pad. `ckey`
  * itself is still zeroed by the caller.
  *
+ * WHO OWNS A CLAIM. A claim stands from the moment it is made, and the call that
+ * made it is the only thing that can undo it (`CoverClaim.release`, handed back
+ * through `StegoEmbedOptions.onClaim`). A caller that ignores the handle gets the
+ * safe default -- the claim stands -- which is right for a direct API user who now
+ * holds the embedded bytes. The orchestration layer takes the handle, because it
+ * is the only thing that knows whether the artifact reached storage: it releases
+ * on a save that failed BEFORE the stego image was written, and leaves the claim
+ * alone once it has landed, since a real artifact exists from that point and
+ * dropping the claim would let a retry mint a second one from the same cover.
+ *
+ * Per call, never per realm. An earlier version kept one realm-wide set of
+ * unconfirmed claims and released it wholesale on failure, which was wrong in two
+ * directions at once: a save writes incrementally, so a failure after the image
+ * landed released a claim for a cover that really was on disk, and two concurrent
+ * saves released and confirmed each other's claims.
+ *
  * WHY IN MEMORY, AND NOT A FILE. A durable registry of used covers would catch
  * far more — the same photo tomorrow, on another machine, from a second pristine
  * copy. It would also be a file on disk proving that stego covers exist and
@@ -79,26 +95,25 @@ const MAX_TRACKED = 4096;
 const used = new Map<string, string>();
 
 /**
- * Claims not yet confirmed by an artifact reaching disk.
+ * A single cover claim, owned by the call that made it.
  *
- * A reservation blocks a second embed immediately, but it is only *true* once the
- * artifact exists. The embed itself is not that moment: `externalKey` embeds well
- * before `writeOut` runs, so a save that fails afterwards -- most plausibly by
- * refusing to overwrite an existing output -- would otherwise leave the cover
- * claimed for a payload that never reached disk, and refuse the retry. There is no
- * leak in that case, because a leak needs two artifacts to compare.
+ * Per call, not per realm, and that is the whole point. An earlier version kept
+ * one realm-wide set of unconfirmed claims and released it wholesale when a save
+ * failed. Two things were wrong with that, in opposite directions: a save writes
+ * incrementally, so a failure *after* the stego artifact had landed released a
+ * claim for a cover that really was on disk -- re-opening the exact leak §5.3
+ * forbids -- and two concurrent saves in one realm would release and confirm each
+ * other's claims.
  *
- * So the save path owns the outcome: `commitCoverUses` on success,
- * `releaseCoverUses` on failure. See runSave/runGallerySave in
- * src/api/node/commands.ts.
- *
- * KNOWN LIMIT, stated rather than hidden: this is one list per realm, not one per
- * save. Two saves running concurrently in a single realm share it, so a failure in
- * one releases the other's claims too. That makes the guard more permissive under
- * concurrency, never less safe, and concurrent saves in one realm are not a
- * workflow this is built for.
+ * A claim stands from the moment it is made. `release` is the only undo, it is
+ * idempotent, and it removes the entry ONLY if the map still holds exactly what
+ * this call put there: if anything else has since claimed that cover, this call no
+ * longer owns it and must not touch it.
  */
-const provisional = new Set<string>();
+export interface CoverClaim {
+  /** Undo this claim, because the artifact it covers never reached storage. */
+  release: () => void;
+}
 
 /** Options accepted by every stego embedding entry point. */
 export interface StegoEmbedOptions {
@@ -113,6 +128,20 @@ export interface StegoEmbedOptions {
    * cryptographic constraint would be a category error.
    */
   allowCoverReuse?: boolean | undefined;
+  /**
+   * Receives the claim this embed made, once it has succeeded.
+   *
+   * An out-parameter rather than a return value, because the four public embed
+   * functions return `void` or the new bytes and changing that would be a breaking
+   * signature change for every embedder.
+   *
+   * A caller that ignores it gets the safe default: the claim stands, which is
+   * right for a direct API user who now holds the embedded bytes and is going to
+   * do something with them. A caller that knows whether the artifact actually
+   * reached storage -- the orchestration layer, which writes it -- takes the claim
+   * and releases it if the save failed before the artifact landed.
+   */
+  onClaim?: ((claim: CoverClaim) => void) | undefined;
 }
 
 /**
@@ -161,7 +190,7 @@ export async function reserveCoverUse(
   tag: Uint8Array,
   payload: Uint8Array,
   opts?: StegoEmbedOptions,
-): Promise<void> {
+): Promise<CoverClaim> {
   const key = hex(tag);
   // Every await happens before the read, so the check and the claim below are one
   // synchronous step. Computing the digest after reading `used` would reopen the
@@ -174,24 +203,21 @@ export async function reserveCoverUse(
   }
   if (used.size >= MAX_TRACKED && !used.has(key)) {
     const oldest = used.keys().next();
-    if (!oldest.done) {
-      used.delete(oldest.value);
-      provisional.delete(oldest.value);
-    }
+    if (!oldest.done) used.delete(oldest.value);
   }
   used.set(key, digest);
-  if (prior === undefined) provisional.add(key);
-}
 
-/** The artifacts landed: every claim made since the last outcome is now real. */
-export function commitCoverUses(): void {
-  provisional.clear();
-}
-
-/** The save failed: drop claims for artifacts that never reached disk. */
-export function releaseCoverUses(): void {
-  for (const key of provisional) used.delete(key);
-  provisional.clear();
+  let spent = false;
+  return {
+    release: () => {
+      // Idempotent, and ownership-checked: if the entry is no longer exactly what
+      // this call wrote, something else claimed the cover in the meantime and this
+      // call has no business dropping it.
+      if (spent) return;
+      spent = true;
+      if (used.get(key) === digest) used.delete(key);
+    },
+  };
 }
 
 /**
@@ -204,5 +230,4 @@ export function releaseCoverUses(): void {
  */
 export function resetStegoCoverGuard(): void {
   used.clear();
-  provisional.clear();
 }

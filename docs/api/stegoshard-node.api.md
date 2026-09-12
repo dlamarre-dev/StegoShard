@@ -14,6 +14,11 @@ export const CODEC_CHOICES: readonly CodecChoice[];
 export type CodecChoice = 'color' | 'qr';
 
 // @public
+export interface CoverClaim {
+    release: () => void;
+}
+
+// @public
 export function decodeImageToPayload(bytes: Uint8Array, filename: string): Uint8Array | null;
 
 // Warning: (ae-forgotten-export) The symbol "ImageDataLike" needs to be exported by the entry point node.d.ts
@@ -237,6 +242,7 @@ export interface SaveResult {
 // @public
 export interface StegoEmbedOptions {
     allowCoverReuse?: boolean | undefined;
+    onClaim?: ((claim: CoverClaim) => void) | undefined;
 }
 
 // @public

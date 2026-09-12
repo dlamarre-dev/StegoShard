@@ -324,17 +324,26 @@ async function embedFixedStego(
   // After the capacity check, before the first mutation: a refusal must leave the
   // cover untouched, and a cover that is merely too small must say that rather
   // than report a reuse it would never have made.
-  await reserveCoverUse(tag, payload, opts);
+  const claim = await reserveCoverUse(tag, payload, opts);
   const pad = stream.subarray(0, len);
   const reader = new StreamReader(stream.subarray(len));
   const positions = pickPositions(reader, capacity, bits);
 
-  for (let i = 0; i < bits; i++) {
-    const bit = ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
-    const byteIndex = channelByte(positions[i]!);
-    rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
+  try {
+    for (let i = 0; i < bits; i++) {
+      const bit = ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
+      const byteIndex = channelByte(positions[i]!);
+      rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
+    }
+  } catch (e) {
+    // Nothing here is expected to throw, but a claim outliving a failed embed is
+    // a burned cover: the retry would be refused for an artifact that never
+    // existed. Releasing is the safe direction.
+    claim.release();
+    throw e;
   }
   stream.fill(0);
+  opts?.onClaim?.(claim);
 }
 
 /**
@@ -485,7 +494,7 @@ async function embedFixedStegoJpeg(
     // Reserved per branch, and after the capacity check, so the ordering matches
     // the RGBA path above. Capacity on this path depends on which branch runs, so
     // there is no single earlier point that could hold the check for both.
-    await reserveCoverUse(tag, payload, opts);
+    const claim = await reserveCoverUse(tag, payload, opts);
     const reader = new StreamReader(stream.subarray(len));
     const positions = pickPositions(reader, carriers.count, bits);
     const toggles: number[] = [];
@@ -494,18 +503,34 @@ async function embedFixedStegoJpeg(
       if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
     }
     stream.fill(0);
-    return applyScanToggles(model, toggles);
+    let out: Uint8Array;
+    try {
+      out = applyScanToggles(model, toggles);
+    } catch (e) {
+      claim.release();
+      throw e;
+    }
+    opts?.onClaim?.(claim);
+    return out;
   }
 
   // Rare restart-marker files: fall back to a full re-encode of the scan.
   const carriers = eligibleCoefficients(model);
   if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
-  await reserveCoverUse(tag, payload, opts);
+  const claim = await reserveCoverUse(tag, payload, opts);
   const reader = new StreamReader(stream.subarray(len));
   const positions = pickPositions(reader, carriers.count, bits);
   for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
   stream.fill(0);
-  return encodeJpeg(model);
+  let out: Uint8Array;
+  try {
+    out = encodeJpeg(model);
+  } catch (e) {
+    claim.release();
+    throw e;
+  }
+  opts?.onClaim?.(claim);
+  return out;
 }
 
 /** Recover a fixed-length de-whitened payload from a baseline JPEG, or null when

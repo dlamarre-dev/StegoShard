@@ -119,6 +119,11 @@ export const CODEC_QR_GRID = 0;
 export function codecName(id: number): string;
 
 // @public
+export interface CoverClaim {
+    release: () => void;
+}
+
+// @public
 export function createKeyBlock(password: string, params?: Argon2Params): Promise<{
     dek: CryptoKey;
     block: KeyBlock;
@@ -630,6 +635,7 @@ export class StegoCoverReuseError extends Error {
 // @public
 export interface StegoEmbedOptions {
     allowCoverReuse?: boolean | undefined;
+    onClaim?: ((claim: CoverClaim) => void) | undefined;
 }
 
 // @public

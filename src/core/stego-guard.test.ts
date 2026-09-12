@@ -18,8 +18,7 @@ import {
   embedKeyBlockStegoJpeg,
   extractKeyBlockStego,
   resetStegoCoverGuard,
-  commitCoverUses,
-  releaseCoverUses,
+  type CoverClaim,
   stegoErrorCode,
   stegoErrorFromWire,
   stegoErrorToWire,
@@ -228,55 +227,97 @@ describe('the override, and the error', () => {
   });
 });
 
-describe('a claim is provisional until the save says otherwise', () => {
-  it('is dropped when the save fails after the embed', async () => {
+describe('a claim is owned by the call that made it', () => {
+  /** Capture the claim an embed makes, the way the orchestration layer does. */
+  async function embedHolding(cover: Uint8Array, kb: Uint8Array): Promise<CoverClaim> {
+    let claim: CoverClaim | undefined;
+    await embedKeyBlockStego(cover, W, H, kb, PW, FAST, {
+      onClaim: (c) => {
+        claim = c;
+      },
+    });
+    if (!claim) throw new Error('no claim handed back');
+    return claim;
+  }
+
+  it('is dropped when the artifact never reaches disk', async () => {
     // The reported bug. `externalKey` embeds well before `writeOut` runs, so a
-    // save that fails afterwards -- refusing to overwrite an existing output, say
-    // -- would otherwise leave the cover claimed for a payload that never reached
-    // disk and refuse the retry. There is no leak in that case: a leak needs two
-    // artifacts to compare, and only one was ever written.
-    const a = makeCover(41);
-    const b = makeCover(41);
-    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
-    releaseCoverUses(); // the save threw
+    // save that fails afterwards would otherwise leave the cover claimed for a
+    // payload that never landed and refuse the retry. There is no leak in that
+    // case: a leak needs two artifacts to compare, and only one was written.
+    const claim = await embedHolding(makeCover(41), await keyBlock(PW));
+    claim.release();
     await expect(
-      embedKeyBlockStego(b, W, H, await keyBlock('the retry'), PW, FAST),
+      embedKeyBlockStego(makeCover(41), W, H, await keyBlock('the retry'), PW, FAST),
     ).resolves.toBeUndefined();
   });
 
-  it('is kept when the save succeeds', async () => {
-    const a = makeCover(42);
-    const b = makeCover(42);
-    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
-    commitCoverUses(); // the artifacts landed
-    await expect(embedKeyBlockStego(b, W, H, await keyBlock('second'), PW, FAST)).rejects.toThrow(
-      StegoCoverReuseError,
-    );
+  it('stands when the artifact landed, even if the save fails later', async () => {
+    // The other direction, and the more dangerous one. A save writes
+    // incrementally: if the stego image is on disk and a LATER write fails,
+    // releasing would let a retry mint a second artifact from one cover under one
+    // password -- the exact leak SPEC §5.3 forbids.
+    await embedHolding(makeCover(42), await keyBlock(PW));
+    await expect(
+      embedKeyBlockStego(makeCover(42), W, H, await keyBlock('second'), PW, FAST),
+    ).rejects.toThrow(StegoCoverReuseError);
   });
 
-  it('blocks a second embed while still provisional', async () => {
-    // A reservation has to bite immediately, or two overlapping embeds could both
-    // pass the check before either recorded anything.
-    const a = makeCover(43);
-    const b = makeCover(43);
-    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
-    await expect(embedKeyBlockStego(b, W, H, await keyBlock('second'), PW, FAST)).rejects.toThrow(
-      StegoCoverReuseError,
-    );
+  it("does not let one call release another call's claim", async () => {
+    // Two claims on two different covers; releasing one must not touch the other.
+    // An earlier design kept a single realm-wide set of unconfirmed claims, so a
+    // failure in one save released a concurrent save's claims too.
+    const first = await embedHolding(makeCover(45), await keyBlock(PW));
+    await embedHolding(makeCover(46), await keyBlock(PW));
+    first.release();
+    await expect(
+      embedKeyBlockStego(makeCover(45), W, H, await keyBlock('a'), PW, FAST),
+    ).resolves.toBeUndefined();
+    await expect(
+      embedKeyBlockStego(makeCover(46), W, H, await keyBlock('b'), PW, FAST),
+    ).rejects.toThrow(StegoCoverReuseError);
   });
 
-  it('does not claim a cover whose embed failed on capacity', async () => {
-    // The check now runs after the capacity check on both carriers, so a cover
-    // that is merely too small is never claimed at all.
+  it('is inert once the cover has been re-claimed by someone else', async () => {
+    // `release` removes the entry only if it is still exactly what this call
+    // wrote. Otherwise a stale handle could drop a claim it no longer owns.
+    const stale = await embedHolding(makeCover(47), await keyBlock(PW));
+    await embedKeyBlockStego(makeCover(47), W, H, await keyBlock('newer'), PW, FAST, {
+      allowCoverReuse: true,
+    });
+    stale.release();
+    await expect(
+      embedKeyBlockStego(makeCover(47), W, H, await keyBlock('third'), PW, FAST),
+    ).rejects.toThrow(StegoCoverReuseError);
+  });
+
+  it('reports capacity, not reuse, when a cover is too small (RGBA)', async () => {
+    // This pins the ORDER: the capacity check runs before the reuse check, so a
+    // cover that simply cannot hold the payload says so.
+    //
+    // There is deliberately no assertion that the tiny cover was "not claimed".
+    // With fixed-size payloads a capacity failure implies a cover too small to
+    // have ever been claimed, so any such assertion would have to use a DIFFERENT
+    // cover and would pass whether or not the claim was made. An earlier version
+    // of this test did exactly that and proved nothing.
+    resetStegoCoverGuard();
+    await embedKeyBlockStego(makeCover(50), W, H, await keyBlock(PW), PW, FAST);
     const tiny = new Uint8Array(8 * 8 * 4);
     await expect(embedKeyBlockStego(tiny, 8, 8, await keyBlock(PW), PW, FAST)).rejects.toThrow(
       StegoCapacityError,
     );
-    commitCoverUses();
-    const ok = makeCover(44);
+  });
+
+  it('reports capacity, not reuse, when a JPEG cover is too small', async () => {
+    // The JPEG path checks capacity per branch, after the tag is derived, so its
+    // ordering is genuinely separate from the RGBA path's and was inverted until a
+    // review caught it: the reuse check ran first and a too-small cover reported a
+    // reuse it would never have made.
+    resetStegoCoverGuard();
+    await embedKeyBlockStegoJpeg(makeJpeg(51), await keyBlock(PW), PW, FAST);
     await expect(
-      embedKeyBlockStego(ok, W, H, await keyBlock(PW), PW, FAST),
-    ).resolves.toBeUndefined();
+      embedKeyBlockStegoJpeg(makeJpeg(52, 16, 16), await keyBlock(PW), PW, FAST),
+    ).rejects.toThrow(StegoCapacityError);
   });
 });
 
