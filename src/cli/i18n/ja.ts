@@ -32,6 +32,10 @@ export const ja: CliCatalog = {
   errCodecInvalid: '--codec「{value}」は無効です',
   errExportNumberNotDeniable:
     '--export-number は {flags} と併用できません（否認可能な保管庫は他のエクスポートと結びつくものを一切持ってはなりません）',
+  errCoverReused:
+    'この写真はこのセッションで既にこのパスワードの秘密を運んでいます。再利用すると両方の隠し場所が弱くなります（SPEC §5.3）。別の写真か別のパスワードを使ってください。意図的な場合は --allow-cover-reuse で上書きできます。',
+  helpAllowCoverReuse:
+    'カバー写真が同じパスワードで二つ目の秘密を運ぶことを許可します（両方が弱くなります。docs/CLI.md を参照）',
   errExportNumberInvalid:
     '--export-number は 1 から 4294967295 までの整数でなければなりません（指定値: 「{value}」）',
   errExportNumberWrongCommand:

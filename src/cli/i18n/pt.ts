@@ -28,6 +28,10 @@ export const pt: CliCatalog = {
   errCodecInvalid: '--codec «{value}» inválido',
   errExportNumberNotDeniable:
     '--export-number não pode ser usado com {flags}: um cofre negável não deve levar nada que o ligue a outra exportação',
+  errCoverReused:
+    'Esta foto já levou um segredo com esta senha nesta sessão. Reutilizá-la enfraqueceria os dois esconderijos (SPEC §5.3). Escolha outra foto ou outra senha. --allow-cover-reuse ignora isto se for intencional.',
+  helpAllowCoverReuse:
+    'Permitir que uma foto de capa leve um segundo segredo com a mesma senha (enfraquece ambos; veja docs/CLI.md)',
   errExportNumberInvalid:
     '--export-number deve ser um número inteiro de 1 a 4294967295 (recebido «{value}»)',
   errExportNumberWrongCommand:

@@ -276,6 +276,8 @@ export {
   ShareSetError,
   StegoCapacityError,
   StegoCoverFormatError,
+  StegoCoverReuseError,
+  type StegoEmbedOptions,
   TooManyFilesError,
   TooManyImagesError,
   VerificationError,

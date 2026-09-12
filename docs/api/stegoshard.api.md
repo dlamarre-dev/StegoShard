@@ -164,16 +164,16 @@ export const DEFAULT_ARGON2: Argon2Params;
 export function drawBrandBand(img: ImageDataLike, band: BrandBandInput): ImageDataLike;
 
 // @public
-export function embedKeyBlockStego(rgba: Uint8Array | Uint8ClampedArray, width: number, height: number, keyBlock: Uint8Array, password: string, params?: Argon2Params): Promise<void>;
+export function embedKeyBlockStego(rgba: Uint8Array | Uint8ClampedArray, width: number, height: number, keyBlock: Uint8Array, password: string, params?: Argon2Params, opts?: StegoEmbedOptions): Promise<void>;
 
 // @public
-export function embedKeyBlockStegoJpeg(jpegBytes: Uint8Array, keyBlock: Uint8Array, password: string, params?: Argon2Params): Promise<Uint8Array>;
+export function embedKeyBlockStegoJpeg(jpegBytes: Uint8Array, keyBlock: Uint8Array, password: string, params?: Argon2Params, opts?: StegoEmbedOptions): Promise<Uint8Array>;
 
 // @public
-export function embedKeyFactorStego(rgba: Uint8Array | Uint8ClampedArray, width: number, height: number, factor: Uint8Array, password: string, params?: Argon2Params): Promise<void>;
+export function embedKeyFactorStego(rgba: Uint8Array | Uint8ClampedArray, width: number, height: number, factor: Uint8Array, password: string, params?: Argon2Params, opts?: StegoEmbedOptions): Promise<void>;
 
 // @public
-export function embedKeyFactorStegoJpeg(jpegBytes: Uint8Array, factor: Uint8Array, password: string, params?: Argon2Params): Promise<Uint8Array>;
+export function embedKeyFactorStegoJpeg(jpegBytes: Uint8Array, factor: Uint8Array, password: string, params?: Argon2Params, opts?: StegoEmbedOptions): Promise<Uint8Array>;
 
 // @public
 export function encodeShareText(share: Uint8Array): string;
@@ -623,7 +623,17 @@ export class StegoCoverFormatError extends Error {
 }
 
 // @public
-export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
+export class StegoCoverReuseError extends Error {
+    constructor();
+}
+
+// @public
+export interface StegoEmbedOptions {
+    allowCoverReuse?: boolean | undefined;
+}
+
+// @public
+export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'STEGO_COVER_REUSE' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
 
 // @public
 export function stegoErrorCode(err: unknown): StegoErrorCode | null;

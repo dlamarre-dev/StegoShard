@@ -24,9 +24,17 @@
  * markers from `model.restartInterval`.
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resetStegoCoverGuard } from '@core';
 import jpeg from 'jpeg-js';
 import { decode, encode } from './jpeg-coeff';
+
+// The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
+// without this one test's covers would refuse the next test's embeds. That is
+// pollution between independent scenarios rather than the behaviour under test:
+// each `it` here is its own session. A test that deliberately reuses a cover
+// says so with `allowCoverReuse`, which is the honest way to express it.
+beforeEach(resetStegoCoverGuard);
 
 function baseJpeg(width: number, height: number, quality = 80, seed = 1): Uint8Array {
   const data = Buffer.alloc(width * height * 4);

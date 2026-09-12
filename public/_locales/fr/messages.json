@@ -490,6 +490,9 @@
     "message": "Image de couverture non prise en charge. Utilisez un JPEG baseline ou un PNG (JPEG progressif et HEIC non pris en charge).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "Cette photo a déjà été utilisée avec ce mot de passe. La réutiliser affaiblirait les deux cachettes. Choisissez une autre photo ou un autre mot de passe."
+  },
   "destBinary": {
     "message": "Fichier",
     "description": "Popup: binary (single file) destination."

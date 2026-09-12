@@ -311,6 +311,17 @@ StegoShard does **not** claim, and you should not rely on:
   example, because it is readable without any password at all. `--export-number` belongs
   in this category too but sits below them: it leaks only after unlock, and it is refused
   on every deniable path — see _Numbering exports_ above.
+- **Safe reuse of a cover photo.** A cover's _content_ carries at most one payload per
+  password (SPEC §5.3, a **MUST NOT**). Two secrets hidden in two copies of one photograph
+  under one password share a whitening pad and a carrier layout, so the images differ at
+  exactly the carriers where the payloads differ: an observer holding both learns the
+  payloads' Hamming distance and that many positions of the secret layout, more with every
+  reuse. StegoShard refuses the second embed **when it can see it** — in memory, within one
+  run — and that is the most it can do. The format stores no per-embedding nonce, because
+  storing one would give the image the fixed-location header the format exists not to have;
+  and a durable record of which covers you have used would itself be a file proving stego
+  covers exist, which is what `--export-number` is refused for on these paths. Use a
+  different photo, or a different password.
 - **Availability on memory-constrained devices.** Every unlock runs Argon2id at 256 MiB.
   That figure is a deliberate defence against offline guessing, and it has **no
   fallback**: there is no low-memory profile, no device detection, and no degraded mode,

@@ -401,6 +401,9 @@
     "message": "Imagen de portada no compatible. Use un JPEG baseline o un PNG (JPEG progresivo y HEIC no son compatibles).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "Esta foto ya se ha usado con esta contraseña. Reutilizarla debilitaría ambos escondites. Elija otra foto u otra contraseña."
+  },
   "destBinary": {
     "message": "Archivo",
     "description": "Popup: binary (single file) destination."
