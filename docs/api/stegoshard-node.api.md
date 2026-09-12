@@ -73,7 +73,7 @@ export interface GalleryRestoreResult {
     seen: number;
 }
 
-// @public (undocumented)
+// @public
 export function gallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult>;
 
 // @public (undocumented)
@@ -139,7 +139,6 @@ export function restore(opts: RestoreOptions, onProgress?: OnProgress): Promise<
 
 // @public (undocumented)
 export interface RestoreOptions {
-    allowCoverReuse?: boolean | undefined;
     force?: boolean | undefined;
     // (undocumented)
     inputs: string[];
@@ -166,7 +165,7 @@ export interface RestoreResult {
     seen: number;
 }
 
-// @public (undocumented)
+// @public
 export function save(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult>;
 
 // @public (undocumented)

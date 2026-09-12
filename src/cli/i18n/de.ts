@@ -29,7 +29,9 @@ export const de: CliCatalog = {
   errExportNumberNotDeniable:
     '--export-number kann nicht mit {flags} verwendet werden: Ein abstreitbarer Tresor darf nichts tragen, das ihn mit einem anderen Export verbindet',
   errCoverReused:
-    'Dieses Foto hat in dieser Sitzung bereits ein Geheimnis unter diesem Passwort getragen. Es erneut zu verwenden würde beide Verstecke schwächen (SPEC §5.3). Wählen Sie ein anderes Foto oder ein anderes Passwort. --allow-cover-reuse setzt sich darüber hinweg, wenn Sie es so wollen.',
+    'Dieses Foto hat in dieser Sitzung bereits ein Geheimnis unter diesem Passwort getragen. Es erneut zu verwenden würde beide Verstecke schwächen (SPEC §5.3). Wählen Sie ein anderes Foto oder ein anderes Passwort.',
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse hat bei {command} keine Wirkung (nur save bettet in ein Trägerbild ein)',
   helpAllowCoverReuse:
     'Erlauben, dass ein Trägerfoto ein zweites Geheimnis unter demselben Passwort trägt (schwächt beide; siehe docs/CLI.md)',
   errExportNumberInvalid:

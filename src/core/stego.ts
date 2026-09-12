@@ -56,7 +56,7 @@ import {
   eligibleInPlace,
   applyScanToggles,
 } from './jpeg-coeff';
-import { checkCoverUse, coverGuardTag, type StegoEmbedOptions } from './stego-guard';
+import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-guard';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -321,8 +321,10 @@ async function embedFixedStego(
 
   const fingerprint = await coverFingerprintRgba(rgba, width, height);
   const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
-  // Before the first mutation: a refusal must leave the cover untouched.
-  const use = await checkCoverUse(tag, payload, opts);
+  // After the capacity check, before the first mutation: a refusal must leave the
+  // cover untouched, and a cover that is merely too small must say that rather
+  // than report a reuse it would never have made.
+  await reserveCoverUse(tag, payload, opts);
   const pad = stream.subarray(0, len);
   const reader = new StreamReader(stream.subarray(len));
   const positions = pickPositions(reader, capacity, bits);
@@ -333,7 +335,6 @@ async function embedFixedStego(
     rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
   }
   stream.fill(0);
-  use.commit();
 }
 
 /**
@@ -473,11 +474,6 @@ async function embedFixedStegoJpeg(
 
   const fingerprint = await coverFingerprintJpeg(model);
   const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
-  // Before either branch mutates anything. The capacity checks below come after,
-  // and deliberately so: on this path capacity depends on which branch runs, and a
-  // cover that cannot hold the payload should say so rather than report a reuse it
-  // would never have committed.
-  const use = await checkCoverUse(tag, payload, opts);
   const pad = stream.subarray(0, len);
   const bitAt = (i: number): number => ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
 
@@ -486,6 +482,10 @@ async function embedFixedStegoJpeg(
     // must change, leaving every other byte of the original JPEG untouched.
     const carriers = eligibleInPlace(model);
     if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
+    // Reserved per branch, and after the capacity check, so the ordering matches
+    // the RGBA path above. Capacity on this path depends on which branch runs, so
+    // there is no single earlier point that could hold the check for both.
+    await reserveCoverUse(tag, payload, opts);
     const reader = new StreamReader(stream.subarray(len));
     const positions = pickPositions(reader, carriers.count, bits);
     const toggles: number[] = [];
@@ -494,21 +494,18 @@ async function embedFixedStegoJpeg(
       if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
     }
     stream.fill(0);
-    const out = applyScanToggles(model, toggles);
-    use.commit();
-    return out;
+    return applyScanToggles(model, toggles);
   }
 
   // Rare restart-marker files: fall back to a full re-encode of the scan.
   const carriers = eligibleCoefficients(model);
   if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
+  await reserveCoverUse(tag, payload, opts);
   const reader = new StreamReader(stream.subarray(len));
   const positions = pickPositions(reader, carriers.count, bits);
   for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
   stream.fill(0);
-  const out = encodeJpeg(model);
-  use.commit();
-  return out;
+  return encodeJpeg(model);
 }
 
 /** Recover a fixed-length de-whitened payload from a baseline JPEG, or null when
