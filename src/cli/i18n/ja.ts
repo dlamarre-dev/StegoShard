@@ -33,7 +33,9 @@ export const ja: CliCatalog = {
   errExportNumberNotDeniable:
     '--export-number は {flags} と併用できません（否認可能な保管庫は他のエクスポートと結びつくものを一切持ってはなりません）',
   errCoverReused:
-    'この写真はこのセッションで既にこのパスワードの秘密を運んでいます。再利用すると両方の隠し場所が弱くなります（SPEC §5.3）。別の写真か別のパスワードを使ってください。意図的な場合は --allow-cover-reuse で上書きできます。',
+    'この写真はこのセッションで既にこのパスワードの秘密を運んでいます。再利用すると両方の隠し場所が弱くなります（SPEC §5.3）。別の写真か別のパスワードを使ってください。',
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse は {command} では効果がありません（カバー画像に埋め込むのは save だけです）',
   helpAllowCoverReuse:
     'カバー写真が同じパスワードで二つ目の秘密を運ぶことを許可します（両方が弱くなります。docs/CLI.md を参照）',
   errExportNumberInvalid:

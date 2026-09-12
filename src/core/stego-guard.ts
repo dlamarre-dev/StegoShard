@@ -68,8 +68,37 @@ const GUARD_INFO = new TextEncoder().encode('stegoshard/stego/guard');
  */
 const MAX_TRACKED = 4096;
 
-/** tag (hex) -> payload digest (hex) of what was embedded into it. */
+/**
+ * tag (hex) -> payload digest (hex) of what was embedded into it.
+ *
+ * An entry is added the moment a cover is claimed, not when the embed finishes.
+ * That is what closes the check-then-record window: `reserveCoverUse` computes its
+ * digest first and then reads and writes this map with no `await` in between, so
+ * two overlapping embeds into one cover cannot both pass the check.
+ */
 const used = new Map<string, string>();
+
+/**
+ * Claims not yet confirmed by an artifact reaching disk.
+ *
+ * A reservation blocks a second embed immediately, but it is only *true* once the
+ * artifact exists. The embed itself is not that moment: `externalKey` embeds well
+ * before `writeOut` runs, so a save that fails afterwards -- most plausibly by
+ * refusing to overwrite an existing output -- would otherwise leave the cover
+ * claimed for a payload that never reached disk, and refuse the retry. There is no
+ * leak in that case, because a leak needs two artifacts to compare.
+ *
+ * So the save path owns the outcome: `commitCoverUses` on success,
+ * `releaseCoverUses` on failure. See runSave/runGallerySave in
+ * src/api/node/commands.ts.
+ *
+ * KNOWN LIMIT, stated rather than hidden: this is one list per realm, not one per
+ * save. Two saves running concurrently in a single realm share it, so a failure in
+ * one releases the other's claims too. That makes the guard more permissive under
+ * concurrency, never less safe, and concurrent saves in one realm are not a
+ * workflow this is built for.
+ */
+const provisional = new Set<string>();
 
 /** Options accepted by every stego embedding entry point. */
 export interface StegoEmbedOptions {
@@ -128,28 +157,41 @@ async function digestOf(payload: Uint8Array): Promise<string> {
  * changes nothing at all"). Refusing it would be theatre, and would break retry
  * tolerance for no gain.
  */
-export async function checkCoverUse(
+export async function reserveCoverUse(
   tag: Uint8Array,
   payload: Uint8Array,
   opts?: StegoEmbedOptions,
-): Promise<{ commit: () => void }> {
+): Promise<void> {
   const key = hex(tag);
+  // Every await happens before the read, so the check and the claim below are one
+  // synchronous step. Computing the digest after reading `used` would reopen the
+  // window this function exists to close.
   const digest = await digestOf(payload);
+
   const prior = used.get(key);
   if (prior !== undefined && prior !== digest && !opts?.allowCoverReuse) {
     throw new StegoCoverReuseError();
   }
-  // Recorded by the caller only once the write has succeeded, so a capacity
-  // failure or a throwing encoder does not poison the tag and refuse the retry.
-  return {
-    commit: () => {
-      if (used.size >= MAX_TRACKED && !used.has(key)) {
-        const oldest = used.keys().next();
-        if (!oldest.done) used.delete(oldest.value);
-      }
-      used.set(key, digest);
-    },
-  };
+  if (used.size >= MAX_TRACKED && !used.has(key)) {
+    const oldest = used.keys().next();
+    if (!oldest.done) {
+      used.delete(oldest.value);
+      provisional.delete(oldest.value);
+    }
+  }
+  used.set(key, digest);
+  if (prior === undefined) provisional.add(key);
+}
+
+/** The artifacts landed: every claim made since the last outcome is now real. */
+export function commitCoverUses(): void {
+  provisional.clear();
+}
+
+/** The save failed: drop claims for artifacts that never reached disk. */
+export function releaseCoverUses(): void {
+  for (const key of provisional) used.delete(key);
+  provisional.clear();
 }
 
 /**
@@ -162,4 +204,5 @@ export async function checkCoverUse(
  */
 export function resetStegoCoverGuard(): void {
   used.clear();
+  provisional.clear();
 }

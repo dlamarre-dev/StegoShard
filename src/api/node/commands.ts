@@ -70,6 +70,8 @@ import {
   type OnProgress,
   type VaultIdentity,
   type StegoEmbedOptions,
+  commitCoverUses,
+  releaseCoverUses,
 } from '../../core';
 import {
   embedKeyImage,
@@ -524,6 +526,30 @@ async function runSaveDisguised(
 }
 
 /**
+ * Run one save, and tell the cover guard how it ended.
+ *
+ * A stego embed claims its cover the moment it runs, which is well before the
+ * artifact is written: `externalKey` embeds, then `writeOut` can still refuse to
+ * overwrite an existing output. Without this, that failure would leave the cover
+ * claimed for a payload that never reached disk and refuse the retry -- a false
+ * refusal, since a leak needs two artifacts to compare and only one was ever
+ * written.
+ *
+ * So the claim is provisional until the save returns. This is the only place that
+ * knows which it was.
+ */
+async function withCoverSession<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    const out = await run();
+    commitCoverUses();
+    return out;
+  } catch (e) {
+    releaseCoverUses();
+    throw e;
+  }
+}
+
+/**
  * Resolve the save inputs (files, directories, or a mix) into the single
  * (name, content) pair the envelope carries.
  *
@@ -553,7 +579,7 @@ function readSaveInputs(paths: string[]): {
   return { name: BUNDLE_NAME, content: packed, bundle: true, count: files.length };
 }
 
-export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
+async function runSaveImpl(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   const input = readSaveInputs(opts.inputs);
   const content = input.content;
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES;
@@ -717,15 +743,6 @@ export interface RestoreOptions {
   /** Overwrite an existing output file instead of refusing. */
   force?: boolean | undefined;
   /**
-   * Embed into a cover that already carried a different payload under this
-   * password in this realm.
-   *
-   * Separate from `force` on purpose: `force` overwrites an output file, this
-   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
-   * other. See src/core/stego-guard.ts.
-   */
-  allowCoverReuse?: boolean | undefined;
-  /**
    * Ceiling on a binary container's decrypted payload, and on its decompression
    * (a gzip-bomb guard on bytes an adversary may have written). Defaults to
    * {@link DEFAULT_MAX_BINARY_BYTES}; pass `MAX_FILE_BYTES_BINARY_CLI` for the
@@ -802,6 +819,16 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
     (await extractKeyImage(bytes, name, password)) ??
     (await extractKeyFactorImage(bytes, name, password));
   return recovered ?? undefined;
+}
+
+/** Save a vault. See {@link SaveOptions}. */
+export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
+  return withCoverSession(() => runSaveImpl(opts, onProgress));
+}
+
+/** Save a gallery. See {@link GallerySaveOptions}. */
+export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+  return withCoverSession(() => runGallerySaveImpl(opts));
 }
 
 export async function runRestore(
@@ -889,7 +916,7 @@ export interface GallerySaveResult {
   keyMode: KeyMode;
 }
 
-export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+async function runGallerySaveImpl(opts: GallerySaveOptions): Promise<GallerySaveResult> {
   const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
@@ -948,6 +975,7 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     opts.password,
     opts.keyCover,
     'factor',
+    reuseOpt(opts),
   );
   if (ext) outs.push(writeExternalKey(opts, ext));
   // Non-possession: write the n threshold share files to hand to holders.

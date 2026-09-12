@@ -245,6 +245,20 @@ describe('--export-number is refused wherever it cannot be honoured', () => {
   });
 });
 
+describe('--allow-cover-reuse is refused where nothing embeds', () => {
+  it('rejects it on restore and gallery-restore', SLOW, async () => {
+    // The same class of bug as `--track` on restore: a flag registered in the
+    // shared options table but read only by the save branches, so it parsed fine
+    // and did nothing. Pinned here because this project has now shipped it twice.
+    for (const command of ['restore', 'gallery-restore']) {
+      await expect(
+        run([command, join(tmp(), 'nothing'), '--allow-cover-reuse'], fakeIo()),
+        `${command} accepted --allow-cover-reuse and did nothing with it`,
+      ).rejects.toThrow(/--allow-cover-reuse has no effect on/);
+    }
+  });
+});
+
 describe('the flags it replaced are gone', () => {
   it('rejects --track and --track-file as unknown options', SLOW, async () => {
     // Pinned rather than incidental: both were removed outright, with no alias,

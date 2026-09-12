@@ -18,6 +18,8 @@ import {
   embedKeyBlockStegoJpeg,
   extractKeyBlockStego,
   resetStegoCoverGuard,
+  commitCoverUses,
+  releaseCoverUses,
   stegoErrorCode,
   stegoErrorFromWire,
   stegoErrorToWire,
@@ -223,6 +225,58 @@ describe('the override, and the error', () => {
     // durable trace this design exists to avoid creating.
     expect(stegoErrorToWire(err).details).toBeUndefined();
     expect(err.message).not.toMatch(/[0-9a-f]{8}/);
+  });
+});
+
+describe('a claim is provisional until the save says otherwise', () => {
+  it('is dropped when the save fails after the embed', async () => {
+    // The reported bug. `externalKey` embeds well before `writeOut` runs, so a
+    // save that fails afterwards -- refusing to overwrite an existing output, say
+    // -- would otherwise leave the cover claimed for a payload that never reached
+    // disk and refuse the retry. There is no leak in that case: a leak needs two
+    // artifacts to compare, and only one was ever written.
+    const a = makeCover(41);
+    const b = makeCover(41);
+    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
+    releaseCoverUses(); // the save threw
+    await expect(
+      embedKeyBlockStego(b, W, H, await keyBlock('the retry'), PW, FAST),
+    ).resolves.toBeUndefined();
+  });
+
+  it('is kept when the save succeeds', async () => {
+    const a = makeCover(42);
+    const b = makeCover(42);
+    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
+    commitCoverUses(); // the artifacts landed
+    await expect(embedKeyBlockStego(b, W, H, await keyBlock('second'), PW, FAST)).rejects.toThrow(
+      StegoCoverReuseError,
+    );
+  });
+
+  it('blocks a second embed while still provisional', async () => {
+    // A reservation has to bite immediately, or two overlapping embeds could both
+    // pass the check before either recorded anything.
+    const a = makeCover(43);
+    const b = makeCover(43);
+    await embedKeyBlockStego(a, W, H, await keyBlock(PW), PW, FAST);
+    await expect(embedKeyBlockStego(b, W, H, await keyBlock('second'), PW, FAST)).rejects.toThrow(
+      StegoCoverReuseError,
+    );
+  });
+
+  it('does not claim a cover whose embed failed on capacity', async () => {
+    // The check now runs after the capacity check on both carriers, so a cover
+    // that is merely too small is never claimed at all.
+    const tiny = new Uint8Array(8 * 8 * 4);
+    await expect(embedKeyBlockStego(tiny, 8, 8, await keyBlock(PW), PW, FAST)).rejects.toThrow(
+      StegoCapacityError,
+    );
+    commitCoverUses();
+    const ok = makeCover(44);
+    await expect(
+      embedKeyBlockStego(ok, W, H, await keyBlock(PW), PW, FAST),
+    ).resolves.toBeUndefined();
   });
 });
 

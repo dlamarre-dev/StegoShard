@@ -355,6 +355,14 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       command,
     });
     if (wrongCommand) fail(wrongCommand.message, wrongCommand.code);
+    // Same rule for --allow-cover-reuse, and for the same reason: only a save
+    // embeds into a cover, so accepting it on `restore` would be a flag that
+    // quietly does nothing. That is the exact bug this project has now shipped
+    // twice -- `--track` on restore, and this -- so it is worth refusing by
+    // construction rather than by memory.
+    if (values['allow-cover-reuse']) {
+      fail(t('errCoverReuseWrongCommand', { command }), 'USAGE');
+    }
   }
 
   const force = Boolean(values.force);

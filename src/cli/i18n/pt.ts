@@ -29,7 +29,9 @@ export const pt: CliCatalog = {
   errExportNumberNotDeniable:
     '--export-number não pode ser usado com {flags}: um cofre negável não deve levar nada que o ligue a outra exportação',
   errCoverReused:
-    'Esta foto já levou um segredo com esta senha nesta sessão. Reutilizá-la enfraqueceria os dois esconderijos (SPEC §5.3). Escolha outra foto ou outra senha. --allow-cover-reuse ignora isto se for intencional.',
+    'Esta foto já levou um segredo com esta senha nesta sessão. Reutilizá-la enfraqueceria os dois esconderijos (SPEC §5.3). Escolha outra foto ou outra senha.',
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse não tem efeito em {command} (só save incorpora numa capa)',
   helpAllowCoverReuse:
     'Permitir que uma foto de capa leve um segundo segredo com a mesma senha (enfraquece ambos; veja docs/CLI.md)',
   errExportNumberInvalid:

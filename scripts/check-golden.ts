@@ -119,7 +119,27 @@ function main(): void {
       costBefore = null; // new file; nothing to compare against
     }
     const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
-    if (costBefore && costNow && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
+    // An unreadable literal is a hard failure, not a skip. `readArgon2` refuses to
+    // guess at an expression it does not recognise, and treating that as "nothing
+    // changed" would turn the refusal into a silent bypass -- the check would
+    // switch itself off for exactly the edit most likely to have rewritten the
+    // literal. `costBefore === null` is different and legitimate: the file is new
+    // on this branch, so there is nothing to compare against.
+    if (costNow === null) {
+      console.error(
+        [
+          `golden:check: cannot read DEFAULT_ARGON2 from ${COST_FILE}.`,
+          '',
+          'The literal is no longer a plain `Object.freeze({ ... })` of integers or',
+          '`a * b` products, so this guard cannot tell whether the cost changed.',
+          'Update readArgon2 in this file to match the new shape -- do not remove the',
+          'rule. On the stego, gallery and slot-KEK paths the cost IS the format; see',
+          'docs/VERSIONING.md.',
+        ].join('\n'),
+      );
+      process.exit(1);
+    }
+    if (costBefore && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
       let versionBumped: boolean;
       try {
         const was = readVersion(git('show', `${base}:${VERSION_FILE}`), 'FORMAT_VERSION');
