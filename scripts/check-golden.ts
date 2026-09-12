@@ -65,6 +65,96 @@ function main(): void {
   }
   const changed = status.map((l) => l.split('\t').slice(1).join('\t'));
 
+  // Read the constant's value on both sides and require it to have gone up.
+  //
+  // The first version looked for a changed diff line mentioning the constant,
+  // which a reformat, a type annotation, or a *decrement* all satisfy. It would
+  // have accepted `FORMAT_VERSION = 0`. Detecting that a line was touched is not
+  // the same as detecting that a decision was made, and this guard exists only to
+  // force the decision.
+  const readVersion = (blob: string, name: string): number | null => {
+    const m = new RegExp(`${name}\\s*=\\s*(\\d+)`).exec(blob);
+    return m ? Number(m[1]) : null;
+  };
+
+  // --- The Argon2 cost, which is a format constant without looking like one ----
+  //
+  // `DEFAULT_ARGON2` is not in CONSTANTS below, because the rule it needs is a
+  // different one. On the §5.3 stego, §9.1 gallery and §10.2 slot-KEK paths the
+  // parameters are NOT stored in the container, so a decoder can only assume the
+  // cost its encoder used. Change the default and an old vault does not report an
+  // unsupported version -- it derives a different seed and fails exactly like a
+  // wrong password, because deniability requires those two to be indistinguishable.
+  // See "Argon2 cost is a format constant" in docs/VERSIONING.md.
+  //
+  // THIS RUNS BEFORE THE CORPUS EARLY-RETURNS BELOW, and that ordering is the
+  // whole point. The rest of this script asks "the corpus moved, was that
+  // decided?"; a cost change that did *not* regenerate the corpus would take the
+  // `touched.length === 0` exit and never be looked at, which is precisely the
+  // change most worth catching.
+  const readArgon2 = (blob: string): Record<string, number> | null => {
+    const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(blob);
+    if (!body) return null;
+    const out: Record<string, number> = {};
+    for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
+      // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather
+      // than guess, so an unreadable literal fails loudly instead of comparing
+      // two nulls and agreeing.
+      const product = /^\s*(\d+)\s*\*\s*(\d+)\s*$/.exec(expr!);
+      const plain = /^\s*(\d+)\s*$/.exec(expr!);
+      if (product) out[key!] = Number(product[1]) * Number(product[2]);
+      else if (plain) out[key!] = Number(plain[1]);
+      else return null;
+    }
+    return out;
+  };
+
+  const COST_FILE = 'src/core/crypto.ts';
+  const VERSION_FILE = 'src/core/header.ts';
+  if (changed.includes(COST_FILE)) {
+    let costBefore: Record<string, number> | null;
+    try {
+      costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
+    } catch {
+      costBefore = null; // new file; nothing to compare against
+    }
+    const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
+    if (costBefore && costNow && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
+      let versionBumped: boolean;
+      try {
+        const was = readVersion(git('show', `${base}:${VERSION_FILE}`), 'FORMAT_VERSION');
+        const now = readVersion(git('show', `HEAD:${VERSION_FILE}`), 'FORMAT_VERSION');
+        versionBumped = was !== null && now !== null && now > was;
+      } catch {
+        // No base blob to compare: treat as un-bumped rather than assume a decision.
+        versionBumped = false;
+      }
+      if (!versionBumped) {
+        console.error(
+          [
+            'golden:check: DEFAULT_ARGON2 changed with no FORMAT_VERSION bump.',
+            '',
+            `  was: ${JSON.stringify(costBefore)}`,
+            `  now: ${JSON.stringify(costNow)}`,
+            '',
+            'On the stego (SPEC §5.3), gallery (§9.1) and slot-KEK (§10.2) paths the',
+            'Argon2 parameters are not stored in the container, so this is a format',
+            'change whether or not it looks like one. An existing vault on those paths',
+            'will not report an unsupported version: it will derive a different seed and',
+            'fail exactly like a wrong password, with nothing able to tell the user why.',
+            '',
+            'If the cost change is deliberate: bump FORMAT_VERSION, update SPEC §5.1,',
+            '§5.3, §9.1, §10.2 and the §11 constants table, update the Python defaults in',
+            'format.py, stego.py and gallery.py (and their ARGON2_LIMITS ceilings, which',
+            'currently sit exactly at the defaults), then regenerate. See the "Argon2 cost',
+            'is a format constant" section of docs/VERSIONING.md.',
+          ].join('\n'),
+        );
+        process.exit(1);
+      }
+    }
+  }
+
   // Added files are fine: pinning a new output path invalidates nothing that was
   // pinned before, and refusing it would make the corpus impossible to grow, or
   // to introduce. What needs a decision is changing or deleting an artifact that
@@ -91,18 +181,6 @@ function main(): void {
     console.log('golden:check: only PROVENANCE.md changed');
     return;
   }
-
-  // Read the constant's value on both sides and require it to have gone up.
-  //
-  // The first version looked for a changed diff line mentioning the constant,
-  // which a reformat, a type annotation, or a *decrement* all satisfy. It would
-  // have accepted `FORMAT_VERSION = 0`. Detecting that a line was touched is not
-  // the same as detecting that a decision was made, and this guard exists only to
-  // force the decision.
-  const readVersion = (blob: string, name: string): number | null => {
-    const m = new RegExp(`${name}\\s*=\\s*(\\d+)`).exec(blob);
-    return m ? Number(m[1]) : null;
-  };
 
   const bumped: string[] = [];
   for (const [file, name] of CONSTANTS) {

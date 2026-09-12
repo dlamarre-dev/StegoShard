@@ -310,6 +310,16 @@ StegoShard does **not** claim, and you should not rely on:
   sheets are conveniences for Resilient Storage; they are the opposite of deniable. Do not
   use them in Deniable mode. **`--track` belongs in this category**, and is the
   strongest example of it: see _Rollback tracking_ below.
+- **Availability on memory-constrained devices.** Every unlock runs Argon2id at 256 MiB.
+  That figure is a deliberate defence against offline guessing, and it has **no
+  fallback**: there is no low-memory profile, no device detection, and no degraded mode,
+  so a device that cannot allocate it cannot open the vault at all. This is an
+  availability limitation rather than a confidentiality one, and it is not currently
+  measured across low-memory mobile browsers. It is also not freely fixable: on the stego
+  (§5.3), gallery (§9.1) and slot-KEK (§10.2) paths the cost is not stored in the
+  container, so a second, cheaper profile would be a second _format_ on precisely the
+  paths that can least afford another distinguisher — see
+  [VERSIONING.md](VERSIONING.md). Recorded as a known limitation, not a solved trade-off.
 - **Inventing cryptography.** The core is standard symmetric primitives only (Argon2id,
   AES-256-GCM, HKDF-SHA256); no asymmetric crypto, hence no Shor exposure. See
   [CRYPTO-REVIEW.md §9](CRYPTO-REVIEW.md).
