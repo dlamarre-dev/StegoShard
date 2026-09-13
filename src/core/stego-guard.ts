@@ -95,7 +95,7 @@ const GUARD_INFO = new TextEncoder().encode('stegoshard/stego/guard');
  * alternative and is worse, and past this point the guard simply forgets — which
  * is honest, because it was never a proof. 4096 entries is about 200 KB.
  */
-const MAX_TRACKED = 4096;
+export const MAX_TRACKED = 4096;
 
 /**
  * tag (hex) -> payload digest (hex) of what was embedded into it.
@@ -249,8 +249,14 @@ export async function reserveCoverUse(
     throw new StegoCoverReuseError();
   }
   if (used.size >= MAX_TRACKED && !used.has(key)) {
-    const oldest = used.keys().next();
-    if (!oldest.done) used.delete(oldest.value);
+    // The map is non-empty here -- `size >= MAX_TRACKED` and MAX_TRACKED is
+    // positive -- so the first key it yields is the oldest insertion, and the loop
+    // runs exactly once. Written this way rather than as a guarded
+    // `keys().next()` so there is no arm that nothing can ever reach.
+    for (const oldest of used.keys()) {
+      used.delete(oldest);
+      break;
+    }
   }
   const token = nextToken++;
   used.set(key, { digest, token });

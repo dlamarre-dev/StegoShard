@@ -12,6 +12,8 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import {
   type Argon2Params,
+  MAX_TRACKED,
+  reserveCoverUse,
   StegoCapacityError,
   StegoCoverReuseError,
   embedKeyBlockStego,
@@ -435,5 +437,40 @@ describe('the guard forgets rather than growing without bound', () => {
     await expect(
       embedKeyBlockStego(b, W, H, await keyBlock('w'), PW, FAST),
     ).resolves.toBeUndefined();
+  });
+
+  it('drops the oldest cover, and only then, once it is tracking MAX_TRACKED', async () => {
+    // Through `reserveCoverUse` rather than an embed, because filling the table
+    // needs MAX_TRACKED distinct covers and every embed above runs Argon2. The tag
+    // is what the guard actually keys on, so a synthetic one exercises the same
+    // code an embed reaches -- and it is the only way to reach the eviction arm at
+    // all, which until now had never run in this suite or in CI.
+    const tagFor = (n: number): Uint8Array => {
+      const t = new Uint8Array(16);
+      new DataView(t.buffer).setUint32(0, n);
+      return t;
+    };
+    const A = new Uint8Array([1]);
+    const B = new Uint8Array([2]);
+
+    for (let i = 0; i < MAX_TRACKED; i++) await reserveCoverUse(tagFor(i), A);
+
+    // At exactly MAX_TRACKED nothing has been forgotten yet. This assertion is the
+    // one that gives the test its edge: without it, an implementation that evicted
+    // on every call would pass everything below.
+    await expect(reserveCoverUse(tagFor(0), B)).rejects.toThrow(StegoCoverReuseError);
+
+    // One more distinct cover, so the table is over the cap and the oldest goes.
+    await reserveCoverUse(tagFor(MAX_TRACKED), A);
+
+    // The second-oldest is still held -- it is the OLDEST that is dropped, not the
+    // table that is cleared. Asserted before the next line, which by claiming a new
+    // cover would itself evict this one.
+    await expect(reserveCoverUse(tagFor(1), B)).rejects.toThrow(StegoCoverReuseError);
+
+    // And the dropped one is genuinely forgotten: a different payload into it is
+    // now allowed, which is the honest failure mode the header promises -- past the
+    // cap this is a backstop, not a proof.
+    await expect(reserveCoverUse(tagFor(0), B)).resolves.toBeTruthy();
   });
 });
