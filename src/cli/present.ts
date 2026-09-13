@@ -43,28 +43,7 @@ export type WarningCode =
   /** A CJK font could not be found, so the PDF fell back. */
   | 'FONT_FALLBACK'
   /** The secret is large enough that the image count is worth mentioning. */
-  | 'LARGE_SECRET'
-  /**
-   * The restored vault is OLDER than the newest export this machine recorded.
-   * A warning, never a failure: the older copy may be the only one that survived,
-   * and refusing to restore it would turn a detection into a denial of service.
-   */
-  | 'VAULT_ROLLBACK'
-  /**
-   * The vault carries an identity this machine has never seen, while others are
-   * recorded. Informational: a first restore on a new machine looks exactly the
-   * same as a substituted vault, and the registry cannot tell them apart.
-   */
-  | 'VAULT_UNKNOWN'
-  /** The registry could not be read. Rollback detection is off for this run. */
-  | 'VAULT_REGISTRY_UNREADABLE'
-  /**
-   * The vault was written, but the registry could not be. A warning rather than
-   * a failure because the artifact the user asked for exists: reporting the save
-   * as failed would invite a caller to retry, or to clean up a real vault. The
-   * cost is that the next export of this label reuses the number.
-   */
-  | 'VAULT_REGISTRY_UNWRITABLE';
+  | 'LARGE_SECRET';
 
 export interface CliWarning {
   code: WarningCode;

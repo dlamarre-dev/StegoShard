@@ -26,21 +26,12 @@ export const pt: CliCatalog = {
   errGalleryThreshold: 'gallery-save: --mode nonpossession exige --threshold k-of-n',
   errGalleryRestoreMissing: 'gallery-restore: faltam fotos/pasta',
   errCodecInvalid: '--codec «{value}» inválido',
-  warnVaultRollback:
-    'este cofre é a exportação n.º {got}, mas nesta máquina foi registada a n.º {recorded}: pode estar a restaurar uma cópia mais antiga',
-  warnVaultUnknown:
-    'o cofre {vaultId} nunca foi visto nesta máquina, por isso não há nada com que o comparar',
-  warnRegistryUnreadable:
-    'não foi possível ler o ficheiro de cofres conhecidos, por isso não se fez qualquer verificação de retrocesso',
-  errTrackNotDeniable:
-    '--track não pode ser usado com {flags}: um cofre negável não deve deixar rastro de que existe',
-  errTrackWrongCommand: '--track não tem efeito em {command} (só save numera uma exportação)',
-  errTrackEmpty:
-    '--track estava vazio (o rótulo é o que diz de qual cofre este salvamento é outra versão)',
-  errTrackRegistryUnreadable:
-    'o arquivo de cofres conhecidos em {path} não pôde ser lido, então esta exportação não pode ser numerada: mova-o ou use --track-file',
-  warnRegistryUnwritable:
-    'o cofre foi salvo, mas o arquivo de cofres conhecidos não pôde ser atualizado, então a próxima exportação deste rótulo reusará este número',
+  errExportNumberNotDeniable:
+    '--export-number não pode ser usado com {flags}: um cofre negável não deve levar nada que o ligue a outra exportação',
+  errExportNumberInvalid:
+    '--export-number deve ser um número inteiro de 1 a 4294967295 (recebido «{value}»)',
+  errExportNumberWrongCommand:
+    '--export-number não tem efeito em {command} (só save numera uma exportação)',
   errCodecColorPaper: '--codec color não pode ser usado com --paper (as páginas impressas usam QR)',
   errEntropyExclusive: '{flags} são mutuamente exclusivos (escolha uma só fonte de entropia)',
   errEntropyFlagEmpty: '--entropy estava vazio (omita a opção se não quiser entropia adicional)',
@@ -182,10 +173,8 @@ export const pt: CliCatalog = {
     'Aceitar uma palavra-passe fraca (mas com >= 12 caracteres) para um cofre novo. O mínimo de 12 caracteres não pode ser dispensado por esta nem por qualquer outra opção.',
   helpKey: 'Um ficheiro .key, uma imagem estego ou um contentor de chave binário',
   helpShare: 'Um ficheiro de parte (repetível) para um cofre nonpossession',
-  helpTrack:
-    'numerar as exportações deste cofre para assinalar o restauro de uma cópia antiga (nunca em saída negável)',
-  helpTrackFile:
-    'onde fica o registo de cofres conhecidos (predefinição: o diretório de estado da plataforma)',
+  helpExportNumber:
+    'numere você mesmo esta exportação: uma restauração que mostra um número menor indica uma cópia mais antiga (nunca em saída negável)',
   helpForce: 'Substituir os ficheiros de saída existentes (por omissão: recusa)',
   helpQuiet: 'Ocultar o indicador de progresso no stderr',
   helpJson: 'Emitir um documento JSON no stdout; o progresso como NDJSON no stderr',

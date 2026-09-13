@@ -812,8 +812,8 @@ has them.
    inside a container distinguishes it from an older but entirely legitimate
    export of the same vault. An attacker with write access can still destroy or
    replace a vault wholesale. What exists now is an opt-in, off-by-default
-   detector built on state the container does not carry (SPEC §4.1 plus a local
-   registry); §7.7 says what it is worth.
+   detector built on state the container does not carry (SPEC §4.1 plus a number
+   the user keeps); §7.7 says what it is worth.
 
 4. **The 4-byte truncated SHA-256 in the image header is an integrity _hint_**
    for fast triage of reconstruction errors. The security boundary is the GCM
@@ -822,26 +822,29 @@ has them.
 6. **DEK reuse across vaults** is decoupled from the IV bound by the per-export
    content key (§2): the shared DEK never encrypts content directly, so each
    export gets an independent AES-GCM key and the collision bound is per-export.
-7. **Rollback detection relocates trust; it does not create it.** The optional
-   `--track` registry records a vault id and an export counter locally, and warns
-   when a restore presents a lower counter than the one on file. It catches a
-   _silent_ replacement — a botched sync, a stale stick, an adversary with write
-   access to the vault. It catches nothing against an adversary who can also
-   write to the registry: they lower the number, or delete the file, and the
-   check reports an unknown vault or stays quiet. Trust moves from the vault file
-   to a local JSON file, and the threat models where those differ are real but
-   narrower than the feature invites a reader to assume.
+7. **Rollback detection relocates trust; it does not create it.** `--export-number`
+   writes a user-supplied counter and a fresh per-export tag into the encrypted
+   envelope (SPEC §4.1), and both save and restore print `tag 3f8a1c02 · export
+#4`. It catches a _silent_ replacement — a botched sync, a stale stick, an
+   adversary with write access to the vault — by making the number legible to the
+   person who chose it. Trust moves from the vault file to the user's own memory,
+   and the threat models where those differ are real but narrower than the feature
+   invites a reader to assume.
 
-   It also has a cost the rest of the tool does not. The registry is a durable
-   cleartext list of vault identifiers and access times in the user's home
-   directory, and it is the first persistent state the command line has ever
-   kept. Against the coercive adversary it is the most damaging artifact the tool
-   can produce: not where a vault is or what is in it, but **how many exist and
-   when they were touched**, which is what deniability rests on denying. Hence
-   opt-in, off by default, and refused outright on every deniable destination
-   (`TRACKING_NOT_DENIABLE`). The file-free half — the `vault … · export #N` line
-   printed on save and restore — delivers most of the honest value with none of
-   that cost, and is the part worth relying on.
+   It catches nothing against an adversary who can rewrite the artifact, since the
+   number is rewritten with it, and the tool compares nothing on the user's behalf:
+   there is no state anywhere to compare against.
+
+   That is a deliberate retreat from an earlier design, and the retreat is the
+   part worth reviewing. A local registry of vault identifiers and access times
+   would let the machine do the comparing, and would catch a rollback the user had
+   forgotten about — which nothing here replaces. It was removed before shipping
+   because against the coercive adversary that file was the most damaging artifact
+   the tool could produce: not where a vault is or what is in it, but **how many
+   exist and when they were touched**, which is what deniability rests on denying.
+   What remains is refused outright on every deniable destination
+   (`EXPORT_NUMBER_NOT_DENIABLE`), because a number is itself a link between
+   artifacts once the vault is open.
 
 ## 8. How to reproduce
 
