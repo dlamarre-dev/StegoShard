@@ -16,13 +16,14 @@ decoders can recover a vault. The current candidate, format version 2, is docume
 in [SPEC.md](../SPEC.md); its compatibility promise begins at the public 1.0 release.
 The format carries several independent version tags:
 
-| Constant            | Where                          | Meaning                                    |
-| ------------------- | ------------------------------ | ------------------------------------------ |
-| `FORMAT_VERSION`    | `src/core/header.ts`           | Per-image header, §6 vault blob, envelope  |
-| `KEY_BLOCK_VERSION` | `src/core/crypto.ts`           | Serialized wrapped-DEK key block (§5.1)    |
-| `SEG_VERSION`       | `src/core/segmented.ts`        | Segmented `.ssbn` / `.db` container (§8.1) |
-| `BINARY_VERSION`    | `src/core/binary-container.ts` | Branded binary container framing (§8)      |
-| `CODEC_GALLERY`     | `src/core/header.ts`           | Gallery Mode codec id (§9)                 |
+| Constant            | Where                          | Meaning                                                                        |
+| ------------------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| `FORMAT_VERSION`    | `src/core/header.ts`           | Per-image header, §6 vault blob, envelope                                      |
+| `KEY_BLOCK_VERSION` | `src/core/crypto.ts`           | Serialized wrapped-DEK key block (§5.1)                                        |
+| `SEG_VERSION`       | `src/core/segmented.ts`        | Segmented `.ssbn` / `.db` container (§8.1)                                     |
+| `BINARY_VERSION`    | `src/core/binary-container.ts` | Branded binary container framing (§8)                                          |
+| `CODEC_GALLERY`     | `src/core/header.ts`           | Gallery Mode codec id (§9)                                                     |
+| `DEFAULT_ARGON2`    | `src/core/crypto.ts`           | Argon2id cost; **unstored and therefore format-defining** on §5.3, §9.1, §10.2 |
 
 `FORMAT_VERSION`, `KEY_BLOCK_VERSION` and `SEG_VERSION` are `2`; `BINARY_VERSION`
 is `1` (its wrapper framing never changed) and `CODEC_GALLERY` is a codec
@@ -52,13 +53,79 @@ moved `FORMAT_VERSION` to `2` — that was the AAD binding and the identity bloc
 §4.1, §11.1), which do change how a decoder parses. The geometry above still announces
 itself nowhere, under version 2 as under version 1.
 
+### Argon2 cost is a format constant on three paths (SPEC §5.3, §9.1, §10.2)
+
+`DEFAULT_ARGON2` (`src/core/crypto.ts`: `iterations 4`, `memoryKiB 262144`,
+`parallelism 1`) is frozen, mirrored in `python/stegoshard/`, and looks like a tuning
+knob. On three paths it is not one. It is **part of the format**, with no version tag and
+nowhere to put one.
+
+The §5.1 key block **stores** its Argon2 parameters, so changing the default there affects
+only vaults written afterwards and old ones keep opening. The **stego key factor**
+(§5.3/§5.4), **Gallery Mode** (§9.1) and the **slot KEK** (§10.2) store nothing: the stego
+path stores no header, no magic and no length at all, and the slot geometry carries no cost
+field. On those three the decoder can only assume the same frozen cost the encoder used.
+
+**What a cost change does there is worse than breaking.** It does not raise "unsupported
+version". It derives a _different seed_, which is indistinguishable from a wrong password:
+gallery winnowing finds no fragment, no slot opens, stego extraction de-whitens to noise
+that fails Reed–Solomon. The vault is intact and unreadable and the tool cannot say why.
+That is not a defect to be fixed — deniability **requires** a wrong password and an empty
+carrier to look identical — which is exactly why the property that makes the format safe
+is the property that makes this failure silent.
+
+Note what that does to the pre-1.0 carve-out below: "an artifact in an older format fails
+the ordinary version check" is true on §5.1 and false on these three, because there is no
+version check to fail.
+
+**Therefore: changing `DEFAULT_ARGON2` is a breaking format change**, and follows every
+rule in _Rules for a format change_ — bump `FORMAT_VERSION`, update SPEC §5.1, §5.3, §9.1,
+§10.2 and the §11 constants table, update the Python defaults in `format.py`, `stego.py`
+and `gallery.py`, and regenerate vectors, fixtures and the golden corpus.
+`scripts/check-golden.ts` refuses a cost change that arrives without the bump, and
+`src/core/crypto.hardening.test.ts` pins the three values so it cannot be made in one place
+quietly.
+
+There is a **second trap on the path this section calls safe.** `python/stegoshard/format.py`
+pins `iterations` to `(1, 4)` and `memory_kib` to `(8, 256 * 1024)` — ceilings numerically
+equal to the current defaults, coupled to them by nothing. Raising either default without
+raising both ceilings makes the reference decoder reject every key block the TypeScript
+encoder writes, on the one path that stores its parameters. `scripts/check-spec.ts` checks
+that pairing.
+
+**Post-1.0 this is not solved, and this section does not pretend otherwise.** Once vaults
+exist in the wild, none of the three available moves is acceptable as written:
+
+- _Store the parameters._ There is nowhere to put them. The stego path's whole guarantee is
+  that nothing is stored; the slot geometry has no free field; and the only reserved space,
+  `slot_plaintext.reserved[15]` (§10.1), sits **inside the ciphertext** and is therefore
+  unreadable until the KEK — the thing whose cost you needed to know — already exists.
+- _Add a version byte._ Refused for the same reason the access structure carries no version
+  tag: a byte that appears only where a hidden alternative might exist is itself the
+  distinguisher (SPEC §10).
+- _Trial-decode over a list of historical profiles._ The only move needing no format change,
+  and the most expensive. Argon2id at 256 MiB is roughly a second and 256 MiB resident per
+  attempt, so trying _p_ profiles multiplies both by _p_. It also breaks the **"Argon2 runs
+  exactly once per unlock, whatever the outcome"** invariant that CI counts on every pull
+  request ([CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.7) — a property held deliberately so
+  unlock cost does not vary with what the inputs turn out to be. Making the attempt count
+  depend on which profile a vault was written under introduces a new observable, on the
+  paths least able to afford one.
+
+The pre-1.0 answer is that there are no vaults to migrate, so the cost is frozen and a
+change is a version bump. **The post-1.0 answer does not exist yet.** It should be settled
+before 1.0 rather than at the first time someone wants to raise the memory cost, and it is
+recorded here so that decision is taken deliberately instead of discovered.
+
 ### Rules for a format change
 
 A post-1.0 change is **breaking** if an existing artifact would no longer decode, or a
 new artifact would not decode on an older reader. Before 1.0, audit-driven changes may
 replace the candidate in place but must still:
 
-1. Bump the relevant version constant.
+1. Bump the relevant version constant. A change to `DEFAULT_ARGON2` bumps
+   `FORMAT_VERSION` — see _Argon2 cost is a format constant_ above for why a KDF cost
+   is a format constant at all.
 
    **Pre-1.0 carve-out.** Post-1.0 a bump must also add a new decode branch and
    keep the old one until support is formally dropped. Before 1.0 it must not:

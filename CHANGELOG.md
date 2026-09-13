@@ -9,6 +9,22 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **The Argon2id cost is documented as a format constant, and guarded as one.**
+  `DEFAULT_ARGON2` looks like a tuning knob, and on the §5.1 key block it is one — those
+  parameters are stored. On the stego (§5.3), Gallery Mode (§9.1) and slot-KEK (§10.2)
+  paths nothing is stored, so the decoder can only assume the cost its encoder used, and
+  changing the default silently orphans every existing container on those paths. Not with
+  an "unsupported version" error: with a _different derived seed_, which is
+  indistinguishable from a wrong password, because deniability requires a wrong password
+  and an empty carrier to look identical. `docs/VERSIONING.md` now says this outright,
+  including that the post-1.0 migration story does not exist yet and why each of the three
+  obvious answers is foreclosed. `golden:check` refuses a cost change that arrives without
+  a `FORMAT_VERSION` bump, and `spec:check` pins the figures SPEC and the Python decoder
+  state. A second trap is covered too: `python/stegoshard/format.py` pinned its Argon2
+  ceilings numerically equal to the defaults, so raising a default without raising them
+  would have made the reference decoder reject every key block the encoder writes — on the
+  one path whose stored parameters were supposed to make it safe.
+
 - **`npm run spec:check`: a guard that refuses a `SPEC.md` disagreeing with the code.**
   It imports the version constants and compares them against every byte-layout diagram,
   table row and prose assignment in the spec and its Python mirror, so the stale claims
@@ -119,6 +135,13 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   `FORMAT_VERSION`. Harmless while the constant was 1; the bump surfaced them.
 
 ### Documentation
+
+- **The 256 MiB Argon2 floor is recorded as a known availability limitation**
+  (`docs/CLAIMS.md`, `docs/THREAT-MODEL.md`). There is no low-memory profile, no device
+  detection and no degraded mode, so a device that cannot allocate it cannot open a vault.
+  Deliberately not fixed: on the three paths above the cost is unstored, so a cheaper
+  profile would be a second format on exactly the paths least able to afford another
+  distinguisher.
 
 - **How to verify a download, and what verification is worth**
   ([docs/CLI.md](docs/CLI.md#verify-your-download)). The release workflow has produced
