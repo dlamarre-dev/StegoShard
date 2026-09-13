@@ -219,32 +219,55 @@ const ARTIFACTS: Artifact[] = [
   },
 ];
 
-// Only when run as a script. `parseSubjectPaths` and `covers` are imported by
-// tests/docs/check-claims.test.ts, and without this guard that import would run the
-// whole check -- including a `process.exit(1)` that would take the test run down
-// with it. See scripts/entry-module.ts.
-function main(): void {
-  /** All doc text, flattened, so a pattern survives prettier's 100-column wrap. */
-  const HAYSTACK = new Map<string, string>();
-  for (const doc of DOCS)
-    HAYSTACK.set(doc, readFileSync(join(ROOT, doc), 'utf-8').replace(/\s+/g, ' '));
+/**
+ * The artifacts the posture family covers, for a test that needs to know how many
+ * there are without asking the function under test.
+ */
+export const ARTIFACT_IDS: readonly string[] = ARTIFACTS.map((a) => a.id);
 
-  function matchesAnywhere(pattern: RegExp): string[] {
-    const hits: string[] = [];
-    for (const [doc, text] of HAYSTACK) if (pattern.test(text)) hits.push(doc);
-    return hits;
-  }
+/** What a rule family found: messages, and how many assertions it actually made. */
+export interface Report {
+  failures: string[];
+  /**
+   * Assertions performed. Reported so a green run says how much it checked, which
+   * is the difference between "agrees" and "had nothing to compare".
+   */
+  checked: number;
+}
 
+/**
+ * The posture family, with its two reads injected.
+ *
+ * Split out from `main` so a test can hand it a workflow that does not exist on
+ * disk. The behaviour that most needs pinning cannot be reached any other way: a
+ * `subject-path` block this cannot parse yields no subjects, and every artifact
+ * then reads as unattested. Left to fall through, that is the worst kind of
+ * failure -- a guard reporting confidently on a posture it never established, and
+ * blaming the docs for it. So zero subjects is its own hard failure naming
+ * `parseSubjectPaths`, and this is where that is tested.
+ *
+ * @param subjectsFor  the `subject-path` entries of a named workflow
+ * @param docs         doc path -> text, whitespace already flattened
+ */
+export function checkPostures(
+  subjectsFor: (workflow: string) => string[],
+  docs: Map<string, string>,
+): Report {
   const failures: string[] = [];
   let checked = 0;
 
-  // --- Family 1: posture -------------------------------------------------------
+  const matchesAnywhere = (pattern: RegExp): string[] => {
+    const hits: string[] = [];
+    for (const [doc, text] of docs) if (pattern.test(text)) hits.push(doc);
+    return hits;
+  };
+
   for (const artifact of ARTIFACTS) {
-    const subjects = subjectsOf(artifact.workflow);
+    const subjects = subjectsFor(artifact.workflow);
     if (subjects.length === 0) {
       failures.push(
         `  [${artifact.id}] found no subject-path entries in ${artifact.workflow}.\n` +
-          `      The block this reads was restructured. Fix subjectsOf() in\n` +
+          `      The block this reads was restructured. Fix parseSubjectPaths() in\n` +
           `      scripts/check-claims.ts -- with no subjects every artifact reads as\n` +
           `      unattested, so this would otherwise fail in a way that looks like a\n` +
           `      docs problem.`,
@@ -281,25 +304,30 @@ function main(): void {
       );
     }
   }
+  return { failures, checked };
+}
 
-  // --- Family 2: citation liveness ---------------------------------------------
-  //
-  // Backticked tokens in CLAIMS.md that look like repository paths. Release
-  // artifacts that exist only on a release page (SHA256SUMS.txt and its web twin)
-  // are not repository files and are listed as such rather than being caught by a
-  // heuristic that would have to guess.
+/**
+ * Backticked tokens in CLAIMS.md that look like repository paths must resolve.
+ *
+ * `exists` is injected for the same reason as above: the interesting case is a
+ * citation whose file is gone, and the register cites no such file today.
+ *
+ * Release artifacts that live only on a release page -- SHA256SUMS.txt and its web
+ * twin -- are listed rather than caught by a heuristic that would have to guess
+ * which backticked filenames are repository paths and which are not.
+ */
+export function checkCitations(claims: string, exists: (path: string) => boolean): Report {
   const NOT_IN_REPO = new Set(['SHA256SUMS.txt', 'SHA256SUMS-web.txt']);
-  // A bare filename in the register means the file wherever it lives; these are the
-  // directories it is cited from, so a rename still fails even though the citation
-  // carries no path.
-  const SEARCH = ['', 'docs', '.github/workflows', 'scripts', 'python/stegoshard'];
+  const failures: string[] = [];
+  let checked = 0;
 
-  for (const token of new Set(readFileSync(join(ROOT, CLAIMS), 'utf-8').match(/`[^`]+`/g) ?? [])) {
+  for (const token of new Set(claims.match(/`[^`]+`/g) ?? [])) {
     const path = token.slice(1, -1);
     if (!/\.(ts|tsx|js|py|sh|yml|yaml|md|json|txt)$/.test(path)) continue;
     if (NOT_IN_REPO.has(path)) continue;
     checked++;
-    if (SEARCH.some((dir) => existsSync(join(ROOT, dir, path)))) continue;
+    if (exists(path)) continue;
     failures.push(
       `  [citation] ${CLAIMS} cites \`${path}\`, which does not exist.\n` +
         `      A claim whose evidence is a dead pointer is an unevidenced claim. If the\n` +
@@ -307,6 +335,31 @@ function main(): void {
         `      evidence or a changed status.`,
     );
   }
+  return { failures, checked };
+}
+
+/**
+ * A bare filename in the register means the file wherever it lives; these are the
+ * directories it is cited from, so a rename still fails even though the citation
+ * carries no path.
+ */
+const SEARCH = ['', 'docs', '.github/workflows', 'scripts', 'python/stegoshard'];
+
+// Only when run as a script. The helpers above are imported by
+// tests/docs/check-claims.test.ts, and without this guard that import would run the
+// whole check -- including a `process.exit(1)` that would take the test run down
+// with it. See scripts/entry-module.ts.
+function main(): void {
+  // Doc text is flattened so a pattern survives prettier's 100-column wrap.
+  const docs = new Map<string, string>();
+  for (const doc of DOCS)
+    docs.set(doc, readFileSync(join(ROOT, doc), 'utf-8').replace(/\s+/g, ' '));
+
+  const posture = checkPostures(subjectsOf, docs);
+  const citations = checkCitations(readFileSync(join(ROOT, CLAIMS), 'utf-8'), (path) =>
+    SEARCH.some((dir) => existsSync(join(ROOT, dir, path))),
+  );
+  const failures = [...posture.failures, ...citations.failures];
 
   if (failures.length > 0) {
     console.error(
@@ -324,7 +377,9 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log(`claims:check: ${checked} register claim(s) agree with the release configuration.`);
+  console.log(
+    `claims:check: ${posture.checked + citations.checked} register claim(s) agree with the release configuration.`,
+  );
 }
 
 if (isEntryModule(import.meta)) {

@@ -12,10 +12,25 @@
  *
  * The cases below are the shapes that decide whether the guard is honest, not a
  * sweep of YAML.
+ *
+ * An earlier version of this file stopped at `parseSubjectPaths` returning an
+ * empty array for a block it could not read. That pinned the input half and
+ * nothing else: it said what the parser returns, not what the guard then DOES
+ * with it -- and what it does is the whole question, because no subjects means
+ * every artifact reads as unattested. A guard that let that fall through would
+ * report confidently on a posture it had never established, and blame the docs
+ * for it. `refuses to check anything when it cannot read the workflow` below is
+ * that missing assertion.
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseSubjectPaths, covers } from '../../scripts/check-claims';
+import {
+  parseSubjectPaths,
+  covers,
+  checkPostures,
+  checkCitations,
+  ARTIFACT_IDS,
+} from '../../scripts/check-claims';
 
 describe('reading subject-path out of a workflow', () => {
   it('reads a block scalar and stops at the next key', () => {
@@ -98,5 +113,88 @@ describe('deciding whether a subject covers a file', () => {
     // cannot actually tell, so it matches nothing -- the safe direction, since the
     // failure it produces is a demand for evidence rather than a silent pass.
     expect(covers(['${{ env.WEB_ARCHIVE }}'], 'stegoshard-web-offline.zip')).toBe(false);
+  });
+});
+
+describe('what the guard does when it cannot read the workflow', () => {
+  const DOCS = new Map([['docs/CLAIMS.md', 'anything at all']]);
+  /**
+   * One failure per artifact in the table, which is what "refuses to check
+   * anything" has to mean: not one complaint, but no artifact silently skipped.
+   *
+   * Taken from the TABLE, not from `checkPostures`. The first attempt read it off
+   * the function under test, so with the fail-closed guard deleted the expected
+   * count became 0 and the assertion passed against zero failures -- the vacuity
+   * dressed up as a derived constant. An expectation must not come from the thing
+   * it is checking.
+   */
+  const ARTIFACT_COUNT = ARTIFACT_IDS.length;
+
+  it('refuses to check anything, and says the parser is what broke', () => {
+    // The failure mode this exists to prevent, stated as an assertion: no
+    // subjects must not quietly become "nothing is attested, so the docs are
+    // wrong". It fails, it fails for every artifact, it names parseSubjectPaths
+    // rather than the documents, and -- the part that makes it fail CLOSED --
+    // `checked` is 0, so it cannot report agreement it never established.
+    const report = checkPostures(() => [], DOCS);
+    expect(report.failures.length).toBeGreaterThan(0);
+    expect(report.checked).toBe(0);
+    for (const f of report.failures) {
+      expect(f).toMatch(/found no subject-path entries/);
+      expect(f).toMatch(/parseSubjectPaths/);
+    }
+  });
+
+  it('does not mistake it for a documentation problem', () => {
+    // The docs here say nothing about attestation at all. If zero subjects were
+    // treated as a real posture, this would produce "the docs do not say so"
+    // failures pointing a contributor at CLAIMS.md, which is the wrong file.
+    //
+    // The length assertion is not decoration. Written as a bare loop over
+    // `failures`, this test passed with the fail-closed guard deleted -- no
+    // guard, no failures, nothing to iterate, green. That is the vacuous shape
+    // this whole file exists to avoid, and it got in anyway on the first draft.
+    const { failures } = checkPostures(() => [], DOCS);
+    expect(failures.length).toBe(ARTIFACT_COUNT);
+    for (const f of failures) {
+      expect(f).not.toMatch(/no document in the register set says so/);
+      expect(f).not.toMatch(/still says otherwise/);
+    }
+  });
+
+  it('checks normally once the workflow parses again', () => {
+    // The other side of the line, so the test above cannot be satisfied by a
+    // guard that simply always fails.
+    const subjects = ['release/stegoshard-*', 'release/SHA256SUMS.txt', 'SHA256SUMS-web.txt'];
+    const report = checkPostures(() => subjects, DOCS);
+    expect(report.checked).toBeGreaterThan(0);
+    expect(report.failures.some((f) => /no document in the register set says so/.test(f))).toBe(
+      true,
+    );
+  });
+});
+
+describe('citations', () => {
+  it('fails on a cited file that is gone, and names it', () => {
+    const report = checkCitations('evidence: `scripts/gone.ts`', () => false);
+    expect(report.checked).toBe(1);
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures[0]).toMatch(/cites `scripts\/gone\.ts`, which does not exist/);
+  });
+
+  it('ignores backticked text that is not a path', () => {
+    // `DEFAULT_ARGON2`, `--allow-cover-reuse` and the like are cited constantly.
+    // Treating them as paths would make the family fire on every row.
+    const report = checkCitations('`DEFAULT_ARGON2` and `--force` and `k-of-n`', () => false);
+    expect(report.checked).toBe(0);
+    expect(report.failures).toEqual([]);
+  });
+
+  it('does not ask the repository for a release-page artifact', () => {
+    // SHA256SUMS.txt is produced by the release workflow and exists in no
+    // checkout. Checking for it would fail permanently.
+    const report = checkCitations('`SHA256SUMS.txt` and `SHA256SUMS-web.txt`', () => false);
+    expect(report.checked).toBe(0);
+    expect(report.failures).toEqual([]);
   });
 });
