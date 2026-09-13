@@ -1106,7 +1106,7 @@ is CSPRNG to the same bucket). Below the threshold, the holder does not possess 
 cryptographic material required to derive the real region's key. The container is
 byte-indistinguishable from a plain vault of the same bucket.
 
-**Gated slot KEK (§10.6.2 of the design):**
+**Gated slot KEK:**
 
 ```
 slot_kek := HKDF-SHA256(ikm  = base_kek || S,
@@ -1120,7 +1120,7 @@ ungated KEK. At unlock the reader derives Argon2id **once** and tries `[ base_ke
 gate(base_kek, S) ]` across all slots, so timing depends only on whether threshold
 material was supplied, never on the container.
 
-**Shamir secret sharing (GF(2^8), §10.6.1):** `S` is split `k`-of-`n` over the same field
+**Shamir secret sharing (GF(2^8)):** `S` is split `k`-of-`n` over the same field
 as Reed-Solomon (§7.1). Any `k` shares recover `S`; any `k-1` yield **zero** information
 (not a partial key), so the container cannot "notice" a sub-threshold set and degrade;
 `shamir_recover` has no notion of `k`. Share wire format (38 bytes):
@@ -1141,7 +1141,7 @@ A product mode over the same geometry: **two live slots and two real regions**. 
 credential (real) opens one region; a second, independent credential (duress) opens the
 other, which holds a plausible decoy. Region indices are assigned by CSPRNG, so the decoy
 is as likely to be region 0 as region 1. Because each region has an **independent DEK**
-carried in its own slot (§10 governing decision), the duress credential yields **only** the
+carried in its own slot (§10.1), the duress credential yields **only** the
 decoy; the real region's key is never derivable from it.
 
 - **Independent credentials (author-time, normative).** The writer MUST reject a duress

@@ -389,6 +389,7 @@ function lineOf(text: string, index: number): number {
 
 const failures: string[] = [];
 let checked = 0;
+let refs = 0;
 
 for (const rule of RULES) {
   const path = join(ROOT, rule.file);
@@ -428,6 +429,42 @@ for (const rule of RULES) {
   }
 }
 
+// --- SPEC.md must not cite a section that does not exist ---------------------
+//
+// A different failure from every rule above -- nothing here disagrees with the
+// code -- but the same kind of defect, and it belongs to the same script for the
+// same reason: SPEC.md is what an outside implementer reads, and a pointer into a
+// document they do not have is a dead end they cannot resolve.
+//
+// It happened three times in §10 alone. §10.8 cited "§10.6.2 of the design" and
+// "§10.6.1", and §10.9 cited "§10 governing decision" -- all three pointing at an
+// internal design document that is not part of the shipped spec set, while the
+// sections they meant (§10.2, §10.1) were right there in the file. An auditor's
+// first question is which document those are, and there was no answer.
+//
+// Cheap to check and total: every `§N.N` in the file must name a heading in the
+// file. No pinned count here, because unlike the rules above this one is not
+// anchored to a phrase that could be reworded out from under it -- it enumerates
+// whatever the document actually contains.
+{
+  const spec = readFileSync(join(ROOT, SPEC), 'utf-8');
+  const headings = new Set<string>();
+  for (const m of spec.matchAll(/^#+\s+(?:§\s*)?(\d+(?:\.\d+)*)\.?\s/gm)) headings.add(m[1]!);
+  const seen = new Set<string>();
+  for (const m of spec.matchAll(/§\s*(\d+(?:\.\d+)*)/g)) {
+    const ref = m[1]!;
+    refs++;
+    if (headings.has(ref) || seen.has(ref)) continue;
+    seen.add(ref);
+    failures.push(
+      `  [spec-dangling-reference] ${SPEC}:${lineOf(spec, m.index ?? 0)}\n` +
+        `      cites §${ref}, which is not a heading in ${SPEC}.\n` +
+        `      Either the section was renumbered, or the reference points at a document\n` +
+        `      that does not ship. Cite a section of this file, or name the document.`,
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error(
     [
@@ -446,4 +483,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`spec:check: ${checked} version claim(s) agree with the code.`);
+console.log(
+  `spec:check: ${checked} version claim(s) agree with the code, ` +
+    `${refs} cross-reference(s) resolve.`,
+);
