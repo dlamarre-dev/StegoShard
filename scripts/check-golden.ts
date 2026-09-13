@@ -16,10 +16,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
-import { basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { isEntryModule } from './entry-module';
 
 /**
  * Read `DEFAULT_ARGON2`'s three fields out of a source blob, using TypeScript's
@@ -408,64 +406,8 @@ function main(): void {
 // Only when run as a script. `readArgon2` is imported by
 // tests/docs/check-golden-argon2.test.ts, and without this guard that import would
 // execute the whole check -- git subprocesses, and a `process.exit(1)` that would
-// take the test run down with it.
-//
-// Compared through realpath on BOTH sides, which is the whole fix. The first
-// version compared `import.meta.url` against `pathToFileURL(process.argv[1])`, and
-// ESM resolves symlinks while argv does not -- so running the script through a
-// symlinked checkout matched nothing, skipped main(), and exited 0 having printed
-// and checked nothing at all. A guard that silently becomes a no-op is worse than
-// no guard.
-//
-// With realpath on both sides that case now matches and runs, so the non-matching
-// branch is only ever "something imported this module" -- a test, or a future
-// caller of `readArgon2`. Staying quiet there is correct; an earlier attempt made
-// it exit(1), which killed the test run on import, reintroducing the same class of
-// problem from the other direction.
-function isEntryModule(): boolean {
-  const invokedAs = process.argv[1];
-  // No entry script at all: something imported this module.
-  if (!invokedAs) return false;
-
-  // When identity cannot be established, RUN. A guard that skips itself reports
-  // green having checked nothing, which this file has already done once behind a
-  // symlink; a guard that runs when it should not merely prints a line. The
-  // earlier version wrapped both resolutions in one try and returned false on any
-  // failure, so a non-`file:` `import.meta.url` -- the bundled-runner case cited
-  // as the reason for the try -- silently disabled the whole check.
-  // Taken off the URL string, never through `fileURLToPath`. The previous fallback
-  // called that function again -- the very call whose throw put us in the catch --
-  // so the bundled-runner case it existed for was never reachable, and the check
-  // exited 0 having run nothing. A URL always has a last path segment, whatever
-  // its scheme.
-  //
-  // This fix was described in a commit message one round before it was actually
-  // made; the block was byte-identical to the version it claimed to change.
-  const ownName = import.meta.url.split('/').pop() ?? '';
-  const byName = (): boolean => basename(invokedAs) === ownName;
-
-  let self: string;
-  try {
-    self = realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    // Our own location is unresolvable: a non-`file:` URL, or a permissions
-    // failure. Nothing to compare against, so fall back to the entry's name.
-    try {
-      return byName();
-    } catch {
-      return false;
-    }
-  }
-  try {
-    return realpathSync(invokedAs) === self;
-  } catch {
-    // The entry path itself does not resolve -- a loader that rewrites it, or a
-    // deleted file. `realpathSync` throws rather than returning, which is why this
-    // is caught at all.
-    return basename(invokedAs) === basename(self);
-  }
-}
-
-if (isEntryModule()) {
+// take the test run down with it. The reasoning behind the comparison itself lives
+// with the function, in scripts/entry-module.ts.
+if (isEntryModule(import.meta)) {
   main();
 }

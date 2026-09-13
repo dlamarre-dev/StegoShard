@@ -159,6 +159,46 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **The claims register still called `SHA256SUMS.txt` unattested** a day after it started
+  being attested. `docs/CLI.md` and the entry above had both moved; the release-integrity
+  row in `docs/CLAIMS.md` had not, and still ended “`SHA256SUMS.txt` is itself neither
+  signed nor attested”.
+
+  Worth naming the direction, because it is the opposite of the one the project's rule is
+  written against. `docs/ELI15.md` makes the register authoritative precisely to stop copy
+  elsewhere sounding _stronger_ than the evidence. Here the register was **weaker** than
+  reality, so a reader applying that rule would have believed the stale sentence and
+  skipped verifying the checksum file — which is the step that makes the cheap hash
+  comparison worth anything. An understated register is not a harmless lag; it tells people
+  not to use a control that exists.
+
+  Also fixed, in the same spirit: the `[Unreleased]` section contradicted itself, with one
+  bullet announcing the attestation fix and another further down still calling the file
+  unattested. That sentence is now dated rather than deleted — a changelog records what was
+  true when it was written — and says where it was superseded.
+
+- **`npm run claims:check`: a guard so that row cannot go stale again**
+  (`scripts/check-claims.ts`, wired into `ci:node`). It reads the `subject-path` lists out
+  of `release-cli.yml` and `pages.yml` rather than restating them, so what the docs must say
+  flips automatically when the release configuration changes — add a subject and the docs
+  must claim it, remove one and they must stop. It also refuses a citation in the register
+  that points at a file which no longer exists, since a claim whose evidence is a dead
+  pointer is an unevidenced claim.
+
+  It is a separate script from `spec:check` on purpose: that one compares a number in a
+  document against a constant in the code, this one compares a _posture_ in a document
+  against a list in a workflow, and they share no rule engine because those are not the
+  same check. `CHANGELOG.md` is deliberately outside its doc set — rewriting shipped entries
+  to match today would destroy the only record of when a control arrived.
+
+- **`SPEC.md` cited three sections that do not exist in it.** §10.8 pointed at “§10.6.2 of
+  the design” and “§10.6.1”, and §10.9 at the “§10 governing decision” — references into an
+  internal design document that is not part of the shipped spec set, while the sections they
+  meant (§10.2, §10.1) were in the file all along. Harmless to a reader who already knows
+  the format and a dead end to the auditor who does not. `spec:check` now resolves every
+  `§N.N` in the file against its own headings; 175 of them, and the three above were the
+  only ones that did not.
+
 - **Three byte-layout diagrams in `SPEC.md` still said version `1`** after the constants
   moved to `2`: the §3 image header table, the §5.1 key block, and the §8.1 segmented
   blob. This is not a typo in documentation — `SPEC.md` ships in the package and is the
@@ -208,9 +248,11 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   Two things this turned up rather than fixed. `sha256sum -c SHA256SUMS.txt`, which is
   what anyone would write first, **fails** on a normal single-platform download: the file
   lists six entries and you fetched one, so `--ignore-missing` is not optional. And
-  `SHA256SUMS.txt` is itself **neither signed nor attested** while sitting on the same
-  page as the archives it vouches for — so on its own it is circular, and the attestation
-  is the load-bearing check, not the checksum.
+  `SHA256SUMS.txt` was, at the time this was written, **neither signed nor attested** while
+  sitting on the same page as the archives it vouches for — so on its own it was circular,
+  and the attestation was the load-bearing check rather than the checksum. That second one
+  is fixed in this same release, above; the checksum file is now attested, and the
+  transfer-check-versus-provenance-check distinction is what survives.
 
 - **The threat model gained the adversary it was missing**: upstream compromise, plus a
   section on the build and the download. The point it makes plainly is that "no network
