@@ -26,6 +26,11 @@ const CONSTANTS = [
   // which is the exact failure the guard exists to prevent.
   ['src/core/segmented.ts', 'SEG_VERSION'],
   ['src/core/header.ts', 'CODEC_GALLERY'],
+  // Added with check-spec.ts, and absent for the same reason SEG_VERSION was:
+  // nobody added them when they were introduced. docs/VERSIONING.md already
+  // records that lesson once; this is it happening twice more.
+  ['src/core/shamir.ts', 'SHARE_VERSION'],
+  ['src/core/crypto.ts', 'KEY_FACTOR_BLOCK_VERSION'],
 ] as const;
 
 function arg(name: string): string | undefined {

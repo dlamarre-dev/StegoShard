@@ -59,11 +59,16 @@ jobs:
       - name: Create offline bundle, SBOM, and checksums
         run: bash scripts/package-web-bundle.sh
       # Provenance belongs to a released artifact; a manual deploy publishes none.
-      - name: Attest offline web bundle
+      # The checksum file is attested with the bundle, for the reason spelled out
+      # in release-cli.yml: a list of hashes that nothing vouches for is the one
+      # file on a release page with no integrity of its own.
+      - name: Attest offline web bundle and its checksums
         if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ env.WEB_ARCHIVE }}
+          subject-path: |
+            ${{ env.WEB_ARCHIVE }}
+            SHA256SUMS-web.txt
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

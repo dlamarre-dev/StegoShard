@@ -201,7 +201,7 @@ describes the whole set; there is no separate manifest image.
 | Offset | Size | Field         | Notes                                   |
 | -----: | ---: | ------------- | --------------------------------------- |
 |      0 |    4 | `MAGIC`       | ASCII `"SSHD"` = `53 53 48 44`          |
-|      4 |    1 | `VERSION`     | format version, `1`                     |
+|      4 |    1 | `VERSION`     | format version, `2`                     |
 |      5 |    8 | `SET_ID`      | random per-vault identifier             |
 |     13 |    2 | `SHARD_INDEX` | u16, global shard index `0 … k+m-1`     |
 |     15 |    2 | `K`           | u16, number of data shards              |
@@ -316,7 +316,7 @@ The DEK is wrapped (encrypted) by a **KEK** derived from the password with
 Argon2id. The key block is self-contained and password-protected.
 
 ```
-[ MAGIC 4 = "SSKY" = 53 53 4B 59 ][ VER 1 = 1 ]
+[ MAGIC 4 = "SSKY" = 53 53 4B 59 ][ VER 1 = 2 ]
 [ iterations u32 ][ memoryKiB u32 ][ parallelism u8 ]      (Argon2id parameters)
 [ salt 16 ]
 [ wrapIv 12 ][ wrappedLen u16 ][ wrappedDEK (wrappedLen bytes) ]
@@ -650,7 +650,7 @@ sealed with AES-256-GCM under a STREAM nonce discipline (Hoang–Reyhanitabar–
 Rogaway–Vizár, the construction `age` uses).
 
 ```
-[ MAGIC "SSCS" = 53 53 43 53 ][ VERSION u8 = 1 ][ FLAGS u8 (bit0 = key block embedded) ]
+[ MAGIC "SSCS" = 53 53 43 53 ][ VERSION u8 = 2 ][ FLAGS u8 (bit0 = key block embedded) ]
 [ KB_LEN u16 ][ key block (KB_LEN bytes, §5.1; empty for external keys) ]
 [ contentSalt 16 ][ noncePrefix 7 ][ chunkSize u32 ][ plaintextLen u64 ]
 [ chunk_0 ] … [ chunk_{n-1} ]        chunk_i = ciphertext_i || tag_i(16)
