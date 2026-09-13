@@ -13,6 +13,7 @@ import {
   drawBrandBand,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  type StegoEmbedOptions,
   embedKeyFactorStego,
   embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
@@ -204,11 +205,12 @@ export async function embedKeyImage(
   cover: Blob,
   keyBlock: Uint8Array,
   password: string,
+  opts?: StegoEmbedOptions,
 ): Promise<StegoKeyImage> {
   const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) {
     try {
-      const out = await embedKeyBlockStegoJpeg(bytes, keyBlock, password);
+      const out = await embedKeyBlockStegoJpeg(bytes, keyBlock, password, undefined, opts);
       return { bytes: out, mime: 'image/jpeg', ext: 'jpg' };
     } catch (err) {
       if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
@@ -217,7 +219,7 @@ export async function embedKeyImage(
   }
   if (isPngBytes(bytes)) {
     const img = await fileToImageData(cover); // full resolution (no cap)
-    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
+    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password, undefined, opts);
     const blob = await imageDataToPngBlob(img);
     return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png', ext: 'png' };
   }
@@ -249,11 +251,12 @@ export async function embedKeyFactorImage(
   cover: Blob,
   factor: Uint8Array,
   password: string,
+  opts?: StegoEmbedOptions,
 ): Promise<StegoKeyImage> {
   const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) {
     try {
-      const out = await embedKeyFactorStegoJpeg(bytes, factor, password);
+      const out = await embedKeyFactorStegoJpeg(bytes, factor, password, undefined, opts);
       return { bytes: out, mime: 'image/jpeg', ext: 'jpg' };
     } catch (err) {
       if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
@@ -262,7 +265,7 @@ export async function embedKeyFactorImage(
   }
   if (isPngBytes(bytes)) {
     const img = await fileToImageData(cover); // full resolution (no cap)
-    await embedKeyFactorStego(img.data, img.width, img.height, factor, password);
+    await embedKeyFactorStego(img.data, img.width, img.height, factor, password, undefined, opts);
     const blob = await imageDataToPngBlob(img);
     return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png', ext: 'png' };
   }

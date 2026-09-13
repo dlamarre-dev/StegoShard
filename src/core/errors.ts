@@ -34,6 +34,7 @@ import { JpegUnsupportedError } from './jpeg-coeff';
 import { SegmentedFormatError } from './segmented';
 import { ShareChecksumError, ShareSetError } from './shamir';
 import { StegoCapacityError, StegoCoverFormatError } from './stego';
+import { StegoCoverReuseError } from './stego-guard';
 import {
   FileTooLargeError,
   MissingKeyError,
@@ -59,6 +60,7 @@ export type StegoErrorCode =
   | 'SHARE_SET'
   | 'STEGO_CAPACITY'
   | 'STEGO_COVER_FORMAT'
+  | 'STEGO_COVER_REUSE'
   | 'TOO_MANY_FILES'
   | 'TOO_MANY_IMAGES'
   | 'VERIFICATION_FAILED'
@@ -253,6 +255,12 @@ const TABLE: readonly CodeRow[] = [
   ),
   // Passes its argument through unwrapped, so the message *is* the argument.
   row(ShareSetError, 'ShareSetError', 'SHARE_SET', (m) => new ShareSetError(m)),
+  row(
+    StegoCoverReuseError,
+    'StegoCoverReuseError',
+    'STEGO_COVER_REUSE',
+    nullary(() => new StegoCoverReuseError()),
+  ),
   row(
     StegoCapacityError,
     'StegoCapacityError',

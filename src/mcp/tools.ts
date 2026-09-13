@@ -26,6 +26,13 @@
  * **No `force`.** Overwriting is not something to do on an agent's judgement, so
  * a name collision returns `OUTPUT_EXISTS` and the agent picks another directory.
  *
+ * **No `allow_cover_reuse`**, for the same reason one step further. An agent
+ * looping `stegoshard_save` over one cover photo is the most plausible way this
+ * bug actually happens, and it is precisely the case the guard in
+ * `src/core/stego-guard.ts` exists to catch, since this server is a long-lived
+ * process. Waiving a cryptographic constraint (SPEC §5.3) is a decision for a
+ * person; the agent gets `STEGO_COVER_REUSE` and picks another photo.
+ *
  * **No entropy options, no paper prose.** `--entropy*` needs a human choosing
  * randomness; `title`, `locale`, `instructions` and the rest are printed sheets an
  * agent should not be authoring.
@@ -346,7 +353,7 @@ export async function callTool(
           ? { codec: optEnum(args, 'codec', ['color', 'qr'] as const) }
           : {}),
         ...(cover ? { cover: inRoot('cover', cover) } : {}),
-        // `force` is deliberately never set: see the header.
+        // `force` and `allowCoverReuse` are deliberately never set: see the header.
       });
       return { result: saveResultJson(res) };
     }

@@ -510,6 +510,9 @@
     "message": "Unsupported cover image. Use a baseline JPEG or a PNG (progressive JPEG and HEIC aren't supported).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "This photo has already been used with this password. Using it again would weaken both hiding places. Choose a different photo, or a different password."
+  },
   "destBinary": {
     "message": "File",
     "description": "Popup: binary (single file) destination."

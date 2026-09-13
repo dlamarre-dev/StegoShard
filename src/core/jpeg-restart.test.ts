@@ -24,9 +24,17 @@
  * markers from `model.restartInterval`.
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resetStegoCoverGuard } from '@core';
 import jpeg from 'jpeg-js';
 import { decode, encode } from './jpeg-coeff';
+
+// The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
+// without this one test's covers would refuse the next test's embeds. That is
+// pollution between independent scenarios rather than the behaviour under test:
+// each `it` here is its own session. A test that deliberately reuses a cover
+// says so with `allowCoverReuse`, which is the honest way to express it.
+beforeEach(resetStegoCoverGuard);
 
 function baseJpeg(width: number, height: number, quality = 80, seed = 1): Uint8Array {
   const data = Buffer.alloc(width * height * 4);
@@ -191,5 +199,39 @@ describe('stego on a JPEG with restart intervals', () => {
     const block = serializeKeyBlock((await createKeyBlock('pw', fast)).block);
     const stego = await embedKeyBlockStegoJpeg(jpegWithRestarts(4, 256, 256), block, 'pw', fast);
     expect(await extractKeyBlockStegoJpeg(stego, 'wrong', fast)).toBeNull();
+  });
+});
+
+describe('the cover-reuse claim on the restart-marker fallback', () => {
+  it("releases when the consumer's onClaim callback throws", async () => {
+    // The third and last `onClaim` site. The other two -- the RGBA path and the
+    // in-place JPEG branch -- are covered in stego-guard.test.ts; this one needs a
+    // restart-marker cover to reach, so it lives here beside the fixture that
+    // builds one.
+    //
+    // If the hand-off sat outside the releasing try, a throwing callback would
+    // escape past `claim.release()` and strand the claim: the cover would be
+    // refused for the rest of the realm with no artifact anywhere.
+    const { createKeyBlock, serializeKeyBlock } = await import('./crypto');
+    const { embedKeyBlockStegoJpeg } = await import('./stego');
+    const fast = { iterations: 1, memoryKiB: 8, parallelism: 1 } as const;
+
+    const cover = jpegWithRestarts(4, 256, 256);
+    expect(decode(cover).restartInterval).toBe(4); // the fallback's trigger
+
+    const block = serializeKeyBlock((await createKeyBlock('pw', fast)).block);
+    await expect(
+      embedKeyBlockStegoJpeg(cover, block, 'pw', fast, {
+        onClaim: () => {
+          throw new Error('the consumer blew up');
+        },
+      }),
+    ).rejects.toThrow('the consumer blew up');
+
+    // The cover is free: nothing was embedded, so a real save must still work.
+    const other = serializeKeyBlock((await createKeyBlock('pw2', fast)).block);
+    await expect(embedKeyBlockStegoJpeg(cover, other, 'pw', fast)).resolves.toBeInstanceOf(
+      Uint8Array,
+    );
   });
 });

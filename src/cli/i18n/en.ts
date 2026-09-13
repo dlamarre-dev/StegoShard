@@ -40,6 +40,13 @@ export const en = {
   errCodecInvalid: 'invalid --codec "{value}"',
   errExportNumberNotDeniable:
     '--export-number cannot be used with {flags}: a deniable vault must carry nothing that links it to another export',
+  errCoverReused:
+    'This photo has already carried a secret under this password in this session. Using it again would weaken both hiding places (SPEC §5.3). Choose a different photo, or a different password.',
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse has no effect on {command} (only save embeds into a cover)',
+  hintAllowCoverReuse: 'Pass --allow-cover-reuse to override this if you mean it.',
+  helpAllowCoverReuse:
+    'Allow a cover photo to carry a second secret under the same password (weakens both; see docs/CLI.md)',
   errExportNumberInvalid:
     '--export-number must be a whole number from 1 to 4294967295 (got "{value}")',
   errExportNumberWrongCommand:

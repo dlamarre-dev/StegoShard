@@ -401,6 +401,9 @@
     "message": "Immagine di copertina non supportata. Usa un JPEG baseline o un PNG (JPEG progressivo e HEIC non sono supportati).",
     "description": "Stego: cover format not supported (must be baseline JPEG or PNG)."
   },
+  "errCoverReused": {
+    "message": "Questa foto è già stata usata con questa password. Riusarla indebolirebbe entrambi i nascondigli. Scegli un'altra foto o un'altra password."
+  },
   "destBinary": {
     "message": "File",
     "description": "Popup: binary (single file) destination."

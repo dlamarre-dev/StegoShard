@@ -245,6 +245,20 @@ describe('--export-number is refused wherever it cannot be honoured', () => {
   });
 });
 
+describe('--allow-cover-reuse is refused where nothing embeds', () => {
+  it('rejects it on restore and gallery-restore', SLOW, async () => {
+    // The same class of bug as `--track` on restore: a flag registered in the
+    // shared options table but read only by the save branches, so it parsed fine
+    // and did nothing. Pinned here because this project has now shipped it twice.
+    for (const command of ['restore', 'gallery-restore']) {
+      await expect(
+        run([command, join(tmp(), 'nothing'), '--allow-cover-reuse'], fakeIo()),
+        `${command} accepted --allow-cover-reuse and did nothing with it`,
+      ).rejects.toThrow(/--allow-cover-reuse has no effect on/);
+    }
+  });
+});
+
 describe('the flags it replaced are gone', () => {
   it('rejects --track and --track-file as unknown options', SLOW, async () => {
     // Pinned rather than incidental: both were removed outright, with no alias,
@@ -258,5 +272,46 @@ describe('the flags it replaced are gone', () => {
         `${argv[0]} is still accepted`,
       ).rejects.toThrow();
     }
+  });
+});
+
+describe('the cover-reuse hint reaches both CLI exits', () => {
+  it('appears in the --json envelope, not only on the human path', SLOW, async () => {
+    // The `--json` half was missing and nothing caught it: `run()` renders that
+    // envelope itself and returns, so main.ts -- where the hint originally lived --
+    // never executes under `--json`. Reverting the append in run.ts must fail this.
+    //
+    // MCP deliberately has no such flag, which is why the hint is appended at the
+    // CLI exits rather than inside `toCliFailure`, the classifier MCP shares.
+    const dir = tmp();
+    const src = secret();
+    const cover = join(dir, 'cover.png');
+    writeFileSync(cover, readFileSync(join(process.cwd(), 'tests/golden/stego/key.png')));
+
+    const argv = (out: string) => [
+      'save',
+      src,
+      '--out',
+      out,
+      '--binary',
+      '--key-mode',
+      'stego',
+      '--cover',
+      cover,
+      '--json',
+    ];
+    const first = fakeIo();
+    expect(await run(argv(join(dir, 'a')), first), first.stderr).toBe(0);
+
+    // Same realm, same cover, same password: the second save is refused.
+    const second = fakeIo();
+    expect(await run(argv(join(dir, 'b')), second)).not.toBe(0);
+    const doc = JSON.parse(second.stdout.trim().split('\n').pop()!) as {
+      error: { code: string; message: string };
+    };
+    expect(doc.error.code).toBe('STEGO_COVER_REUSE');
+    expect(doc.error.message, 'the --allow-cover-reuse hint is missing under --json').toContain(
+      '--allow-cover-reuse',
+    );
   });
 });

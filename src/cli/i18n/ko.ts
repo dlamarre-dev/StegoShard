@@ -32,6 +32,13 @@ export const ko: CliCatalog = {
   errCodecInvalid: '--codec "{value}" 는 올바르지 않습니다',
   errExportNumberNotDeniable:
     '--export-number 는 {flags} 와 함께 쓸 수 없습니다(부인 가능한 보관함은 다른 내보내기와 연결되는 것을 지녀서는 안 됩니다)',
+  errCoverReused:
+    '이 사진은 이번 세션에서 이미 이 비밀번호로 비밀을 담았습니다. 다시 쓰면 두 은닉처가 모두 약해집니다(SPEC §5.3). 다른 사진이나 다른 비밀번호를 쓰세요.',
+  errCoverReuseWrongCommand:
+    '--allow-cover-reuse 는 {command} 에서 아무 효과가 없습니다(커버 이미지에 삽입하는 것은 save 뿐입니다)',
+  hintAllowCoverReuse: '의도한 것이라면 --allow-cover-reuse 를 지정해 무시할 수 있습니다.',
+  helpAllowCoverReuse:
+    '커버 사진이 같은 비밀번호로 두 번째 비밀을 담도록 허용합니다(둘 다 약해집니다. docs/CLI.md 참고)',
   errExportNumberInvalid:
     '--export-number 는 1 부터 4294967295 까지의 정수여야 합니다(입력값: 「{value}」)',
   errExportNumberWrongCommand:

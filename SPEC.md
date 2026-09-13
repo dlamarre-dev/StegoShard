@@ -455,9 +455,20 @@ info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    Hamming-distance and layout leak, which is reason enough to forbid reuse.
 
    So the rule is a usage constraint, and it belongs to whatever drives this
-   layer: **a cover image's content is used at most once per password.**
-   Different passwords over one cover are unaffected, because the seed and
-   therefore the key differ.
+   layer: **a cover image's content MUST NOT carry more than one payload under
+   the same password.** An implementation that embeds MUST refuse a second
+   embedding into the same cover content under the same password and Argon2id
+   parameters unless the caller explicitly overrides that refusal, and MUST NOT
+   proceed silently. Different passwords over one cover are unaffected, because
+   the seed and therefore the key differ; so are different Argon2id parameters,
+   for the same reason.
+
+   The constraint binds **writers only**. Extraction MUST NOT be gated on it: a
+   reader has no way to know how a carrier was produced, and refusing to read
+   would deny recovery. Re-embedding a **byte-identical** payload into the same
+   cover under the same password is also permitted — the fingerprint is invariant
+   under embedding, so the second write moves nothing, produces no second artifact
+   and leaves no Hamming distance to compare.
 
    That constraint is about the cover's _content_, not about a particular file,
    and the distinction is what makes it awkward to enforce. Two pristine copies
@@ -472,8 +483,30 @@ info = "stegoshard/stego/cover", L = 32)`. Because `fp` depends only on
    caller remembers which cover contents it has already used with a password, for
    example by keeping fingerprints of them, or the layer gains genuine
    per-embedding uniqueness, which means storing a nonce and giving up the
-   headerless property. Neither is specified here, so the constraint is stated
-   and left to the caller. Nothing in this repository enforces it today.
+   headerless property.
+
+   **What this repository enforces.** `src/core/stego-guard.ts` holds, in memory, a
+   tag per cover key already used to embed in the current realm, where the tag is
+   `HKDF-Expand(ckey, "stegoshard/stego/guard", 16)` over the step-1a key. Keying
+   on the derived key rather than on the fingerprint is deliberate: identical tag
+   ⟺ identical pad and identical positions, which is exactly the equivalence class
+   of the leak, and it does not refuse the same cover under a different password or
+   a different cost. Every embedding path — command line, extension, web app, MCP
+   server, library — refuses a repeat with `StegoCoverReuseError`
+   (`STEGO_COVER_REUSE`), overridable per call.
+
+   The guard is **session-scoped by construction**: a map for the lifetime of one
+   realm, never written to disk, bounded and evicting oldest-first. That bound is
+   the design, not a shortcut. A durable registry of used covers would be a file on
+   disk proving that stego covers exist and naming them, which is the one kind of
+   state this path refuses to keep — the same reason `--export-number` is refused
+   outright on every deniable destination (docs/THREAT-MODEL.md). So the guard
+   catches reuse **within one run or one batch**, which is the realistic case: an
+   operator saving twice into one photo, a script looping over a folder, an agent
+   looping a save tool over one cover. It cannot catch a second run tomorrow, a
+   second machine, or a second pristine copy of the photograph. The **MUST NOT**
+   above therefore remains the operator's to keep; the guard is a backstop, not a
+   proof, and docs/CLAIMS.md says so.
 
 2. `stream = AES-256-CTR(key, counter = 0¹²⁸)` applied to zero bytes,
    generating as many bytes as needed. The first `KEY_BLOCK_LEN` bytes are the
@@ -505,6 +538,15 @@ coefficient magnitude with bit 0 masked off, encoded big-endian int32)`, again
 exactly the content embedding leaves unchanged (`|coef| ≥ 2` is preserved and
 only the magnitude LSB is touched), so it is identical at embed and extract and
 nothing is stored. Only the carrier differs:
+
+The §5.3 cover-reuse constraint applies verbatim: a baseline JPEG cover's
+coefficient content **MUST NOT** carry more than one payload under one password.
+Because the fingerprint domain differs, one photograph's JPEG file and a PNG
+decode of the same photograph are **two distinct covers** for that rule — they
+derive independent keys, share no pad and no layout, and using both is not reuse.
+Stating that explicitly matters: a normative rule should not have to be inferred
+from an enumeration of shared mechanisms, and `scripts/gen-stego-samples.ts`
+already relies on the distinction.
 
 - **Carrier set:** every quantized **AC** coefficient (zig-zag indices 1..63; the
   DC coefficient is never used) whose value satisfies **|coef| ≥ 2**, enumerated

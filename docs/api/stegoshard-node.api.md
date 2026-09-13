@@ -14,6 +14,11 @@ export const CODEC_CHOICES: readonly CodecChoice[];
 export type CodecChoice = 'color' | 'qr';
 
 // @public
+export interface CoverClaim {
+    release: () => void;
+}
+
+// @public
 export function decodeImageToPayload(bytes: Uint8Array, filename: string): Uint8Array | null;
 
 // Warning: (ae-forgotten-export) The symbol "ImageDataLike" needs to be exported by the entry point node.d.ts
@@ -25,10 +30,10 @@ export function decodePixelsToPayload(img: ImageDataLike): Uint8Array | null;
 export const DEFAULT_MAX_BINARY_BYTES: number;
 
 // @public
-export function embedKeyFactorImage(coverBytes: Uint8Array, coverName: string, factor: Uint8Array, password: string): Promise<StegoKeyImage>;
+export function embedKeyFactorImage(coverBytes: Uint8Array, coverName: string, factor: Uint8Array, password: string, opts?: StegoEmbedOptions): Promise<StegoKeyImage>;
 
 // @public
-export function embedKeyImage(coverBytes: Uint8Array, coverName: string, keyBlock: Uint8Array, password: string): Promise<StegoKeyImage>;
+export function embedKeyImage(coverBytes: Uint8Array, coverName: string, keyBlock: Uint8Array, password: string, opts?: StegoEmbedOptions): Promise<StegoKeyImage>;
 
 // @public (undocumented)
 export function estimate(inputFile: string, paper: boolean, codec?: CodecChoice): Promise<{
@@ -73,11 +78,12 @@ export interface GalleryRestoreResult {
     seen: number;
 }
 
-// @public (undocumented)
+// @public
 export function gallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult>;
 
 // @public (undocumented)
 export interface GallerySaveOptions {
+    allowCoverReuse?: boolean | undefined;
     covers: string[];
     force?: boolean | undefined;
     keyCover?: string | undefined;
@@ -164,11 +170,12 @@ export interface RestoreResult {
     seen: number;
 }
 
-// @public (undocumented)
+// @public
 export function save(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult>;
 
 // @public (undocumented)
 export interface SaveOptions {
+    allowCoverReuse?: boolean | undefined;
     // Warning: (ae-forgotten-export) The symbol "BinaryVariant" needs to be exported by the entry point node.d.ts
     binary?: BinaryVariant | undefined;
     codec?: CodecChoice | undefined;
@@ -230,6 +237,12 @@ export interface SaveResult {
     // (undocumented)
     setId: string;
     sizeWarning?: string;
+}
+
+// @public
+export interface StegoEmbedOptions {
+    allowCoverReuse?: boolean | undefined;
+    onClaim?: ((claim: CoverClaim) => void) | undefined;
 }
 
 // @public

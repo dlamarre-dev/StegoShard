@@ -69,6 +69,8 @@ import {
   type ManifestEntry,
   type OnProgress,
   type VaultIdentity,
+  type StegoEmbedOptions,
+  type CoverClaim,
 } from '../../core';
 import {
   embedKeyImage,
@@ -222,11 +224,12 @@ const asFiles = (outs: readonly OutFile[]) => ({
 });
 
 /** Write the external key artifact, copying the cover's timestamps when stego. */
-function writeExternalKey(
-  target: WriteTarget,
-  ext: { name: string; bytes: Uint8Array; mimicPath?: string },
-): OutFile {
+function writeExternalKey(target: WriteTarget, ext: KeyArtifact): OutFile {
   const path = writeOut(target, ext.name, ext.bytes);
+  // The artifact exists from here on, so the cover claim is real regardless of
+  // what else the save does afterwards -- and other writes DO follow on some
+  // paths (recovery-N.txt on the non-possession and gallery paths).
+  ext.onLanded?.();
   if (ext.mimicPath) {
     try {
       const s = statSync(ext.mimicPath);
@@ -298,6 +301,15 @@ export interface SaveOptions {
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
   /**
+   * Embed into a cover that already carried a different payload under this
+   * password in this realm.
+   *
+   * Separate from `force` on purpose: `force` overwrites an output file, this
+   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
+   * other. See src/core/stego-guard.ts.
+   */
+  allowCoverReuse?: boolean | undefined;
+  /**
    * Ceiling on the binary path's payload, and on its decompression (a gzip-bomb
    * guard). Defaults to {@link DEFAULT_MAX_BINARY_BYTES}; pass
    * `MAX_FILE_BYTES_BINARY_CLI` for the 1 GiB terminal budget. Ignored on the
@@ -336,6 +348,41 @@ export interface SaveResult {
  * cover's format and reuses its **filename** (to blend into a photo library);
  * `mimicPath` is the cover whose mtime/atime the output should copy.
  */
+/**
+ * Lift the caller's cover-reuse decision into the shape the stego layer takes.
+ *
+ * Kept as a helper rather than inlined so there is one place asserting that this
+ * is the ONLY thing forwarded: `force` must never end up here. `--force` means
+ * "overwrite an existing output file", and letting a file-overwrite convenience
+ * waive a cryptographic constraint would be a category error.
+ */
+function reuseOpt(o: { allowCoverReuse?: boolean | undefined }): StegoEmbedOptions {
+  return { allowCoverReuse: o.allowCoverReuse };
+}
+
+/**
+ * The external key artifact, and the hook that says it reached disk.
+ *
+ * `writeExternalKey` is NOT the last write on every save path -- the
+ * non-possession and gallery paths write recovery-N.txt after it -- so a save can
+ * fail with the cover artifact already written. That case must KEEP its claim:
+ * there is a real artifact out there, and releasing would let a retry mint a
+ * second one from the same cover under one password, which is the leak SPEC §5.3
+ * forbids. An earlier version of this comment asserted the opposite invariant and
+ * was simply wrong.
+ *
+ * `onLanded` is why the design does not depend on that ordering at all: the write
+ * itself reports, rather than the outcome being inferred from where an exception
+ * surfaced.
+ */
+interface KeyArtifact {
+  name: string;
+  bytes: Uint8Array;
+  mimicPath?: string;
+  /** Set by `externalKey`; called by `writeExternalKey` once the bytes are on disk. */
+  onLanded?: (() => void) | undefined;
+}
+
 async function externalKey(
   keyMode: KeyMode,
   keyBlock: Uint8Array,
@@ -345,7 +392,10 @@ async function externalKey(
   // Single-region paths (branded .ssbn, disk, paper) hide a 92-byte key block;
   // multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
   variant: 'block' | 'factor' = 'block',
-): Promise<{ name: string; bytes: Uint8Array; mimicPath?: string } | undefined> {
+  opts?: StegoEmbedOptions,
+  hold?: (claim: CoverClaim) => void,
+  landed?: () => void,
+): Promise<KeyArtifact | undefined> {
   if (keyMode === 'stego') {
     if (!cover) {
       throw new StegoShardApiError(
@@ -353,11 +403,14 @@ async function externalKey(
         'stego key mode needs a cover image to hide the key in',
       );
     }
+    // `onClaim` forwards straight to the holder, so the claim is registered before
+    // anything else in this function can throw.
+    const embedOpts: StegoEmbedOptions = { ...opts, onClaim: hold };
     const key =
       variant === 'factor'
-        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password)
-        : await embedKeyImage(read(cover), basename(cover), keyBlock, password);
-    return { name: basename(cover), bytes: key.bytes, mimicPath: cover };
+        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password, embedOpts)
+        : await embedKeyImage(read(cover), basename(cover), keyBlock, password, embedOpts);
+    return { name: basename(cover), bytes: key.bytes, mimicPath: cover, onLanded: landed };
   }
   if (keyMode !== 'embedded') {
     return { name: `stegoshard-${setHex}.key`, bytes: keyBlock };
@@ -365,11 +418,51 @@ async function externalKey(
   return undefined;
 }
 
-/** Save the disguised .db vault in the requested access mode (§10). */
-async function runSaveDisguised(
+/**
+ * Run a save, and drop the stego cover claim if the artifact never reached disk.
+ *
+ * `hold` is called from `onClaim`, the instant the guard makes the claim -- not
+ * when the embed returns. That distinction is load-bearing: `embedKeyImage`
+ * re-encodes the PNG after the embed succeeds, so a throw there would otherwise
+ * leave a claim nothing could release, which is the burned cover this exists to
+ * prevent.
+ *
+ * `landed` is set by `writeExternalKey` itself. It is NOT inferred from where an
+ * exception was caught, because the stego image is not always the last write: the
+ * non-possession path writes recovery-N.txt afterwards, and so does
+ * `runGallerySaveImpl`. A failure in those must keep the claim -- a real artifact
+ * is on disk by then, and releasing would let a retry mint a second one from the
+ * same cover.
+ *
+ * Threaded as a parameter rather than kept in module scope, so two saves running
+ * concurrently in one realm cannot touch each other's claims.
+ */
+async function withKeyClaim<T>(
+  run: (hold: (claim: CoverClaim) => void, landed: () => void) => Promise<T>,
+): Promise<T> {
+  let claim: CoverClaim | undefined;
+  let written = false;
+  try {
+    return await run(
+      (c) => {
+        claim = c;
+      },
+      () => {
+        written = true;
+      },
+    );
+  } catch (err) {
+    if (!written) claim?.release();
+    throw err;
+  }
+}
+
+async function runSaveDisguisedImpl(
   opts: SaveOptions,
   input: { name: string; content: Uint8Array; bundle: boolean },
-  onProgress?: OnProgress,
+  onProgress: OnProgress | undefined,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
 ): Promise<SaveResult> {
   const content = input.content;
   const mode = opts.mode ?? 'plain';
@@ -390,7 +483,17 @@ async function runSaveDisguised(
         emit(opts, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised'), 'keyfile'),
       ];
     }
-    const ext = await externalKey('stego', keyFactor, '', opts.password, opts.cover, 'factor');
+    const ext = await externalKey(
+      'stego',
+      keyFactor,
+      '',
+      opts.password,
+      opts.cover,
+      'factor',
+      reuseOpt(opts),
+      hold,
+      landed,
+    );
     return ext ? [writeExternalKey(opts, ext)] : [];
   }
 
@@ -478,7 +581,17 @@ async function runSaveDisguised(
   } else if (keyMode === 'stego') {
     // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
     // cover, keyed by the same per-save password that derives the slot KEK.
-    const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover, 'factor');
+    const ext = await externalKey(
+      'stego',
+      keyBlock,
+      '',
+      opts.password,
+      opts.cover,
+      'factor',
+      reuseOpt(opts),
+      hold,
+      landed,
+    );
     if (ext) outs.push(writeExternalKey(opts, ext));
   }
   return { ...asFiles(outs), imageCount: 0, setId: '', keyMode, binary: 'disguised' };
@@ -514,7 +627,12 @@ function readSaveInputs(paths: string[]): {
   return { name: BUNDLE_NAME, content: packed, bundle: true, count: files.length };
 }
 
-export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
+async function runSaveImpl(
+  opts: SaveOptions,
+  onProgress: OnProgress | undefined,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
+): Promise<SaveResult> {
   const input = readSaveInputs(opts.inputs);
   const content = input.content;
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES;
@@ -522,7 +640,7 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   // Disguised .db output: a §10 multi-region container keyed by the PASSWORD (each
   // region gets its own DEK; the managed key is not used on this supported path).
   if (opts.binary === 'disguised') {
-    return runSaveDisguised(opts, input, onProgress);
+    return runSaveDisguisedImpl(opts, input, onProgress, hold, landed);
   }
   // A non-plain access mode is only meaningful on the supported .db path.
   if (opts.mode && opts.mode !== 'plain') {
@@ -548,7 +666,17 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
     await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
     const outs = [emit(opts, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
-      const ext = await externalKey('stego', keyBlock, '', opts.password, opts.cover);
+      const ext = await externalKey(
+        'stego',
+        keyBlock,
+        '',
+        opts.password,
+        opts.cover,
+        'block',
+        reuseOpt(opts),
+        hold,
+        landed,
+      );
       if (ext) outs.push(writeExternalKey(opts, ext));
     } else if (keyMode === 'keyfile') {
       outs.push(emit(opts, binaryKeyName(variant), wrapBinary(keyBlock, variant), 'keyfile'));
@@ -572,7 +700,17 @@ export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promi
   await verifyImageExport(imagePayloads, key.dek, input.name, content);
   const setHex = toHex(setId);
   const outs: OutFile[] = [];
-  const ext = await externalKey(keyMode, keyBlock, setHex, opts.password, opts.cover);
+  const ext = await externalKey(
+    keyMode,
+    keyBlock,
+    setHex,
+    opts.password,
+    opts.cover,
+    'block',
+    reuseOpt(opts),
+    hold,
+    landed,
+  );
   // Large secrets sprawl into many images; nudge toward --binary before writing.
   const sizeWarning =
     content.length > WARN_FILE_BYTES
@@ -740,6 +878,16 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
   return recovered ?? undefined;
 }
 
+/** Save a vault. See {@link SaveOptions}. */
+export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
+  return withKeyClaim((hold, landed) => runSaveImpl(opts, onProgress, hold, landed));
+}
+
+/** Save a gallery. See {@link GallerySaveOptions}. */
+export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+  return withKeyClaim((hold, landed) => runGallerySaveImpl(opts, hold, landed));
+}
+
 export async function runRestore(
   opts: RestoreOptions,
   onProgress?: OnProgress,
@@ -802,6 +950,15 @@ export interface GallerySaveOptions {
   threshold?: { k: number; n: number } | undefined;
   /** Overwrite existing output files instead of refusing. */
   force?: boolean | undefined;
+  /**
+   * Embed into a cover that already carried a different payload under this
+   * password in this realm.
+   *
+   * Separate from `force` on purpose: `force` overwrites an output file, this
+   * waives a cryptographic constraint (SPEC §5.3), and one should never imply the
+   * other. See src/core/stego-guard.ts.
+   */
+  allowCoverReuse?: boolean | undefined;
 }
 
 export interface GallerySaveResult {
@@ -816,7 +973,11 @@ export interface GallerySaveResult {
   keyMode: KeyMode;
 }
 
-export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
+async function runGallerySaveImpl(
+  opts: GallerySaveOptions,
+  hold: (claim: CoverClaim) => void,
+  landed: () => void,
+): Promise<GallerySaveResult> {
   const keyMode = opts.keyMode ?? 'embedded';
   const content = read(opts.secretFile);
   const coverPaths = gatherImageFiles(opts.covers);
@@ -875,6 +1036,9 @@ export async function runGallerySave(opts: GallerySaveOptions): Promise<GalleryS
     opts.password,
     opts.keyCover,
     'factor',
+    reuseOpt(opts),
+    hold,
+    landed,
   );
   if (ext) outs.push(writeExternalKey(opts, ext));
   // Non-possession: write the n threshold share files to hand to holders.

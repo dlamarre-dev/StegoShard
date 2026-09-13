@@ -56,6 +56,7 @@ import {
   eligibleInPlace,
   applyScanToggles,
 } from './jpeg-coeff';
+import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-guard';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -192,13 +193,21 @@ async function keystreamFromSeed(seed: Uint8Array, len: number): Promise<Uint8Ar
   );
 }
 
-/** Deterministic keystream of `len` bytes from the password via Argon2id + AES-CTR. */
+/**
+ * Deterministic keystream of `len` bytes from the password via Argon2id + AES-CTR,
+ * plus the guard tag for this (cover, password, cost) combination.
+ *
+ * The tag comes from here rather than from the callers because `ckey` is the only
+ * value that identifies the keystream, and it is zeroed two lines later. Deriving
+ * it anywhere else would mean recomputing the fingerprint -- a second full JPEG
+ * decode on that path -- for a value this function already holds.
+ */
 async function keystream(
   password: string,
   len: number,
   params: Argon2Params,
   fingerprint: Uint8Array,
-): Promise<Uint8Array> {
+): Promise<{ stream: Uint8Array; tag: Uint8Array }> {
   const seed = (await argon2id({
     password: normalizePassword(password),
     salt: STEGO_SALT,
@@ -213,8 +222,9 @@ async function keystream(
   const ckey = await coverKey(seed, fingerprint);
   seed.fill(0);
   const stream = await keystreamFromSeed(ckey, len);
+  const tag = await coverGuardTag(ckey);
   ckey.fill(0);
-  return stream;
+  return { stream, tag };
 }
 
 /**
@@ -300,22 +310,45 @@ async function embedFixedStego(
   payload: Uint8Array,
   password: string,
   params: Argon2Params,
+  opts?: StegoEmbedOptions,
 ): Promise<void> {
   const len = payload.length;
   const bits = len * 8;
   const capacity = capacityBits(width, height);
+  // Capacity first, so a cover that is simply too small still reports that rather
+  // than a reuse it never got far enough to commit.
   if (capacity < minCapacityRgba(len)) throw new StegoCapacityError(capacity);
 
   const fingerprint = await coverFingerprintRgba(rgba, width, height);
-  const stream = await keystream(password, streamLen(len), params, fingerprint);
-  const pad = stream.subarray(0, len);
-  const reader = new StreamReader(stream.subarray(len));
-  const positions = pickPositions(reader, capacity, bits);
+  const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
+  // After the capacity check, before the first mutation: a refusal must leave the
+  // cover untouched, and a cover that is merely too small must say that rather
+  // than report a reuse it would never have made.
+  const claim = await reserveCoverUse(tag, payload, opts);
 
-  for (let i = 0; i < bits; i++) {
-    const bit = ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
-    const byteIndex = channelByte(positions[i]!);
-    rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
+  // Everything after the reservation is inside the try -- `pickPositions`, which
+  // throws when the keystream runs short, and the `onClaim` hand-off itself.
+  //
+  // `onClaim` is handed over first, not at the end: the orchestration layer's
+  // holder has to own the claim from the instant it exists, or a throw in between
+  // leaves it held by nobody. But the call belongs INSIDE the try, because the
+  // callback is consumer code doing real work -- the JSDoc tells it to -- and a
+  // throw from it escaping past the release would strand the claim in exactly the
+  // way the hand-off exists to prevent. Release is idempotent, so the belt (here)
+  // and the braces (the holder) do not conflict.
+  try {
+    opts?.onClaim?.(claim);
+    const pad = stream.subarray(0, len);
+    const reader = new StreamReader(stream.subarray(len));
+    const positions = pickPositions(reader, capacity, bits);
+    for (let i = 0; i < bits; i++) {
+      const bit = ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
+      const byteIndex = channelByte(positions[i]!);
+      rgba[byteIndex] = (rgba[byteIndex]! & 0xfe) | bit;
+    }
+  } catch (e) {
+    claim.release();
+    throw e;
   }
   stream.fill(0);
 }
@@ -337,7 +370,7 @@ async function extractFixedStego(
   if (capacity < minCapacityRgba(len)) return null;
 
   const fingerprint = await coverFingerprintRgba(rgba, width, height);
-  const stream = await keystream(password, streamLen(len), params, fingerprint);
+  const { stream } = await keystream(password, streamLen(len), params, fingerprint);
   const pad = stream.subarray(0, len);
   const reader = new StreamReader(stream.subarray(len));
   const bits = len * 8;
@@ -364,11 +397,12 @@ export async function embedKeyBlockStego(
   keyBlock: Uint8Array,
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
+  opts?: StegoEmbedOptions,
 ): Promise<void> {
   if (keyBlock.length !== KEY_BLOCK_LEN) {
     throw new RangeError(`stego: key block must be ${KEY_BLOCK_LEN} bytes`);
   }
-  await embedFixedStego(rgba, width, height, keyBlock, password, params);
+  await embedFixedStego(rgba, width, height, keyBlock, password, params, opts);
 }
 
 /**
@@ -401,8 +435,17 @@ export async function embedKeyFactorStego(
   factor: Uint8Array,
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
+  opts?: StegoEmbedOptions,
 ): Promise<void> {
-  await embedFixedStego(rgba, width, height, serializeKeyFactorBlock(factor), password, params);
+  await embedFixedStego(
+    rgba,
+    width,
+    height,
+    serializeKeyFactorBlock(factor),
+    password,
+    params,
+    opts,
+  );
 }
 
 /**
@@ -439,13 +482,14 @@ async function embedFixedStegoJpeg(
   payload: Uint8Array,
   password: string,
   params: Argon2Params,
+  opts?: StegoEmbedOptions,
 ): Promise<Uint8Array> {
   const len = payload.length;
   const bits = len * 8;
   const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
 
   const fingerprint = await coverFingerprintJpeg(model);
-  const stream = await keystream(password, streamLen(len), params, fingerprint);
+  const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
   const pad = stream.subarray(0, len);
   const bitAt = (i: number): number => ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
 
@@ -454,25 +498,43 @@ async function embedFixedStegoJpeg(
     // must change, leaving every other byte of the original JPEG untouched.
     const carriers = eligibleInPlace(model);
     if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
-    const reader = new StreamReader(stream.subarray(len));
-    const positions = pickPositions(reader, carriers.count, bits);
-    const toggles: number[] = [];
-    for (let i = 0; i < bits; i++) {
-      const p = positions[i]!;
-      if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
+    // Reserved per branch, and after the capacity check, so the ordering matches
+    // the RGBA path above. Capacity on this path depends on which branch runs, so
+    // there is no single earlier point that could hold the check for both.
+    const claim = await reserveCoverUse(tag, payload, opts);
+    // The whole remainder, the `onClaim` hand-off included: see embedFixedStego.
+    try {
+      opts?.onClaim?.(claim);
+      const reader = new StreamReader(stream.subarray(len));
+      const positions = pickPositions(reader, carriers.count, bits);
+      const toggles: number[] = [];
+      for (let i = 0; i < bits; i++) {
+        const p = positions[i]!;
+        if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
+      }
+      stream.fill(0);
+      return applyScanToggles(model, toggles);
+    } catch (e) {
+      claim.release();
+      throw e;
     }
-    stream.fill(0);
-    return applyScanToggles(model, toggles);
   }
 
   // Rare restart-marker files: fall back to a full re-encode of the scan.
   const carriers = eligibleCoefficients(model);
   if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
-  const reader = new StreamReader(stream.subarray(len));
-  const positions = pickPositions(reader, carriers.count, bits);
-  for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
-  stream.fill(0);
-  return encodeJpeg(model);
+  const claim = await reserveCoverUse(tag, payload, opts);
+  try {
+    opts?.onClaim?.(claim);
+    const reader = new StreamReader(stream.subarray(len));
+    const positions = pickPositions(reader, carriers.count, bits);
+    for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
+    stream.fill(0);
+    return encodeJpeg(model);
+  } catch (e) {
+    claim.release();
+    throw e;
+  }
 }
 
 /** Recover a fixed-length de-whitened payload from a baseline JPEG, or null when
@@ -494,7 +556,7 @@ async function extractFixedStegoJpeg(
   if (carriers.count < minCapacityJpeg(len)) return null;
 
   const fingerprint = await coverFingerprintJpeg(model);
-  const stream = await keystream(password, streamLen(len), params, fingerprint);
+  const { stream } = await keystream(password, streamLen(len), params, fingerprint);
   const pad = stream.subarray(0, len);
   const reader = new StreamReader(stream.subarray(len));
   const bits = len * 8;
@@ -518,11 +580,12 @@ export async function embedKeyBlockStegoJpeg(
   keyBlock: Uint8Array,
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
+  opts?: StegoEmbedOptions,
 ): Promise<Uint8Array> {
   if (keyBlock.length !== KEY_BLOCK_LEN) {
     throw new RangeError(`stego: key block must be ${KEY_BLOCK_LEN} bytes`);
   }
-  return embedFixedStegoJpeg(jpegBytes, keyBlock, password, params);
+  return embedFixedStegoJpeg(jpegBytes, keyBlock, password, params, opts);
 }
 
 /**
@@ -545,8 +608,9 @@ export async function embedKeyFactorStegoJpeg(
   factor: Uint8Array,
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
+  opts?: StegoEmbedOptions,
 ): Promise<Uint8Array> {
-  return embedFixedStegoJpeg(jpegBytes, serializeKeyFactorBlock(factor), password, params);
+  return embedFixedStegoJpeg(jpegBytes, serializeKeyFactorBlock(factor), password, params, opts);
 }
 
 /** Recover the 32-byte key factor from a baseline JPEG, or null (indistinguishable). */

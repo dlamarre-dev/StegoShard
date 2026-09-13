@@ -610,8 +610,28 @@ fixed salt)` produces a seed, which is combined with a **fingerprint of the cove
   per-embedding nonce would have to be stored, and storing it would give the image the
   header this format exists to avoid. Note that a pre-embedding extraction check does
   **not** detect it, since both copies are clean at that point; only the narrower
-  overwrite case is visible that way. Nothing in the repository enforces the constraint
-  today, and the UI and CLI embed without any such check.
+  overwrite case is visible that way.
+
+  **What enforces it now.** `src/core/stego-guard.ts` refuses a repeat on every embedding
+  path — CLI, extension, web app, MCP server and library — by holding, per realm and in
+  memory, a tag per cover key already embedded into: `HKDF-Expand(ckey,
+"stegoshard/stego/guard", 16)` over the step-1a key. Keying on the derived key rather
+  than on the fingerprint is what makes it correct rather than merely strict: identical tag
+  ⟺ identical pad and identical positions, so the same cover under a different password, or
+  under different Argon2 parameters, is allowed — as it must be, since those derive
+  independent keystreams. Refusal is `StegoCoverReuseError` (`STEGO_COVER_REUSE`),
+  overridable per call and never globally.
+
+  Two properties worth checking rather than taking on trust. The tag is retained for the
+  realm's lifetime, which sits against this codebase's zeroization habit: it is one-way, 16
+  bytes, derived under an info label distinct from every other use of that key, and does
+  not permit recomputation of the pad; `ckey` itself is still zeroed. And the guard is
+  deliberately **not** durable. A file recording which covers had been used would catch far
+  more — the same photo tomorrow, on another machine, from a second pristine copy — and
+  would itself be a durable artifact proving stego covers exist, which is the state this
+  path refuses to keep. So it catches reuse within one run or one batch, and the constraint
+  above remains the operator's to keep.
+
 - **No structure on the wire.** Fixed payload length, no magic/length/header in
   the image. Wrong-password extraction yields random bytes that fail the §5.1
   key-block magic check and is reported identically to "no key here"

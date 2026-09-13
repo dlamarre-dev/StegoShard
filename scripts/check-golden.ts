@@ -16,6 +16,124 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+
+/**
+ * Read `DEFAULT_ARGON2`'s three fields out of a source blob, using TypeScript's
+ * own parser.
+ *
+ * THIS USED TO BE A REGEX, and it produced a fresh fail-open in every round of
+ * review it survived: stripping comments after the capture (a brace inside a
+ * comment truncated the body), then stripping the whole file (an unbalanced `/*`
+ * in any earlier string swallowed the declaration), then anchoring on the first
+ * mention of the name (a comment mentioning it was parsed instead of the
+ * constant), then anchoring on the first *declaration* -- which still lost,
+ * because the comment strip ran after the anchor, so a commented-out declaration
+ * matched first. That last one is the ordinary shape of a cost edit: comment the
+ * old line, write the new one. Both sides then parsed the old values and a real
+ * change would have shipped with no version bump.
+ *
+ * Every one of those bugs was in locating the declaration and deciding what was a
+ * comment. A lexer does both exactly, and `typescript` is already a dependency, so
+ * there is no reason to keep approximating one. What remains here is a walk to a
+ * named declaration and an evaluation of numeric literals -- no text scanning at
+ * all.
+ *
+ * Three outcomes, and conflating the last two is how a guard switches itself off:
+ * 'absent' means this blob DECLARES no such constant (a rename, a move, or a file
+ * that merely mentions or re-exports the name), 'unparseable' means a declaration
+ * is there in a shape this reader does not recognise. Only the second is a reason
+ * to refuse to guess, and the caller's message has to say which one happened --
+ * they send a contributor to different places, `COST_FILE` versus this function.
+ */
+export function readArgon2(blob: string): Record<string, number> | 'absent' | 'unparseable' {
+  const source = ts.createSourceFile('crypto.ts', blob, ts.ScriptTarget.Latest, true);
+
+  // The MODULE-LEVEL declaration, not the first one in pre-order. A walk over the
+  // whole tree would take a `DEFAULT_ARGON2` inside a function body -- a test
+  // helper above the real export, say -- and both sides of a diff would then read
+  // the helper. That is the same shape as the commented-out declaration this file
+  // has already been caught by, so it is excluded structurally rather than by
+  // hoping the real one comes first.
+  let initializer: ts.Expression | undefined;
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.name.text === 'DEFAULT_ARGON2' && decl.initializer) {
+        initializer ??= decl.initializer;
+      }
+    }
+  }
+  if (!initializer) return 'absent';
+
+  // Unwrap `Object.freeze({...})`, `{...} as const`, and parentheses -- and
+  // NOTHING else.
+  //
+  // Accepting any single-argument call was a fail-open: `tuneForHost({...})` or
+  // `Object.freeze(scaleMemory({...}))` would have been read as the constant's
+  // value, so changing the wrapper left both sides reading the same inner literal.
+  // The regex this replaced required a literal `Object.freeze(`, and that was the
+  // stricter behaviour.
+  //
+  // Refusing rather than evaluating is deliberate, and it is why this reads the
+  // AST instead of importing the module and taking the value. On the §5.3, §9.1
+  // and §10.2 paths this constant IS the format; it has to stay a plain literal
+  // anyone can read off the page, in TypeScript and in the Python mirror. A
+  // computed one should fail loudly here, not be quietly evaluated into agreement.
+  const isObjectFreeze = (call: ts.CallExpression): boolean =>
+    ts.isPropertyAccessExpression(call.expression) &&
+    ts.isIdentifier(call.expression.expression) &&
+    call.expression.expression.text === 'Object' &&
+    call.expression.name.text === 'freeze' &&
+    call.arguments.length === 1;
+
+  let expr = initializer;
+  for (;;) {
+    if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) expr = expr.expression;
+    else if (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+    else if (ts.isCallExpression(expr) && isObjectFreeze(expr)) expr = expr.arguments[0]!;
+    else break;
+  }
+  if (!ts.isObjectLiteralExpression(expr)) return 'unparseable';
+
+  /** Numeric literals and the products the real constant is written with. */
+  const value = (node: ts.Expression): number | undefined => {
+    if (ts.isNumericLiteral(node)) return Number(node.text);
+    if (ts.isParenthesizedExpression(node)) return value(node.expression);
+    if (ts.isBinaryExpression(node)) {
+      const l = value(node.left);
+      const r = value(node.right);
+      if (l === undefined || r === undefined) return undefined;
+      if (node.operatorToken.kind === ts.SyntaxKind.AsteriskToken) return l * r;
+      if (node.operatorToken.kind === ts.SyntaxKind.PlusToken) return l + r;
+    }
+    return undefined;
+  };
+
+  const out: Record<string, number> = {};
+  for (const prop of expr.properties) {
+    // Anything that is not a plain `name: <number>` -- a spread, a computed key, a
+    // shorthand, a method -- means this reader has not understood the literal, and
+    // saying so is the whole point of the 'unparseable' outcome.
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) return 'unparseable';
+    const v = value(prop.initializer);
+    if (v === undefined) return 'unparseable';
+    out[prop.name.text] = v;
+  }
+  // Exactly the three fields, no more and no fewer. The regex this replaced
+  // required the full set and the first AST version did not, so
+  // `Object.freeze({ iterations: 4 })` parsed confidently -- and if a field were
+  // ever extracted into its own constant, later changes to it would compare equal
+  // forever.
+  const EXPECTED = ['iterations', 'memoryKiB', 'parallelism'];
+  const found = Object.keys(out).sort();
+  return EXPECTED.every((k) => found.includes(k)) && found.length === EXPECTED.length
+    ? out
+    : 'unparseable';
+}
 
 const CONSTANTS = [
   ['src/core/header.ts', 'FORMAT_VERSION'],
@@ -63,7 +181,15 @@ function main(): void {
     console.log(`${message} (skipping locally)`);
     return;
   }
-  const changed = status.map((l) => l.split('\t').slice(1).join('\t'));
+  // Every path a status line names, not the tail joined back together.
+  //
+  // `--name-status` emits `R097\told\tnew` for a rename, and joining the tail
+  // produced the single string "src/core/crypto.ts\tsrc/core/kdf.ts" -- so
+  // `changed.includes(COST_FILE)` was false and a change that MOVED crypto.ts
+  // while altering the cost skipped the guard entirely. That is the most likely
+  // way this constant ever moves, so it is the case the guard could least afford
+  // to miss.
+  const changed = status.flatMap((l) => l.split('\t').slice(1).filter(Boolean));
 
   // Read the constant's value on both sides and require it to have gone up.
   //
@@ -92,34 +218,87 @@ function main(): void {
   // decided?"; a cost change that did *not* regenerate the corpus would take the
   // `touched.length === 0` exit and never be looked at, which is precisely the
   // change most worth catching.
-  const readArgon2 = (blob: string): Record<string, number> | null => {
-    const body = /DEFAULT_ARGON2[^=]*=\s*Object\.freeze\(\{([^}]*)\}/.exec(blob);
-    if (!body) return null;
-    const out: Record<string, number> = {};
-    for (const [, key, expr] of body[1]!.matchAll(/(\w+)\s*:\s*([^,\n]+)/g)) {
-      // Tolerate `256 * 1024` as well as `262144`; refuse anything else rather
-      // than guess, so an unreadable literal fails loudly instead of comparing
-      // two nulls and agreeing.
-      const product = /^\s*(\d+)\s*\*\s*(\d+)\s*$/.exec(expr!);
-      const plain = /^\s*(\d+)\s*$/.exec(expr!);
-      if (product) out[key!] = Number(product[1]) * Number(product[2]);
-      else if (plain) out[key!] = Number(plain[1]);
-      else return null;
-    }
-    return out;
-  };
-
   const COST_FILE = 'src/core/crypto.ts';
   const VERSION_FILE = 'src/core/header.ts';
   if (changed.includes(COST_FILE)) {
-    let costBefore: Record<string, number> | null;
+    // Two different reasons the base side can be absent, and only one of them is
+    // benign. `git show` throwing means the file is new on this branch, so there
+    // is genuinely nothing to compare against. `readArgon2` returning null means
+    // the literal was there and could not be parsed -- and treating THAT as
+    // "nothing to compare" is the same silent bypass the costNow check below
+    // refuses. Hardening one side and not the other left the hole open.
+    const unreadable = (where: string, why: 'absent' | 'unparseable'): never => {
+      console.error(
+        [
+          `golden:check: cannot read DEFAULT_ARGON2 from ${where}.`,
+          '',
+          why === 'absent'
+            ? 'The constant is not declared there at all. If it was renamed or moved,'
+            : 'The literal is there but is not a shape this guard can parse, so it',
+          why === 'absent'
+            ? 'update COST_FILE and readArgon2 in this file -- do not remove the rule.'
+            : 'cannot tell whether the cost changed. Update readArgon2 -- do not remove it.',
+          '',
+          'On the stego, gallery and slot-KEK paths the cost IS the format; see',
+          'docs/VERSIONING.md.',
+        ].join('\n'),
+      );
+      process.exit(1);
+    };
+
+    /**
+     * Narrow the reader's three outcomes down to a value, exiting on the rest.
+     *
+     * `return unreadable(...)` rather than a cast: `unreadable` is annotated
+     * `never`, so this typechecks on its own. The cast that used to be here
+     * silenced the compiler on precisely the hazard this function exists to
+     * handle.
+     */
+    const costAt = (where: string, blob: string): Record<string, number> => {
+      const read = readArgon2(blob);
+      if (read === 'absent' || read === 'unparseable') return unreadable(where, read);
+      return read;
+    };
+
+    // The try covers the `git show` and NOTHING else. It used to wrap `costAt` as
+    // well, so a throw from the reader was swallowed as "new file on this branch"
+    // and the comparison was skipped -- the opposite of what the comment below it
+    // promised.
+    let baseBlob: string | undefined;
     try {
-      costBefore = readArgon2(git('show', `${base}:${COST_FILE}`));
+      baseBlob = git('show', `${base}:${COST_FILE}`);
     } catch {
-      costBefore = null; // new file; nothing to compare against
+      baseBlob = undefined; // not in the base tree: new here, or renamed into place
     }
-    const costNow = readArgon2(git('show', `HEAD:${COST_FILE}`));
-    if (costBefore && costNow && JSON.stringify(costBefore) !== JSON.stringify(costNow)) {
+    const costBefore =
+      baseBlob === undefined ? undefined : costAt(`${base}:${COST_FILE}`, baseBlob);
+
+    // A deleted COST_FILE reaches here too -- `D<TAB>path` puts it in `changed` --
+    // and `git show HEAD:<deleted>` throws. Reported as guidance rather than as a
+    // raw execFileSync stack trace, since the answer is to update COST_FILE.
+    const headBlob = ((): string => {
+      try {
+        return git('show', `HEAD:${COST_FILE}`);
+      } catch {
+        return unreadable(`HEAD:${COST_FILE}`, 'absent');
+      }
+    })();
+    const costNow = costAt(COST_FILE, headBlob);
+    // An unreadable literal is a hard failure, not a skip (see `costAt` above).
+    // `readArgon2` refuses to guess at a shape it does not recognise, and treating
+    // that as "nothing changed" would turn the refusal into a silent bypass -- the
+    // check would switch itself off for exactly the edit most likely to have
+    // rewritten the literal. A `git show` that THROWS is different and legitimate:
+    // the file is new on this branch, so there is nothing to compare against.
+    // Compared field by field. `JSON.stringify` preserves insertion order and `out`
+    // is built in AST property order, so reordering the three keys with no value
+    // change would have failed CI as a cost change. (The messages below still use
+    // stringify, which is fine: they are for a human to read.)
+    const sameCost = (a: Record<string, number>, b: Record<string, number>): boolean => {
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+      return keys.every((k) => a[k] === b[k]);
+    };
+    if (costBefore !== undefined && !sameCost(costBefore, costNow)) {
       let versionBumped: boolean;
       try {
         const was = readVersion(git('show', `${base}:${VERSION_FILE}`), 'FORMAT_VERSION');
@@ -226,4 +405,67 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+// Only when run as a script. `readArgon2` is imported by
+// tests/docs/check-golden-argon2.test.ts, and without this guard that import would
+// execute the whole check -- git subprocesses, and a `process.exit(1)` that would
+// take the test run down with it.
+//
+// Compared through realpath on BOTH sides, which is the whole fix. The first
+// version compared `import.meta.url` against `pathToFileURL(process.argv[1])`, and
+// ESM resolves symlinks while argv does not -- so running the script through a
+// symlinked checkout matched nothing, skipped main(), and exited 0 having printed
+// and checked nothing at all. A guard that silently becomes a no-op is worse than
+// no guard.
+//
+// With realpath on both sides that case now matches and runs, so the non-matching
+// branch is only ever "something imported this module" -- a test, or a future
+// caller of `readArgon2`. Staying quiet there is correct; an earlier attempt made
+// it exit(1), which killed the test run on import, reintroducing the same class of
+// problem from the other direction.
+function isEntryModule(): boolean {
+  const invokedAs = process.argv[1];
+  // No entry script at all: something imported this module.
+  if (!invokedAs) return false;
+
+  // When identity cannot be established, RUN. A guard that skips itself reports
+  // green having checked nothing, which this file has already done once behind a
+  // symlink; a guard that runs when it should not merely prints a line. The
+  // earlier version wrapped both resolutions in one try and returned false on any
+  // failure, so a non-`file:` `import.meta.url` -- the bundled-runner case cited
+  // as the reason for the try -- silently disabled the whole check.
+  // Taken off the URL string, never through `fileURLToPath`. The previous fallback
+  // called that function again -- the very call whose throw put us in the catch --
+  // so the bundled-runner case it existed for was never reachable, and the check
+  // exited 0 having run nothing. A URL always has a last path segment, whatever
+  // its scheme.
+  //
+  // This fix was described in a commit message one round before it was actually
+  // made; the block was byte-identical to the version it claimed to change.
+  const ownName = import.meta.url.split('/').pop() ?? '';
+  const byName = (): boolean => basename(invokedAs) === ownName;
+
+  let self: string;
+  try {
+    self = realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    // Our own location is unresolvable: a non-`file:` URL, or a permissions
+    // failure. Nothing to compare against, so fall back to the entry's name.
+    try {
+      return byName();
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return realpathSync(invokedAs) === self;
+  } catch {
+    // The entry path itself does not resolve -- a loader that rewrites it, or a
+    // deleted file. `realpathSync` throws rather than returning, which is why this
+    // is caught at all.
+    return basename(invokedAs) === basename(self);
+  }
+}
+
+if (isEntryModule()) {
+  main();
+}

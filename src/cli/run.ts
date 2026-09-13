@@ -27,7 +27,7 @@ import {
 } from '../api/node/commands';
 import { codecArgError, entropyArgError, exportNumberArgError } from './argcheck';
 import { identityLine, mintVaultId } from './identity';
-import { CliError, type CliErrorCode, toCliFailure } from './errors';
+import { CliError, type CliErrorCode, coverReuseHint, toCliFailure } from './errors';
 import type { CliIo } from './io';
 import { humanPresenter, type Presenter } from './present';
 import { jsonPresenter } from './json';
@@ -291,6 +291,7 @@ const OPTIONS = {
   'export-number': { type: 'string' },
   quiet: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
+  'allow-cover-reuse': { type: 'boolean' },
   json: { type: 'boolean' },
 } as const;
 
@@ -354,6 +355,14 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       command,
     });
     if (wrongCommand) fail(wrongCommand.message, wrongCommand.code);
+    // Same rule for --allow-cover-reuse, and for the same reason: only a save
+    // embeds into a cover, so accepting it on `restore` would be a flag that
+    // quietly does nothing. That is the exact bug this project has now shipped
+    // twice -- `--track` on restore, and this -- so it is worth refusing by
+    // construction rather than by memory.
+    if (values['allow-cover-reuse']) {
+      fail(t('errCoverReuseWrongCommand', { command }), 'USAGE');
+    }
   }
 
   const force = Boolean(values.force);
@@ -440,6 +449,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       keyLocation: values['key-location'] as string | undefined,
       fontPath: values.font as string | undefined,
       force,
+      allowCoverReuse: Boolean(values['allow-cover-reuse']),
       // The terminal is headless and bounded only by the machine's RAM, so it
       // asks for the full 1 GiB budget. The orchestration layer defaults to the
       // conservative 256 MiB figure for embedded callers, so this has to be said
@@ -543,6 +553,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       mode: gMode as 'plain' | 'nonpossession',
       threshold: gThreshold,
       force,
+      allowCoverReuse: Boolean(values['allow-cover-reuse']),
     });
     present.gallerySave(res);
     return 0;
@@ -615,7 +626,14 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
     return await runCommand(argv, quiet, present);
   } catch (err) {
     const failure = toCliFailure(err);
-    present.failure(failure, err);
+    // The flag hint is appended at both CLI exits, and there are exactly two: this
+    // one, which is reached ONLY under `--json` (the human path returns above,
+    // before this try, and leaves its failure to the bootstrap), and main.ts for
+    // everything else. Appending it only in main.ts dropped it from `--json`,
+    // which is still the command line. It stays out of `toCliFailure` itself
+    // because MCP shares that classifier and offers no such flag.
+    const hint = coverReuseHint(err);
+    present.failure(hint ? { ...failure, message: `${failure.message} ${hint}` } : failure, err);
     return failure.exitCode;
   }
 }

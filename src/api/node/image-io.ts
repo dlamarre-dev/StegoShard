@@ -18,6 +18,7 @@ import {
   decodeWithAnyCodec,
   embedKeyBlockStego,
   embedKeyBlockStegoJpeg,
+  type StegoEmbedOptions,
   embedKeyFactorStego,
   embedKeyFactorStegoJpeg,
   extractKeyBlockStego,
@@ -177,10 +178,11 @@ export async function embedKeyImage(
   coverName: string,
   keyBlock: Uint8Array,
   password: string,
+  opts?: StegoEmbedOptions,
 ): Promise<StegoKeyImage> {
   if (isJpegBytes(coverBytes)) {
     try {
-      const out = await embedKeyBlockStegoJpeg(coverBytes, keyBlock, password);
+      const out = await embedKeyBlockStegoJpeg(coverBytes, keyBlock, password, undefined, opts);
       return { bytes: out, ext: 'jpg' };
     } catch (err) {
       if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
@@ -189,7 +191,7 @@ export async function embedKeyImage(
   }
   if (isPngBytes(coverBytes)) {
     const img = fileToImageData(coverBytes, coverName);
-    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password);
+    await embedKeyBlockStego(img.data, img.width, img.height, keyBlock, password, undefined, opts);
     return { bytes: imageDataToPng(img), ext: 'png' };
   }
   throw new StegoCoverFormatError();
@@ -246,10 +248,11 @@ export async function embedKeyFactorImage(
   coverName: string,
   factor: Uint8Array,
   password: string,
+  opts?: StegoEmbedOptions,
 ): Promise<StegoKeyImage> {
   if (isJpegBytes(coverBytes)) {
     try {
-      const out = await embedKeyFactorStegoJpeg(coverBytes, factor, password);
+      const out = await embedKeyFactorStegoJpeg(coverBytes, factor, password, undefined, opts);
       return { bytes: out, ext: 'jpg' };
     } catch (err) {
       if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
@@ -258,7 +261,7 @@ export async function embedKeyFactorImage(
   }
   if (isPngBytes(coverBytes)) {
     const img = fileToImageData(coverBytes, coverName);
-    await embedKeyFactorStego(img.data, img.width, img.height, factor, password);
+    await embedKeyFactorStego(img.data, img.width, img.height, factor, password, undefined, opts);
     return { bytes: imageDataToPng(img), ext: 'png' };
   }
   throw new StegoCoverFormatError();

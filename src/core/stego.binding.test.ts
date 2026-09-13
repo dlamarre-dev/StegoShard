@@ -29,9 +29,18 @@
  * constant is consistent. So these tests compare *across* covers instead.
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resetStegoCoverGuard, StegoCoverReuseError } from '@core';
 import jpeg from 'jpeg-js';
 import { decode as decodeCoeff, encode as encodeCoeff, type JpegModel } from './jpeg-coeff';
+
+// The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
+// without this one test's covers would refuse the next test's embeds. That is
+// pollution between independent scenarios rather than the behaviour under test:
+// each `it` here is its own session. A test that deliberately reuses a cover
+// says so with `allowCoverReuse`, which is the honest way to express it.
+beforeEach(resetStegoCoverGuard);
+
 import {
   type Argon2Params,
   createKeyBlock,
@@ -360,6 +369,22 @@ describe('the JPEG carrier layout is bound to the cover (SPEC §5.3)', () => {
  * the payload XOR" and it is the accurate one.
  */
 describe('reusing one cover repeats the keystream (SPEC §5.3 constraint)', () => {
+  it('is refused by default, which is why the test below has to opt out', async () => {
+    // The other half of the measurement. Everything below shows what reuse leaks;
+    // this shows that reaching it now takes a deliberate flag. If the guard ever
+    // stops refusing, this fails first and points at the reason the numbers below
+    // matter.
+    const base = await keyBlockBytes('pw-one');
+    const other = base.slice();
+    other[40] = other[40]! ^ 0x01;
+    const a = makeCover(7);
+    const b = makeCover(7);
+    await embedKeyBlockStego(a, W, H, base, PW, FAST);
+    await expect(embedKeyBlockStego(b, W, H, other, PW, FAST)).rejects.toThrow(
+      StegoCoverReuseError,
+    );
+  });
+
   it('cancels the pad, so payload differences map one-to-one onto image differences', async () => {
     // The two-time pad, demonstrated by counting rather than by argument, and
     // stated more carefully than it was at first.
@@ -381,11 +406,21 @@ describe('reusing one cover repeats the keystream (SPEC §5.3 constraint)', () =
     const threeBitsOff = base.slice();
     threeBitsOff[10] = threeBitsOff[10]! ^ 0x07;
 
+    // `allowCoverReuse` is the point of this block, not an inconvenience: the
+    // guard in src/core/stego-guard.ts refuses exactly what this test measures, so
+    // demonstrating the weakness now means opting out of the protection against
+    // it. The file that measures the leak is therefore also the file that
+    // documents the override, and the assertion below pins that the default
+    // refuses.
     const embedPair = async (other: Uint8Array, passwordB: string) => {
       const a = makeCover(7);
       const b = makeCover(7); // an identical copy, not a different photo
-      await embedKeyBlockStego(a, W, H, base, PW, FAST);
-      await embedKeyBlockStego(b, W, H, other, passwordB, FAST);
+      // Both embeds opt out, not just the second: this helper runs three times
+      // over the same cover and password, so its *first* embed collides with the
+      // previous run's as well.
+      const reuse = { allowCoverReuse: true };
+      await embedKeyBlockStego(a, W, H, base, PW, FAST, reuse);
+      await embedKeyBlockStego(b, W, H, other, passwordB, FAST, reuse);
       return changedPositions(a, b).length;
     };
 
