@@ -33,6 +33,12 @@ export default [
       '.stryker-tmp/**',
       'reports/**',
       'test-results/**',
+      // A Claude Code skill install, same story one tool over again: the tree
+      // under .claude/ is a vendored upstream package this repository does not
+      // own, and linting it reported 164 problems in code nobody here wrote. CI
+      // never noticed, because a fresh checkout has no skills installed. Also in
+      // .gitignore and .prettierignore.
+      '.claude/**',
     ],
   },
   js.configs.recommended,

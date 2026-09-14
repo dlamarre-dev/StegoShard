@@ -66,3 +66,10 @@ reports/
 # committed for two reasons: `ci:node` runs `notices:check` before any build has
 # happened, and a change to what we distribute should be a reviewable diff rather
 # than something that only appears in a regenerated notices file.
+
+# Locally installed Claude Code skills. Developer tooling, not part of the
+# product: vendored from upstream, large, and formatted to its own conventions,
+# which is why it is in .prettierignore too. `skills-lock.json` is deliberately
+# NOT ignored. It records which skill and revision were installed, the way
+# package-lock.json does, and that should be a reviewable diff.
+.claude/

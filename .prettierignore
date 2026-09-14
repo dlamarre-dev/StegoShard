@@ -19,3 +19,14 @@ tests/golden
 # Site-root tokens (search-engine and CA verification). Their contents are fixed
 # by the issuer and verification fails on any edit, including a trailing newline.
 src/web/site-root
+
+# The specification the architecture diagram is rendered from. It carries a
+# SHA-256 receipt recorded at delivery time, and reformatting it would break
+# that receipt without changing what the diagram says. Regenerate the PNG with
+# the archify skill after editing it, then run `npm run architecture:check`.
+docs/architecture.archify.json
+
+# Locally installed Claude Code skills, vendored from upstream and formatted to
+# their own conventions. Reformatting them would produce a large diff against
+# code this repository does not own. Also ignored by git.
+.claude/

@@ -1,0 +1,486 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "StegoShard Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/dlamarre-dev/StegoShard",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "e2aa6b0cb3eb1174af5771bf36bba39b9d7ad3ed"
+    },
+    "views": [
+      {
+        "id": "save-path",
+        "label": "Resilient save path",
+        "focus": [
+          "browser",
+          "core",
+          "crypto",
+          "erasure",
+          "codec",
+          "resilient"
+        ],
+        "note": "A file becomes encrypted shards, then coded images or printed pages."
+      },
+      {
+        "id": "machine-surfaces",
+        "label": "Machine surfaces",
+        "focus": [
+          "cli",
+          "mcp",
+          "nodeapi",
+          "core"
+        ],
+        "note": "CLI, MCP server and library all reach the core through one Node API."
+      },
+      {
+        "id": "deniable-path",
+        "label": "Deniable path",
+        "focus": [
+          "core",
+          "containers",
+          "deniable"
+        ],
+        "note": "The same bytes behind a SQLite header, or a key hidden in a photo."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Browser app",
+      "sublabel": "extension and web app",
+      "tag": "9 locales",
+      "pos": [
+        30,
+        110
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/ui/app.ts",
+          "label": "shared UI"
+        },
+        {
+          "path": "src/web/main.ts",
+          "label": "web app entry"
+        },
+        {
+          "path": "src/ui/pipeline.worker.ts",
+          "label": "Web Worker"
+        }
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "CLI",
+      "sublabel": "save, restore, estimate",
+      "pos": [
+        30,
+        300
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/cli/run.ts",
+          "label": "command layer"
+        },
+        {
+          "path": "src/cli/main.ts",
+          "label": "process entry"
+        },
+        {
+          "path": "src/cli/identity.ts",
+          "label": "export number"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP server",
+      "sublabel": "stdio only, no socket",
+      "pos": [
+        30,
+        470
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/mcp/server.ts",
+          "label": "stdio server"
+        },
+        {
+          "path": "src/mcp/tools.ts",
+          "label": "tool surface"
+        },
+        {
+          "path": "src/mcp/policy.ts",
+          "label": "root policy"
+        }
+      ]
+    },
+    {
+      "id": "nodeapi",
+      "type": "backend",
+      "label": "Node API",
+      "sublabel": "stegoshard/node, file I/O",
+      "pos": [
+        270,
+        390
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/api/node.ts",
+          "label": "public surface"
+        },
+        {
+          "path": "src/api/node/commands.ts",
+          "label": "command bodies"
+        },
+        {
+          "path": "src/api/index.ts",
+          "label": "browser library"
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "Vault pipeline",
+      "sublabel": "export and import",
+      "tag": "FORMAT_VERSION 2",
+      "pos": [
+        510,
+        225
+      ],
+      "size": [
+        180,
+        92
+      ],
+      "sources": [
+        {
+          "path": "src/core/vault.ts",
+          "label": "orchestration"
+        },
+        {
+          "path": "src/core/segmented.ts",
+          "label": "chunked AEAD"
+        },
+        {
+          "path": "src/core/binary-container.ts",
+          "label": "ssbn wrapper"
+        }
+      ]
+    },
+    {
+      "id": "crypto",
+      "type": "security",
+      "label": "Crypto core",
+      "sublabel": "Argon2id, AES-GCM, AAD",
+      "tag": "256 MiB",
+      "pos": [
+        870,
+        50
+      ],
+      "size": [
+        170,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/crypto.ts",
+          "label": "KEK and DEK"
+        },
+        {
+          "path": "src/core/aad.ts",
+          "label": "per-site AAD"
+        }
+      ]
+    },
+    {
+      "id": "erasure",
+      "type": "backend",
+      "label": "Erasure coding",
+      "sublabel": "Reed-Solomon k + m shards",
+      "pos": [
+        870,
+        195
+      ],
+      "size": [
+        170,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/erasure.ts",
+          "label": "shard split"
+        },
+        {
+          "path": "src/core/reed-solomon.ts",
+          "label": "GF(256) codec"
+        }
+      ]
+    },
+    {
+      "id": "codec",
+      "type": "backend",
+      "label": "Image codecs",
+      "sublabel": "color-grid and qr-grid",
+      "pos": [
+        870,
+        340
+      ],
+      "size": [
+        170,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/codec/index.ts",
+          "label": "codec registry"
+        },
+        {
+          "path": "src/core/codec/color-grid.ts",
+          "label": "colour grid"
+        },
+        {
+          "path": "src/core/codec/qr-grid.ts",
+          "label": "QR grid"
+        }
+      ]
+    },
+    {
+      "id": "containers",
+      "type": "security",
+      "label": "Containers",
+      "sublabel": "binary, SQLite, photo LSB",
+      "pos": [
+        870,
+        485
+      ],
+      "size": [
+        170,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/sqlite-container.ts",
+          "label": "decoy header"
+        },
+        {
+          "path": "src/core/stego.ts",
+          "label": "keyed LSB"
+        },
+        {
+          "path": "src/core/stego-guard.ts",
+          "label": "cover reuse guard"
+        }
+      ]
+    },
+    {
+      "id": "resilient",
+      "type": "database",
+      "label": "Resilient forms",
+      "sublabel": "images, PDF pages, .ssbn",
+      "pos": [
+        1170,
+        270
+      ],
+      "size": [
+        165,
+        80
+      ],
+      "sources": [
+        {
+          "path": "SPEC.md",
+          "label": "format spec"
+        }
+      ]
+    },
+    {
+      "id": "deniable",
+      "type": "database",
+      "label": "Deniable forms",
+      "sublabel": "ordinary photos, decoy .db",
+      "pos": [
+        1170,
+        485
+      ],
+      "size": [
+        165,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/access.ts",
+          "label": "access structures"
+        },
+        {
+          "path": "src/core/gallery.ts",
+          "label": "Gallery Mode"
+        },
+        {
+          "path": "SPEC.md",
+          "label": "format spec"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Entry surfaces, offline on your device",
+      "wraps": [
+        "browser",
+        "cli",
+        "mcp",
+        "nodeapi"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Shared byte core (src/core)",
+      "wraps": [
+        "core",
+        "crypto",
+        "erasure",
+        "codec",
+        "containers"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-to-core",
+      "from": "browser",
+      "to": "core",
+      "label": "in page and in a worker",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cli-to-nodeapi",
+      "from": "cli",
+      "to": "nodeapi"
+    },
+    {
+      "id": "mcp-to-nodeapi",
+      "from": "mcp",
+      "to": "nodeapi",
+      "label": "same commands, JSON out",
+      "labelDx": -20
+    },
+    {
+      "id": "nodeapi-to-core",
+      "from": "nodeapi",
+      "to": "core",
+      "label": "reads files, passes bytes"
+    },
+    {
+      "id": "core-to-crypto",
+      "from": "core",
+      "to": "crypto",
+      "label": "wrap and unwrap the DEK",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "core-to-erasure",
+      "from": "core",
+      "to": "erasure",
+      "label": "split into k + m shards"
+    },
+    {
+      "id": "core-to-codec",
+      "from": "core",
+      "to": "codec",
+      "label": "render each shard",
+      "labelDy": -8
+    },
+    {
+      "id": "core-to-containers",
+      "from": "core",
+      "to": "containers",
+      "label": "wrap or hide",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "codec-to-resilient",
+      "from": "codec",
+      "to": "resilient",
+      "label": "self-describing images"
+    },
+    {
+      "id": "containers-to-resilient",
+      "from": "containers",
+      "to": "resilient",
+      "label": ".ssbn vault",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "containers-to-deniable",
+      "from": "containers",
+      "to": "deniable",
+      "label": "decoy .db, hidden key",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Surfaces",
+      "items": [
+        "Extension, web app, CLI, MCP server, library",
+        "No account, no server, no network permission"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Byte core",
+      "items": [
+        "Argon2id 256 MiB wraps the AES-256-GCM key",
+        "Every AEAD site is bound to its container"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Output forms",
+      "items": [
+        "Deniable adds Gallery Mode across many photos",
+        "A reused photo cover is refused, not reused"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Verification",
+      "items": [
+        "A Python decoder restores both families in CI",
+        "FORMAT_VERSION 2, versioned but not yet frozen"
+      ]
+    }
+  ]
+}
