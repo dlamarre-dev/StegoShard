@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "StegoShard Key Material",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1070,
+      500
+    ],
+    "views": [
+      {
+        "id": "password-path",
+        "label": "From a password",
+        "focus": [
+          "password",
+          "kek",
+          "keyblock"
+        ],
+        "note": "One Argon2id derivation per unlock attempt, which is the cost that buys the rest."
+      },
+      {
+        "id": "gated",
+        "label": "Gated credentials",
+        "focus": [
+          "keyfactor",
+          "shares",
+          "kek"
+        ],
+        "note": "A keyfile factor mixes in; threshold shares gate a KEK you cannot otherwise form."
+      },
+      {
+        "id": "content",
+        "label": "What encrypts content",
+        "focus": [
+          "dek",
+          "regionkey",
+          "sealed"
+        ],
+        "note": "The DEK never encrypts content directly. A per-region key does."
+      },
+      {
+        "id": "rest",
+        "label": "Where the key rests",
+        "focus": [
+          "keyblock",
+          "embedded",
+          "keyfile",
+          "photo"
+        ],
+        "note": "The same wrapped block, in a vault, a file, or nowhere visible at all."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "emphasis": {
+          "label": "Main path"
+        },
+        "security": {
+          "label": "Gated or deniable"
+        },
+        "default": {
+          "label": "Supporting flow"
+        },
+        "database": {
+          "label": "Written to disk"
+        }
+      }
+    }
+  },
+  "stages": [
+    {
+      "label": "What you supply"
+    },
+    {
+      "label": "Keys in memory"
+    },
+    {
+      "label": "Sealed structures"
+    },
+    {
+      "label": "Where the key rests"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "password",
+      "type": "external",
+      "stage": 0,
+      "row": 0,
+      "label": "Password",
+      "sublabel": "NFC normalized",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "keyfactor",
+      "type": "security",
+      "stage": 0,
+      "row": 1,
+      "label": "Key factor",
+      "sublabel": "keyfile or photo",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "shares",
+      "type": "external",
+      "stage": 0,
+      "row": 2,
+      "label": "Shamir shares",
+      "sublabel": "k of n",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "kek",
+      "type": "security",
+      "stage": 1,
+      "row": 0,
+      "label": "KEK",
+      "sublabel": "never stored",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "dek",
+      "type": "security",
+      "stage": 1,
+      "row": 1,
+      "label": "DEK",
+      "sublabel": "AES-256, random",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "regionkey",
+      "type": "security",
+      "stage": 1,
+      "row": 2,
+      "label": "Region key",
+      "sublabel": "one per region",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "keyblock",
+      "type": "database",
+      "stage": 2,
+      "row": 1,
+      "label": "Key block",
+      "sublabel": "SSKY v2",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "sealed",
+      "type": "database",
+      "stage": 2,
+      "row": 2,
+      "label": "Sealed content",
+      "sublabel": "AES-256-GCM",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "embedded",
+      "type": "database",
+      "stage": 3,
+      "row": 0,
+      "label": "In the vault",
+      "sublabel": "embedded mode",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "keyfile",
+      "type": "database",
+      "stage": 3,
+      "row": 1,
+      "label": "A .key file",
+      "sublabel": "keyfile mode",
+      "width": 104,
+      "height": 64
+    },
+    {
+      "id": "photo",
+      "type": "security",
+      "stage": 3,
+      "row": 2,
+      "label": "Ordinary photo",
+      "sublabel": "no header at all",
+      "width": 104,
+      "height": 64
+    }
+  ],
+  "flows": [
+    {
+      "id": "password-kek",
+      "from": "password",
+      "to": "kek",
+      "label": "Argon2id, 256 MiB",
+      "classification": "secret",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -24
+    },
+    {
+      "id": "keyfactor-kek",
+      "from": "keyfactor",
+      "to": "kek",
+      "label": "HKDF mixes it in",
+      "classification": "secret",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          180,
+          274
+        ],
+        [
+          180,
+          160
+        ]
+      ]
+    },
+    {
+      "id": "shares-kek",
+      "from": "shares",
+      "to": "kek",
+      "label": "k shares gate it",
+      "classification": "never stored",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          240,
+          388
+        ],
+        [
+          240,
+          160
+        ]
+      ],
+      "labelDx": -40,
+      "labelDy": 26
+    },
+    {
+      "id": "kek-keyblock",
+      "from": "kek",
+      "to": "keyblock",
+      "label": "wraps the DEK",
+      "classification": "never stored",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          400,
+          160
+        ],
+        [
+          400,
+          274
+        ]
+      ]
+    },
+    {
+      "id": "dek-keyblock",
+      "from": "dek",
+      "to": "keyblock",
+      "label": "wrapped",
+      "classification": "sealed",
+      "route": "straight",
+      "labelDy": 26
+    },
+    {
+      "id": "dek-regionkey",
+      "from": "dek",
+      "to": "regionkey",
+      "label": "HKDF per region",
+      "classification": "secret",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "regionkey-sealed",
+      "from": "regionkey",
+      "to": "sealed",
+      "label": "encrypts content",
+      "classification": "sealed",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "keyblock-embedded",
+      "from": "keyblock",
+      "to": "embedded",
+      "label": "with the images",
+      "classification": "at rest",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          600,
+          274
+        ],
+        [
+          600,
+          160
+        ]
+      ]
+    },
+    {
+      "id": "keyblock-keyfile",
+      "from": "keyblock",
+      "to": "keyfile",
+      "label": "kept apart",
+      "classification": "at rest",
+      "route": "straight",
+      "labelDy": -24
+    },
+    {
+      "id": "keyblock-photo",
+      "from": "keyblock",
+      "to": "photo",
+      "label": "into keyed LSBs",
+      "classification": "deniable",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          637,
+          274
+        ],
+        [
+          637,
+          388
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Never written",
+      "items": [
+        "KEK and raw DEK are zeroized after use",
+        "The writer keeps no secret, no share"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Forming the KEK",
+      "items": [
+        "Argon2id at 256 MiB per attempt",
+        "A factor mixes in; shares gate it"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Content keys",
+      "items": [
+        "A region key is HKDF of the DEK",
+        "AAD binds every site to its container"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "What leaks",
+      "items": [
+        "No k, n, or slot count in a container",
+        "A stego photo has no header or length"
+      ]
+    }
+  ]
+}

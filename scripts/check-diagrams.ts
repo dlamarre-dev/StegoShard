@@ -68,9 +68,14 @@ const LOCALES = 'public/_locales';
  * One entry per generated diagram.
  *
  * `sources` says whether the diagram's schema can carry source links at all.
- * The architecture schema can; the workflow schema has no such field, so there
- * is nothing to check liveness on and pretending otherwise would report a
- * passing count for a rule that never ran.
+ * The architecture schema can; the workflow and data-flow schemas have no such
+ * field, so there is nothing to check liveness on and pretending otherwise would
+ * report a passing count for a rule that never ran.
+ *
+ * `rules` hangs off the entry rather than being selected by a conditional in
+ * main(). With two diagrams a ternary was equivalent; with three it is a trap,
+ * because the diagram nobody named falls through to another diagram's rules and
+ * reports agreement it never checked. The registry is the one place that knows.
  */
 export interface Diagram {
   /** Names the diagram in a failure message. */
@@ -78,6 +83,7 @@ export interface Diagram {
   spec: string;
   png: string;
   sources: boolean;
+  rules: (localeCount: number) => ClaimRule[];
 }
 
 export const DIAGRAMS: Diagram[] = [
@@ -86,12 +92,21 @@ export const DIAGRAMS: Diagram[] = [
     spec: 'docs/architecture.archify.json',
     png: 'docs/images/architecture.png',
     sources: true,
+    rules: (locales) => architectureClaimRules(locales),
   },
   {
     id: 'workflow',
     spec: 'docs/workflow.archify.json',
     png: 'docs/images/workflow.png',
     sources: false,
+    rules: () => workflowClaimRules(),
+  },
+  {
+    id: 'dataflow',
+    spec: 'docs/dataflow.archify.json',
+    png: 'docs/images/dataflow.png',
+    sources: false,
+    rules: () => dataflowClaimRules(),
   },
 ];
 
@@ -168,6 +183,23 @@ export function workflowClaimRules(): ClaimRule[] {
       id: 'workflow-argon2-memory',
       pattern: /(\d+) MiB/g,
       count: 1,
+      expected: DEFAULT_ARGON2.memoryKiB / 1024,
+      source: 'DEFAULT_ARGON2.memoryKiB in src/core/crypto.ts',
+    },
+  ];
+}
+
+/**
+ * The data-flow diagram states the Argon2 cost twice: on the derivation flow
+ * and again in a card. Pinned at two for the same reason every count here is
+ * pinned, so a reworded label fails loudly rather than matching nothing.
+ */
+export function dataflowClaimRules(): ClaimRule[] {
+  return [
+    {
+      id: 'dataflow-argon2-memory',
+      pattern: /(\d+) MiB/g,
+      count: 2,
       expected: DEFAULT_ARGON2.memoryKiB / 1024,
       source: 'DEFAULT_ARGON2.memoryKiB in src/core/crypto.ts',
     },
@@ -303,9 +335,7 @@ function main(): void {
       sourceCount += report.checked;
     }
 
-    const rules =
-      diagram.id === 'workflow' ? workflowClaimRules() : architectureClaimRules(locales);
-    const claims = checkClaims(specText, rules);
+    const claims = checkClaims(specText, diagram.rules(locales));
     failures.push(...claims.failures);
     claimCount += claims.checked;
 
