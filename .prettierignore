@@ -26,6 +26,7 @@ src/web/site-root
 # archify skill after editing, then run `npm run diagrams:check`.
 docs/architecture.archify.json
 docs/workflow.archify.json
+docs/dataflow.archify.json
 
 # Locally installed Claude Code skills, vendored from upstream and formatted to
 # their own conventions. Reformatting them would produce a large diff against
