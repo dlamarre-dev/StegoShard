@@ -23,6 +23,7 @@ import {
   checkWiring,
   architectureClaimRules,
   workflowClaimRules,
+  dataflowClaimRules,
   DIAGRAMS,
 } from '../../scripts/check-diagrams';
 
@@ -160,7 +161,7 @@ describe('the diagram registry', () => {
     // The workflow schema has no source field at all. Claiming otherwise would
     // report a passing count for a rule that never ran, which is the exact
     // failure this whole script exists to prevent.
-    expect(DIAGRAMS.map((d) => d.id)).toEqual(['architecture', 'workflow']);
+    expect(DIAGRAMS.map((d) => d.id)).toEqual(['architecture', 'workflow', 'dataflow']);
     expect(DIAGRAMS.filter((d) => d.sources).map((d) => d.id)).toEqual(['architecture']);
   });
 
@@ -171,7 +172,7 @@ describe('the diagram registry', () => {
 });
 
 describe('per-diagram wiring', () => {
-  const readme = '| [A](docs/images/architecture.png) | [W](docs/images/workflow.png) |';
+  const readme = DIAGRAMS.map((d) => `| [x](${d.png}) |`).join(' ');
 
   it('checks the png it was handed, not a default', () => {
     for (const diagram of DIAGRAMS) {
@@ -199,5 +200,43 @@ describe('workflow claim rules', () => {
     const stale = rules[0]!.expected + 1;
     const report = checkClaims(`"tag": "Argon2id ${stale} MiB"`, rules);
     expect(report.failures).toHaveLength(1);
+  });
+});
+
+describe('rules belong to the registry entry', () => {
+  it('gives every diagram its own rule set, with no shared fallback', () => {
+    // The trap this replaced: a ternary on id sent any unnamed diagram to
+    // another one's rules, reporting agreement it had never checked. Each entry
+    // must answer for itself.
+    const ids = DIAGRAMS.map((d) =>
+      d
+        .rules(9)
+        .map((r) => r.id)
+        .join(','),
+    );
+    expect(new Set(ids).size).toBe(DIAGRAMS.length);
+  });
+
+  it('routes each diagram to the rule set written for it', () => {
+    const byId = Object.fromEntries(DIAGRAMS.map((d) => [d.id, d.rules(9)]));
+    expect(byId.architecture).toEqual(architectureClaimRules(9));
+    expect(byId.workflow).toEqual(workflowClaimRules());
+    expect(byId.dataflow).toEqual(dataflowClaimRules());
+  });
+});
+
+describe('dataflow claim rules', () => {
+  it('pins two Argon2 sites, because the data-flow diagram states it twice', () => {
+    const rules = dataflowClaimRules();
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.count).toBe(2);
+  });
+
+  it('fails when one of the two sites is reworded away', () => {
+    // Half the sites matching is not half a pass; the rule has stopped checking.
+    const rules = dataflowClaimRules();
+    const report = checkClaims(`"label": "Argon2id, ${rules[0]!.expected} MiB"`, rules);
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures[0]).toContain('found 1');
   });
 });
