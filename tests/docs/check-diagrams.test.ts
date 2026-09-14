@@ -1,5 +1,5 @@
 /**
- * The three rule families of `architecture:check`.
+ * The three rule families of `diagrams:check`.
  *
  * The script runs green on every PR, which exercises its rules against the real
  * specification and never once against a broken one. That is precisely how a
@@ -21,8 +21,10 @@ import {
   checkSources,
   checkClaims,
   checkWiring,
-  claimRules,
-} from '../../scripts/check-architecture';
+  architectureClaimRules,
+  workflowClaimRules,
+  DIAGRAMS,
+} from '../../scripts/check-diagrams';
 
 const always = (): boolean => true;
 const never = (): boolean => false;
@@ -71,7 +73,7 @@ describe('source liveness', () => {
 });
 
 describe('claim agreement', () => {
-  const rule = (over: Partial<ReturnType<typeof claimRules>[number]> = {}) => [
+  const rule = (over: Partial<ReturnType<typeof architectureClaimRules>[number]> = {}) => [
     {
       id: 'format-version',
       pattern: /FORMAT_VERSION (\d+)/g,
@@ -121,7 +123,7 @@ describe('claim agreement', () => {
   it('derives the locale expectation from the count it is handed', () => {
     // Not from a literal in the script, which would be the second copy the whole
     // guard exists to avoid.
-    const rules = claimRules(11);
+    const rules = architectureClaimRules(11);
     expect(rules.find((r) => r.id === 'locale-count')?.expected).toBe(11);
   });
 });
@@ -149,6 +151,53 @@ describe('render wiring', () => {
     // A path named in prose is not a row in the table. Matching on the closing
     // paren of the markdown link is what keeps those apart.
     const report = checkWiring('see docs/images/architecture.png for the map', always);
+    expect(report.failures).toHaveLength(1);
+  });
+});
+
+describe('the diagram registry', () => {
+  it('declares both diagrams, and only the architecture one carries source links', () => {
+    // The workflow schema has no source field at all. Claiming otherwise would
+    // report a passing count for a rule that never ran, which is the exact
+    // failure this whole script exists to prevent.
+    expect(DIAGRAMS.map((d) => d.id)).toEqual(['architecture', 'workflow']);
+    expect(DIAGRAMS.filter((d) => d.sources).map((d) => d.id)).toEqual(['architecture']);
+  });
+
+  it('gives each diagram its own png, so wiring cannot pass on the other one', () => {
+    const pngs = DIAGRAMS.map((d) => d.png);
+    expect(new Set(pngs).size).toBe(pngs.length);
+  });
+});
+
+describe('per-diagram wiring', () => {
+  const readme = '| [A](docs/images/architecture.png) | [W](docs/images/workflow.png) |';
+
+  it('checks the png it was handed, not a default', () => {
+    for (const diagram of DIAGRAMS) {
+      expect(checkWiring(readme, () => true, diagram.png).failures).toEqual([]);
+    }
+  });
+
+  it('fails the workflow diagram when only the architecture one is linked', () => {
+    const onlyArchitecture = '| [A](docs/images/architecture.png) |';
+    const report = checkWiring(onlyArchitecture, () => true, 'docs/images/workflow.png');
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures[0]).toContain('docs/images/workflow.png');
+  });
+});
+
+describe('workflow claim rules', () => {
+  it('pins one Argon2 site, because the workflow diagram states it once', () => {
+    const rules = workflowClaimRules();
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.count).toBe(1);
+  });
+
+  it('fails when the workflow diagram disagrees with the code', () => {
+    const rules = workflowClaimRules();
+    const stale = rules[0]!.expected + 1;
+    const report = checkClaims(`"tag": "Argon2id ${stale} MiB"`, rules);
     expect(report.failures).toHaveLength(1);
   });
 });

@@ -1,0 +1,350 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "StegoShard Save and Restore",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "save",
+        "label": "Save",
+        "focus": [
+          "file",
+          "envelope",
+          "encrypt",
+          "shard",
+          "render"
+        ],
+        "note": "One file becomes k data and m parity payloads, each self-describing."
+      },
+      {
+        "id": "keys",
+        "label": "Where the key goes",
+        "focus": [
+          "encrypt",
+          "render",
+          "reuse"
+        ],
+        "note": "Embedded, a keyfile, or hidden in a photo the guard will not reuse."
+      },
+      {
+        "id": "restore",
+        "label": "Restore",
+        "focus": [
+          "render",
+          "reassemble",
+          "unlock",
+          "restored"
+        ],
+        "note": "Any k surviving carriers rebuild the blob, then the password opens it."
+      },
+      {
+        "id": "refusals",
+        "label": "What it refuses",
+        "focus": [
+          "reuse",
+          "toofew",
+          "wrongpw"
+        ],
+        "note": "Each failure is reported as itself, never as a partial result."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "external": {
+          "label": "You"
+        },
+        "backend": {
+          "label": "Processing step"
+        },
+        "security": {
+          "label": "Crypto or refusal"
+        },
+        "database": {
+          "label": "Stored carriers"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "you",
+      "label": "You"
+    },
+    {
+      "id": "pipeline",
+      "label": "Byte pipeline"
+    },
+    {
+      "id": "carriers",
+      "label": "Carriers"
+    },
+    {
+      "id": "refused",
+      "label": "Refusals",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "save",
+      "label": "Save",
+      "fromCol": 0,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "restore",
+      "label": "Restore",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": [
+    "file",
+    "envelope",
+    "encrypt",
+    "shard",
+    "render",
+    "reassemble",
+    "unlock",
+    "restored"
+  ],
+  "semanticChecks": {
+    "allowedRoots": [
+      "file"
+    ],
+    "allowedTerminals": [
+      "restored",
+      "reuse",
+      "toofew",
+      "wrongpw"
+    ],
+    "requiredEdges": [
+      {
+        "from": "render",
+        "to": "reassemble"
+      }
+    ],
+    "requiredPaths": [
+      {
+        "from": "file",
+        "to": "restored"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "file",
+      "lane": "you",
+      "col": 0,
+      "type": "external",
+      "label": "Your file",
+      "sublabel": "and a password",
+      "width": 100
+    },
+    {
+      "id": "envelope",
+      "lane": "pipeline",
+      "col": 1,
+      "type": "backend",
+      "label": "Envelope",
+      "sublabel": "name inside, gzip",
+      "width": 108
+    },
+    {
+      "id": "encrypt",
+      "lane": "pipeline",
+      "col": 2,
+      "type": "security",
+      "label": "Seal",
+      "sublabel": "AES-256-GCM seal",
+      "tag": "Argon2id 256 MiB",
+      "width": 116
+    },
+    {
+      "id": "shard",
+      "lane": "pipeline",
+      "col": 3,
+      "type": "backend",
+      "label": "Erasure code",
+      "sublabel": "k data, m parity",
+      "width": 108
+    },
+    {
+      "id": "render",
+      "lane": "carriers",
+      "col": 3,
+      "type": "database",
+      "label": "Write carriers",
+      "sublabel": "images, PDF, .ssbn, .db",
+      "tag": "key: embedded, .key, or photo",
+      "width": 150
+    },
+    {
+      "id": "reassemble",
+      "lane": "carriers",
+      "col": 4,
+      "type": "backend",
+      "label": "Reassemble",
+      "sublabel": "sift, then rebuild",
+      "width": 120
+    },
+    {
+      "id": "unlock",
+      "lane": "pipeline",
+      "col": 4,
+      "type": "security",
+      "label": "Unlock",
+      "sublabel": "password, decrypt",
+      "width": 112
+    },
+    {
+      "id": "restored",
+      "lane": "you",
+      "col": 5,
+      "type": "external",
+      "label": "Your file back",
+      "sublabel": "byte for byte",
+      "width": 104
+    },
+    {
+      "id": "reuse",
+      "lane": "refused",
+      "col": 3,
+      "type": "security",
+      "label": "Cover reused",
+      "sublabel": "refused, not reused",
+      "width": 108
+    },
+    {
+      "id": "toofew",
+      "lane": "refused",
+      "col": 4,
+      "type": "security",
+      "label": "Fewer than k",
+      "sublabel": "nothing to rebuild",
+      "width": 108
+    },
+    {
+      "id": "wrongpw",
+      "lane": "refused",
+      "col": 5,
+      "type": "security",
+      "label": "Nothing opens",
+      "sublabel": "or no key was there",
+      "width": 112
+    }
+  ],
+  "edges": [
+    {
+      "id": "file-envelope",
+      "from": "file",
+      "to": "envelope",
+      "label": "name and bytes",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "envelope-encrypt",
+      "from": "envelope",
+      "to": "encrypt",
+      "label": "compressed plaintext",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "encrypt-shard",
+      "from": "encrypt",
+      "to": "shard",
+      "label": "vault blob",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "shard-render",
+      "from": "shard",
+      "to": "render",
+      "label": "k + m payloads",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "render-reassemble",
+      "from": "render",
+      "to": "reassemble",
+      "label": "years later, any subset",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reassemble-unlock",
+      "from": "reassemble",
+      "to": "unlock",
+      "label": "hash-checked blob",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "unlock-restored",
+      "from": "unlock",
+      "to": "restored",
+      "label": "decompress",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "render-reuse",
+      "from": "render",
+      "to": "reuse",
+      "label": "same cover twice",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "reassemble-toofew",
+      "from": "reassemble",
+      "to": "toofew",
+      "label": "too many lost",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "unlock-wrongpw",
+      "from": "unlock",
+      "to": "wrongpw",
+      "label": "no slot opens",
+      "role": "error",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Why losses are survivable",
+      "items": [
+        "Reed-Solomon adds 30% parity, floor of two shards",
+        "Any k of the k + m carriers rebuild the blob"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Why a stranger cannot break it",
+      "items": [
+        "Foreign or corrupt carriers are dropped by majority set",
+        "Alternative k-subsets are retried before giving up"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "What it refuses to do",
+      "items": [
+        "A photo cover is never used twice under one password",
+        "A wrong password yields nothing, not a partial file"
+      ]
+    }
+  ]
+}

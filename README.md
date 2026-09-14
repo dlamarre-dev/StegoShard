@@ -263,6 +263,7 @@ works without the extension.
 | [Why StegoShard?](docs/WHY.md)                                                                         | The problem, and the reasoning behind the two-model design.                                      |
 | [Where it fits](docs/COMPARISON.md)                                                                    | Cited competitive map vs. seed backups, encrypted archives, VeraCrypt, and steganography tools.  |
 | [Architecture diagram](docs/images/architecture.png)                                                   | How every surface reaches one shared byte core. Generated, and checked against the code.         |
+| [Save and restore workflow](docs/images/workflow.png)                                                  | The save and restore round trip, and what it refuses to do. Generated and checked.               |
 | [Command-line reference](docs/CLI.md)                                                                  | Full CLI: save/restore, key modes, paper, binary, Gallery Mode, packaging.                       |
 | [Machine interfaces](docs/API.md)                                                                      | Driving StegoShard from a program: the JS/TS library, the `--json` envelope, and the MCP server. |
 | [Threat model](docs/THREAT-MODEL.md)                                                                   | Adversaries, what each model defends against, and the deliberate non-goals.                      |
