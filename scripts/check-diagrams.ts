@@ -1,5 +1,5 @@
 /**
- * Refuse an architecture diagram that no longer describes this codebase.
+ * Refuse a generated diagram that no longer describes this codebase.
  *
  * docs/images/architecture.png is the only picture of how the pieces reach each
  * other: four surfaces onto one shared byte core, and the resilient and deniable
@@ -48,7 +48,7 @@
  * is printed on success instead, so a reviewer can see how old the picture is and
  * judge for themselves.
  *
- * Run with: npm run architecture:check
+ * Run with: npm run diagrams:check
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -61,10 +61,39 @@ import { DEFAULT_ARGON2 } from '../src/core/crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const SPEC = 'docs/architecture.archify.json';
-const PNG = 'docs/images/architecture.png';
 const README = 'README.md';
 const LOCALES = 'public/_locales';
+
+/**
+ * One entry per generated diagram.
+ *
+ * `sources` says whether the diagram's schema can carry source links at all.
+ * The architecture schema can; the workflow schema has no such field, so there
+ * is nothing to check liveness on and pretending otherwise would report a
+ * passing count for a rule that never ran.
+ */
+export interface Diagram {
+  /** Names the diagram in a failure message. */
+  id: string;
+  spec: string;
+  png: string;
+  sources: boolean;
+}
+
+export const DIAGRAMS: Diagram[] = [
+  {
+    id: 'architecture',
+    spec: 'docs/architecture.archify.json',
+    png: 'docs/images/architecture.png',
+    sources: true,
+  },
+  {
+    id: 'workflow',
+    spec: 'docs/workflow.archify.json',
+    png: 'docs/images/workflow.png',
+    sources: false,
+  },
+];
 
 export interface Report {
   failures: string[];
@@ -96,7 +125,7 @@ interface ClaimRule {
  * restated here. A second copy of a constant is a second thing to forget, which
  * is the bug this whole file is about.
  */
-export function claimRules(localeCount: number): ClaimRule[] {
+export function architectureClaimRules(localeCount: number): ClaimRule[] {
   return [
     {
       id: 'format-version',
@@ -126,12 +155,36 @@ export function claimRules(localeCount: number): ClaimRule[] {
 }
 
 /**
+ * The workflow diagram restates one constant, on the Seal step.
+ *
+ * Deliberately its own list rather than a shared one with a count parameter:
+ * the two diagrams state different things a different number of times, and a
+ * count pinned against the wrong document is a rule that passes without
+ * checking anything.
+ */
+export function workflowClaimRules(): ClaimRule[] {
+  return [
+    {
+      id: 'workflow-argon2-memory',
+      pattern: /(\d+) MiB/g,
+      count: 1,
+      expected: DEFAULT_ARGON2.memoryKiB / 1024,
+      source: 'DEFAULT_ARGON2.memoryKiB in src/core/crypto.ts',
+    },
+  ];
+}
+
+/**
  * Every repository path the specification cites must resolve.
  *
  * `exists` is injected so the interesting case -- a citation whose file is gone --
  * can be tested without staging a rename in the working tree.
  */
-export function checkSources(spec: Spec, exists: (path: string) => boolean): Report {
+export function checkSources(
+  spec: Spec,
+  exists: (path: string) => boolean,
+  specPath = DIAGRAMS[0]!.spec,
+): Report {
   const failures: string[] = [];
   let checked = 0;
 
@@ -142,7 +195,7 @@ export function checkSources(spec: Spec, exists: (path: string) => boolean): Rep
       failures.push(
         `  [source] node "${component.id}" cites ${path}, which does not exist.\n` +
           `      The diagram promises a reader they can open that file and see the thing\n` +
-          `      the box names. If it moved, update ${SPEC} and re-render;\n` +
+          `      the box names. If it moved, update ${specPath} and re-render;\n` +
           `      if it went away, the box needs a different source or no longer belongs.`,
       );
     }
@@ -178,7 +231,7 @@ export function checkClaims(specText: string, rules: ClaimRule[]): Report {
       failures.push(
         `  [${rule.id}] the diagram says ${stated}, the code says ${rule.expected}.\n` +
           `      Truth: ${rule.source}\n` +
-          `      Update ${SPEC}, re-render ${PNG} with the archify\n` +
+          `      Update the specification, re-render the PNG with the archify\n` +
           `      skill, and commit both.`,
       );
     }
@@ -187,23 +240,27 @@ export function checkClaims(specText: string, rules: ClaimRule[]): Report {
 }
 
 /** The rendered picture must exist, and the docs table must point at it. */
-export function checkWiring(readme: string, exists: (path: string) => boolean): Report {
+export function checkWiring(
+  readme: string,
+  exists: (path: string) => boolean,
+  png = DIAGRAMS[0]!.png,
+): Report {
   const failures: string[] = [];
   let checked = 0;
 
   checked++;
-  if (!exists(PNG)) {
+  if (!exists(png)) {
     failures.push(
-      `  [render] ${PNG} does not exist.\n` +
+      `  [render] ${png} does not exist.\n` +
         `      The specification is the source, but the PNG is the only form a reader\n` +
         `      ever sees. Re-render it with the archify skill.`,
     );
   }
 
   checked++;
-  if (!readme.includes(`(${PNG})`)) {
+  if (!readme.includes(`(${png})`)) {
     failures.push(
-      `  [wiring] ${README} does not link ${PNG}.\n` +
+      `  [wiring] ${README} does not link ${png}.\n` +
         `      The documentation table is how anyone finds the diagram. An unlinked\n` +
         `      picture is a file nobody opens.`,
     );
@@ -212,27 +269,56 @@ export function checkWiring(readme: string, exists: (path: string) => boolean): 
 }
 
 // Only when run as a script. The helpers above are imported by
-// tests/docs/check-architecture.test.ts, and without this guard that import would
+// tests/docs/check-diagrams.test.ts, and without this guard that import would
 // run the whole check -- including a `process.exit(1)` that would take the test run
 // down with it. See scripts/entry-module.ts.
 function main(): void {
-  const specText = readFileSync(join(ROOT, SPEC), 'utf-8');
-  const spec = JSON.parse(specText) as Spec;
+  const readme = readFileSync(join(ROOT, README), 'utf-8');
   const locales = readdirSync(join(ROOT, LOCALES), { withFileTypes: true }).filter((e) =>
     e.isDirectory(),
   ).length;
+  const exists = (path: string): boolean => existsSync(join(ROOT, path));
 
-  const sources = checkSources(spec, (path) => existsSync(join(ROOT, path)));
-  const claims = checkClaims(specText, claimRules(locales));
-  const wiring = checkWiring(readFileSync(join(ROOT, README), 'utf-8'), (path) =>
-    existsSync(join(ROOT, path)),
-  );
-  const failures = [...sources.failures, ...claims.failures, ...wiring.failures];
+  const failures: string[] = [];
+  let sourceCount = 0;
+  let claimCount = 0;
+  const revisions: string[] = [];
+
+  for (const diagram of DIAGRAMS) {
+    if (!exists(diagram.spec)) {
+      failures.push(
+        `  [missing] ${diagram.spec} does not exist.\n` +
+          `      The PNG is rendered from it. Without the specification nobody can\n` +
+          `      regenerate the diagram, and this guard has nothing to check against.`,
+      );
+      continue;
+    }
+
+    const specText = readFileSync(join(ROOT, diagram.spec), 'utf-8');
+    const spec = JSON.parse(specText) as Spec;
+
+    if (diagram.sources) {
+      const report = checkSources(spec, exists, diagram.spec);
+      failures.push(...report.failures);
+      sourceCount += report.checked;
+    }
+
+    const rules =
+      diagram.id === 'workflow' ? workflowClaimRules() : architectureClaimRules(locales);
+    const claims = checkClaims(specText, rules);
+    failures.push(...claims.failures);
+    claimCount += claims.checked;
+
+    failures.push(...checkWiring(readme, exists, diagram.png).failures);
+
+    const revision = spec.meta?.repository?.revision;
+    revisions.push(`${diagram.id} at ${revision ? revision.slice(0, 7) : 'unpinned'}`);
+  }
 
   if (failures.length > 0) {
     console.error(
       [
-        `architecture:check: ${failures.length} problem(s) in the architecture diagram.`,
+        `diagrams:check: ${failures.length} problem(s) in the generated diagrams.`,
         '',
         ...failures,
         '',
@@ -244,11 +330,10 @@ function main(): void {
     process.exit(1);
   }
 
-  const revision = spec.meta?.repository?.revision ?? 'unpinned';
   console.log(
-    `architecture:check: ${sources.checked} source link(s) resolve, ` +
-      `${claims.checked} claim(s) agree with the code, rendered form wired up. ` +
-      `Diagram generated at ${revision.slice(0, 7)}.`,
+    `diagrams:check: ${DIAGRAMS.length} diagrams, ${sourceCount} source link(s) resolve, ` +
+      `${claimCount} claim(s) agree with the code, rendered forms wired up. ` +
+      `Generated: ${revisions.join(', ')}.`,
   );
 }
 
