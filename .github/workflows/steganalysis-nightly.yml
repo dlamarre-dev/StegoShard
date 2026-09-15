@@ -20,8 +20,13 @@
 # embedding *positions* are fixed, deriving from a constant password and cover
 # fingerprint. Each run is therefore an independent draw, and thirty nights would give
 # thirty samples of a measurement that rests on one working detector over two covers.
-# The container drifts too: aletheia.Dockerfile starts from ubuntu:24.04 with unpinned
-# apt and pip packages, so running it also catches upstream breakage.
+# The container drifts, but less than it did. As of 2026-09-15 the pip layer is
+# pinned: Aletheia to a commit and TensorFlow to an exact version, because those two
+# carry the detector code and the trained weights, and a detector free to change
+# underneath the suite makes a red night unattributable between the scheme and the
+# instrument. The base image and apt packages are still unpinned, so running this
+# still catches upstream breakage there; what it no longer catches is a change in
+# Aletheia itself, which is the price of being able to read its verdict.
 #
 # Gating is thus a deliberate trade of resampling for cost, not an optimisation that
 # costs nothing. The seven-day bucket in the cache key is the floor that keeps both

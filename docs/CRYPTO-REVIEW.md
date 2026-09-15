@@ -347,9 +347,19 @@ discriminates.
 | `park`     | 0.1        | **0.1**          | 0.2              | control not detected        |
 | `mountain` | 0.7        | **0.7**          | n/a              | clean cover already flagged |
 
-Across all four detectors, saturated ones included, the carrier scores what its own
-cover scores: `park` and `mountain` are identical on every column, and nothing else
-moves by more than the 0.1 reporting granularity.
+Across all four detectors, saturated ones included, the carrier stays on the clean
+side of the 0.5 threshold wherever its own cover is on the clean side. It does not
+hold still: the payload is a fresh key block each run, so the carrier is a different
+image every night, and `beach` has measured 0.1, 0.2 and 0.3 on Steghide against a
+clean cover reading 0.1. None of those is a detection, and the column above records
+one run rather than a fixed value.
+
+This module asserted the stronger "within 0.1 of its own cover" until 2026-09-15,
+when a nightly failed on it with nothing under test changed. The bound was tighter
+than the measurement's own noise. What the clean column does establish is that the
+instrument is steady: clean covers are the same bytes every night and have scored
+identically across every observed run, so the movement is the carrier's, not
+Aletheia's.
 
 The `night` control is measured but not counted. Locally outguess accepts that cover;
 on GitHub runners it has declined it reproducibly, refusing to fit the message into the
@@ -358,8 +368,9 @@ smallest and darkest image of the set. CI therefore requires **two** controls, `
 the instrument check quietly stop running while the suite stayed green.
 
 **What this establishes, precisely.** On the two covers where the detector is
-demonstrably awake in CI, StegoShard's JPEG carrier is indistinguishable from the cover it
-was made from, while an outguess carrier in the same cover is flagged at 0.6 to 1.0.
+demonstrably awake in CI, StegoShard's JPEG carrier is not detected, while an outguess
+carrier in the same cover is flagged at 0.6 to 1.0. Not detected is the claim; scoring
+identically to its cover is not, and no longer pretends to be.
 
 **What it does not.** Three detectors of four carry no information here, so the
 result rests on one working detector over two enforced covers plus the differential. The

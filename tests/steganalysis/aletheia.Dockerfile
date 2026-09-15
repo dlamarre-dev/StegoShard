@@ -67,7 +67,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Aletheia without its dependency resolution, then supply the stack with a
 # TensorFlow that exists for this architecture. Keeping the two steps apart makes
 # the substitution explicit rather than buried in a resolver decision.
-RUN pip3 install --no-cache-dir "tensorflow>=2.16,<2.20"
+# Pinned exactly, not ranged. A detector that can change underneath the suite
+# makes a red night unattributable: the scheme, or the instrument? 2.19.1 is what
+# the range above resolved to on the last green nightly, so this freezes the
+# behaviour already measured rather than adopting a new one.
+RUN pip3 install --no-cache-dir "tensorflow==2.19.1"
 # `efficientnet` backs the JPEG detectors and imports cleanly against TensorFlow
 # 2.19. `steganogan` is deliberately absent: it fails to build here, and it backs
 # only the SteganoGAN *spatial* detector, which is not what this image is for. Its
@@ -75,6 +79,15 @@ RUN pip3 install --no-cache-dir "tensorflow>=2.16,<2.20"
 RUN pip3 install --no-cache-dir \
       imageio numpy scipy scikit-learn pandas hdf5storage h5py \
       matplotlib python-magic Pillow efficientnet
-RUN pip3 install --no-cache-dir --no-deps git+https://github.com/daniellerch/aletheia
+# Pinned to a commit for the same reason as TensorFlow above. Aletheia carries the
+# detector code *and* the trained model weights, so tracking its default branch
+# meant the measurement could move without anything here changing. The scores in
+# this module's docstring were recorded against this commit.
+#
+# The base image and apt packages are deliberately NOT pinned. Freezing those
+# would freeze OS security updates too, and the evidence says they are not the
+# risk: clean-cover scores were identical across every observed run while the
+# carrier moved, which is what a stable instrument looks like.
+RUN pip3 install --no-cache-dir --no-deps git+https://github.com/daniellerch/aletheia@1baf974ea8fcf0b51802935d9acbe59903d06845
 
 WORKDIR /work
