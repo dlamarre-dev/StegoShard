@@ -8,7 +8,8 @@
     "repository": {
       "url": "https://github.com/dlamarre-dev/StegoShard",
       "provider": "github",
-      "link_mode": "web"
+      "link_mode": "web",
+      "revision": "136872f380420d21b3fc3280c689d5bc2a478a3a"
     },
     "views": [
       {
