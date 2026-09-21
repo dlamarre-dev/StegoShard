@@ -25,6 +25,7 @@ import {
   mpfEntrySizeField,
   mpfIndexSegment,
   mpfSegment,
+  patchMpfIndex,
   pokeMpfIndex as poke,
   spliceBeforeSos,
   withMpfGainMap,
@@ -115,12 +116,13 @@ describe('parseMpfIndex', () => {
 });
 
 describe('mpfTrailerLink', () => {
-  it('is none when no index locates anything', () => {
-    // No MPF segment at all, and an MPF index with nothing after EOI: neither
-    // has an offset that a shift could invalidate.
+  it('is none when there is nothing to maintain', () => {
+    // A trailer with no index over it, bytes that are not a JPEG, and an index
+    // that cannot be read in a file with nothing after EOI: no offset a shift
+    // could invalidate, and no size this module could have read anyway.
     expect(mpfTrailerLink(withTrailer(baseJpeg(32, 32), gainMap)).kind).toBe('none');
-    expect(mpfTrailerLink(spliceBeforeSos(baseJpeg(32, 32), mpfIndexSegment())).kind).toBe('none');
     expect(mpfTrailerLink(new Uint8Array([0xff, 0xd8, 0xff])).kind).toBe('none');
+    expect(mpfTrailerLink(spliceBeforeSos(baseJpeg(32, 32), mpfSegment())).kind).toBe('none');
   });
 
   it('carries the geometry of a file whose index locates a trailer', () => {
@@ -129,12 +131,52 @@ describe('mpfTrailerLink', () => {
     expect(link).toMatchObject({ kind: 'index', trailerStart, length: bytes.length });
   });
 
-  it('is unreadable when an index it cannot read locates a trailer', () => {
+  /**
+   * An index with no trailer is still maintained, because its first entry
+   * declares the primary image's size: that is where the trailer would start, and
+   * an edit ahead of it makes the number wrong even though no offset moved.
+   */
+  it('carries the geometry of an index with no trailer at all', () => {
+    const single = patchMpfIndex(spliceBeforeSos(baseJpeg(32, 32), mpfIndexSegment(1)), []);
+    const link = mpfTrailerLink(single);
+    expect(link).toMatchObject({ kind: 'index', trailerStart: single.length });
+  });
+
+  it('is unsupported when an index it cannot read locates a trailer', () => {
     const broken = withTrailer(spliceBeforeSos(baseJpeg(32, 32), mpfSegment()), gainMap);
     const link = mpfTrailerLink(broken);
-    expect(link.kind).toBe('unreadable');
+    expect(link.kind).toBe('unsupported');
     // The reason is what a caller prints, so it has to say what is wrong.
-    expect(link.kind === 'unreadable' && link.reason).toMatch(/could not be read/);
+    expect(link.kind === 'unsupported' && link.reason).toMatch(/could not be read/);
+  });
+
+  /**
+   * Every refusal is decided from the cover, which SPEC §9.7 requires: whether
+   * an edit shifts the trailer depends on the keyed carrier positions, so a check
+   * made afterwards would accept the same photo under one password and refuse it
+   * under another. These are the entry shapes a rewrite cannot carry forward.
+   */
+  it.each([
+    {
+      what: 'an entry that does not locate the trailer',
+      break: (f: Uint8Array) => poke(f, mpfEntryOffsetField(1), 0, 0, 0, 0x10),
+      says: /MPF entry 2 locates byte/,
+    },
+    {
+      what: 'a primary entry with a data offset',
+      break: (f: Uint8Array) => poke(f, mpfEntryOffsetField(0), 0, 0, 0, 0x20),
+      says: /MPF entry 1 is the primary image/,
+    },
+    {
+      what: 'a second entry with no data offset',
+      break: (f: Uint8Array) => poke(f, mpfEntryOffsetField(1), 0, 0, 0, 0),
+      says: /MPF entry 2 locates byte 0/,
+    },
+  ])('is unsupported for $what', ({ break: break_, says }) => {
+    const { bytes } = ultraHdr();
+    const link = mpfTrailerLink(break_(bytes));
+    expect(link.kind).toBe('unsupported');
+    expect(link.kind === 'unsupported' && link.reason).toMatch(says);
   });
 });
 
@@ -185,9 +227,9 @@ describe('retargetMpfIndex', () => {
   });
 
   it('refuses an entry that does not locate the trailer', () => {
-    // Either the producer measured from somewhere other than the endian header,
-    // or the index was already pointing outside its own file. Both are numbers
-    // whose meaning would be a guess, and a guess here silently breaks a photo.
+    // `mpfTrailerLink` already turns such a cover away, so this is the same test
+    // against the caller-supplied geometry: a public entry point cannot assume
+    // its argument came from the function above.
     const { bytes, link } = ultraHdr();
     for (const offset of [
       [0, 0, 0, 0x10],
@@ -198,6 +240,22 @@ describe('retargetMpfIndex', () => {
       expect(res.ok).toBe(false);
       expect(!res.ok && res.reason).toMatch(/MPF entry 2/);
     }
+  });
+
+  /**
+   * An index with no trailer: no offset to move, and the primary size still has
+   * to follow the file's own length. Left stale, this produced a JPEG whose MPF
+   * index disagreed with its own size by a byte, which is the sort of oddity
+   * §9.7 exists to remove rather than introduce.
+   */
+  it('follows the primary size of an index with no trailer', () => {
+    const single = patchMpfIndex(spliceBeforeSos(baseJpeg(32, 32), mpfIndexSegment(1)), []);
+    const link = mpfTrailerLink(single);
+    expect(link.kind).toBe('index');
+    const grown = growScan(single, 3);
+
+    expect(retargetMpfIndex(grown, link as never)).toEqual({ ok: true, rewritten: 1 });
+    expect(parseMpfIndex(grown)!.entries[0]!.size).toBe(grown.length);
   });
 
   it('refuses when the index cannot be read back out of the edited file', () => {

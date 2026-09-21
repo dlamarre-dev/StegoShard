@@ -32,7 +32,9 @@ import {
   baseJpeg as texturedJpeg,
   gainMapTrailer,
   mpfEntryOffsetField,
+  mpfIndexSegment,
   mpfSegment,
+  patchMpfIndex,
   pokeMpfIndex,
   spliceBeforeSos,
   withMpfGainMap,
@@ -254,19 +256,39 @@ describe('capacity refusals', () => {
 
   /**
    * A readable index whose entry does not locate the trailer: refused rather than
-   * moved to a position that would be a guess. Decided after the embed, because
-   * it can only be known once the trailer has actually moved, which is why it
-   * uses the drifting fixture from the first case above.
+   * moved to a position that would be a guess.
+   *
+   * Decided from the **cover**, which SPEC §9.7 requires, and both payloads are
+   * here to pin that. The 128-byte one drifts the scan and the 8-byte one does
+   * not, and the answer has to be the same either way: a refusal that depended on
+   * the drift would accept this photo under one password and turn it away under
+   * another, for a defect that is in the file rather than in the embed.
    */
-  it('refuses a cover whose MPF entry does not locate the trailer', async () => {
+  it.each([128, 8])('refuses a cover whose MPF entry misses the trailer (%i bytes)', async (n) => {
     const ultra = withMpfGainMap(texturedJpeg(128, 128, 85, 1));
     const odd = pokeMpfIndex(ultra, mpfEntryOffsetField(1), 0, 0, 0, 0x10);
-    await expect(embedBytesStegoJpeg(odd, new Uint8Array(128).fill(9), SEED)).rejects.toMatchObject(
-      {
-        name: 'JpegUnsupportedError',
-        message: expect.stringContaining('MPF entry 2'),
-      },
+    await expect(embedBytesStegoJpeg(odd, new Uint8Array(n).fill(9), SEED)).rejects.toMatchObject({
+      name: 'JpegUnsupportedError',
+      message: expect.stringContaining('MPF entry 2'),
+    });
+  });
+
+  /**
+   * An MPF index with nothing after EOI. No offset locates anything, so this used
+   * to be waved through, and the primary image's declared size was left one byte
+   * short of the file it describes: a JPEG that disagrees with its own index,
+   * which is the sort of oddity §9.7 exists to remove rather than introduce.
+   */
+  it('keeps the primary size correct on an index with no trailer', async () => {
+    const single = patchMpfIndex(
+      spliceBeforeSos(texturedJpeg(128, 128, 85, 1), mpfIndexSegment(1)),
+      [],
     );
+    const stego = await embedBytesStegoJpeg(single, new Uint8Array(128).fill(9), SEED);
+
+    expect(stego.length).not.toBe(single.length); // the drift this exists to catch
+    expect(parseMpfIndex(stego)!.entries[0]!.size).toBe(stego.length);
+    expect(parseJpegSegments(stego).trailerStart).toBe(stego.length);
   });
 
   /**

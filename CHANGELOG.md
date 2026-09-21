@@ -61,12 +61,19 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   gain map itself is never touched, and neither is any other field, segment or scan byte.
   SPEC §9.7.1 pins the formula so an independent implementation emits the same bytes.
 
-  Two refusals remain, both fail-closed. An index this code cannot read, over a trailer it
-  claims to locate, is refused from the cover alone, before any work: a file in that state
-  is malformed rather than unusual, and deciding from the result instead would accept the
-  same photo under one password and refuse it under another. And an entry whose offset does
-  not resolve into the trailer is refused rather than moved, because its meaning would be a
-  guess, and a guess there silently breaks a photo.
+  Two refusals remain, both fail-closed, and **both decided from the cover** before any
+  work starts, because the alternative would accept a photo under one password and refuse it
+  under another: whether an edit shifts the trailer at all depends on the keyed carrier
+  positions. An index this code cannot read, over a trailer it claims to locate, is refused;
+  a file in that state is malformed rather than unusual. So is an index whose entries this
+  cannot account for, meaning a first entry that is not the primary image or a later one
+  whose offset does not resolve into the trailer: a rewrite would have to guess at what such
+  a number meant, and a guess there silently breaks a photo.
+
+  An index with **no** trailer is maintained too. Its offsets locate nothing, but its first
+  entry declares the primary image's size, which is where the trailer would begin, and an
+  edit ahead of it leaves that number disagreeing with the file's own length: a JPEG at odds
+  with its own index, which is the kind of oddity §9.7 exists to remove rather than add.
 
   A JPEG whose marker structure does not parse is likewise refused rather than passed
   through: a file whose structure cannot be walked is one nothing can promise carries no

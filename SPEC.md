@@ -956,12 +956,17 @@ An encoder therefore:
   normalization. Either way an implementation **MUST NOT** emit a file whose gain
   map no longer resolves.
 
-  The requirement is conditional on a trailer existing: an index with nothing
-  after EOI locates no second image, and there is nothing for a shift to
-  invalidate. An implementation that refuses rather than rewrites **MUST** decide
-  from the cover alone rather than from the result, so that the same photo is
-  accepted or refused independently of the password, which chooses the carrier
-  positions and therefore how far the scan drifts.
+  The **offset** part of that is conditional on a trailer existing: an index with
+  nothing after EOI locates no second image, and there is nothing for a shift to
+  invalidate. The **size** in its first entry is not conditional, because that
+  field states where the trailer would begin, and any edit ahead of it leaves the
+  number disagreeing with the file's own length.
+
+  Whatever an implementation refuses, it **MUST** decide from the cover alone
+  rather than from the result, so that the same photo is accepted or refused
+  independently of the password, which chooses the carrier positions and therefore
+  how far the scan drifts. A conforming implementation therefore inspects the
+  index before it starts work, not the file it has just produced.
 
 - **MUST** fail closed on a JPEG whose marker structure does not parse: a file
   whose structure cannot be walked is one no implementation can assert carries no
@@ -1009,10 +1014,16 @@ into a different wrong number is not a repair; the offsets are what locate the
 trailer, and they are still corrected.
 
 An implementation **MUST** fail rather than rewrite when the index cannot be
-parsed, when a non-zero data offset does not resolve into the old trailer
-(`P_old < trailerStart_old` or `P_old >= length_old`), or when a rewritten offset
-would not fit its unsigned 32-bit field. Byte order is the index's own, read from
-the MP endian field, never the host's.
+parsed, when it carries no entries, when the first entry's data offset is not
+`0`, when any later entry's is `0`, when a non-zero data offset does not resolve
+into the old trailer (`P_old < trailerStart_old` or `P_old >= length_old`), or
+when a rewritten offset would not fit its unsigned 32-bit field. Byte order is
+the index's own, read from the MP endian field, never the host's.
+
+Every one of those conditions is a property of the file as it arrives, so §9.7's
+rule applies: they **MUST** be evaluated before the edit, not after it. An
+implementation that checked them against its own output would make the answer
+depend on whether the scan happened to drift, and therefore on the password.
 
 Both fields live in the APP2 payload. No other field of the index, no other
 segment, no byte of the entropy-coded scan and no byte of the trailer changes,

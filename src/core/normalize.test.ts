@@ -280,8 +280,8 @@ describe('the MPF index across a removal', () => {
    * endian field, or the index was already pointing outside its own file, and
    * both are numbers whose meaning a rewrite would have to guess at.
    *
-   * Deterministic, unlike the same case on the embed path: a removal always
-   * changes the length, so the rewrite always runs.
+   * Decided from the file handed in, before anything is removed, which is the
+   * same point at which the embed paths decide it.
    */
   it('refuses a removal when an entry does not locate the trailer', () => {
     const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
@@ -314,14 +314,33 @@ describe('the MPF index across a removal', () => {
   });
 
   /**
-   * Nothing after EOI means the index locates no second image, so there is no
-   * offset for a shift to invalidate, and not even an unreadable one matters.
+   * Nothing after EOI and an index that cannot be read: no offset locates
+   * anything, and no size this code could have maintained either, so the removal
+   * goes ahead rather than refusing over a field nobody can use.
    */
-  it('does not care about the index when there is no trailer', () => {
+  it('does not care about an unreadable index when there is no trailer', () => {
     const jpg = spliceBeforeSos(spliceAfterSoi(baseJpeg(64, 64), mpfSegment()), c2paSegment(1));
     const out = normalizeJpegCover(jpg);
     expect(out.removed.segments).toBe(1);
     expect(inspectJpegCover(out.bytes).mpf).toBe(true);
+  });
+
+  /**
+   * A *readable* index with no trailer is maintained all the same: its first
+   * entry declares the primary image's size, which a removal changes even though
+   * no offset moved. Left alone, that is a JPEG whose own index disagrees with its
+   * length by the size of the manifest.
+   */
+  it('follows the primary size of an index with no trailer', () => {
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment(1));
+    const jpg = patchMpfIndex(spliceAfterSoi(indexed, c2paSegment(1)), []);
+    expect(parseMpfIndex(jpg)!.entries[0]!.size).toBe(jpg.length);
+
+    const out = normalizeJpegCover(jpg);
+
+    expect(out.removed.segments).toBe(1);
+    expect(out.bytes.length).toBeLessThan(jpg.length);
+    expect(parseMpfIndex(out.bytes)!.entries[0]!.size).toBe(out.bytes.length);
   });
 });
 

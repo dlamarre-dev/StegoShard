@@ -22,10 +22,18 @@
  *
  * FAIL CLOSED WHERE THE REWRITE CANNOT BE TRUSTED
  * Every read here is bounds-checked against the segment it lives in, and
- * anything unexpected answers "unreadable" rather than a guess: an index this
- * module cannot parse is one it must not silently leave pointing into the middle
- * of a file. The callers turn that into their own refusal, which is the same
- * behaviour the whole feature had before rewriting existed.
+ * anything unexpected answers "unsupported" rather than a guess: an index this
+ * module cannot parse, or whose entries it cannot account for, is one it must not
+ * silently leave pointing into the middle of a file. The callers turn that into
+ * their own refusal, which is the same behaviour the whole feature had before
+ * rewriting existed, and {@link mpfTrailerLink} reaches it from the cover alone so
+ * the answer never depends on the password.
+ *
+ * An index with **no** trailer still gets maintained. Its offsets locate nothing,
+ * but its first entry declares the primary image's size, which is where the
+ * trailer would begin, and that number goes stale the moment an edit changes the
+ * length ahead of it. A file whose MPF index disagrees with its own size by a
+ * byte is exactly the kind of oddity §9.7 exists to remove.
  *
  * Nothing here touches the entropy-coded scan or a single byte of the trailer.
  */
@@ -145,20 +153,31 @@ export function parseMpfIndex(bytes: Uint8Array, layout?: JpegLayout): MpfIndex 
 }
 
 /**
- * What a file's MPF index has to say about its trailer, captured **before** an
- * edit so the same index can be made true again afterwards.
+ * What a file's MPF index says about itself, read **before** an edit so the same
+ * index can be made true again afterwards.
  *
  * Three answers, because they call for three different things:
  *
- *  - `none`: no MPF index, or nothing after EOI for one to locate. Nothing to
- *    keep resolvable, so an edit needs no fixing up. A file whose markers do not
- *    parse at all also lands here: the decode that follows refuses it with a
- *    better message than this could give, and there is no path on which this
- *    answer lets such a file through.
- *  - `index`: the geometry {@link retargetMpfIndex} needs.
- *  - `unreadable`: there is an index and there is a trailer, and this module
- *    cannot read the index. The caller must refuse: moving the trailer under an
- *    index nobody understands is exactly the outcome SPEC §9.7 forbids.
+ *  - `none`: nothing here to maintain. No MPF segment at all, or markers that do
+ *    not parse, or an index this module cannot read in a file with nothing after
+ *    EOI. That last one carries no offset a shift could invalidate and no size
+ *    this module could read anyway, and the decode that follows refuses a
+ *    malformed file with a better message than this could give.
+ *  - `index`: the geometry {@link retargetMpfIndex} needs. Returned whether or
+ *    not there is a trailer: an index with none still declares the primary
+ *    image's size, which is where the trailer *would* start, and that goes stale
+ *    when an edit changes the length ahead of it.
+ *  - `unsupported`: there is a trailer and an index that cannot be kept correct,
+ *    either because it does not parse or because one of its entries does not
+ *    locate the trailer. The caller must refuse: moving those bytes under offsets
+ *    nobody can account for is the outcome SPEC §9.7 forbids.
+ *
+ * **Every refusal is decided here, from the cover alone.** SPEC §9.7 requires it:
+ * whether an edit shifts the trailer at all depends on the keyed carrier
+ * positions, so a check made afterwards would accept the same photo under one
+ * password and refuse it under another. That is why the entry range test lives in
+ * this function and not only in the rewrite, which repeats it because it is a
+ * public entry point that takes a caller-supplied geometry.
  */
 export type MpfLink =
   | { kind: 'none' }
@@ -171,28 +190,76 @@ export type MpfLink =
       /** The whole file's length, to bound where an entry may point. */
       length: number;
     }
-  | { kind: 'unreadable'; reason: string };
+  | { kind: 'unsupported'; reason: string };
 
 export function mpfTrailerLink(bytes: Uint8Array, layout?: JpegLayout): MpfLink {
   const map = layoutOf(bytes, layout);
-  if (!map) return { kind: 'none' };
-  if (!mpfSegment(bytes, map)) return { kind: 'none' };
-  if (map.trailerStart >= bytes.length) return { kind: 'none' };
+  if (!map || !mpfSegment(bytes, map)) return { kind: 'none' };
+  const hasTrailer = map.trailerStart < bytes.length;
+
   const index = parseMpfIndex(bytes, map);
   if (!index) {
+    if (!hasTrailer) return { kind: 'none' };
     return {
-      kind: 'unreadable',
+      kind: 'unsupported',
       reason:
         'an APP2 MPF index that could not be read locates bytes after EOI, so the ' +
         'offsets it carries cannot be kept correct',
     };
   }
+
+  const trouble = entryTrouble(index.entries, {
+    endianAt: index.endianAt,
+    trailerStart: map.trailerStart,
+    length: bytes.length,
+  });
+  if (trouble) return { kind: 'unsupported', reason: trouble };
+
   return {
     kind: 'index',
     endianAt: index.endianAt,
     trailerStart: map.trailerStart,
     length: bytes.length,
   };
+}
+
+/**
+ * The first entry an edit could not account for, or null when every one of them
+ * is something {@link retargetMpfIndex} can carry forward.
+ *
+ * Entry 1 is the primary image, whose data offset is `0` by definition (SPEC
+ * §9.7.1): it *is* the image the index sits in. Every later entry names one of
+ * the images after EOI, so its offset must be non-zero and must land inside the
+ * trailer. Anything else is either an offset measured from somewhere other than
+ * the endian field or an index already pointing outside its own file, and both
+ * are numbers whose meaning a rewrite would have to guess at.
+ *
+ * `file` is the geometry the offsets were written **for**, which is not always
+ * the file the entries were just read out of: on the rewrite path the values are
+ * still the old ones while the endian field has already moved, so the caller
+ * passes the old position along with the old trailer. Reading `endianAt` off the
+ * new index there turned a correct Ultra HDR file into a refusal.
+ */
+function entryTrouble(
+  entries: readonly MpfEntryFields[],
+  file: { endianAt: number; trailerStart: number; length: number },
+): string | null {
+  const primary = entries[0];
+  if (!primary) return 'the MPF index carries no entries';
+  if (primary.offset !== 0) {
+    return `MPF entry 1 is the primary image and must carry a data offset of 0, not ${primary.offset}`;
+  }
+  for (const [i, entry] of entries.entries()) {
+    if (i === 0) continue;
+    const at = entry.offset === 0 ? 0 : file.endianAt + entry.offset;
+    if (entry.offset === 0 || at < file.trailerStart || at >= file.length) {
+      return (
+        `MPF entry ${i + 1} locates byte ${at}, which is not inside the trailer at ` +
+        `${file.trailerStart}..${file.length}`
+      );
+    }
+  }
+  return null;
 }
 
 /** Whether the rewrite could be made, and how many fields it touched. */
@@ -238,28 +305,26 @@ export function retargetMpfIndex(
   const index = parseMpfIndex(out, layout);
   if (!index) return { ok: false, reason: 'the MPF index could not be read after the edit' };
 
+  // The same test {@link mpfTrailerLink} already made of the cover, repeated
+  // against `before` because this is a public entry point and its geometry comes
+  // from the caller. A refusal here means the two disagree about the file.
+  const trouble = entryTrouble(index.entries, before);
+  if (trouble) return { ok: false, reason: trouble };
+
   const puts: { at: number; value: number }[] = [];
   for (const [i, entry] of index.entries.entries()) {
-    if (entry.offset === 0) {
-      // The primary image: everything up to EOI, so its size is where the
-      // trailer starts. Left alone when it did not say that to begin with.
+    if (i === 0) {
+      // Entry 1 is the primary image by definition: everything up to EOI, so its
+      // size is where the trailer starts. Keyed on the position rather than on
+      // `offset === 0`, which SPEC §9.7.1 pins and which a later entry could also
+      // carry; such an entry is refused above rather than treated as a second
+      // primary image.
       if (entry.size === before.trailerStart && entry.size !== layout.trailerStart) {
         puts.push({ at: entry.at + 4, value: layout.trailerStart });
       }
       continue;
     }
     const was = before.endianAt + entry.offset;
-    if (was < before.trailerStart || was >= before.length) {
-      // Either the offset is not measured from the endian header the way
-      // CIPA DC-007 says, or the index was already pointing outside its own
-      // file. Refuse rather than move a number whose meaning is a guess.
-      return {
-        ok: false,
-        reason:
-          `MPF entry ${i + 1} locates byte ${was}, which is not inside the trailer at ` +
-          `${before.trailerStart}..${before.length}`,
-      };
-    }
     const now = layout.trailerStart + (was - before.trailerStart) - index.endianAt;
     if (now < 0 || now > 0xffffffff) {
       return { ok: false, reason: `MPF entry ${i + 1} would need an offset of ${now}` };

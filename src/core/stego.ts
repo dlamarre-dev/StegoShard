@@ -498,7 +498,7 @@ export async function extractKeyFactorStego(
  * every HDR shot, so refusing took the photos a user actually has out of the
  * cover pool to protect a property that four lines of arithmetic can preserve.
  *
- * An index this code cannot read is still refused, by {@link assertMpfReadable}
+ * An index that cannot be kept correct is refused by {@link assertMpfUsable}
  * before any work starts. Raised as {@link JpegUnsupportedError}, which every
  * image adapter already translates to `StegoCoverFormatError`: from the caller's
  * side this is the same fact as "not a usable cover", and a new error class would
@@ -516,16 +516,18 @@ function keepTrailerResolvable(link: MpfLink, cover: Uint8Array, out: Uint8Array
 }
 
 /**
- * Refuse a cover whose MPF index locates a trailer and cannot be read.
+ * Refuse a cover whose MPF index cannot be kept correct: one that does not parse,
+ * or one whose entries do not locate the trailer they claim to.
  *
- * Up front, from the cover alone, rather than after the embed has decided
- * whether the trailer moved: whether it moves depends on the keyed carrier
- * positions, so a check at the end would accept this photo under one password
- * and refuse it under another. A file in this state is malformed rather than
- * merely unusual, so nothing a user actually has is turned away by it.
+ * Up front, from the cover alone, rather than after the embed has decided whether
+ * the trailer moved. Whether it moves depends on the keyed carrier positions, so
+ * a check at the end would accept this photo under one password and refuse it
+ * under another, which SPEC §9.7 forbids for exactly that reason. A file in this
+ * state is malformed rather than merely unusual, so nothing a camera writes is
+ * turned away by it.
  */
-function assertMpfReadable(link: MpfLink): MpfLink {
-  if (link.kind === 'unreadable') throw new JpegUnsupportedError(link.reason);
+function assertMpfUsable(link: MpfLink): MpfLink {
+  if (link.kind === 'unsupported') throw new JpegUnsupportedError(link.reason);
   return link;
 }
 
@@ -544,7 +546,7 @@ async function embedFixedStegoJpeg(
   // original. Removal touches only marker segments, so the coefficients below,
   // the fingerprint derived from them, and the cover-reuse tag are all unchanged.
   const cover = normalizeCoverBytes(jpegBytes).bytes;
-  const mpf = assertMpfReadable(mpfTrailerLink(cover));
+  const mpf = assertMpfUsable(mpfTrailerLink(cover));
   const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
 
   const fingerprint = await coverFingerprintJpeg(model);
@@ -809,7 +811,7 @@ export async function embedBytesStegoJpeg(
   // here it runs on every gallery photo, carriers and decoys alike, which is what
   // makes the set uniform rather than sortable (SPEC §9.7).
   const cover = normalizeCoverBytes(jpegBytes).bytes;
-  const mpf = assertMpfReadable(mpfTrailerLink(cover));
+  const mpf = assertMpfUsable(mpfTrailerLink(cover));
   const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
   const payloadBits = data.length * 8;
   const bitAt = (i: number): number => (data[i >> 3]! >> (7 - (i & 7))) & 1;

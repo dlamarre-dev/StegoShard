@@ -500,8 +500,9 @@ export interface NormalizeResult {
  * refusal remains for an index this code cannot read, because moving a trailer
  * under offsets nobody understands is the outcome §9.7 is about.
  *
- * None of this applies when nothing follows EOI: an index with no trailer
- * locates no second image, so there is no offset a shift can invalidate.
+ * An index with no trailer locates no second image, so no offset it carries can
+ * be invalidated. Its first entry still declares the primary image's size, which
+ * a removal does change, so that much is maintained either way.
  */
 export function normalizeJpegCover(bytes: Uint8Array, label?: string): NormalizeResult {
   let layout: JpegLayout;
@@ -513,16 +514,17 @@ export function normalizeJpegCover(bytes: Uint8Array, label?: string): Normalize
   const doomed = layout.segments.filter((s) => isJumbf(bytes, s));
   if (doomed.length === 0) return { bytes, removed: { segments: 0, bytes: 0 } };
 
-  // What the index says about the trailer, read before the removal moves either
-  // of them. `none` for a file with no index or nothing after EOI, which is
-  // most of them; `unreadable` is the one case still refused.
+  // What the index says about the file, read before the removal moves anything.
+  // `none` for a file with no index, which is most of them; `unsupported` names
+  // the one an edit could not keep correct, and is refused from these bytes alone
+  // rather than from what the removal turns out to shift.
   //
   // `label` names the file in whatever goes wrong with it. A gallery save
   // normalizes many photos in a loop, and "one of your photos cannot be
   // normalized" is not an actionable thing to be told.
   const named = label ? `${label}: ` : '';
   const link = mpfTrailerLink(bytes, layout);
-  if (link.kind === 'unreadable') throw new ProvenanceNormalizeError(`${named}${link.reason}`);
+  if (link.kind === 'unsupported') throw new ProvenanceNormalizeError(`${named}${link.reason}`);
 
   let removedBytes = 0;
   for (const s of doomed) removedBytes += s.end - s.start;

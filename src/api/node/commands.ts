@@ -1173,10 +1173,11 @@ export interface NormalizeCoverRow {
    * file is not a JPEG, or is a JPEG whose structure did not parse.
    *
    * Present alongside `problem` when the inventory succeeded and the *removal*
-   * then refused: an Ultra HDR photo carrying a JUMBF segment behind its MPF
-   * index is exactly the file a user needs to see the inventory of, and
-   * discarding it because the second step failed left the report silent about
-   * the one photo it had most to say about.
+   * then refused, which since SPEC §9.7.1 means an MPF index that could not be
+   * kept correct rather than one the manifest merely sat behind. That photo is
+   * exactly the one a user needs to see the inventory of, and discarding it
+   * because the second step failed left the report silent about the file it had
+   * most to say about.
    */
   profile: CoverProfile | null;
   /**
