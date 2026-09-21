@@ -63,6 +63,15 @@ import {
   shamirRecover,
   randomBytes,
   KEY_FACTOR_LEN,
+  inspectCoverSet,
+  inspectJpegCover,
+  isHeif,
+  isJpeg as isJpegBytes,
+  normalizeJpegCover,
+  type CoverKind,
+  type CoverProfile,
+  type CoverSetEntry,
+  type CoverSetReport,
   type FilePurpose,
   type ImageDataLike,
   type KeyMode,
@@ -381,6 +390,30 @@ interface KeyArtifact {
   mimicPath?: string;
   /** Set by `externalKey`; called by `writeExternalKey` once the bytes are on disk. */
   onLanded?: (() => void) | undefined;
+}
+
+/**
+ * How much provenance a stego key cover is carrying, before the embed removes it.
+ *
+ * Asked separately rather than reported out of the stego layer. `embedKeyImage`
+ * normalizes the cover itself (SPEC §9.7, via `stego.ts`), but what it returns
+ * is a key image; threading a report back out through four adapters and six
+ * `SaveResult` return sites would be a great deal of plumbing for one number.
+ * Walking the marker segments is a linear pass over the header, next to an
+ * Argon2 and a full JPEG decode.
+ *
+ * Answers undefined for anything it cannot read rather than throwing: the embed
+ * that follows refuses a bad cover with a proper error, and a warning counter
+ * must never be the thing that fails a save.
+ */
+export function coverManifest(path: string): { segments: number; bytes: number } | undefined {
+  try {
+    const bytes = read(path);
+    if (!isJpegBytes(bytes)) return undefined;
+    return inspectJpegCover(bytes).jumbf;
+  } catch {
+    return undefined;
+  }
 }
 
 async function externalKey(
@@ -971,6 +1004,13 @@ export interface GallerySaveResult {
   decoys: number;
   setId: string;
   keyMode: KeyMode;
+  /**
+   * Cover normalization over the whole set, carriers and decoys alike
+   * (SPEC §9.7). `uniform` false means the photos that were just written can
+   * still be sorted by their metadata, which is the condition normalizing only
+   * the carriers would have produced.
+   */
+  provenance: { covers: number; segments: number; bytes: number; uniform: boolean };
 }
 
 async function runGallerySaveImpl(
@@ -1057,7 +1097,15 @@ async function runGallerySaveImpl(
       outs.push(emit(opts, `recovery-${i + 1}.txt`, new TextEncoder().encode(body), 'share'));
     });
   }
-  return { ...asFiles(outs), k: res.k, m: res.m, decoys: res.decoys, setId: setHex, keyMode };
+  return {
+    ...asFiles(outs),
+    k: res.k,
+    m: res.m,
+    decoys: res.decoys,
+    setId: setHex,
+    keyMode,
+    provenance: { ...res.normalization.removed, uniform: res.normalization.uniform },
+  };
 }
 
 export interface GalleryRestoreResult {
@@ -1099,6 +1147,249 @@ function writeRestored(
   if (!bundled) return [writeOut(target, basename(filename) || 'restored.bin', content)];
   // unpackBundle reduces every entry to a basename, so nothing can escape the dir.
   return unpackBundle(content).map((f) => writeOut(target, f.name, f.bytes));
+}
+
+export interface NormalizeOptions {
+  /** Image files or directories. Directories are walked for image files. */
+  inputs: string[];
+  /** Where normalized copies go. Required unless `report` is set. */
+  outDir?: string | undefined;
+  /** Inspect only: compute everything, write nothing. */
+  report?: boolean | undefined;
+  /** Overwrite existing output files instead of refusing. */
+  force?: boolean | undefined;
+}
+
+/** One input file's outcome. */
+export interface NormalizeCoverRow {
+  /** The path as given. */
+  input: string;
+  /** Its basename, which is also the output name. */
+  name: string;
+  kind: CoverKind;
+  /**
+   * The inventory taken **before** removal, so it still shows the manifest that
+   * was taken out along with everything else the file declares. Null when the
+   * file is not a JPEG, or is a JPEG whose structure did not parse.
+   *
+   * Present alongside `problem` when the inventory succeeded and the *removal*
+   * then refused: an Ultra HDR photo carrying a JUMBF segment behind its MPF
+   * index is exactly the file a user needs to see the inventory of, and
+   * discarding it because the second step failed left the report silent about
+   * the one photo it had most to say about.
+   */
+  profile: CoverProfile | null;
+  /**
+   * Why this file produced no normalized copy: it is a JPEG whose structure did
+   * not parse, or one whose manifest could not be removed without invalidating
+   * something else (see `normalizeJpegCover`). A PNG or a HEIC carries no
+   * `problem`; it is named by `kind`, because being another format is not a
+   * fault in the file.
+   */
+  problem?: string;
+  removed: { segments: number; bytes: number };
+  /** Where the normalized copy landed. Absent in report mode, and for skipped files. */
+  output?: string;
+}
+
+export interface NormalizeCoversResult {
+  /** Written paths, in write order. Empty in report mode. */
+  files: string[];
+  manifest: ManifestEntry[];
+  /** Per-file inventory, in input order. */
+  covers: NormalizeCoverRow[];
+  /**
+   * Set-level uniformity over every member, computed on the **normalized**
+   * bytes for the JPEGs that normalized and on the originals for the rest.
+   * Report mode therefore answers "what would I get", rather than restating
+   * what the files already are, which the per-file profiles already say. A
+   * member that produced no output still counts against `uniform`: a set an
+   * adversary can sort by format is not one uniformity holds over.
+   */
+  set: CoverSetReport;
+  removed: { covers: number; segments: number; bytes: number };
+  /**
+   * Members that produced no normalized bytes: a PNG, a HEIC, a JPEG that did
+   * not parse, or one whose manifest could not be removed safely. Counted, not
+   * derived from `profile === null`, because the last of those keeps its
+   * inventory.
+   */
+  skipped: number;
+  /**
+   * True when this was `--report`: nothing was written, and `files` is empty
+   * because of that rather than because every member was skipped. A presenter
+   * cannot tell those apart from the result alone, and telling a user their
+   * library has been normalized when it has not is the one wrong thing to say
+   * here.
+   */
+  report: boolean;
+}
+
+/**
+ * Strip provenance manifests from a set of photos, and report on what is left.
+ *
+ * WHY THIS IS A COMMAND AND NOT ONLY A PIPELINE STEP
+ * The automatic step in `stego.ts` reaches exactly the photos handed to
+ * StegoShard. Uniformity is a property of the whole library an adversary sees,
+ * not of the nine photos that ended up carrying something: normalizing nine
+ * photos inside a folder of three hundred *is* the discriminating condition the
+ * feature exists to remove. So this runs over an arbitrary set, and it takes the
+ * set rather than a file at a time, because `uniform` is not a property a single
+ * photo can have.
+ *
+ * SCOPE
+ * JPEG only. A PNG is copied by nothing here: its metadata lives in chunks this
+ * module does not rewrite, so passing it through would quietly promise a
+ * normalization that did not happen. (A PNG *cover* is normalized anyway on the
+ * embed path, where the decode to pixels drops every chunk.) A HEIC is named and
+ * skipped for the reason in `isHeif`. Both are reported, never silently dropped.
+ *
+ * A file that does not parse produces no output and a recorded `problem`; the
+ * run continues. Failing the whole command because one photo in a library is
+ * odd would make the tool useless on exactly the libraries it is for, and the
+ * "never emit corrupt output" rule is satisfied by writing nothing for it.
+ */
+/**
+ * Which files `normalize` looks at.
+ *
+ * Deliberately not `gatherImageFiles`, whose pattern is the one `restore` and
+ * the gallery commands use and does **not** include HEIC. That is right for
+ * them: a `.heic` sitting in a folder being restored from is not an input, and
+ * silently ignoring it is correct. It is wrong here, where a HEIC among the
+ * JPEGs is a finding, and the whole job is to report what a set is made of. So
+ * this pattern is wider, and the extra formats are reported and skipped rather
+ * than processed.
+ */
+const NORMALIZE_IMAGE_RE = /\.(jpe?g|png|hei[cf]|avif)$/i;
+
+function gatherNormalizeFiles(paths: string[]): string[] {
+  const files: string[] = [];
+  for (const path of paths) {
+    if (statSync(path).isDirectory()) files.push(...walk(path));
+    else files.push(path);
+  }
+  return files.filter((p) => NORMALIZE_IMAGE_RE.test(basename(p)));
+}
+
+export async function runNormalize(opts: NormalizeOptions): Promise<NormalizeCoversResult> {
+  const paths = gatherNormalizeFiles(opts.inputs);
+  if (paths.length === 0) {
+    throw new StegoShardApiError('NO_NORMALIZE_FILES', 'no image files found to normalize');
+  }
+  if (!opts.report && !opts.outDir) {
+    throw new StegoShardApiError(
+      'NORMALIZE_OUT_REQUIRED',
+      'normalize needs --out: writing beside the originals is the opposite of the point',
+    );
+  }
+
+  const covers: NormalizeCoverRow[] = [];
+  // Every member of the set, JPEG or not, normalized where that was possible:
+  // a HEIC among the JPEGs is precisely what the set sorts on (SPEC §9.7), so
+  // leaving it out of the report would claim a uniformity the set does not have.
+  const setEntries: CoverSetEntry[] = [];
+  const outs: OutFile[] = [];
+  let removedCovers = 0;
+  let removedSegments = 0;
+  let removedBytes = 0;
+  let skipped = 0;
+  const used = new Set<string>();
+
+  for (const path of paths) {
+    const name = basename(path);
+    const bytes = read(path);
+    const kind: CoverKind = isJpegBytes(bytes)
+      ? 'jpeg'
+      : isHeif(bytes)
+        ? 'heif'
+        : bytes[0] === 0x89 && bytes[1] === 0x50
+          ? 'png'
+          : 'other';
+
+    if (kind !== 'jpeg') {
+      covers.push({ input: path, name, kind, profile: null, removed: { segments: 0, bytes: 0 } });
+      setEntries.push({ name, bytes });
+      skipped++;
+      continue;
+    }
+
+    // Two steps, two try blocks, because they fail for different reasons and one
+    // of them fails with the inventory already in hand. Reading a profile and
+    // removing a manifest used to share a block, so a photo that inventoried
+    // fine and then refused removal was filed as "did not parse" with no profile
+    // at all.
+    let profile: CoverProfile;
+    try {
+      profile = inspectJpegCover(bytes);
+    } catch (err) {
+      covers.push({
+        input: path,
+        name,
+        kind,
+        profile: null,
+        problem: err instanceof Error ? err.message : String(err),
+        removed: { segments: 0, bytes: 0 },
+      });
+      setEntries.push({ name, bytes });
+      skipped++;
+      continue;
+    }
+
+    let normalized: Uint8Array;
+    let removed: { segments: number; bytes: number };
+    try {
+      const res = normalizeJpegCover(bytes, name);
+      normalized = res.bytes;
+      removed = res.removed;
+    } catch (err) {
+      // Profile kept: it is what says which segments this photo carries and in
+      // what order, which is the whole explanation of why the removal refused.
+      covers.push({
+        input: path,
+        name,
+        kind,
+        profile,
+        problem: err instanceof Error ? err.message : String(err),
+        removed: { segments: 0, bytes: 0 },
+      });
+      setEntries.push({ name, bytes });
+      skipped++;
+      continue;
+    }
+
+    if (removed.segments > 0) {
+      removedCovers++;
+      removedSegments += removed.segments;
+      removedBytes += removed.bytes;
+    }
+    setEntries.push({ name, bytes: normalized });
+
+    const row: NormalizeCoverRow = { input: path, name, kind, profile, removed };
+    if (!opts.report) {
+      // Two inputs can share a basename; disambiguate so nothing is overwritten.
+      let outName = name;
+      for (let n = 2; used.has(outName); n++) outName = name.replace(/(\.[^.]+)?$/, `-${n}$1`);
+      used.add(outName);
+      const out = emit({ outDir: opts.outDir!, force: opts.force }, outName, normalized, 'photos');
+      outs.push(out);
+      row.output = out.path;
+    }
+    covers.push(row);
+  }
+
+  return {
+    ...asFiles(outs),
+    covers,
+    set: inspectCoverSet(setEntries),
+    removed: { covers: removedCovers, segments: removedSegments, bytes: removedBytes },
+    // Counted as the loop goes: anything that produced no normalized bytes. A
+    // PNG, a HEIC, a JPEG that did not parse, or a JPEG whose manifest could not
+    // be removed safely, which keeps its profile and so cannot be found by
+    // looking for a null one. They are in `set` too, where they are part of what
+    // makes it non-uniform; this is the count, which means the same in both modes.
+    skipped,
+    report: Boolean(opts.report),
+  };
 }
 
 export async function runEstimate(

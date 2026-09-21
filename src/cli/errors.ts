@@ -58,6 +58,35 @@ export type CliErrorCode =
   /** Anything not classified above. */
   | 'INTERNAL';
 
+/**
+ * Every invocation code, sorted.
+ *
+ * Derived from a `Record` over the union rather than written out by hand. A
+ * hand-kept `readonly CliErrorCode[]` can be short without the type checker
+ * minding, which is exactly how `API_ERROR_CODES` fell a code behind its own
+ * union; `satisfies Record<CliErrorCode, true>` makes an unlisted code a build
+ * error and leaves no way for a retired one to linger.
+ *
+ * Published because the codes are: they appear in the `--json` envelope's
+ * `error.code` and in the MCP tool result, so a caller writing a branch per
+ * failure needs the set, and `docs/API.md` documents it.
+ */
+const CLI_ERROR_CODE_ROWS = {
+  ENTROPY_ARG: true,
+  EXPORT_NUMBER_INVALID: true,
+  EXPORT_NUMBER_NOT_DENIABLE: true,
+  INTERNAL: true,
+  PASSWORD_REQUIRED: true,
+  PASSWORD_TOO_SHORT: true,
+  PASSWORD_WEAK: true,
+  UI_UNAVAILABLE: true,
+  USAGE: true,
+} satisfies Record<CliErrorCode, true>;
+
+export const CLI_ERROR_CODES: readonly CliErrorCode[] = (
+  Object.keys(CLI_ERROR_CODE_ROWS) as CliErrorCode[]
+).sort();
+
 /** A failure the command line raised itself, carrying its localized message. */
 export class CliError extends Error {
   constructor(
@@ -80,8 +109,12 @@ export class CliError extends Error {
  * `ApiErrorCode` makes a new code without a message a build error, and every key
  * below is the one that code's `throw` used to pass to `t()` directly, so the
  * printed text is unchanged in all nine languages.
+ *
+ * Exported for `errors.test.ts`, which reads it as the runtime spelling of the
+ * `ApiErrorCode` union: a `Record` over the union is exhaustive by construction,
+ * so its keys are the one list that cannot fall behind.
  */
-const API_ERROR_KEY: Record<ApiErrorCode, CliKey> = {
+export const API_ERROR_KEY: Record<ApiErrorCode, CliKey> = {
   OUTPUT_EXISTS: 'errOverwrite',
   STEGO_NEEDS_COVER: 'errStegoNeedsCover',
   DURESS_DECOY_REQUIRED: 'errSaveDuressDecoy',
@@ -92,6 +125,8 @@ const API_ERROR_KEY: Record<ApiErrorCode, CliKey> = {
   NO_READABLE_IMAGES: 'errNoReadableImages',
   NO_COVERS_FOUND: 'errNoCoversFound',
   NO_GALLERY_IMAGES: 'errNoGalleryImages',
+  NO_NORMALIZE_FILES: 'errNoNormalizeFiles',
+  NORMALIZE_OUT_REQUIRED: 'errNormalizeOut',
 };
 
 /** What to print for a thrown value, and what to exit with. */

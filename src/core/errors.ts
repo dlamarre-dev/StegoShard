@@ -31,6 +31,8 @@ import {
 import { CredentialsNotIndependentError, type CredentialRelation } from './access';
 import { BucketTooLargeError } from './buckets';
 import { JpegUnsupportedError } from './jpeg-coeff';
+import { JpegStructureError } from './jpeg-segments';
+import { ProvenanceNormalizeError } from './normalize';
 import { SegmentedFormatError } from './segmented';
 import { ShareChecksumError, ShareSetError } from './shamir';
 import { StegoCapacityError, StegoCoverFormatError } from './stego';
@@ -53,8 +55,10 @@ export type StegoErrorCode =
   | 'GALLERY_RESTORE_FAILED'
   | 'GALLERY_TOO_FEW_IMAGES'
   | 'GALLERY_TOO_MANY_IMAGES'
+  | 'JPEG_STRUCTURE'
   | 'JPEG_UNSUPPORTED'
   | 'MISSING_KEY'
+  | 'PROVENANCE_NORMALIZE'
   | 'SEGMENTED_FORMAT'
   | 'SHARE_CHECKSUM'
   | 'SHARE_SET'
@@ -230,6 +234,12 @@ const TABLE: readonly CodeRow[] = [
   // The constructor wraps its argument, so the argument is recovered from the
   // wrapped message rather than carried separately.
   row(
+    JpegStructureError,
+    'JpegStructureError',
+    'JPEG_STRUCTURE',
+    (m) => new JpegStructureError(unprefix(m, 'malformed JPEG: ')),
+  ),
+  row(
     JpegUnsupportedError,
     'JpegUnsupportedError',
     'JPEG_UNSUPPORTED',
@@ -240,6 +250,12 @@ const TABLE: readonly CodeRow[] = [
     'MissingKeyError',
     'MISSING_KEY',
     nullary(() => new MissingKeyError()),
+  ),
+  row(
+    ProvenanceNormalizeError,
+    'ProvenanceNormalizeError',
+    'PROVENANCE_NORMALIZE',
+    (m) => new ProvenanceNormalizeError(unprefix(m, 'cannot normalize: ')),
   ),
   row(
     SegmentedFormatError,

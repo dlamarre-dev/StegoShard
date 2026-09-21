@@ -61,6 +61,9 @@ const COMMANDS = [
   'stegoshard estimate <file> [--paper] [--codec color|qr]',
   'stegoshard gallery-save <file> <cover-photos|folder ...> [options]',
   'stegoshard gallery-restore <photos|folder ...> [options]',
+  // --out and --report are alternatives, not a flag and an option: --report writes
+  // nothing, so the two together are refused rather than resolved.
+  'stegoshard normalize <photos|folder ...> (--out <dir> | --report)',
   'stegoshard ui [--port <n>] [--open]',
   'stegoshard mcp --root <dir> [--allow-inline-password]',
 ];
@@ -132,6 +135,11 @@ const GALLERY_ROWS: Row[] = [
   ['--share <file>', 'helpGalleryShare'],
 ];
 
+const NORMALIZE_ROWS: Row[] = [
+  ['--out <dir>', 'helpNormalizeOut'],
+  ['--report', 'helpNormalizeReport'],
+];
+
 const UI_ROWS: Row[] = [
   ['--port <n>', 'helpUiPort'],
   ['--open', 'helpUiOpen'],
@@ -148,6 +156,8 @@ const EXAMPLES = [
   'stegoshard restore ./vault --out ./restored',
   'stegoshard gallery-save note.txt ./photos --out ./album',
   'stegoshard gallery-restore ./album --out ./restored',
+  'stegoshard normalize ./photos --report',
+  'stegoshard normalize ./photos --out ./photos-clean',
 ];
 
 /** The full `--help` text in the active language. */
@@ -179,6 +189,10 @@ export function usage(): string {
     ...GALLERY_ROWS.map(row),
     para('helpGalleryNoDuress'),
     para('helpGalleryNote'),
+    '',
+    ...wrap(t('helpNormalizeHeading'), WIDTH),
+    ...NORMALIZE_ROWS.map(row),
+    para('helpNormalizeNote'),
     '',
     t('helpUiHeading'),
     para('helpUi'),

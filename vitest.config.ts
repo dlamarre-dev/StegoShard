@@ -87,6 +87,11 @@ export default defineConfig({
         'src/cli/main.ts',
         'src/cli/io.ts',
         'src/cli/serve-standalone.ts',
+        // Test fixtures that live in src/ so three test files can share them
+        // without one importing another's suites. They are not production code,
+        // and measuring them would put a floor on how thoroughly the tests test
+        // their own scaffolding, which is not a number that means anything.
+        'src/core/jpeg-fixtures.ts',
       ],
       thresholds: {
         // Per file, not aggregate. The aggregate gate let seven files sit below

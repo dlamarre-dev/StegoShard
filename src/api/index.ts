@@ -9,7 +9,7 @@
  * in the import rather than decided by a resolver condition.
  *
  * **This is a curated facade, not the internal barrel.** `src/core/index.ts`
- * re-exports 255 names, including the erasure-coding matrices, the Galois field,
+ * re-exports 281 runtime values, including the erasure-coding matrices, the Galois field,
  * the SPEC §10 slot layer, the region geometry, and a bare `decode`/`encode` pair
  * that means "JPEG coefficient model". Publishing that would freeze all of it and
  * make every internal rename a breaking change. What is here is what a consumer
@@ -238,6 +238,43 @@ export {
   extractKeyFactorStegoJpeg,
   jpegStegoCapacityBits,
   isJpeg,
+} from '../core';
+
+// ---------------------------------------------------------------------------
+// Cover normalization (SPEC §9.7)
+// ---------------------------------------------------------------------------
+
+/**
+ * The embed paths normalize their covers themselves, so a consumer using
+ * `save()` or `galleryEncode()` gets this whether or not it calls anything here.
+ * What these add is the part the pipeline cannot reach: the rest of a photo
+ * library, which has to carry the same metadata profile as the covers or the
+ * covers stand out by carrying a different one.
+ *
+ * `inspectCoverSet` is the one to reach for: uniformity is a property of a set,
+ * and a single photo cannot be non-uniform on its own.
+ */
+export {
+  normalizeJpegCover,
+  normalizeCoverBytes,
+  inspectJpegCover,
+  inspectCoverSet,
+  isHeif,
+  JUMBF_APP11_PREFIX,
+} from '../core';
+
+export type {
+  CoverProfile,
+  CoverKind,
+  CoverSetEntry,
+  CoverSetReport,
+  CoverSetRow,
+  CoverSetDivergence,
+  SegmentClass,
+  TrailerKind,
+  XmpFindings,
+  ExifFindings,
+  NormalizeResult,
 } from '../core';
 
 // ---------------------------------------------------------------------------

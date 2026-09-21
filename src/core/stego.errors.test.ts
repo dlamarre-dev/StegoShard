@@ -28,6 +28,8 @@ import {
   KEY_BLOCK_LEN,
 } from './index';
 
+import { gainMapTrailer, mpfSegment, spliceBeforeSos, withTrailer } from './jpeg-fixtures';
+
 const SEED = new Uint8Array(32).fill(7);
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
@@ -192,6 +194,19 @@ describe('capacity refusals', () => {
     const tooBig = new Uint8Array(Math.ceil(carriers / 8) + 16);
     await expect(embedBytesStegoJpeg(jpegBytes, tooBig, SEED)).rejects.toBeInstanceOf(
       StegoCapacityError,
+    );
+  });
+
+  /**
+   * Same refusal as the key-photo path, on the path every gallery photo takes:
+   * an embed re-serializes the scan, which moves a trailer an MPF index locates
+   * by offset (SPEC §9.7). Raised as `JpegUnsupportedError` because that is the
+   * class the four image adapters already translate to `StegoCoverFormatError`.
+   */
+  it('refuses a gallery cover whose MPF index locates its trailer', async () => {
+    const cover = withTrailer(spliceBeforeSos(baseJpeg(64, 64), mpfSegment()), gainMapTrailer());
+    await expect(embedBytesStegoJpeg(cover, new Uint8Array(8).fill(9), SEED)).rejects.toMatchObject(
+      { name: 'JpegUnsupportedError' },
     );
   });
 

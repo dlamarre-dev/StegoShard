@@ -40,7 +40,18 @@ export type ApiErrorCode =
   /** A gallery save found no usable cover photos. */
   | 'NO_COVERS_FOUND'
   /** A gallery restore was handed no images to scan. */
-  | 'NO_GALLERY_IMAGES';
+  | 'NO_GALLERY_IMAGES'
+  /**
+   * `normalize` was handed no image files at all.
+   *
+   * Its own code rather than `NO_COVERS_FOUND`: that one means "a gallery save
+   * found nothing to hide a secret in", and `normalize` walks a wider set of
+   * formats for a different purpose, so sharing the code made the terminal
+   * answer an empty folder with a sentence about gallery cover photos.
+   */
+  | 'NO_NORMALIZE_FILES'
+  /** `normalize` was asked to write without being told where. */
+  | 'NORMALIZE_OUT_REQUIRED';
 
 /** Substitutions the CLI needs to render this code in the user's language. */
 export type ApiErrorParams = Record<string, string | number>;
@@ -63,14 +74,23 @@ export class StegoShardApiError extends Error {
   }
 }
 
-/** Every code, sorted. Lets a caller enumerate them, and a test check coverage. */
+/**
+ * Every code, sorted. Lets a caller enumerate them, and a test check coverage.
+ *
+ * `src/cli/errors.test.ts` now holds that test, comparing this list against the
+ * exhaustive `Record<ApiErrorCode, CliKey>` the CLI keeps: the list had fallen a
+ * code behind the union, which is invisible to the type checker because a
+ * `readonly ApiErrorCode[]` is just as valid when it is short.
+ */
 export const API_ERROR_CODES: readonly ApiErrorCode[] = [
   'DURESS_DECOY_REQUIRED',
   'DURESS_PASSWORD_REQUIRED',
   'MODE_NEEDS_DISGUISE',
+  'NORMALIZE_OUT_REQUIRED',
   'NO_COVERS_FOUND',
   'NO_GALLERY_IMAGES',
   'NO_INPUT_FILES',
+  'NO_NORMALIZE_FILES',
   'NO_READABLE_IMAGES',
   'OUTPUT_EXISTS',
   'STEGO_NEEDS_COVER',

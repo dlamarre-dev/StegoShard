@@ -27,8 +27,10 @@ import {
   galleryCoversForEnvelopeLen,
   galleryDecode,
   galleryEncode,
+  inspectJpegCover,
   shamirRecover,
 } from './index';
+import { withC2pa } from './jpeg-fixtures';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
@@ -85,6 +87,96 @@ async function coversFor(
   const covers = Array.from({ length: needed + extra }, (_, i) => make(`p${i}`, i + 101));
   return { covers, k, m, needed };
 }
+
+/**
+ * Cover normalization across the set (SPEC §9.7).
+ *
+ * The property is uniformity, not cleanliness, so the decoys matter as much as
+ * the carriers: a set where only the K+M fragment photos lost their manifests
+ * sorts exactly as well as one where only those photos fail C2PA validation.
+ * `galleryEncode` normalizes before it embeds, so these assert on the produced
+ * images rather than on what was handed in.
+ */
+describe('gallery cover normalization', () => {
+  it('strips the manifest from carriers AND decoys alike', async () => {
+    const secret = enc.encode('uniformity is the property');
+    const { covers, k, m } = await coversFor('n.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    // Every cover arrives carrying a manifest.
+    const dirty = covers.map((c) => (c.kind === 'jpeg' ? { ...c, jpeg: withC2pa(c.jpeg, 2) } : c));
+
+    const res = await galleryEncode('n.txt', secret, 'pw', dirty, { params: FAST });
+    for (const img of res.images) {
+      if (img.kind === 'jpeg') expect(inspectJpegCover(img.jpeg).jumbf.segments).toBe(0);
+    }
+    // Decoys are the covers past the K+M carriers, and they are in the loop too.
+    expect(res.images.length).toBeGreaterThan(k + m);
+    expect(res.normalization.removed.covers).toBe(dirty.length);
+    expect(res.normalization.uniform).toBe(true);
+  }, 45000);
+
+  it('normalizes a mixed set down to one profile, not just the dirty half', async () => {
+    const secret = enc.encode('half and half');
+    const { covers } = await coversFor('n.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    const mixed = covers.map((c, i) =>
+      c.kind === 'jpeg' && i % 2 === 0 ? { ...c, jpeg: withC2pa(c.jpeg, 1) } : c,
+    );
+
+    const res = await galleryEncode('n.txt', secret, 'pw', mixed, { params: FAST });
+    expect(res.normalization.removed.covers).toBeGreaterThan(0);
+    expect(res.normalization.removed.covers).toBeLessThan(mixed.length);
+    // The point: having started uneven, the set ends up even.
+    expect(res.normalization.covers?.withManifest).toEqual([]);
+    expect(res.normalization.covers?.divergent).toEqual([]);
+    expect(res.normalization.uniform).toBe(true);
+  }, 45000);
+
+  it('still restores after the manifests are gone', async () => {
+    const secret = enc.encode('round trip through normalization');
+    const { covers } = await coversFor('n.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    const dirty = covers.map((c) => (c.kind === 'jpeg' ? { ...c, jpeg: withC2pa(c.jpeg, 3) } : c));
+    const { images } = await galleryEncode('n.txt', secret, 'pw', dirty, { params: FAST });
+    const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST });
+    expect(dec.decode(out.content)).toBe('round trip through normalization');
+  }, 45000);
+
+  it('reports a raster cover set as non-uniform when it is mixed with JPEGs', async () => {
+    const secret = enc.encode('mixed formats');
+    const { covers } = await coversFor('n.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    // Swap one JPEG for a PNG-backed raster cover of the same size.
+    const mixed = [...covers.slice(0, -1), rgbaCover('odd.png', 77)];
+    const res = await galleryEncode('n.txt', secret, 'pw', mixed, { params: FAST });
+    expect(res.normalization.raster).toBe(1);
+    expect(res.normalization.uniform).toBe(false);
+  }, 45000);
+
+  /**
+   * `fileToGalleryCover` calls anything with an SOI a JPEG, so a truncated photo
+   * in the cover folder reaches normalization. It used to arrive as a bare
+   * `JpegStructureError`, which no image adapter maps, so a consumer catching
+   * `StegoCoverFormatError` around a gallery save met an unhandled type. The
+   * refusal is also cheap: it lands before the Argon2, not after it.
+   */
+  it('refuses a truncated cover with the class the adapters translate', async () => {
+    const secret = enc.encode('truncated cover');
+    const { covers } = await coversFor('n.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    const broken = covers.map((c, i) =>
+      i === 0 && c.kind === 'jpeg' ? { ...c, jpeg: c.jpeg.subarray(0, c.jpeg.length - 12) } : c,
+    );
+    await expect(
+      galleryEncode('n.txt', secret, 'pw', broken, { params: FAST }),
+    ).rejects.toMatchObject({ name: 'JpegUnsupportedError' });
+  });
+
+  it('an all-raster set is uniform and reports nothing removed', async () => {
+    const secret = enc.encode('all png');
+    const { covers } = await coversFor('n.txt', secret, (n, s) => rgbaCover(`${n}.png`, s));
+    const res = await galleryEncode('n.txt', secret, 'pw', covers, { params: FAST });
+    expect(res.normalization.raster).toBe(covers.length);
+    expect(res.normalization.covers).toBeNull();
+    expect(res.normalization.removed.covers).toBe(0);
+    expect(res.normalization.uniform).toBe(true);
+  });
+});
 
 describe('gallery round-trip', () => {
   it('hides a secret across RGBA covers and restores it blindly', async () => {

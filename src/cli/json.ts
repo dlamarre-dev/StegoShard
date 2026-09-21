@@ -35,6 +35,7 @@ import type { CliWarning, EstimateResult, Presenter } from './present';
 import type {
   GalleryRestoreResult,
   GallerySaveResult,
+  NormalizeCoversResult,
   RestoreResult,
   SaveResult,
 } from '../api/node/commands';
@@ -163,6 +164,50 @@ export function gallerySaveResultJson(res: GallerySaveResult): Record<string, un
     decoys: res.decoys,
     setId: res.setId,
     keyMode: res.keyMode,
+    // Uniformity is the security property of the set (SPEC §9.7), and a caller
+    // driving gallery-save from a script has no other way to see whether the
+    // photos it just wrote achieved it.
+    provenance: res.provenance,
+  };
+}
+
+/**
+ * The normalization document.
+ *
+ * Carries the whole inventory, because the point of `--report --json` is to be
+ * the input to a policy decision that has not been made yet (SPEC §9.7 removes
+ * manifests; what to do about XMP and EXIF identifiers is answered by reading
+ * this over real photos). `uniform` is the one field a script should branch on.
+ *
+ * `profile.exif` deliberately carries make/model/software/timestamp as values
+ * and the serial numbers only as flags: see `ExifFindings` in
+ * `src/core/normalize.ts` for why a report must not copy an identifier out of
+ * the file it is warning about.
+ */
+export function normalizeResultJson(res: NormalizeCoversResult): Record<string, unknown> {
+  return {
+    files: abs(res.files),
+    manifest: res.manifest.map((m) => ({ name: resolve(m.name), purpose: m.purpose })),
+    uniform: res.set.uniform,
+    report: res.report,
+    removed: res.removed,
+    skipped: res.skipped,
+    covers: res.covers.map((c) => ({
+      input: resolve(c.input),
+      name: c.name,
+      kind: c.kind,
+      removed: c.removed,
+      ...(c.output ? { output: resolve(c.output) } : {}),
+      ...(c.problem ? { problem: c.problem } : {}),
+      ...(c.profile ? { profile: c.profile } : {}),
+    })),
+    set: {
+      common: res.set.common,
+      divergent: res.set.divergent,
+      withManifest: res.set.withManifest,
+      trailerKinds: res.set.trailerKinds,
+      unparsed: res.set.unparsed,
+    },
   };
 }
 
@@ -253,6 +298,10 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
 
     estimate(res) {
       ok(estimateResultJson(res));
+    },
+
+    normalize(res) {
+      ok(normalizeResultJson(res));
     },
 
     failure(failure: CliFailure, err: unknown) {

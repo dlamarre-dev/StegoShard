@@ -24,7 +24,12 @@ import {
   parseKeyBlock,
   unlockKeyBlock,
 } from '@core';
-import { saveFileToBinary, saveFileToDisk, saveGalleryToDisk } from './disk';
+import {
+  type GallerySaveResult,
+  saveFileToBinary,
+  saveFileToDisk,
+  saveGalleryToDisk,
+} from './disk';
 import { resolveSaveInput } from './bundle';
 
 export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
@@ -177,14 +182,35 @@ function binaryNote(msg: Msg, keyMode: KeyMode, variant: BinaryVariant): string 
   return msg(key, msg(variant === 'branded' ? 'binaryVariantBranded' : 'binaryVariantDisguised'));
 }
 
-function galleryNote(msg: Msg, keyMode: KeyMode, imageCount: number): string {
+/**
+ * The gallery note, plus whatever cover normalization has to say about the set.
+ *
+ * The uniformity verdict is not decoration: a set where only some photos lost a
+ * provenance manifest sorts into two groups, and the smaller one is the
+ * interesting one (SPEC §9.7). The CLI surfaces the same two facts as the
+ * `PROVENANCE_STRIPPED` and `COVERS_NOT_UNIFORM` warnings; this surface read
+ * neither, so a browser user saving a set that does not share one metadata
+ * profile was told only that the save succeeded.
+ *
+ * Appended to the one note because that is the whole channel this surface has:
+ * `SaveOutcome.note` lands in a text node, so the sentences are joined with a
+ * space rather than a newline that would not render.
+ */
+function galleryNote(msg: Msg, keyMode: KeyMode, res: GallerySaveResult): string {
   const key =
     keyMode === 'embedded'
       ? 'statusGallerySaved'
       : keyMode === 'stego'
         ? 'statusGallerySavedStego'
         : 'statusGallerySavedKeyfile';
-  return msg(key, String(imageCount));
+  const parts = [msg(key, String(res.imageCount))];
+  if (res.provenance.covers > 0) {
+    parts.push(msg('warnProvenanceStripped', String(res.provenance.covers)));
+  }
+  // Reported whether or not anything was removed: a set can lose every manifest
+  // and still be sortable on what is left.
+  if (!res.provenance.uniform) parts.push(msg('warnCoversNotUniform'));
+  return parts.join(' ');
 }
 
 /**
@@ -265,7 +291,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
       mode: accessMode,
       threshold: req.threshold,
     });
-    return { note: galleryNote(msg, keyMode, res.imageCount), manifest: res.manifest };
+    return { note: galleryNote(msg, keyMode, res), manifest: res.manifest };
   }
 
   if (!req.key) throw new Error('a vault key is required');

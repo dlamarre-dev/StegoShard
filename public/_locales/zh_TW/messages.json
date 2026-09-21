@@ -499,6 +499,19 @@
     "message": "從照片還原",
     "description": "Gallery Mode: restore button."
   },
+  "warnProvenanceStripped": {
+    "message": "已從其中 $COUNT$ 張相片移除來源聲明。也請正規化相片庫的其餘部分：保留聲明的相片，擺在失去聲明的相片旁邊，同樣會透露線索。",
+    "description": "Gallery Mode: a C2PA provenance manifest was removed from some covers (SPEC 9.7).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnCoversNotUniform": {
+    "message": "這些相片並未共用同一份中繼資料輪廓，仍可據此分辨。",
+    "description": "Gallery Mode: the cover set does not share one metadata profile (SPEC 9.7)."
+  },
   "statusGallerySaving": {
     "message": "正在將秘密藏入你的照片…",
     "description": "Gallery Mode: status while saving."

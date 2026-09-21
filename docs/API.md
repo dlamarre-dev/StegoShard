@@ -58,7 +58,7 @@ await restore({ inputs: ['./vault'], outDir: './restored', password: … });
 ### What is in it, and what is not
 
 The published surface is **curated**, not the internal barrel. `src/core/index.ts`
-re-exports 255 names; the library exports 118 across both entries. What a
+re-exports 281 runtime values; the library exports 126 across both entries. What a
 consumer needs to save and restore a vault is there. What is deliberately not:
 
 - the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,
@@ -194,10 +194,25 @@ directory.
 | `gallery-save`    | `files`, `manifest`, `k`, `m`, `decoys`, `setId`, `keyMode`                          |
 | `gallery-restore` | `files`, `outPath`, `filename`, `seen`                                               |
 | `estimate`        | `images`, `k`, `m`                                                                   |
+| `normalize`       | `files`, `manifest`, `uniform`, `report`, `removed`, `skipped`, `covers`, `set`      |
 
 `setId` is present but **empty** on the binary paths, which mint no image set: one
 shape for every save, rather than a key a caller has to test for. `warnings` is
 added to `result` only when there were any.
+
+On `normalize`, **`uniform` is the field to branch on**. `removed` counts what came
+out and is the reassuring number, not the important one: a set can have every
+manifest gone and still be trivially sortable on what is left, which is what
+`uniform` reports and `set.divergent` explains. `covers[].profile` carries the full
+per-file inventory, and is what `--report --json` exists to produce; note that it
+gives EXIF make, model, software and capture time as values but a body or lens
+serial only as a flag, so a report never copies an identifier out of the file it is
+warning about. `files` is empty under `--report`, and `report` says which mode
+produced the result, so an empty `files` is not ambiguous between "wrote nothing"
+and "had nothing to write". `covers[].profile` survives a photo whose manifest
+could not be removed: `problem` then says why the removal refused, beside the
+inventory that explains it. `skipped` counts every member that produced no
+normalized bytes, including that one.
 
 ### Warnings
 
@@ -211,6 +226,8 @@ Non-fatal. Each appears twice: as an event on stderr when it is raised, and in
 | `WEAK_PASSWORD`         | above the length floor but weak, and acknowledged      |
 | `FONT_FALLBACK`         | no CJK font found, so the PDF fell back                |
 | `LARGE_SECRET`          | the image count is large enough to be worth mentioning |
+| `PROVENANCE_STRIPPED`   | a C2PA manifest was removed from a cover (SPEC §9.7)   |
+| `COVERS_NOT_UNIFORM`    | the gallery photos still do not share one profile      |
 
 `FONT_FALLBACK` and `LARGE_SECRET` carry **English-only** messages today: they are
 built from literals in the orchestration layer rather than from the catalogs, and
@@ -259,19 +276,26 @@ something a caller should need to know.
 
 **Format and crypto** (`src/core/errors.ts`): `WRONG_PASSWORD`, `MISSING_KEY`,
 `FILE_TOO_LARGE`, `TOO_MANY_IMAGES`, `TOO_MANY_FILES`, `VERIFICATION_FAILED`,
-`STEGO_CAPACITY`, `STEGO_COVER_FORMAT`, `JPEG_UNSUPPORTED`,
-`CREDENTIALS_NOT_INDEPENDENT`, `SHARE_CHECKSUM`, `SHARE_SET`, `BUCKET_TOO_LARGE`,
-`SEGMENTED_FORMAT`, `GALLERY_TOO_FEW_IMAGES`, `GALLERY_TOO_MANY_IMAGES`,
-`GALLERY_FILE_TOO_LARGE`, `GALLERY_COVER_CAPACITY`, `GALLERY_RESTORE_FAILED`.
+`STEGO_CAPACITY`, `STEGO_COVER_FORMAT`, `STEGO_COVER_REUSE`, `JPEG_UNSUPPORTED`,
+`JPEG_STRUCTURE`, `PROVENANCE_NORMALIZE`, `CREDENTIALS_NOT_INDEPENDENT`,
+`SHARE_CHECKSUM`, `SHARE_SET`, `BUCKET_TOO_LARGE`, `SEGMENTED_FORMAT`,
+`GALLERY_TOO_FEW_IMAGES`, `GALLERY_TOO_MANY_IMAGES`, `GALLERY_FILE_TOO_LARGE`,
+`GALLERY_COVER_CAPACITY`, `GALLERY_RESTORE_FAILED`.
 
 **Unusable request** (`src/api/errors.ts`): `OUTPUT_EXISTS`, `STEGO_NEEDS_COVER`,
 `DURESS_DECOY_REQUIRED`, `DURESS_PASSWORD_REQUIRED`, `THRESHOLD_REQUIRED`,
 `MODE_NEEDS_DISGUISE`, `NO_INPUT_FILES`, `NO_READABLE_IMAGES`, `NO_COVERS_FOUND`,
-`NO_GALLERY_IMAGES`.
+`NO_GALLERY_IMAGES`, `NO_NORMALIZE_FILES`, `NORMALIZE_OUT_REQUIRED`.
 
 **Invocation** (`src/cli/errors.ts`): `USAGE`, `PASSWORD_REQUIRED`,
 `PASSWORD_TOO_SHORT`, `PASSWORD_WEAK`, `ENTROPY_ARG`, `UI_UNAVAILABLE`,
-`INTERNAL`.
+`EXPORT_NUMBER_NOT_DENIABLE`, `EXPORT_NUMBER_INVALID`, `INTERNAL`.
+
+Each space enumerates its own codes at runtime, as `STEGO_ERROR_CODES`,
+`API_ERROR_CODES` and `CLI_ERROR_CODES`, and `src/cli/errors.test.ts` holds the
+three lists above to them. It also checks that something can actually raise each
+one: a documented code nothing produces is worse than an undocumented one, because
+a caller writing a branch per failure waits for what cannot arrive.
 
 Some errors carry `details` with the numbers a caller would otherwise parse out of
 the message, for example `{"size": 2000000, "limit": 1048576}` on

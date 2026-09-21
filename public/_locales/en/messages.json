@@ -624,6 +624,19 @@
     "message": "Restore from photos",
     "description": "Gallery Mode: restore button."
   },
+  "warnProvenanceStripped": {
+    "message": "A provenance manifest was removed from $COUNT$ of these photos. Normalize the rest of your photo library too: photos that keep their manifests, next to ones that lost theirs, are just as telling.",
+    "description": "Gallery Mode: a C2PA provenance manifest was removed from some covers (SPEC 9.7).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnCoversNotUniform": {
+    "message": "These photos do not share one metadata profile, so they can still be told apart by it.",
+    "description": "Gallery Mode: the cover set does not share one metadata profile (SPEC 9.7)."
+  },
   "statusGallerySaving": {
     "message": "Hiding the secret across your photos…",
     "description": "Gallery Mode: status while saving."

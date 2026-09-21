@@ -525,7 +525,11 @@ Extraction reverses steps 4→3 and validates the result against §5.1 (magic
 
 When the cover is a **baseline JPEG**, the key block is hidden in its quantized
 DCT coefficients so the carrier stays a JPEG of the same size and metadata, a
-`.png` in a phone's photo library would itself be an anomaly. Only baseline
+`.png` in a phone's photo library would itself be an anomaly. One deliberate
+exception: cover normalization (§9.7) removes any embedded C2PA provenance
+manifest first, so the carrier matches the cover **after** that removal, not the
+file as it came off the camera. The coefficients and the filename are unchanged;
+the size differs by the manifest, which is the point. Only baseline
 sequential Huffman (SOF0), 8-bit, is supported; progressive (SOF2), arithmetic
 coding, and other formats (HEIC, WebP) MUST be rejected, never transcoded, which
 would change the file's size/appearance and defeat deniability.
@@ -560,7 +564,8 @@ already relies on the distinction.
   re-emitted entropy scan is the same length (± a few byte-stuffing bytes), the
   size-category histogram is unchanged, and the eligible set is invariant (so the
   extractor recomputes exactly the same carriers). Every non-scan segment
-  (APPn/EXIF, DQT, DHT, SOF, DRI) is copied verbatim.
+  (APPn/EXIF, DQT, DHT, SOF, DRI) is copied verbatim, except the C2PA APP11
+  segments §9.7 removes before the coefficients are read.
 
 Extraction decodes the JPEG to coefficients, rebuilds the same carrier set and
 key-derived positions, reads each carrier's magnitude LSB, de-whitens, and
@@ -890,7 +895,95 @@ The `|coef| ≥ 2` magnitude-LSB invariant keeps a JPEG carrier the same size (b
 faithful for `restartInterval = 0`; ≤ 0.5% drift from byte-stuffing otherwise) and
 its Huffman size-category histogram unchanged. Honest limit: Gallery Mode modifies
 **every** selected photo, so an adversary holding the untouched originals can diff
-them, amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`).
+them, amplified vs. single-image stego (see `docs/CRYPTO-REVIEW.md`). Removing the
+embedded provenance manifest (§9.7) removes one _copy_ of the original's
+fingerprint; it does not remove the original. See the deniability section of
+`docs/THREAT-MODEL.md`.
+
+### 9.7 Cover normalization (normative)
+
+Recent cameras and phones embed a **C2PA provenance manifest** carrying a signed
+hash of the image content. Embedding changes that content, so a carrier fails
+validation, and the manifest additionally states the exact size of the difference
+from the original. The manifest is a fingerprint of the cover transported inside
+the stego object, and the hash cannot be recomputed (the manufacturer holds the
+key), so a conforming implementation removes it.
+
+**The property is uniformity, not cleanliness.** A cover set in which only the
+carriers lack provenance is exactly as discriminating as one in which only the
+carriers fail C2PA validation: either way the set sorts into two groups and the
+smaller group is the interesting one. "No metadata" is not the target either; a
+bare image among camera originals is its own anomaly.
+
+An encoder therefore:
+
+- **MUST** apply normalization to **every** cover in the set, carriers **and**
+  decoys, before embedding anything. A set normalized only on its carriers is
+  **non-conforming**.
+- **MUST** normalize **before** embedding, never after. Container surgery on a
+  finished carrier risks the entropy-coded scan.
+- **MUST** remove every APP11 (`FF EB`) segment whose payload begins with the
+  JUMBF prefix `4A 50` (`"JP"`). A manifest larger than one segment is split
+  across several, each repeating the prefix behind its own box instance and
+  packet sequence numbers, so removing only the first is non-conforming.
+
+  The test is the two-byte prefix, **not** the four bytes a C2PA manifest happens
+  to begin with. In APP11 box carriage those next two bytes are a box _instance
+  number_, and the manifests this rule was written against all use instance 1;
+  treating a counter as part of a magic would let a manifest carried at another
+  instance pass a check that looked correct. The consequence is that a JUMBF box
+  in APP11 which is not a provenance manifest is removed too. That is intended:
+  APP11 is reserved for JPEG Systems box carriage, none of it affects rendering,
+  and the two failures are not symmetric. Removing a box nobody needed costs
+  bytes; leaving one behind can carry a hash of the cover inside the stego
+  object. Over-removal also does not threaten the uniformity requirement above,
+  since the same rule runs over every photo in the set.
+
+- **MUST NOT** alter the entropy-coded scan. Removal is segment-level; the
+  quantized DCT coefficients are bit-identical across normalization, which is what
+  lets it run before an embed without changing what the embed hides.
+- **MUST** preserve every byte after EOI verbatim, including an Ultra HDR gain map
+  (a second JPEG stream, MPO) and an Android motion-photo trailer (an ISOBMFF
+  stream opening with `ftyp`).
+- **MUST** verify, rather than assume, that removal cannot invalidate an APP2
+  `MPF\0` index. MPF entry offsets are relative to the MPF endian header, so
+  removing a segment **before** that header shifts header and trailer together and
+  leaves the offsets correct, while removing one **after** it shifts only the
+  trailer. An implementation that cannot establish the first case **MUST** fail
+  rather than emit a file whose gain map no longer resolves. The requirement is
+  conditional on a trailer existing: an MPF index with nothing after EOI locates
+  no second image, and there is nothing for a shift to invalidate.
+- **MUST NOT** embed into a cover whose `MPF\0` index locates bytes after EOI.
+  This is the same invariant, one layer out, and it binds the **embed** rather than
+  the removal: §5.4 re-serializes the entropy scan, whose length may drift by the
+  byte-stuffing it re-applies, so head and tail are spliced back around a scan of a
+  different size and the trailer moves relative to the endian header the offsets are
+  measured from. Normalization cannot rescue this by being careful, because the
+  shift does not come from normalization. An encoder **MUST** refuse such a cover
+  for the same reason it refuses the removal: never emit a file whose gain map no
+  longer resolves. A conforming encoder refuses it **before** embedding, not by
+  inspecting the result, so that the same photo is accepted or refused
+  independently of the password, which chooses the carrier positions.
+- **MUST** fail closed on a JPEG whose marker structure does not parse: a file
+  whose structure cannot be walked is one no implementation can assert carries no
+  manifest.
+- **MUST** be idempotent, and **MUST** leave a file carrying no manifest unchanged
+  byte for byte.
+
+What is deliberately **not** removed at this version: XMP identifiers
+(`xmpMM:DocumentID`, `InstanceID`, `History`), IPTC `DigitalSourceType`, EXIF
+`Software`, timestamps and serial numbers, and vendor blocks. Dropping the XMP
+packet wholesale would take the `Container:Directory` with it and orphan an Ultra
+HDR gain map that is still physically present in the trailer, leaving a photo that
+renders SDR while carrying the bytes for HDR: a visible anomaly rather than a
+removed one. These are **reported** instead, so a policy for them can be written
+from an inventory of what devices actually emit rather than from the schema.
+
+HEIF/HEIC/AVIF is **out of scope here and MUST NOT be transcoded** (§5.4). There
+are no JPEG DCT coefficients in an HEVC-coded image to carry a payload, so such a
+file is not a cover. The uniformity rule above still bears on it: a library that is
+HEIC everywhere except the handful of photos converted to JPEG to carry something
+sorts on exactly that. Convert the whole set or use one that was JPEG already.
 
 ---
 

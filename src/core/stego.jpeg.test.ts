@@ -27,8 +27,16 @@ import {
   extractKeyFactorStegoJpeg,
   isSerializedKeyBlock,
   serializeKeyBlock,
+  inspectJpegCover,
   KEY_FACTOR_LEN,
 } from './index';
+import {
+  gainMapTrailer,
+  mpfSegment,
+  spliceBeforeSos,
+  withC2pa,
+  withTrailer,
+} from './jpeg-fixtures';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
@@ -145,6 +153,99 @@ describe('JPEG stego round-trip', () => {
     }
     expect(changed).toBeGreaterThan(0);
     expect(changed).toBeLessThanOrEqual(92 * 8); // ≤ payload bits
+  });
+});
+
+/**
+ * A key photo is a cover too (SPEC §9.7).
+ *
+ * `save --key-mode stego --cover photo.jpg` runs one photo through the same
+ * embedder the gallery uses, and a manifest left in that one photo is the same
+ * fingerprint of the same original. Both fixed-payload entry points are covered,
+ * because they are separate exports over one internal path and a regression in
+ * either is a carrier that fails C2PA validation.
+ */
+describe('key photo normalization', () => {
+  it('removes the manifest from a key photo, and still round-trips', async () => {
+    const kb = await keyBlockBytes('pw');
+    const cover = withC2pa(noisyJpeg(W, H), 3);
+    expect(inspectJpegCover(cover).jumbf.segments).toBe(3);
+
+    const stego = await embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST);
+    expect(inspectJpegCover(stego).jumbf.segments).toBe(0);
+    expect(stego.length).toBeLessThan(cover.length);
+
+    const out = await extractKeyBlockStegoJpeg(stego, 'pw', FAST);
+    expect([...out!]).toEqual([...kb]);
+  });
+
+  it('removes it on the key-factor path too', async () => {
+    const factor = Uint8Array.from({ length: KEY_FACTOR_LEN }, (_, i) => (i * 11 + 3) & 0xff);
+    const cover = withC2pa(noisyJpeg(W, H), 2);
+    const stego = await embedKeyFactorStegoJpeg(cover, factor, 'pw', FAST);
+    expect(inspectJpegCover(stego).jumbf.segments).toBe(0);
+    expect([...(await extractKeyFactorStegoJpeg(stego, 'pw', FAST))!]).toEqual([...factor]);
+  });
+
+  /**
+   * The §5.4 cover fingerprint is derived from the coefficients, and removal is
+   * segment-level, so normalizing before the embed must be indistinguishable
+   * from having been handed an already-normalized cover. Byte equality of the
+   * two outputs is the sharpest way to say that: it pins the fingerprint, the
+   * keystream, the chosen carrier positions and the resulting file all at once.
+   *
+   * The second embed waives the cover-reuse guard on purpose. The two covers
+   * have identical coefficient content by construction, which is exactly what
+   * the guard is built to refuse; here that sameness is the thing being asserted.
+   */
+  it('is equivalent to being handed an already-normalized cover', async () => {
+    const kb = await keyBlockBytes('pw');
+    const clean = noisyJpeg(W, H, 85, 4);
+    const dirty = withC2pa(clean, 2);
+
+    const fromDirty = await embedKeyBlockStegoJpeg(dirty, kb, 'pw', FAST);
+    const fromClean = await embedKeyBlockStegoJpeg(clean, kb, 'pw', FAST, {
+      allowCoverReuse: true,
+    });
+    expect([...fromDirty]).toEqual([...fromClean]);
+  });
+
+  it('leaves a cover with no manifest byte-identical to before this existed', async () => {
+    const kb = await keyBlockBytes('pw');
+    const cover = noisyJpeg(W, H, 85, 6);
+    const stego = await embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST);
+    // Same size as the cover (± byte stuffing): nothing was removed, so the
+    // only change is the toggled carrier bits.
+    expect(Math.abs(stego.length - cover.length)).toBeLessThan(16);
+  });
+
+  /**
+   * The gain map above survives because nothing locates it by offset. Add an MPF
+   * index that does, and the embed is refused instead: re-serializing the scan
+   * moves the trailer relative to the endian header those offsets are measured
+   * from, and SPEC §9.7 says to fail rather than emit a photo whose gain map no
+   * longer resolves. Refused up front, so the answer does not depend on which
+   * carriers the password happened to choose.
+   */
+  it('refuses a cover whose MPF index locates its gain map', async () => {
+    const kb = await keyBlockBytes('pw');
+    const cover = withTrailer(spliceBeforeSos(noisyJpeg(W, H), mpfSegment()), gainMapTrailer());
+    await expect(embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST)).rejects.toMatchObject({
+      name: 'JpegUnsupportedError',
+    });
+    // The same photo with no trailer is a usable cover: the refusal is about the
+    // bytes an index points at, not about carrying an MPF index at all.
+    const noTrailer = spliceBeforeSos(noisyJpeg(W, H), mpfSegment());
+    expect((await embedKeyBlockStegoJpeg(noTrailer, kb, 'pw', FAST)).length).toBeGreaterThan(0);
+  });
+
+  it('preserves a gain map trailer on a key photo', async () => {
+    const kb = await keyBlockBytes('pw');
+    const gainMap = gainMapTrailer();
+    const cover = withTrailer(withC2pa(noisyJpeg(W, H), 1), gainMap);
+    const stego = await embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST);
+    expect([...stego.subarray(stego.length - gainMap.length)]).toEqual([...gainMap]);
+    expect([...(await extractKeyBlockStegoJpeg(stego, 'pw', FAST))!]).toEqual([...kb]);
   });
 });
 

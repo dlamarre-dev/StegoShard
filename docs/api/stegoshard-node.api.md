@@ -116,6 +116,12 @@ export interface GallerySaveResult {
     m: number;
     // Warning: (ae-forgotten-export) The symbol "ManifestEntry" needs to be exported by the entry point node.d.ts
     manifest: ManifestEntry[];
+    provenance: {
+        covers: number;
+        segments: number;
+        bytes: number;
+        uniform: boolean;
+    };
     // (undocumented)
     setId: string;
 }
@@ -136,6 +142,54 @@ export function gatherInputs(paths: string[]): Promise<GatheredInputs>;
 
 // @public
 export function imageDataToPng(img: ImageDataLike): Uint8Array;
+
+// @public (undocumented)
+export function normalize(opts: NormalizeOptions): Promise<NormalizeCoversResult>;
+
+// @public
+export interface NormalizeCoverRow {
+    input: string;
+    // Warning: (ae-forgotten-export) The symbol "CoverKind" needs to be exported by the entry point node.d.ts
+    //
+    // (undocumented)
+    kind: CoverKind;
+    name: string;
+    output?: string;
+    problem?: string;
+    // Warning: (ae-forgotten-export) The symbol "CoverProfile" needs to be exported by the entry point node.d.ts
+    profile: CoverProfile | null;
+    // (undocumented)
+    removed: {
+        segments: number;
+        bytes: number;
+    };
+}
+
+// @public (undocumented)
+export interface NormalizeCoversResult {
+    covers: NormalizeCoverRow[];
+    files: string[];
+    // (undocumented)
+    manifest: ManifestEntry[];
+    // (undocumented)
+    removed: {
+        covers: number;
+        segments: number;
+        bytes: number;
+    };
+    report: boolean;
+    // Warning: (ae-forgotten-export) The symbol "CoverSetReport" needs to be exported by the entry point node.d.ts
+    set: CoverSetReport;
+    skipped: number;
+}
+
+// @public (undocumented)
+export interface NormalizeOptions {
+    force?: boolean | undefined;
+    inputs: string[];
+    outDir?: string | undefined;
+    report?: boolean | undefined;
+}
 
 // Warning: (ae-forgotten-export) The symbol "OnProgress" needs to be exported by the entry point node.d.ts
 //

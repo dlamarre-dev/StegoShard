@@ -20,6 +20,7 @@ const saveGalleryToDisk = vi.fn(async () => ({
   m: 2,
   decoys: 2,
   setId: 'cd',
+  provenance: { covers: 0, segments: 0, bytes: 0, uniform: true },
 }));
 vi.mock('./disk', () => ({ saveFileToDisk, saveFileToBinary, saveGalleryToDisk }));
 
@@ -95,6 +96,30 @@ describe('runSave routing', () => {
     });
     expect(saveFileToDisk).not.toHaveBeenCalled();
     expect(note).toBe('statusGallerySaved:5');
+  });
+
+  /**
+   * The uniformity verdict is the security property cover normalization exists
+   * for (SPEC §9.7), and the CLI raises it as `COVERS_NOT_UNIFORM`. This surface
+   * read neither field, so a browser user saving a set that does not share one
+   * metadata profile was told only that the save had succeeded.
+   */
+  it('carries the cover-normalization verdict into the note', async () => {
+    saveGalleryToDisk.mockImplementationOnce(async () => ({
+      imageCount: 5,
+      k: 1,
+      m: 2,
+      decoys: 2,
+      setId: 'cd',
+      provenance: { covers: 3, segments: 3, bytes: 900, uniform: false },
+    }));
+    const { note } = await runSave(
+      { dest: 'gallery', files: [file], covers: [], galleryPassword: 'pw' },
+      msg,
+    );
+    expect(note).toContain('statusGallerySaved:5');
+    expect(note).toContain('warnProvenanceStripped:3');
+    expect(note).toContain('warnCoversNotUniform');
   });
 
   it('rejects a gallery save with no password', async () => {

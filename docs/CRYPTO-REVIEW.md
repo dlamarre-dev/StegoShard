@@ -684,6 +684,19 @@ metadata and filename can mimic the original exactly. Non-baseline covers
 (progressive/arithmetic JPEG, HEIC) are **rejected, never transcoded**, a
 re-quantization would change the weight and reintroduce the anomaly.
 
+One segment is deliberately **not** copied: a C2PA provenance manifest (APP11
+JUMBF) is removed from every cover before the coefficients are read (SPEC §9.7).
+It carries a signed hash of the image content, so a carrier keeping it would both
+fail validation and state the exact byte distance from its original. The removal
+is segment-level, so the coefficients, the §5.4 cover fingerprint derived from
+them and the cover-reuse tag are all unchanged; the carrier matches the cover
+_after_ normalization rather than the file as it left the camera. Applied to every
+photo in a set, carriers and decoys alike, because a set where only the carriers
+lost their manifests sorts exactly as well as one where only the carriers fail
+validation. What it does **not** do is documented in
+[THREAT-MODEL.md](THREAT-MODEL.md#deniability-is-conditional-on-the-original-being-gone):
+it removes the embedded copy of the original's fingerprint, not the original.
+
 **In-place embedding (no encoder fingerprint).** The embedder does not
 re-serialize the scan; it toggles the minimal set of magnitude-LSB bits directly
 in the file's _own_ entropy stream (`applyScanToggles`, gated to the common

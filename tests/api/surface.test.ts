@@ -48,6 +48,33 @@ describe('the published surface', () => {
     expect(Object.keys(api).length).toBeLessThan(Object.keys(core).length / 2);
   });
 
+  /**
+   * The two counts quoted in prose, guarded.
+   *
+   * Both were wrong: the facade's number had been reached by adding to the
+   * previous one rather than by counting, and the doc's was stale by an entry.
+   * Nothing else in the repository checks a number written inside a sentence,
+   * and these two describe exactly the property this file exists to defend.
+   */
+  it('keeps the counts quoted in the docs honest', () => {
+    const quoted = (text: string, re: RegExp, where: string): number => {
+      const m = text.match(re);
+      expect(m, `${where} no longer states a count matching ${re}`).not.toBeNull();
+      return Number(m![1]);
+    };
+    const facade = readFileSync(join(import.meta.dirname, '../../src/api/index.ts'), 'utf8');
+    const doc = readFileSync(join(import.meta.dirname, '../../docs/API.md'), 'utf8');
+    const barrel = Object.keys(core).length;
+    const published = Object.keys(api).length + Object.keys(nodeApi).length;
+
+    const count = /re-exports (\d+) runtime values/;
+    expect(quoted(facade, count, 'src/api/index.ts')).toBe(barrel);
+    expect(quoted(doc, count, 'docs/API.md')).toBe(barrel);
+    expect(quoted(doc, /the library exports (\d+) across both entries/, 'docs/API.md')).toBe(
+      published,
+    );
+  });
+
   it('keeps the two entry points disjoint', () => {
     const shared = Object.keys(api).filter((n) => n in nodeApi);
     expect(shared, 'an entry point must not re-export the other').toEqual([]);

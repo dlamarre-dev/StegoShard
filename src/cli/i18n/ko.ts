@@ -48,6 +48,12 @@ export const ko: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy 가 비어 있습니다(추가 엔트로피를 원하지 않으면 이 플래그를 빼세요)',
   errEstimateMissing: 'estimate: <파일> 이 없습니다',
+  errNormalizeMissing: 'normalize: <사진|폴더 ...> 가 없습니다',
+  errNoNormalizeFiles:
+    'normalize: 지정한 경로에서 사진을 찾지 못했습니다(.jpg, .jpeg, .png, .heic, .heif, .avif 를 찾았습니다)',
+  errNormalizeReportOut:
+    'normalize: --report 와 --out <디렉터리> 는 함께 사용할 수 없습니다' +
+    '(--report 는 아무것도 쓰지 않습니다)',
   errUiPort: 'ui: --port 는 포트 번호여야 합니다(받은 값: "{value}")',
   errJsonUiUnsupported:
     '{command}: --json은 지원되지 않습니다. 이 명령은 오래 실행되는 서버이며 결과를 출력하는 명령이 아닙니다.',
@@ -84,6 +90,10 @@ export const ko: CliCatalog = {
   errNoReadableImages: '입력에서 읽을 수 있는 StegoShard 이미지를 찾지 못했습니다',
   errNoCoversFound: 'gallery: 지정한 경로에서 커버 이미지를 찾지 못했습니다',
   errNoGalleryImages: 'gallery: 입력에서 이미지를 찾지 못했습니다',
+  errNormalizeOut:
+    'normalize: --out <디렉터리> 가 필요합니다. 정규화한 사본은 직접 고른 디렉터리에 쓰며, ' +
+    '원본 옆에는 결코 두지 않습니다. 원본이야말로 제거된 매니페스트가 제공하던 바로 그 비교 대상이기 ' +
+    '때문입니다. 아무것도 쓰지 않고 살펴보려면 --report 를 쓰세요.',
   warnPasswordFlag:
     '경고: --password 는 셸 기록과 프로세스 목록에 드러납니다. ' +
     'STEGOSHARD_PASSWORD, --password-file, 또는 대화형 입력을 쓰세요.',
@@ -94,6 +104,13 @@ export const ko: CliCatalog = {
     '경고: {label}이(가) 약합니다(추정 {bits}비트). ' +
     '오프라인 금고는 사용자에게 연락하지 않고도 추측될 수 있습니다.',
   warnPrefix: '경고: {message}',
+  warnProvenanceStripped:
+    '경고: 커버 사진 {covers}장에서 출처 매니페스트를 제거했습니다. 사진 라이브러리의 나머지도 ' +
+    '정규화하세요. 매니페스트를 잃은 사진 옆에 매니페스트를 그대로 지닌 사진이 있다는 사실 자체가 ' +
+    '똑같이 많은 것을 알려 줍니다. stegoshard normalize 를 실행하세요.',
+  warnCoversNotUniform:
+    '경고: 이 사진들은 메타데이터 프로필이 서로 달라 여전히 그것으로 구별됩니다. 이 묶음에 ' +
+    'stegoshard normalize --report 를 실행해 무엇이 다른지 확인하세요.',
   labelPassword: '비밀번호',
   promptPassword: '비밀번호: ',
   promptDuressPassword: '강요용 비밀번호: ',
@@ -126,6 +143,25 @@ export const ko: CliCatalog = {
   outDecoded: '이미지 {seen}개 중 {decoded}개 해독',
   outScanned: '사진 {seen}장 확인',
   outEstimate: '이미지 {images}개  (k={k} 데이터 + m={m} 패리티)',
+  outNormalized:
+    '사진 {covers}장을 정규화했고, 그중 {removed}장에서 출처 매니페스트를 제거했습니다({bytes} 바이트).',
+  outNormalizeUniform: '이 사진들은 하나의 메타데이터 프로필을 공유합니다.',
+  outNormalizeNotUniform:
+    '이 사진들은 하나의 메타데이터 프로필을 공유하지 않아 여전히 구별할 수 있습니다:',
+  outNormalizeDivergent: '{segmentClass}: {present}장에 있고 {absent}장에 없습니다',
+  outNormalizeReport:
+    '사진 {covers}장을 확인했고, 그중 {removed}장에 출처 매니페스트가 있습니다' +
+    '({bytes} 바이트). 아무것도 쓰지 않았습니다.',
+  outNormalizeRefused:
+    '{name}: 게인 맵을 깨뜨리지 않고는 제거할 수 없는 매니페스트가 있어 ' +
+    '이 파일에 대해서는 아무것도 쓰지 않았습니다',
+  outNormalizeSkippedFile: '{name}: {kind} 파일입니다. 그대로 두었고 이 보장의 범위 밖입니다',
+  outNormalizeProblem: '{name}: 읽을 수 없어 이 파일에 대해서는 아무것도 쓰지 않았습니다',
+  outNormalizeSkipped:
+    '파일 {count}개를 건너뛰었으며 이 보장의 범위 밖입니다(JPEG 가 아니거나 읽을 수 없음).',
+  outNormalizeOriginals:
+    '원본은 그대로 남아 있으며, 제거된 매니페스트가 제공하던 바로 그 비교 대상입니다. ' +
+    'docs/THREAT-MODEL.md 의 부인 가능성 절을 보세요.',
   helpTagline:
     'StegoShard: 파일을 복원력 높은 이미지, 내용이 드러나지 않는 바이너리 파일, 또는 위장 데이터베이스로 암호화하고 다시 복원합니다.',
   helpUsageHeading: '사용법:',
@@ -147,6 +183,11 @@ export const ko: CliCatalog = {
     '(강요 모드는 갤러리에서 쓸 수 없습니다. --binary --disguise --mode duress 를 쓰세요)',
   helpGalleryNote:
     '모든 사진이 수정됩니다. 가장 알맞은 K+M 장이 리드-솔로몬 조각을 담고 나머지는 미끼가 됩니다(사진 최소 5장, 미끼 최소 2장). 복원은 블라인드로 이루어집니다. 인증되는 사진은 모두 쓰이며, 조각 K개면 재구성됩니다.',
+  helpNormalizeHeading: '커버 정규화(카메라가 심어 넣는 출처 매니페스트 제거):',
+  helpNormalizeNote:
+    '저장은 건네받은 커버를 이미 정규화합니다. 이 명령은 사진 라이브러리의 나머지를 위한 것입니다. ' +
+    '매니페스트를 그대로 지닌 수백 장 사이에 정규화된 몇 장이 섞여 있는 것은, 운반용 사진만 ' +
+    '정규화한 갤러리만큼이나 쉽게 골라낼 수 있습니다. JPEG 만 처리하며 나머지는 알린 뒤 건너뜁니다.',
   helpExamplesHeading: '예시:',
   helpOut: '출력 디렉터리(기본값: 현재 디렉터리)',
   helpPaper: 'PNG 대신 인쇄용 PDF 생성(높은 ECC)',
@@ -195,6 +236,8 @@ export const ko: CliCatalog = {
   helpGalleryKey: 'keyfile/stego 갤러리용 외부 키(gallery-restore)',
   helpGalleryMode: '임계값 공유본으로 갤러리 잠그기(--threshold k-of-n 과 함께)',
   helpGalleryShare: 'gallery-restore 용 임계값 공유 파일(여러 번 지정 가능)',
+  helpNormalizeOut: '정규화한 사본을 쓸 곳(필수. 원본 위치는 불가)',
+  helpNormalizeReport: '살펴보고 보고만 함: 아무것도 쓰지 않습니다',
   helpUiPort: '빈 포트 대신 이 포트에서 제공',
   helpUiOpen: '주소를 출력할 뿐 아니라 브라우저에서 열기',
 };

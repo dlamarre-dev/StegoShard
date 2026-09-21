@@ -551,6 +551,19 @@ export interface GallerySaveResult {
   decoys: number;
   setId: string;
   manifest: ManifestEntry[];
+  /**
+   * Cover normalization over the whole set, carriers and decoys alike
+   * (SPEC §9.7). `uniform` false means the photos just delivered can still be
+   * sorted by their metadata, which is the condition normalizing only the
+   * carriers would have produced.
+   *
+   * Returned for the same reason the CLI raises `PROVENANCE_STRIPPED` and
+   * `COVERS_NOT_UNIFORM` from it: the verdict is the security property this
+   * whole step exists for, and a browser user was previously the one person
+   * never told it. Same shape as `GallerySaveResult.provenance` on the Node
+   * side, so the two surfaces say the same thing.
+   */
+  provenance: { covers: number; segments: number; bytes: number; uniform: boolean };
 }
 
 /**
@@ -657,6 +670,7 @@ export async function saveGalleryToDisk(
     decoys: res.decoys,
     setId: setHex,
     manifest: manifestOf(downloads),
+    provenance: { ...res.normalization.removed, uniform: res.normalization.uniform },
   };
 }
 

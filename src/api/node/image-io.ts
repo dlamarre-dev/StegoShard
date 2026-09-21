@@ -25,6 +25,7 @@ import {
   extractKeyBlockStegoJpeg,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
+  isHeif,
   isJpeg as isJpegBytes,
 } from '../../core';
 
@@ -206,6 +207,11 @@ export async function embedKeyImage(
  */
 export function fileToGalleryCover(bytes: Uint8Array, name: string): GalleryCover {
   if (isJpegBytes(bytes)) return { kind: 'jpeg', name, jpeg: bytes };
+  // HEIC/HEIF/AVIF named before the decode attempt, which would otherwise fail
+  // as a jpeg-js stack trace. StegoShard never ingests one (SPEC §5.4), and the
+  // useful half of that answer is what to do instead: convert the whole set, not
+  // the carriers. See `isHeif`.
+  if (isHeif(bytes)) throw new StegoCoverFormatError();
   const img = fileToImageData(bytes, name);
   return { kind: 'rgba', name, rgba: img.data, width: img.width, height: img.height };
 }

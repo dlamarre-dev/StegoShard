@@ -51,12 +51,14 @@ import {
 import {
   decode as decodeJpeg,
   encode as encodeJpeg,
+  JpegUnsupportedError,
   type JpegModel,
   eligibleCoefficients,
   eligibleInPlace,
   applyScanToggles,
 } from './jpeg-coeff';
 import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-guard';
+import { mpfLocatedTrailer, normalizeCoverBytes } from './normalize';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -477,6 +479,38 @@ export async function extractKeyFactorStego(
  * verbatim). Payload length is taken from `payload`. Throws JpegUnsupportedError
  * (non-baseline cover) or StegoCapacityError.
  */
+/**
+ * Refuse a cover whose APP2 MPF index locates bytes after EOI.
+ *
+ * Both embed paths below splice head ‖ scan ‖ tail back together around a scan
+ * they re-serialized, and both can change its length: the byte-faithful path
+ * re-stuffs the entropy stream, so a toggled bit that creates or destroys an
+ * `FF` moves everything after it by one, and the restart-marker path re-encodes
+ * the scan outright (SPEC §5.4 allows the drift). The trailer therefore shifts
+ * relative to the MPF endian header the index measures from, and the gain map it
+ * locates no longer resolves: a photo that renders SDR while carrying the bytes
+ * for HDR, which is an anomaly rather than a removed one.
+ *
+ * Normalization already fails closed on the one removal that could do this
+ * (SPEC §9.7, {@link mpfLocatedTrailer}). Refusing the removal while the embed
+ * went on to shift the same bytes anyway was an assertion that bought nothing,
+ * so the refusal moved to where the shift actually happens, and covers the whole
+ * embed rather than one segment of it.
+ *
+ * Raised as {@link JpegUnsupportedError}, which every image adapter already
+ * translates to `StegoCoverFormatError`: from the caller's side this is the same
+ * fact as "not a usable cover", and a new error class would leak an unhandled
+ * type through four adapters to say what they already say.
+ */
+function assertTrailerNotAtRisk(cover: Uint8Array): void {
+  if (!mpfLocatedTrailer(cover)) return;
+  throw new JpegUnsupportedError(
+    'an APP2 MPF index locates bytes after EOI (an Ultra HDR gain map, or a motion-photo ' +
+      'trailer), and an embed re-serializes the entropy scan, which moves them out from ' +
+      'under that index. Use a photo with no gain map, or one flattened to a single image.',
+  );
+}
+
 async function embedFixedStegoJpeg(
   jpegBytes: Uint8Array,
   payload: Uint8Array,
@@ -486,7 +520,14 @@ async function embedFixedStegoJpeg(
 ): Promise<Uint8Array> {
   const len = payload.length;
   const bits = len * 8;
-  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  // Provenance surgery BEFORE the coefficients are read (SPEC §9.7). A camera's
+  // C2PA manifest hashes the image content, so a key photo that kept one would
+  // both fail validation and disclose the exact size of its difference from the
+  // original. Removal touches only marker segments, so the coefficients below,
+  // the fingerprint derived from them, and the cover-reuse tag are all unchanged.
+  const cover = normalizeCoverBytes(jpegBytes).bytes;
+  assertTrailerNotAtRisk(cover);
+  const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
 
   const fingerprint = await coverFingerprintJpeg(model);
   const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
@@ -746,7 +787,12 @@ export async function embedBytesStegoJpeg(
   seed: Uint8Array,
   margin = 2,
 ): Promise<Uint8Array> {
-  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  // Same normalization as the fixed-payload path above, and for the same reason;
+  // here it runs on every gallery photo, carriers and decoys alike, which is what
+  // makes the set uniform rather than sortable (SPEC §9.7).
+  const cover = normalizeCoverBytes(jpegBytes).bytes;
+  assertTrailerNotAtRisk(cover);
+  const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
   const payloadBits = data.length * 8;
   const bitAt = (i: number): number => (data[i >> 3]! >> (7 - (i & 7))) & 1;
   const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));

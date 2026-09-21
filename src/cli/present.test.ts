@@ -14,7 +14,8 @@
 import { describe, it, expect } from 'vitest';
 import { humanPresenter } from './present';
 import type { CliIo } from './io';
-import type { SaveResult } from '../api/node/commands';
+import type { CoverProfile } from '@core';
+import type { NormalizeCoversResult, SaveResult } from '../api/node/commands';
 
 interface Captured extends CliIo {
   stdout: string;
@@ -146,6 +147,7 @@ describe('gallery output', () => {
       decoys: 2,
       setId: 'deadbeef',
       keyMode: 'embedded',
+      provenance: { covers: 0, segments: 0, bytes: 0, uniform: true },
     });
     expect(io.stdout).toMatch(/3/);
     expect(io.stderr).toBe('');
@@ -160,6 +162,7 @@ describe('gallery output', () => {
       m: 2,
       decoys: 2,
       setId: 'deadbeef',
+      provenance: { covers: 0, segments: 0, bytes: 0, uniform: true },
     };
     humanPresenter(embedded).gallerySave({ ...base, keyMode: 'embedded' });
     const stego = fakeIo();
@@ -177,6 +180,81 @@ describe('gallery output', () => {
     });
     expect(io.stdout).toMatch(/^Restored n\.txt/m);
     expect(io.stderr).toMatch(/9/);
+  });
+});
+
+/**
+ * The presenter reads `profile` as "was an inventory taken", never for its
+ * contents, so a placeholder keeps this file free of JPEG fixtures.
+ */
+const SOME_PROFILE = {} as CoverProfile;
+
+const NORMALIZE: NormalizeCoversResult = {
+  files: ['clean/a.jpg'],
+  manifest: [{ name: 'clean/a.jpg', purpose: 'photos' }],
+  covers: [
+    {
+      input: 'photos/a.jpg',
+      name: 'a.jpg',
+      kind: 'jpeg',
+      profile: SOME_PROFILE,
+      removed: { segments: 1, bytes: 400 },
+      output: 'clean/a.jpg',
+    },
+    {
+      input: 'photos/b.heic',
+      name: 'b.heic',
+      kind: 'heif',
+      profile: null,
+      removed: { segments: 0, bytes: 0 },
+    },
+  ],
+  set: {
+    files: [],
+    common: [],
+    divergent: [],
+    withManifest: [],
+    trailerKinds: [],
+    unparsed: [],
+    uniform: false,
+  },
+  removed: { covers: 1, segments: 1, bytes: 400 },
+  skipped: 1,
+  report: false,
+};
+
+describe('normalize output', () => {
+  it('names every skipped member, not just how many there were', () => {
+    const io = fakeIo();
+    humanPresenter(io).normalize(NORMALIZE);
+    expect(io.stdout).toMatch(/^Normalized 1 photo/m);
+    // SPEC §9.7 singles out the library that is HEIC everywhere except the few
+    // photos converted to JPEG; a bare count leaves the user hunting for which.
+    expect(io.stderr).toContain('b.heic');
+    expect(io.stderr).toContain('heif');
+  });
+
+  it('does not say a --report run normalized anything', () => {
+    const io = fakeIo();
+    humanPresenter(io).normalize({ ...NORMALIZE, report: true, files: [], manifest: [] });
+    expect(io.stdout).toMatch(/^Inspected 1 photo/m);
+    expect(io.stdout).not.toMatch(/Normalized/);
+    // And no note about the originals: nothing was written to compare them to.
+    expect(io.stdout).not.toMatch(/originals/);
+  });
+
+  it('tells a refused removal apart from a file it could not read', () => {
+    const io = fakeIo();
+    const refused = { ...NORMALIZE.covers[0]!, problem: 'cannot normalize: MPF index at 20' };
+    const unreadable = {
+      ...NORMALIZE.covers[1]!,
+      kind: 'jpeg' as const,
+      name: 'torn.jpg',
+      problem: 'malformed JPEG: no EOI',
+    };
+    humanPresenter(io).normalize({ ...NORMALIZE, covers: [refused, unreadable], skipped: 2 });
+    expect(io.stderr).toMatch(/a\.jpg: carries a manifest that cannot be removed/);
+    expect(io.stderr).toMatch(/torn\.jpg: could not be read/);
   });
 });
 
