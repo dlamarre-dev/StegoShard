@@ -25,6 +25,7 @@ import {
 import type {
   GalleryRestoreResult,
   GallerySaveResult,
+  NormalizeCoversResult,
   RestoreResult,
   SaveResult,
 } from '../api/node/commands';
@@ -43,7 +44,26 @@ export type WarningCode =
   /** A CJK font could not be found, so the PDF fell back. */
   | 'FONT_FALLBACK'
   /** The secret is large enough that the image count is worth mentioning. */
-  | 'LARGE_SECRET';
+  | 'LARGE_SECRET'
+  /**
+   * A provenance manifest was removed from a cover (SPEC §9.7).
+   *
+   * Worth saying out loud rather than doing silently, because the removal is
+   * only half of the property. One normalized photo sitting in a library that
+   * keeps its manifests everywhere else is the same discriminating condition as
+   * a gallery where only the carriers were normalized. The warning points at
+   * `stegoshard normalize` for the rest of the library.
+   */
+  | 'PROVENANCE_STRIPPED'
+  /**
+   * A gallery was written whose photos still do not share one metadata profile.
+   *
+   * Not a failure: the set may mix formats, or carry metadata classes the level
+   * of normalization implemented here does not touch. But it is the exact
+   * property the feature exists to deliver, so a set that misses it must not
+   * pass silently.
+   */
+  | 'COVERS_NOT_UNIFORM';
 
 export interface CliWarning {
   code: WarningCode;
@@ -78,6 +98,7 @@ export interface Presenter {
   gallerySave(res: GallerySaveResult): void;
   galleryRestore(res: GalleryRestoreResult): void;
   estimate(res: EstimateResult): void;
+  normalize(res: NormalizeCoversResult): void;
   /**
    * The command failed. The human presenter writes nothing (the bootstrap owns
    * that), so this exists for JSON, where the failure is itself the document a
@@ -221,6 +242,61 @@ export function humanPresenter(io: CliIo): Presenter {
 
     estimate(res) {
       io.out(`${t('outEstimate', { images: res.images, k: res.k, m: res.m })}\n`);
+    },
+
+    /**
+     * The uniformity verdict first, then the detail.
+     *
+     * A count of manifests removed is the reassuring number and the less
+     * important one: a set can have every manifest gone and still be trivially
+     * sortable, which is the mistake this whole feature exists to prevent. So
+     * the set verdict leads, the divergences that caused a "no" are named, and
+     * the skipped members are stated rather than left to be inferred from a
+     * count that does not add up.
+     *
+     * `--report` gets its own opening line. The summary used to be written in
+     * the past tense in both modes, so a user who asked only to be told what
+     * their library looks like was told it had been normalized, which is the one
+     * thing this must not say when nothing was written.
+     *
+     * Each skipped member is also named, not only counted. SPEC §9.7 singles out
+     * the library that is HEIC everywhere except the few photos converted to
+     * JPEG, and "3 file(s) were skipped" is exactly the report that would leave
+     * a user hunting for which three.
+     */
+    normalize(res) {
+      io.out(
+        `${t(res.report ? 'outNormalizeReport' : 'outNormalized', {
+          covers: res.covers.length - res.skipped,
+          removed: res.removed.covers,
+          bytes: res.removed.bytes,
+        })}\n${manifestLines(res.manifest)}`,
+      );
+      io.out(`${t(res.set.uniform ? 'outNormalizeUniform' : 'outNormalizeNotUniform')}\n`);
+      for (const d of res.set.divergent) {
+        io.out(
+          `  ${t('outNormalizeDivergent', {
+            segmentClass: d.segmentClass,
+            present: d.presentIn.length,
+            absent: d.absentFrom.length,
+          })}\n`,
+        );
+      }
+      for (const row of res.covers) {
+        if (row.problem) {
+          // A kept profile means the inventory was read and the removal then
+          // refused, which is a different thing to be told than "unreadable".
+          const key = row.profile ? 'outNormalizeRefused' : 'outNormalizeProblem';
+          io.err(`${t(key, { name: row.name })}\n`);
+        } else if (row.kind !== 'jpeg') {
+          io.err(`${t('outNormalizeSkippedFile', { name: row.name, kind: row.kind })}\n`);
+        }
+      }
+      if (res.skipped > 0) io.err(`${t('outNormalizeSkipped', { count: res.skipped })}\n`);
+      // The original is the comparison oracle the removed manifest used to be.
+      // Saying so here, where the user is looking at a freshly written copy, is
+      // the only moment it is actionable. See docs/THREAT-MODEL.md.
+      if (res.files.length > 0) io.out(`${t('outNormalizeOriginals')}\n`);
     },
 
     failure() {

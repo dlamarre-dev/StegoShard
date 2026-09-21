@@ -17,9 +17,11 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   type AccessMode,
+  coverManifest,
   runEstimate,
   runGalleryRestore,
   runGallerySave,
+  runNormalize,
   runRestore,
   runSave,
   type CodecChoice,
@@ -236,10 +238,13 @@ async function runUi(io: CliIo, args: string[]): Promise<number> {
   // The standalone binaries embed only this bundle, and are compiled without
   // --allow-net so they could not listen anyway. One check covers both: say where
   // the UI does live rather than failing on a missing directory.
-  if (!root) {
-    io.err(`${t('errUiNoWebApp')}\n`);
-    return 1;
-  }
+  //
+  // Raised rather than printed here. The message and the exit code are what they
+  // were, but going through `fail` means this failure is classified like every
+  // other one, and it makes `UI_UNAVAILABLE` a code something can actually
+  // produce: it was declared and documented while the only path to it wrote to
+  // stderr and returned, so no caller could ever have seen it.
+  if (!root) fail(t('errUiNoWebApp'), 'UI_UNAVAILABLE');
 
   const server = await startUiServer(collectAssets(root), port);
   io.out(startupNotice(server.url));
@@ -290,6 +295,7 @@ const OPTIONS = {
   force: { type: 'boolean' },
   'export-number': { type: 'string' },
   quiet: { type: 'boolean' },
+  report: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
   'allow-cover-reuse': { type: 'boolean' },
   json: { type: 'boolean' },
@@ -458,9 +464,21 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       identity,
     };
 
+    // Asked before the save, because the answer is about the cover as the user
+    // still has it on disk; afterwards the key image has already lost its
+    // manifest and there is nothing left to count. See `coverManifest`.
+    const coverProvenance = keyMode === 'stego' ? coverManifest(values.cover as string) : undefined;
+
     const progress = present.progress(Boolean(values.quiet));
     const res = await runSave(opts, progress.onProgress);
     progress.done();
+    if (coverProvenance && coverProvenance.segments > 0) {
+      present.warn({
+        code: 'PROVENANCE_STRIPPED',
+        message: t('warnProvenanceStripped', { covers: 1 }),
+        details: { covers: 1, segments: coverProvenance.segments, bytes: coverProvenance.bytes },
+      });
+    }
     // Nothing to commit and nothing that can fail here: the number came from the
     // user and the tag was minted in memory, so once the artifact exists the line
     // is simply printed. The registry this replaced had a reserve/commit split, a
@@ -555,6 +573,24 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       force,
       allowCoverReuse: Boolean(values['allow-cover-reuse']),
     });
+    if (res.provenance.covers > 0) {
+      present.warn({
+        code: 'PROVENANCE_STRIPPED',
+        message: t('warnProvenanceStripped', { covers: res.provenance.covers }),
+        details: {
+          covers: res.provenance.covers,
+          segments: res.provenance.segments,
+          bytes: res.provenance.bytes,
+        },
+      });
+    }
+    // Reported whether or not anything was removed: a set can lose every
+    // manifest and still be sortable on what is left, which is the failure this
+    // names. Not fatal, because the remaining differences are ones this level of
+    // normalization deliberately does not touch (see SPEC §9.7).
+    if (!res.provenance.uniform) {
+      present.warn({ code: 'COVERS_NOT_UNIFORM', message: t('warnCoversNotUniform') });
+    }
     present.gallerySave(res);
     return 0;
   }
@@ -571,6 +607,28 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       force,
     });
     present.galleryRestore(res);
+    return 0;
+  }
+
+  if (command === 'normalize') {
+    if (positionals.length === 0) fail(t('errNormalizeMissing'));
+    // Refused rather than resolved, like every other contradictory pair in this
+    // file: `--report` writes nothing, so an `--out` alongside it is a request
+    // this command cannot honour, and silently ignoring the directory a user
+    // named is how someone ends up believing a normalized copy of their library
+    // exists somewhere.
+    if (values.report && values.out !== undefined) fail(t('errNormalizeReportOut'));
+    const res = await runNormalize({
+      inputs: positionals,
+      // Read from `values.out`, not the `outDir` default above: `normalize`
+      // refuses to guess a destination, so "not given" has to stay
+      // distinguishable from "given as `.`". Writing normalized copies beside
+      // the originals is the opposite of what the threat model asks for.
+      outDir: values.out as string | undefined,
+      report: Boolean(values.report),
+      force,
+    });
+    present.normalize(res);
     return 0;
   }
 

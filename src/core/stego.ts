@@ -51,12 +51,15 @@ import {
 import {
   decode as decodeJpeg,
   encode as encodeJpeg,
+  JpegUnsupportedError,
   type JpegModel,
   eligibleCoefficients,
   eligibleInPlace,
   applyScanToggles,
 } from './jpeg-coeff';
 import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-guard';
+import { type MpfLink, mpfTrailerLink, retargetMpfIndex } from './mpf';
+import { normalizeCoverBytes } from './normalize';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -477,6 +480,57 @@ export async function extractKeyFactorStego(
  * verbatim). Payload length is taken from `payload`. Throws JpegUnsupportedError
  * (non-baseline cover) or StegoCapacityError.
  */
+/**
+ * Keep an MPF index pointing at the trailer it located, after an embed moved it.
+ *
+ * Both paths below splice head ‖ scan ‖ tail back together around a scan they
+ * re-serialized, and both can change its length: the byte-faithful path
+ * re-stuffs the entropy stream, so a toggled bit that creates or destroys an
+ * `FF` moves everything after it by one, and the restart-marker path re-encodes
+ * the scan outright (SPEC §5.4 allows the drift). The trailer therefore shifts
+ * relative to the MPF endian header the index measures from, and an Ultra HDR
+ * gain map located by that index would no longer resolve: a photo that renders
+ * SDR while carrying the bytes for HDR, which is an anomaly rather than a
+ * removed one.
+ *
+ * So the index is rewritten to the new positions (SPEC §9.7.1). This began as a
+ * refusal, which was correct and useless: a recent Pixel writes a gain map on
+ * every HDR shot, so refusing took the photos a user actually has out of the
+ * cover pool to protect a property that four lines of arithmetic can preserve.
+ *
+ * An index that cannot be kept correct is refused by {@link assertMpfUsable}
+ * before any work starts. Raised as {@link JpegUnsupportedError}, which every
+ * image adapter already translates to `StegoCoverFormatError`: from the caller's
+ * side this is the same fact as "not a usable cover", and a new error class would
+ * leak an unhandled type through four adapters to say what they already say.
+ */
+function keepTrailerResolvable(link: MpfLink, cover: Uint8Array, out: Uint8Array): Uint8Array {
+  // Nothing an index locates, or a scan that came out the same length so the
+  // trailer never moved. The second is why the rewrite is decided per embed:
+  // most embeds do not move the trailer at all, and rewriting a field to the
+  // value it already holds would be a change to the head for no reason.
+  if (link.kind !== 'index' || out.length === cover.length) return out;
+  const retarget = retargetMpfIndex(out, link);
+  if (!retarget.ok) throw new JpegUnsupportedError(retarget.reason);
+  return out;
+}
+
+/**
+ * Refuse a cover whose MPF index cannot be kept correct: one that does not parse,
+ * or one whose entries do not locate the trailer they claim to.
+ *
+ * Up front, from the cover alone, rather than after the embed has decided whether
+ * the trailer moved. Whether it moves depends on the keyed carrier positions, so
+ * a check at the end would accept this photo under one password and refuse it
+ * under another, which SPEC §9.7 forbids for exactly that reason. A file in this
+ * state is malformed rather than merely unusual, so nothing a camera writes is
+ * turned away by it.
+ */
+function assertMpfUsable(link: MpfLink): MpfLink {
+  if (link.kind === 'unsupported') throw new JpegUnsupportedError(link.reason);
+  return link;
+}
+
 async function embedFixedStegoJpeg(
   jpegBytes: Uint8Array,
   payload: Uint8Array,
@@ -486,7 +540,14 @@ async function embedFixedStegoJpeg(
 ): Promise<Uint8Array> {
   const len = payload.length;
   const bits = len * 8;
-  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  // Provenance surgery BEFORE the coefficients are read (SPEC §9.7). A camera's
+  // C2PA manifest hashes the image content, so a key photo that kept one would
+  // both fail validation and disclose the exact size of its difference from the
+  // original. Removal touches only marker segments, so the coefficients below,
+  // the fingerprint derived from them, and the cover-reuse tag are all unchanged.
+  const cover = normalizeCoverBytes(jpegBytes).bytes;
+  const mpf = assertMpfUsable(mpfTrailerLink(cover));
+  const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
 
   const fingerprint = await coverFingerprintJpeg(model);
   const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
@@ -513,7 +574,7 @@ async function embedFixedStegoJpeg(
         if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
       }
       stream.fill(0);
-      return applyScanToggles(model, toggles);
+      return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
     } catch (e) {
       claim.release();
       throw e;
@@ -530,7 +591,7 @@ async function embedFixedStegoJpeg(
     const positions = pickPositions(reader, carriers.count, bits);
     for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
     stream.fill(0);
-    return encodeJpeg(model);
+    return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
   } catch (e) {
     claim.release();
     throw e;
@@ -746,7 +807,12 @@ export async function embedBytesStegoJpeg(
   seed: Uint8Array,
   margin = 2,
 ): Promise<Uint8Array> {
-  const model = decodeJpeg(jpegBytes); // throws JpegUnsupportedError if not baseline
+  // Same normalization as the fixed-payload path above, and for the same reason;
+  // here it runs on every gallery photo, carriers and decoys alike, which is what
+  // makes the set uniform rather than sortable (SPEC §9.7).
+  const cover = normalizeCoverBytes(jpegBytes).bytes;
+  const mpf = assertMpfUsable(mpfTrailerLink(cover));
+  const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
   const payloadBits = data.length * 8;
   const bitAt = (i: number): number => (data[i >> 3]! >> (7 - (i & 7))) & 1;
   const stream = await keystreamFromSeed(seed, positionStreamLen(payloadBits));
@@ -761,7 +827,7 @@ export async function embedBytesStegoJpeg(
       if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
     }
     stream.fill(0);
-    return applyScanToggles(model, toggles);
+    return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
   }
 
   const carriers = eligibleCoefficients(model);
@@ -769,7 +835,7 @@ export async function embedBytesStegoJpeg(
   const positions = pickPositions(new StreamReader(stream), carriers.count, payloadBits);
   for (let i = 0; i < payloadBits; i++) carriers.setLsb(positions[i]!, bitAt(i));
   stream.fill(0);
-  return encodeJpeg(model);
+  return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
 }
 
 /**

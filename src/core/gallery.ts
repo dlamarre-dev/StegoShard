@@ -72,6 +72,7 @@ import {
 } from './vault';
 import { buildNonPossessionVaultBlob } from './access';
 import { BucketTooLargeError, GALLERY_LADDER } from './buckets';
+import { type CoverSetReport, inspectCoverSet, normalizeCoverBytes } from './normalize';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -134,6 +135,29 @@ export interface GalleryEncodeOptions {
   /** CONTENT is a .zip of several files (SPEC §4 FLAGS bit1). */
   bundle?: boolean | undefined;
 }
+/**
+ * What cover normalization did to this set (SPEC §9.7).
+ *
+ * Reported rather than merely done, because uniformity is the security property
+ * and a caller has no other way to see whether it was achieved. `covers` is
+ * computed *after* normalization, so it describes the photos that were actually
+ * written, not the ones that were handed in.
+ */
+export interface GalleryNormalizationReport {
+  /** Uniformity over the JPEG covers, after normalization. Null when none are JPEG. */
+  covers: CoverSetReport | null;
+  /** Covers carried as raster pixels (a PNG), whose metadata the decode already dropped. */
+  raster: number;
+  /** Covers a manifest was removed from, and how much came out. */
+  removed: { covers: number; segments: number; bytes: number };
+  /**
+   * False when the set mixes JPEG and raster covers, or when the JPEG covers do
+   * not share one profile. A set that fails this is one an adversary can sort,
+   * which is exactly what normalizing only the carriers would have produced.
+   */
+  uniform: boolean;
+}
+
 export interface GalleryEncodeResult {
   images: GalleryImage[];
   k: number;
@@ -144,6 +168,8 @@ export interface GalleryEncodeResult {
   keyBlock: Uint8Array;
   /** Mode B only: the n serialized Shamir shares to deliver to holders. */
   shares?: Uint8Array[] | undefined;
+  /** Cover normalization over the whole set, carriers and decoys alike (SPEC §9.7). */
+  normalization: GalleryNormalizationReport;
 }
 export interface GalleryDecodeOptions {
   params?: Argon2Params;
@@ -328,6 +354,72 @@ async function extractSlot(cover: GalleryCover, posKey: Uint8Array): Promise<Uin
 }
 
 /**
+ * Strip provenance from every cover in the set, and report on what is left
+ * (SPEC §9.7).
+ *
+ * Runs over **all** the covers before any of them is embedded into, carriers and
+ * decoys alike. That ordering is the whole point: a set where only the carriers
+ * lost their manifests is exactly as sortable as one where only the carriers
+ * fail C2PA validation, so the property being preserved is uniformity, not
+ * cleanliness. Doing it here rather than leaving it to the embedder also means
+ * the decoys, which are never handed to `embedBytesStegoJpeg` with anything to
+ * hide but a block of random bytes, are covered by the same pass.
+ *
+ * Raster covers (a PNG, carried as pixels) are counted but not touched: their
+ * metadata is already gone, dropped by the decode that turned them into pixels.
+ * A set mixing the two is reported as non-uniform, because it is.
+ */
+function normalizeCovers(covers: GalleryCover[]): {
+  covers: GalleryCover[];
+  report: GalleryNormalizationReport;
+} {
+  const out: GalleryCover[] = [];
+  const entries: { name: string; bytes: Uint8Array }[] = [];
+  let raster = 0;
+  let removedCovers = 0;
+  let removedSegments = 0;
+  let removedBytes = 0;
+
+  for (const cover of covers) {
+    if (cover.kind !== 'jpeg') {
+      raster++;
+      out.push(cover);
+      continue;
+    }
+    // Named, so a malformed photo in a folder of twelve says which one it is.
+    //
+    // `normalizeCoverBytes`, not `normalizeJpegCover`: this is a cover about to
+    // be embedded into, so it wants the embed path's error contract. That
+    // wrapper re-raises a structural failure as `JpegUnsupportedError`, which
+    // the four image adapters translate to `StegoCoverFormatError`; the precise
+    // class is for a normalization *report*, and `fileToGalleryCover` calls
+    // anything with an SOI a JPEG, so a truncated photo in the cover folder
+    // reached here and threw a class no adapter handled.
+    const res = normalizeCoverBytes(cover.jpeg, cover.name);
+    if (res.removed.segments > 0) {
+      removedCovers++;
+      removedSegments += res.removed.segments;
+      removedBytes += res.removed.bytes;
+    }
+    out.push({ kind: 'jpeg', name: cover.name, jpeg: res.bytes });
+    entries.push({ name: cover.name, bytes: res.bytes });
+  }
+
+  // Inspected AFTER normalization, so the report describes the photos that will
+  // actually be written rather than the ones that were handed in.
+  const inspected = entries.length > 0 ? inspectCoverSet(entries) : null;
+  return {
+    covers: out,
+    report: {
+      covers: inspected,
+      raster,
+      removed: { covers: removedCovers, segments: removedSegments, bytes: removedBytes },
+      uniform: (inspected?.uniform ?? true) && (raster === 0 || entries.length === 0),
+    },
+  };
+}
+
+/**
  * Encode a secret across `covers`, sealing each RS fragment into its own photo and
  * filling the remaining photos with decoys. Every cover is modified and must have
  * enough eligible carriers; the first K+M covers become fragment carriers, the rest
@@ -355,6 +447,17 @@ export async function galleryEncode(
   if (content.length > MAX_FILE_BYTES) {
     throw new GalleryFileTooLargeError(content.length, MAX_FILE_BYTES);
   }
+
+  // Provenance surgery over the WHOLE set, before anything is embedded and
+  // before the key derivation below spends an Argon2: a cover that cannot be
+  // normalized should fail the save cheaply, not after the expensive part.
+  //
+  // That ordering also decides which complaint a caller hears when a set is
+  // wrong twice over, and it is the right way round. The decoy-count refusal
+  // further down needs `k`, which needs the built blob, which costs the Argon2;
+  // a structural problem with a photo is knowable now, for free, and is a fact
+  // about that photo rather than about how many photos were supplied.
+  const { covers: clean, report: normalization } = normalizeCovers(covers);
 
   // One self-contained, password-encrypted MULTI-REGION blob (§10.4): the mandatory
   // 4-slot / 2-region geometry, always embedded in the fragments. embedded mode is
@@ -448,10 +551,10 @@ export async function galleryEncode(
     } else {
       slot = randomBytes(GALLERY_SLOT_BYTES);
     }
-    images.push(await embedSlot(covers[i]!, slot, posKey));
+    images.push(await embedSlot(clean[i]!, slot, posKey));
   }
   posKey.fill(0);
-  return { images, k, m, decoys, setId, keyBlock, shares };
+  return { images, k, m, decoys, setId, keyBlock, shares, normalization };
 }
 
 /** Reconstruct one set's blob from its authenticated fragments, or throw. */

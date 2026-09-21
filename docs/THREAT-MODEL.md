@@ -71,6 +71,76 @@ recompressed, you lose the key, not the data (keep a copy of the key by another 
 that matters to you). Existence-hiding applies to the _key photo_; the resilient images
 themselves are still openly a vault.
 
+## Deniability is conditional on the original being gone
+
+This section is the one to read before relying on Deniable Storage. It is not a
+caveat on a feature; it is the assumption the whole model rests on.
+
+### What removing the manifest does, and what it does not
+
+Recent phones and cameras embed a signed **C2PA provenance manifest** containing a
+hash of the image content. A carrier therefore fails C2PA validation, and the
+manifest states the exact size of the difference from the original. StegoShard
+removes it from every cover before embedding (SPEC §9.7), and
+`stegoshard normalize` exists for the rest of your photo library.
+
+That removes the **embedded** reference. It does not remove the reference.
+
+The removal is worth doing, because a manifest travels _inside_ the stego object
+and makes the comparison attack self-contained: anyone holding the carrier alone
+can run it, automatically, at no cost. Without it, an adversary needs the original.
+With the original, they need nothing else.
+
+### With the original, the comparison is trivial
+
+The ±1 scheme is statistically undetectable taken on its own. No first-order
+attack sees it: global and windowed Westfeld-Pfitzmann chi-square, F5 signatures,
+histogram shape. That has been measured, not assumed (`tests/steganalysis`,
+[CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.4).
+
+Put the original beside the carrier and none of that matters. A diff shows on the
+order of 8,500 coefficients changed by exactly ±1, with 0 and ±1 never touched.
+That signature is unmistakable, takes seconds to read, and yields a payload-size
+estimate accurate to within a few bytes. No steganalysis is involved; it is
+subtraction.
+
+So the deniability of the system rests **entirely** on the cover being
+unavailable. That is an operational assumption, and one the tool cannot enforce.
+It is stated here rather than left implicit, because a user who does not know it
+cannot satisfy it.
+
+### How an original survives in practice
+
+Usually without the user doing anything, and usually without their knowing:
+
+- **Automatic cloud backup.** Google Photos and iCloud Photos are frequently on by
+  default, back up on capture, and keep the exact original.
+- **Trash and "recently deleted".** Both retain for weeks after a delete that
+  looked final.
+- **The same photo already shared.** Messaging apps, social networks, email. A
+  recipient's copy is an original you do not control and cannot delete.
+- **Local copies.** The DCIM folder, thumbnail and preview caches, device backups
+  on a computer, an old SD card.
+- **Shared libraries and family albums.** A cover from a shared album is an
+  original sitting on other people's devices by design.
+
+### The usable rule
+
+Prefer covers that have **never been backed up and never been shared**. Treat any
+image that has passed through a cloud service as **burned** as a cover.
+
+And note the honest part: you usually cannot verify that condition. You can check
+whether backup is enabled today; you cannot easily establish that a given photo was
+never synced, never cached, never sent. Deniability is therefore **conditional**,
+never a guarantee of the format, and this documentation will not present it as one.
+
+One consequence in the tooling: `stegoshard normalize` requires `--out` and writes
+to a directory you choose, so it never overwrites the originals. That is
+deliberate, and it cuts both ways. Nothing is destroyed without your say-so, and
+the originals it leaves behind are exactly the comparison the removed manifests
+used to provide. What to do with them is your decision, and it is the decision this
+section is about.
+
 ## Access structures: duress & non-possession
 
 The Gallery and decoy-database (`.db`) carriers can hold **two independent payloads behind
@@ -288,6 +358,12 @@ StegoShard does **not** claim, and you should not rely on:
   of its own (§5.4). The targeted-steganalysis half remains unmeasured. The content-tell
   of the decoy database is a known, documented limitation (see
   [ROADMAP.md](ROADMAP.md) → _Later / exploratory_).
+- **Deniability against an adversary who holds the original cover.** Removing the
+  embedded provenance manifest removes one copy of the original's fingerprint, not
+  the original. See [Deniability is conditional on the original being
+  gone](#deniability-is-conditional-on-the-original-being-gone) above: with the
+  cover in hand the comparison is arithmetic, and no property of the format
+  prevents it.
 - **Protection once you are compelled and the resilient vault is found.** Resilient Storage
   is openly a secret; against coercion, only the deniable models help, and only to the
   extent the carrier truly blends in.

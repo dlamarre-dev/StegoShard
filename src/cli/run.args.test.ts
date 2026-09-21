@@ -80,6 +80,17 @@ describe('missing positionals', () => {
   }
 });
 
+describe('contradictory normalize flags', () => {
+  // `--report` writes nothing, so an --out beside it is a request the command
+  // cannot honour. Ignoring the directory a user named is how someone ends up
+  // believing a normalized copy of their library exists somewhere.
+  it('refuses --report with --out', async () => {
+    expect((await refusal(['normalize', './photos', '--report', '--out', './clean'])).code).toBe(
+      'USAGE',
+    );
+  });
+});
+
 describe('contradictory save flags', () => {
   it('refuses --binary with --paper', async () => {
     expect((await refusal(['save', secret(), '--binary', '--paper'])).code).toBe('USAGE');

@@ -44,6 +44,11 @@ export const zhTW: CliCatalog = {
   errEntropyExclusive: '{flags} 不能同時指定（亂度來源只能選一個）',
   errEntropyFlagEmpty: '--entropy 是空的（若不需要額外亂度，請不要加這個選項）',
   errEstimateMissing: 'estimate：缺少 <檔案>',
+  errNormalizeMissing: 'normalize：缺少 <相片|資料夾 ...>',
+  errNoNormalizeFiles:
+    'normalize：在指定的路徑中找不到相片（已尋找 .jpg、.jpeg、.png、.heic、.heif、.avif）',
+  errNormalizeReportOut:
+    'normalize：--report 與 --out <目錄> 不能同時使用（--report 不會寫出任何檔案）',
   errUiPort: 'ui：--port 必須是通訊埠號（收到「{value}」）',
   errJsonUiUnsupported:
     '{command}：不支援 --json；此命令是長時間執行的伺服器，而非會產生結果的命令。',
@@ -77,6 +82,10 @@ export const zhTW: CliCatalog = {
   errNoReadableImages: '輸入中沒有可讀取的 StegoShard 圖片',
   errNoCoversFound: '相簿：在指定的路徑中找不到封面圖片',
   errNoGalleryImages: '相簿：輸入中找不到圖片',
+  errNormalizeOut:
+    'normalize：必須指定 --out <目錄>。正規化後的副本會寫進你選定的目錄，' +
+    '絕不放在原檔旁邊：原檔正是被移除的來源聲明原本提供的那個比對物。' +
+    '若只想檢視而不寫入，請用 --report。',
 
   warnPasswordFlag:
     '警告：--password 會出現在 shell 歷史與處理程序清單中；' +
@@ -87,6 +96,12 @@ export const zhTW: CliCatalog = {
   warnWeakPassword:
     '警告：{label}偏弱（估計 {bits} 位元）。離線的保險庫可以在不聯絡您的情況下被猜測。',
   warnPrefix: '警告：{message}',
+  warnProvenanceStripped:
+    '警告：已從 {covers} 張封面相片移除來源聲明。請一併正規化相片庫的其餘部分：' +
+    '在失去聲明的相片旁邊，還留著聲明的相片同樣說明了一切。請執行：stegoshard normalize。',
+  warnCoversNotUniform:
+    '警告：這些相片沒有共用同一份中繼資料輪廓，仍可據此分辨。' +
+    '請對這一組執行 stegoshard normalize --report，看看差異在哪裡。',
   labelPassword: '密碼',
   promptPassword: '密碼：',
   promptDuressPassword: '脅迫密碼：',
@@ -122,6 +137,20 @@ export const zhTW: CliCatalog = {
   outDecoded: '已解碼 {seen} 張中的 {decoded} 張',
   outScanned: '已掃描 {seen} 張照片',
   outEstimate: '{images} 張圖片  （k={k} 資料 + m={m} 同位）',
+  outNormalized: '已正規化 {covers} 張相片；其中 {removed} 張移除了來源聲明（{bytes} 位元組）。',
+  outNormalizeUniform: '這些相片共用同一份中繼資料輪廓。',
+  outNormalizeNotUniform: '這些相片並未共用同一份中繼資料輪廓，仍可分辨：',
+  outNormalizeDivergent: '{segmentClass}：{present} 張有，{absent} 張沒有',
+  outNormalizeReport:
+    '已檢視 {covers} 張相片；其中 {removed} 張帶有來源聲明（{bytes} 位元組）。未寫出任何檔案。',
+  outNormalizeRefused:
+    '{name}：帶有無法在不破壞增益圖的情況下移除的聲明，因此沒有為這個檔案寫出任何東西',
+  outNormalizeSkippedFile: '{name}：{kind} 檔案，保持原樣，不在此保證範圍內',
+  outNormalizeProblem: '{name}：無法讀取，因此沒有為這個檔案寫出任何東西',
+  outNormalizeSkipped: '略過 {count} 個檔案，不在此保證範圍內（不是 JPEG，或無法讀取）。',
+  outNormalizeOriginals:
+    '原檔仍然存在，而且正是被移除的來源聲明原本提供的那個比對物。' +
+    '請參閱 docs/THREAT-MODEL.md 的可否認性一節。',
 
   helpTagline: 'StegoShard：把檔案加密成具韌性的圖片、不透明的單一檔案，或誘餌資料庫，並可還原。',
   helpUsageHeading: '用法：',
@@ -142,6 +171,11 @@ export const zhTW: CliCatalog = {
   helpGalleryNoDuress: '（相簿不支援 duress；請使用 --binary --disguise --mode duress）',
   helpGalleryNote:
     '所有照片都會被修改；最適合的 K+M 張帶有 Reed-Solomon 碎片，其餘成為誘餌（至少 5 張照片，其中至少 2 張誘餌）。還原是盲式的：所有能通過驗證的照片都會被使用，任意 K 個碎片即可重建。',
+  helpNormalizeHeading: '封面正規化（移除相機嵌入的來源聲明）：',
+  helpNormalizeNote:
+    '儲存時本來就會正規化交給它的封面。這個指令是為相片庫的其餘部分而設：' +
+    '在數百張仍保有聲明的相片中夾著少數幾張正規化過的，' +
+    '和只正規化載體的相簿一樣容易被挑出來。僅處理 JPEG；其餘會回報並略過。',
   helpExamplesHeading: '範例：',
 
   helpOut: '輸出資料夾（預設：目前資料夾）',
@@ -191,6 +225,8 @@ export const zhTW: CliCatalog = {
   helpGalleryKey: 'keyfile/stego 相簿所需的外部金鑰（gallery-restore）',
   helpGalleryMode: '以分片鎖住相簿（搭配 --threshold k-of-n）',
   helpGalleryShare: 'gallery-restore 用的分片檔（可重複指定）',
+  helpNormalizeOut: '正規化副本的寫出位置（必填；不可是原檔位置）',
+  helpNormalizeReport: '只檢視並回報：不寫出任何東西',
   helpUiPort: '在這個通訊埠提供服務，而不是任意空閒的埠',
   helpUiOpen: '除了顯示網址，也在瀏覽器中開啟',
 };

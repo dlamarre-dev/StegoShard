@@ -21,6 +21,7 @@ import {
   brandCaption,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
+  isHeif,
   isJpeg,
   recoveryLines,
   type GalleryCover,
@@ -301,6 +302,10 @@ export async function extractKeyFactorImage(
 export async function fileToGalleryCover(file: File): Promise<GalleryCover> {
   const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
   if (isJpeg(bytes)) return { kind: 'jpeg', name: file.name, jpeg: bytes };
+  // HEIC/HEIF/AVIF named before the decode attempt, mirroring the Node adapter:
+  // StegoShard never ingests one (SPEC §5.4), and a browser that happens to
+  // decode HEIC would otherwise silently transcode a carrier. See `isHeif`.
+  if (isHeif(bytes)) throw new StegoCoverFormatError();
   const img = await fileToImageData(file);
   return { kind: 'rgba', name: file.name, rgba: img.data, width: img.width, height: img.height };
 }

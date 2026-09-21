@@ -144,8 +144,18 @@ describe('result shapes', () => {
       decoys: 2,
       setId: 'deadbeef',
       keyMode: 'embedded',
+      provenance: { covers: 1, segments: 2, bytes: 640, uniform: true },
     });
-    expect(keysOf(io)).toEqual(['decoys', 'files', 'k', 'keyMode', 'm', 'manifest', 'setId']);
+    expect(keysOf(io)).toEqual([
+      'decoys',
+      'files',
+      'k',
+      'keyMode',
+      'm',
+      'manifest',
+      'provenance',
+      'setId',
+    ]);
   });
 
   it('gallery-restore', () => {

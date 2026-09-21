@@ -9,6 +9,129 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **Cover normalization: the C2PA provenance manifest is removed before embedding**
+  (SPEC §9.7, new). Recent phones and cameras embed a signed manifest carrying a hash of
+  the image content. Embedding changes that content, so a carrier fails validation — and
+  the manifest additionally states the exact size of its difference from the original.
+  That makes it a fingerprint of the cover transported inside the stego object: it turns
+  the comparison attack into something an adversary holding the carrier alone can run,
+  automatically, at no cost. The manufacturer holds the signing key, so the hash cannot be
+  recomputed; removal is the only answer.
+
+  **The property is uniformity, not cleanliness, and that is why this is structural.** A
+  set where only the carriers lack provenance sorts exactly as well as one where only the
+  carriers fail validation, so normalization runs over **every** cover a save is handed,
+  carriers and decoys alike. It is wired into the two JPEG embed points in `stego.ts`
+  (`embedFixedStegoJpeg`, `embedBytesStegoJpeg`), so it reaches the gallery photos **and**
+  the key photo of `--key-mode stego`, on every surface — CLI, library, web app,
+  extension — with no step a caller can forget. SPEC §9.7 states it normatively: an
+  encoder that normalizes only the carriers is non-conforming.
+
+  Surgery is at the segment level only. The quantized DCT coefficients are bit-identical
+  across it (asserted at the DCT level, not the pixel level), so the §5.4 cover
+  fingerprint, the keystream and the carrier positions are unchanged, and embedding into a
+  cover with a manifest now produces a byte-identical result to embedding into one already
+  stripped. The entropy scan and everything after EOI — an Ultra HDR gain map, an Android
+  motion-photo video — are copied verbatim.
+
+  **The match is deliberately wider than C2PA.** It is the two-byte JUMBF prefix `"JP"`,
+  not the four bytes a C2PA manifest begins with: the next two are a box _instance
+  number_, every manifest this was written against uses instance 1, and treating a counter
+  as part of a magic would have let a manifest carried at another instance walk through a
+  check that looked correct. A JUMBF box in APP11 that is not a provenance manifest is
+  therefore removed too. That is the intended direction — APP11 is reserved for JPEG
+  Systems box carriage and none of it affects rendering, so removing a box nobody needed
+  costs bytes, while leaving one behind can carry a hash of the cover inside the stego
+  object. Over-removal does not threaten uniformity either, since the same rule runs over
+  every photo in the set. An APP11 that is not box carriage at all is still left alone.
+
+  **Ultra HDR photos work, because the MPF index is rewritten rather than trusted**
+  (SPEC §9.7.1, `src/core/mpf.ts`). An APP2 `MPF\0` index locates the images after EOI by
+  offsets measured from its own endian field, which makes it the one part of a JPEG whose
+  correctness depends on where other bytes sit, and both things done to a cover move those
+  bytes: removing a manifest **behind** the field shifts only the trailer, and an embed
+  re-serializes the entropy scan, whose length drifts by the byte-stuffing it re-applies
+  (on the byte-faithful path as much as the restart-marker one), which moves the trailer
+  for reasons that have nothing to do with normalization.
+
+  Both were refusals first. That was correct and useless: a recent Pixel writes a gain map
+  on every HDR shot, so refusing took the photos a user actually has out of the cover pool
+  to protect a property four lines of arithmetic can preserve. The index now follows the
+  trailer, in both byte orders, and the primary image's declared size follows with it. The
+  gain map itself is never touched, and neither is any other field, segment or scan byte.
+  SPEC §9.7.1 pins the formula so an independent implementation emits the same bytes.
+
+  Two refusals remain, both fail-closed, and **both decided from the cover** before any
+  work starts, because the alternative would accept a photo under one password and refuse it
+  under another: whether an edit shifts the trailer at all depends on the keyed carrier
+  positions. An index this code cannot read, over a trailer it claims to locate, is refused;
+  a file in that state is malformed rather than unusual. So is an index whose entries this
+  cannot account for, meaning a first entry that is not the primary image or a later one
+  whose offset does not resolve into the trailer: a rewrite would have to guess at what such
+  a number meant, and a guess there silently breaks a photo.
+
+  An index with **no** trailer is maintained too. Its offsets locate nothing, but its first
+  entry declares the primary image's size, which is where the trailer would begin, and an
+  edit ahead of it leaves that number disagreeing with the file's own length: a JPEG at odds
+  with its own index, which is the kind of oddity §9.7 exists to remove rather than add.
+
+  A JPEG whose marker structure does not parse is likewise refused rather than passed
+  through: a file whose structure cannot be walked is one nothing can promise carries no
+  manifest. On the cover paths that refusal arrives as `StegoCoverFormatError`, the class
+  every image adapter already speaks, rather than a structural error class none of them
+  handles.
+
+- **`stegoshard normalize <photos|folder ...>`**, with `--report` and `--json`. The
+  automatic step reaches only the photos handed to StegoShard; uniformity is a property of
+  the whole library an adversary sees, so a handful of normalized photos among hundreds
+  that kept their manifests is the same tell one layer out. `--report` writes nothing and
+  prints the inventory — C2PA, XMP identifiers, IPTC, EXIF software and serials, gain
+  maps, motion-photo trailers — plus what differs across the set. `--out` is required:
+  normalized copies never land beside the originals, and `--report` refuses an `--out`
+  rather than ignoring the directory it was given. Every member that produced no
+  normalized copy is named, not just counted: SPEC §9.7 singles out the library that is
+  HEIC everywhere except the photos converted to JPEG, and a bare count leaves the user
+  hunting for which ones those are. A photo whose manifest could not be removed safely
+  keeps its inventory in the report, which is the part that explains why the removal
+  refused. `--json` carries a `report` flag, so an empty `files` is never ambiguous
+  between "wrote nothing" and "had nothing to write". A folder with no photos in it
+  raises `NO_NORMALIZE_FILES` and names the extensions the command looked for, instead
+  of borrowing the gallery's `NO_COVERS_FOUND` and answering with a sentence about
+  cover photos for a command that hides nothing. Both prose lists of error codes in
+  [docs/API.md](docs/API.md) are checked against the code now, which is how that came
+  to light: `API_ERROR_CODES` had fallen a code behind its own union, and the core
+  list three behind. The invocation codes are enumerable now too, as `CLI_ERROR_CODES`,
+  derived from the union rather than restated so the list cannot drift from it. That
+  guard found `UI_UNAVAILABLE` declared and documented while nothing could raise it:
+  `stegoshard ui` wrote its message and returned instead of failing, so no `--json`
+  caller could ever have seen the code. It goes through the one failure path now, with
+  the same message and the same exit code.
+
+  `save` and `gallery-save` now warn (`PROVENANCE_STRIPPED`) when a manifest was actually
+  removed, and `gallery-save` warns (`COVERS_NOT_UNIFORM`) when the photos it just wrote
+  still do not share one metadata profile. The web app and the extension say the same two
+  things alongside the save note: the uniformity verdict is the security property this
+  whole step exists for, and a browser user should not be the one person never told it.
+
+- **HEIC/HEIF/AVIF covers are refused by name** instead of failing as a decoder stack
+  trace. StegoShard has never ingested one and never transcodes (SPEC §5.4): there are no
+  JPEG DCT coefficients in an HEVC-coded image to carry a payload. The uniformity rule
+  still bears on it, and the docs now say so: a library that is HEIC everywhere except the
+  photos converted to JPEG to carry something sorts on exactly that.
+
+- **A threat-model section on what removing the manifest does not do**
+  ([docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)). It removes the **embedded** reference,
+  not the reference. The ±1 scheme is undetectable taken alone, and that is measured; put
+  the original beside the carrier and it is arithmetic — about 8,500 coefficients moved by
+  exactly ±1, with 0 and ±1 never touched, readable in seconds and yielding a payload-size
+  estimate good to a few bytes. Deniability therefore rests entirely on the cover being
+  unavailable, which the tool cannot enforce. The section documents how an original
+  survives in practice (automatic cloud backup, trash retention, copies already shared,
+  DCIM and thumbnail caches, shared albums) and states the rule plainly: treat any image
+  that has passed through a cloud service as burned as a cover, and understand that you
+  usually cannot verify that condition — so deniability is conditional, never a guarantee
+  of the format.
+
 - **A reused stego cover is now refused instead of silently leaking.** SPEC §5.3 always
   said a cover's content carries at most one payload per password — but it said it as a
   bold sentence with no MUST, in a section that uses MUST freely for everything else, so a

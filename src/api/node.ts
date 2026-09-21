@@ -35,6 +35,12 @@ export {
   runGalleryRestore as galleryRestore,
   /** How many carrier images a file would need. Reads the file, writes nothing. */
   runEstimate as estimate,
+  /**
+   * Strip provenance manifests from a set of photos, and report what is left
+   * (SPEC §9.7). For the photo library around the covers; the covers themselves
+   * are normalized by the save that uses them.
+   */
+  runNormalize as normalize,
   /** The conservative binary ceiling this layer defaults to. */
   DEFAULT_MAX_BINARY_BYTES,
   CODEC_CHOICES,
@@ -46,6 +52,9 @@ export type {
   GalleryRestoreResult,
   GallerySaveOptions,
   GallerySaveResult,
+  NormalizeCoverRow,
+  NormalizeCoversResult,
+  NormalizeOptions,
   RestoreOptions,
   RestoreResult,
   SaveOptions,

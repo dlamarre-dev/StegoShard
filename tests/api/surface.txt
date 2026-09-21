@@ -19,6 +19,7 @@ stegoshard/node:galleryRestore
 stegoshard/node:gallerySave
 stegoshard/node:gatherInputs
 stegoshard/node:imageDataToPng
+stegoshard/node:normalize
 stegoshard/node:restore
 stegoshard/node:save
 stegoshard:BINARY_VERSION
@@ -37,6 +38,7 @@ stegoshard:GalleryFileTooLargeError
 stegoshard:GalleryRestoreError
 stegoshard:GalleryTooFewImagesError
 stegoshard:GalleryTooManyImagesError
+stegoshard:JUMBF_APP11_PREFIX
 stegoshard:JpegUnsupportedError
 stegoshard:KEY_BLOCK_LEN
 stegoshard:KEY_FACTOR_LEN
@@ -99,11 +101,16 @@ stegoshard:getCodec
 stegoshard:hasUserEntropy
 stegoshard:importVault
 stegoshard:importVaultBinary
+stegoshard:inspectCoverSet
+stegoshard:inspectJpegCover
 stegoshard:installUserEntropy
+stegoshard:isHeif
 stegoshard:isJpeg
 stegoshard:isSerializedKeyBlock
 stegoshard:jpegStegoCapacityBits
 stegoshard:looksLikeBinaryContainer
+stegoshard:normalizeCoverBytes
+stegoshard:normalizeJpegCover
 stegoshard:normalizePassword
 stegoshard:parseKeyBlock
 stegoshard:recoveryLines

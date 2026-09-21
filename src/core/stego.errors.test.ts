@@ -28,6 +28,21 @@ import {
   KEY_BLOCK_LEN,
 } from './index';
 
+import {
+  baseJpeg as texturedJpeg,
+  gainMapTrailer,
+  mpfEntryOffsetField,
+  mpfIndexSegment,
+  mpfSegment,
+  patchMpfIndex,
+  pokeMpfIndex,
+  spliceBeforeSos,
+  withMpfGainMap,
+  withTrailer,
+} from './jpeg-fixtures';
+import { parseMpfIndex } from './mpf';
+import { parseJpegSegments } from './jpeg-segments';
+
 const SEED = new Uint8Array(32).fill(7);
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
@@ -192,6 +207,99 @@ describe('capacity refusals', () => {
     const tooBig = new Uint8Array(Math.ceil(carriers / 8) + 16);
     await expect(embedBytesStegoJpeg(jpegBytes, tooBig, SEED)).rejects.toBeInstanceOf(
       StegoCapacityError,
+    );
+  });
+
+  /**
+   * The MPF rewrite, on the one path where the drift can be pinned.
+   *
+   * This path takes a fixed seed and a fixed payload, so the whole embed is
+   * deterministic and the byte-stuffing drift of a given cover is a property of
+   * the fixture rather than of the run. That matters because the drift is usually
+   * **zero**: a test that did not choose its cover for it would assert the rewrite
+   * and exercise the early return instead. These three cases are the three things
+   * that can happen, and each asserts the delta it was chosen for, so a change to
+   * the encoder that moved them shows up here rather than silently collapsing the
+   * suite into one case.
+   *
+   * The negative drift is worth its own case: the trailer moving *earlier* is the
+   * direction a sign error survives.
+   */
+  it.each([
+    { what: 'grows', payload: 128, seed: 1, delta: 1 },
+    { what: 'shrinks', payload: 128, seed: 4, delta: -2 },
+    { what: 'stays the same length', payload: 8, seed: 1, delta: 0 },
+  ])('keeps the gain map resolvable when the scan $what', async ({ payload, seed, delta }) => {
+    const gainMap = gainMapTrailer();
+    const cover = withMpfGainMap(texturedJpeg(128, 128, 85, seed));
+    const stego = await embedBytesStegoJpeg(cover, new Uint8Array(payload).fill(9), SEED);
+
+    expect(stego.length - cover.length).toBe(delta);
+    const index = parseMpfIndex(stego)!;
+    const { trailerStart } = parseJpegSegments(stego);
+    // Follow the index in the output and find the gain map, byte for byte.
+    expect(index.endianAt + index.entries[1]!.offset).toBe(trailerStart);
+    expect([...stego.subarray(trailerStart)]).toEqual([...gainMap]);
+    expect(index.entries[0]!.size).toBe(trailerStart);
+  });
+
+  it('writes nothing to the head when the scan does not drift', async () => {
+    // The common case, and the one that must not rewrite: the index is already
+    // correct, so touching it would change the head for no reason.
+    const cover = withMpfGainMap(texturedJpeg(128, 128, 85, 1));
+    const stego = await embedBytesStegoJpeg(cover, new Uint8Array(8).fill(9), SEED);
+
+    expect(stego.length).toBe(cover.length);
+    const { sosStart } = parseJpegSegments(stego);
+    expect([...stego.subarray(0, sosStart)]).toEqual([...cover.subarray(0, sosStart)]);
+  });
+
+  /**
+   * A readable index whose entry does not locate the trailer: refused rather than
+   * moved to a position that would be a guess.
+   *
+   * Decided from the **cover**, which SPEC §9.7 requires, and both payloads are
+   * here to pin that. The 128-byte one drifts the scan and the 8-byte one does
+   * not, and the answer has to be the same either way: a refusal that depended on
+   * the drift would accept this photo under one password and turn it away under
+   * another, for a defect that is in the file rather than in the embed.
+   */
+  it.each([128, 8])('refuses a cover whose MPF entry misses the trailer (%i bytes)', async (n) => {
+    const ultra = withMpfGainMap(texturedJpeg(128, 128, 85, 1));
+    const odd = pokeMpfIndex(ultra, mpfEntryOffsetField(1), 0, 0, 0, 0x10);
+    await expect(embedBytesStegoJpeg(odd, new Uint8Array(n).fill(9), SEED)).rejects.toMatchObject({
+      name: 'JpegUnsupportedError',
+      message: expect.stringContaining('MPF entry 2'),
+    });
+  });
+
+  /**
+   * An MPF index with nothing after EOI. No offset locates anything, so this used
+   * to be waved through, and the primary image's declared size was left one byte
+   * short of the file it describes: a JPEG that disagrees with its own index,
+   * which is the sort of oddity §9.7 exists to remove rather than introduce.
+   */
+  it('keeps the primary size correct on an index with no trailer', async () => {
+    const single = patchMpfIndex(
+      spliceBeforeSos(texturedJpeg(128, 128, 85, 1), mpfIndexSegment(1)),
+      [],
+    );
+    const stego = await embedBytesStegoJpeg(single, new Uint8Array(128).fill(9), SEED);
+
+    expect(stego.length).not.toBe(single.length); // the drift this exists to catch
+    expect(parseMpfIndex(stego)!.entries[0]!.size).toBe(stego.length);
+    expect(parseJpegSegments(stego).trailerStart).toBe(stego.length);
+  });
+
+  /**
+   * An index that cannot be read, over a trailer it claims to locate, is still
+   * refused. Raised as `JpegUnsupportedError` because that is the class the four
+   * image adapters already translate to `StegoCoverFormatError`.
+   */
+  it('refuses a gallery cover whose MPF index cannot be read', async () => {
+    const cover = withTrailer(spliceBeforeSos(baseJpeg(64, 64), mpfSegment()), gainMapTrailer());
+    await expect(embedBytesStegoJpeg(cover, new Uint8Array(8).fill(9), SEED)).rejects.toMatchObject(
+      { name: 'JpegUnsupportedError' },
     );
   });
 

@@ -8,8 +8,7 @@
     "repository": {
       "url": "https://github.com/dlamarre-dev/StegoShard",
       "provider": "github",
-      "link_mode": "web",
-      "revision": "e2aa6b0cb3eb1174af5771bf36bba39b9d7ad3ed"
+      "link_mode": "web"
     },
     "views": [
       {
@@ -42,6 +41,7 @@
         "focus": [
           "core",
           "containers",
+          "normalize",
           "deniable"
         ],
         "note": "The same bytes behind a SQLite header, or a key hidden in a photo."
@@ -297,6 +297,34 @@
       ]
     },
     {
+      "id": "normalize",
+      "type": "security",
+      "label": "Cover normalization",
+      "sublabel": "strip provenance, whole set",
+      "pos": [
+        870,
+        630
+      ],
+      "size": [
+        170,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/core/normalize.ts",
+          "label": "manifest removal"
+        },
+        {
+          "path": "src/core/jpeg-segments.ts",
+          "label": "segment parser"
+        },
+        {
+          "path": "SPEC.md",
+          "label": "SPEC 9.7"
+        }
+      ]
+    },
+    {
       "id": "resilient",
       "type": "database",
       "label": "Resilient forms",
@@ -364,7 +392,8 @@
         "crypto",
         "erasure",
         "codec",
-        "containers"
+        "containers",
+        "normalize"
       ]
     }
   ],
@@ -447,6 +476,16 @@
       "label": "decoy .db, hidden key",
       "fromSide": "right",
       "toSide": "left"
+    },
+    {
+      "id": "containers-to-normalize",
+      "from": "containers",
+      "to": "normalize",
+      "label": "strip provenance before embedding",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
     }
   ],
   "cards": [
@@ -471,7 +510,7 @@
       "title": "Output forms",
       "items": [
         "Deniable adds Gallery Mode across many photos",
-        "A reused photo cover is refused, not reused"
+        "Every cover loses its provenance; reuse is refused"
       ]
     },
     {

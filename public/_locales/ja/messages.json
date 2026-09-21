@@ -499,6 +499,19 @@
     "message": "写真から復元",
     "description": "Gallery Mode: restore button."
   },
+  "warnProvenanceStripped": {
+    "message": "これらの写真のうち $COUNT$ 枚から来歴マニフェストを取り除きました。写真ライブラリの残りも正規化してください。マニフェストを保ったままの写真は、失った写真の隣に置くと同じだけ手がかりになります。",
+    "description": "Gallery Mode: a C2PA provenance manifest was removed from some covers (SPEC 9.7).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnCoversNotUniform": {
+    "message": "これらの写真はメタデータのプロファイルが揃っていないため、まだ見分けられます。",
+    "description": "Gallery Mode: the cover set does not share one metadata profile (SPEC 9.7)."
+  },
   "statusGallerySaving": {
     "message": "写真に秘密を隠しています…",
     "description": "Gallery Mode: status while saving."

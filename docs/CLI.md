@@ -20,8 +20,12 @@ Key modes and paper output mirror the apps:
 ```bash
 # Hybrid mode (🔗): the archive is stored resiliently as images, and only the
 # recovery key is hidden deniably inside an ordinary photo. A baseline JPEG
-# cover stays a JPEG of the same size, metadata, and filename (the key rides in
-# its DCT coefficients); a PNG cover stays a PNG. The key image is named after
+# cover stays a JPEG with its coefficients, metadata, and filename intact (the
+# key rides in its DCT coefficients); a PNG cover stays a PNG. One exception:
+# a C2PA provenance manifest is removed first (SPEC §9.7), so the key photo is
+# smaller than the cover by the manifest. That is the point: a manifest hashes
+# the image content, so keeping it would both fail validation and publish the
+# exact byte distance from the original. The key image is named after
 # the cover, so restore points --key at that file. If the cover photo is later
 # recompressed, only the key is lost; the resilient archive survives.
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
@@ -70,6 +74,26 @@ npm run cli -- restore ./vault/cache.db --out ./restored
 # fragments rebuild the secret. Needs 5+ photos (at least 2 become decoys).
 npm run cli -- gallery-save note.txt ./photos --out ./album
 npm run cli -- gallery-restore ./album --out ./restored
+
+# Cover normalization (SPEC §9.7): strip the C2PA provenance manifest cameras
+# embed. Saving already does this to the covers it is handed, carriers AND
+# decoys, because a set where only the carriers lost their manifests sorts just
+# as easily as one where only the carriers fail validation.
+#
+# This command is for everything else in your photo library, which the pipeline
+# never sees: a handful of normalized photos among hundreds that kept theirs is
+# the same tell one layer out. --report writes nothing and prints the inventory
+# (C2PA, XMP identifiers, IPTC, EXIF software/serials, gain maps, motion-photo
+# trailers) plus what differs across the set.
+npm run cli -- normalize ./photos --report
+npm run cli -- normalize ./photos --out ./photos-clean
+#
+# The two are exclusive: --report writes nothing, so passing --out with it is
+# refused rather than ignored. --out is required otherwise: normalized copies
+# never land beside the originals. Read the
+# deniability section of docs/THREAT-MODEL.md before deciding what to do with
+# those originals. Removing the manifest removes the embedded copy of the
+# cover's fingerprint; the original itself is still the comparison.
 
 # Duress mode (SPEC §10.9, --binary --disguise only): a plausible decoy opens
 # under a 2nd, independent password, while the real payload stays unreachable

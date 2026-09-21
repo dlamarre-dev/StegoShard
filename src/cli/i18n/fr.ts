@@ -47,6 +47,12 @@ export const fr: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy était vide (omettez l’option si vous ne voulez pas d’entropie supplémentaire)',
   errEstimateMissing: 'estimate : <fichier> manquant',
+  errNormalizeMissing: 'normalize : <photos|dossier ...> manquant',
+  errNoNormalizeFiles:
+    'normalize : aucune photo trouvée dans les chemins indiqués (recherche de .jpg, .jpeg, .png, .heic, .heif, .avif)',
+  errNormalizeReportOut:
+    'normalize : --report et --out <dossier> ne peuvent pas être utilisés ensemble ' +
+    '(--report n’écrit rien)',
   errUiPort: 'ui : --port doit être un numéro de port (reçu « {value} »)',
   errJsonUiUnsupported:
     '{command} : --json n’est pas pris en charge ; cette commande est un serveur de longue durée, pas une commande qui produit un résultat',
@@ -85,6 +91,11 @@ export const fr: CliCatalog = {
   errNoReadableImages: 'aucune image StegoShard lisible dans les entrées',
   errNoCoversFound: 'galerie : aucune image de couverture trouvée dans les chemins indiqués',
   errNoGalleryImages: 'galerie : aucune image trouvée dans les entrées',
+  errNormalizeOut:
+    'normalize : --out <dossier> est obligatoire. Les copies normalisées vont dans un ' +
+    "dossier que vous choisissez, jamais à côté des originaux : l'original est " +
+    'exactement la comparaison que le manifeste retiré fournissait. Utilisez --report ' +
+    'pour inspecter sans rien écrire.',
 
   warnPasswordFlag:
     'Attention : --password est visible dans l’historique du shell et la liste des processus ; ' +
@@ -96,6 +107,15 @@ export const fr: CliCatalog = {
     'Attention : le {label} est faible (environ {bits} bits). ' +
     'Un coffre hors ligne peut être deviné sans vous contacter.',
   warnPrefix: 'Attention : {message}',
+  warnProvenanceStripped:
+    'Attention : un manifeste de provenance a été retiré de {covers} photo(s) de ' +
+    'couverture. Normalisez aussi le reste de votre photothèque : des photos qui ' +
+    'gardent leur manifeste autour de photos qui ont perdu le leur sont tout aussi ' +
+    'parlantes. Lancez : stegoshard normalize.',
+  warnCoversNotUniform:
+    'Attention : ces photos ne partagent pas un même profil de métadonnées ; elles ' +
+    'restent donc distinguables par là. Lancez stegoshard normalize --report sur ' +
+    "l'ensemble pour voir ce qui diffère.",
   labelPassword: 'mot de passe',
   promptPassword: 'Mot de passe : ',
   promptDuressPassword: 'Mot de passe de contrainte : ',
@@ -131,6 +151,28 @@ export const fr: CliCatalog = {
   outDecoded: '{decoded} image(s) décodée(s) sur {seen}',
   outScanned: '{seen} photo(s) analysée(s)',
   outEstimate: '{images} image(s)  (k={k} données + m={m} parité)',
+  outNormalized:
+    'Normalisé {covers} photo(s) ; manifeste de provenance retiré de {removed} ' +
+    "d'entre elles ({bytes} octets).",
+  outNormalizeUniform: 'Ces photos partagent un même profil de métadonnées.',
+  outNormalizeNotUniform:
+    'Ces photos ne partagent PAS un même profil de métadonnées ; elles restent ' +
+    'distinguables :',
+  outNormalizeDivergent: '{segmentClass} : présent sur {present}, absent de {absent}',
+  outNormalizeReport:
+    '{covers} photo(s) inspectée(s) ; {removed} d’entre elles portent un manifeste de ' +
+    'provenance ({bytes} octets). Rien n’a été écrit.',
+  outNormalizeRefused:
+    '{name} : porte un manifeste qui ne peut être retiré sans invalider sa carte de ' +
+    'gain ; rien n’a été écrit pour ce fichier',
+  outNormalizeSkippedFile: '{name} : un fichier {kind}, laissé tel quel et hors de cette garantie',
+  outNormalizeProblem: '{name} : illisible, rien n’a été écrit pour ce fichier',
+  outNormalizeSkipped:
+    '{count} fichier(s) ignoré(s), hors de cette garantie (pas un JPEG, ou illisible).',
+  outNormalizeOriginals:
+    'Les originaux existent toujours et sont exactement la comparaison que les ' +
+    'manifestes retirés fournissaient. Voir la section déniabilité de ' +
+    'docs/THREAT-MODEL.md.',
 
   helpTagline:
     'StegoShard : chiffrez un fichier en images résilientes, en fichier opaque ou en base de données leurre, et restaurez-le.',
@@ -155,6 +197,14 @@ export const fr: CliCatalog = {
     '(le mode duress n’existe pas pour la galerie ; utilisez --binary --disguise --mode duress)',
   helpGalleryNote:
     'Toutes les photos sont modifiées ; les K+M meilleures portent les fragments Reed-Solomon et les autres deviennent des leurres (5 photos minimum, dont au moins 2 leurres). La restauration est aveugle : toutes les photos qui s’authentifient sont utilisées, et K fragments suffisent à reconstruire.',
+  helpNormalizeHeading:
+    'Normalisation des couvertures (retirer le manifeste de provenance embarqué par ' +
+    "l'appareil) :",
+  helpNormalizeNote:
+    'Une sauvegarde normalise déjà les couvertures qu’on lui donne. Cette commande est ' +
+    'pour le reste de votre photothèque : une poignée de photos normalisées parmi des ' +
+    'centaines qui ont gardé leur manifeste se trie aussi facilement qu’une galerie où ' +
+    'seules les porteuses l’auraient été. JPEG uniquement ; le reste est signalé et ignoré.',
   helpExamplesHeading: 'Exemples :',
 
   helpOut: 'Dossier de sortie (par défaut : dossier courant)',
@@ -204,6 +254,8 @@ export const fr: CliCatalog = {
   helpGalleryKey: 'Clé externe pour une galerie keyfile/stego (gallery-restore)',
   helpGalleryMode: 'Verrouiller la galerie sur des parts (avec --threshold k-of-n)',
   helpGalleryShare: 'Un fichier de part (répétable) pour gallery-restore',
+  helpNormalizeOut: 'Où vont les copies normalisées (obligatoire ; jamais les originaux)',
+  helpNormalizeReport: 'Inspecter et rapporter seulement : n’écrit rien',
   helpUiPort: 'Servir sur ce port au lieu d’un port libre',
   helpUiOpen: 'Ouvrir aussi l’adresse dans le navigateur, en plus de l’afficher',
 };

@@ -489,6 +489,19 @@
   "btnGalleryRestore": {
     "message": "사진에서 복원"
   },
+  "warnProvenanceStripped": {
+    "message": "이 사진 중 $COUNT$장에서 출처 매니페스트를 제거했습니다. 사진 라이브러리의 나머지도 정규화하세요. 매니페스트를 그대로 둔 사진은 잃은 사진 옆에서 똑같이 눈에 띕니다.",
+    "description": "Gallery Mode: a C2PA provenance manifest was removed from some covers (SPEC 9.7).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnCoversNotUniform": {
+    "message": "이 사진들은 하나의 메타데이터 프로필을 공유하지 않아 여전히 구별될 수 있습니다.",
+    "description": "Gallery Mode: the cover set does not share one metadata profile (SPEC 9.7)."
+  },
   "statusGallerySaving": {
     "message": "비밀을 사진들에 나눠 숨기는 중…"
   },

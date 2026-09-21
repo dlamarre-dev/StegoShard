@@ -25,7 +25,18 @@ export type ApiErrorCode =
 /** A gallery save found no usable cover photos. */
 | 'NO_COVERS_FOUND'
 /** A gallery restore was handed no images to scan. */
-| 'NO_GALLERY_IMAGES';
+| 'NO_GALLERY_IMAGES'
+/**
+* `normalize` was handed no image files at all.
+*
+* Its own code rather than `NO_COVERS_FOUND`: that one means "a gallery save
+* found nothing to hide a secret in", and `normalize` walks a wider set of
+* formats for a different purpose, so sharing the code made the terminal
+* answer an empty folder with a sentence about gallery cover photos.
+*/
+| 'NO_NORMALIZE_FILES'
+/** `normalize` was asked to write without being told where. */
+| 'NORMALIZE_OUT_REQUIRED';
 
 // @public
 export type ApiErrorParams = Record<string, string | number>;
@@ -124,6 +135,68 @@ export interface CoverClaim {
 }
 
 // @public
+export type CoverKind = 'jpeg' | 'png' | 'heif' | 'other';
+
+// @public
+export interface CoverProfile {
+    classes: SegmentClass[];
+    exif: ExifFindings | null;
+    jumbf: {
+        segments: number;
+        bytes: number;
+    };
+    mpf: boolean;
+    // (undocumented)
+    totalBytes: number;
+    // (undocumented)
+    trailer: {
+        kind: TrailerKind;
+        bytes: number;
+    };
+    xmp: XmpFindings | null;
+}
+
+// @public
+export interface CoverSetDivergence {
+    // (undocumented)
+    absentFrom: string[];
+    // (undocumented)
+    presentIn: string[];
+    // (undocumented)
+    segmentClass: SegmentClass;
+}
+
+// @public
+export interface CoverSetEntry {
+    // (undocumented)
+    bytes: Uint8Array;
+    // (undocumented)
+    name: string;
+}
+
+// @public
+export interface CoverSetReport {
+    common: SegmentClass[];
+    divergent: CoverSetDivergence[];
+    // (undocumented)
+    files: CoverSetRow[];
+    trailerKinds: TrailerKind[];
+    uniform: boolean;
+    unparsed: string[];
+    withManifest: string[];
+}
+
+// @public
+export interface CoverSetRow {
+    // (undocumented)
+    kind: CoverKind;
+    // (undocumented)
+    name: string;
+    problem?: string;
+    profile: CoverProfile | null;
+}
+
+// @public
 export function createKeyBlock(password: string, params?: Argon2Params): Promise<{
     dek: CryptoKey;
     block: KeyBlock;
@@ -196,6 +269,27 @@ export function estimateImages(filename: string, content: Uint8Array, options?: 
     m: number;
     images: number;
 }>;
+
+// @public
+export interface ExifFindings {
+    // (undocumented)
+    bodySerial: boolean;
+    // (undocumented)
+    dateTimeOriginal?: string;
+    // (undocumented)
+    gps: boolean;
+    // (undocumented)
+    lensSerial: boolean;
+    // (undocumented)
+    make?: string;
+    // (undocumented)
+    makerNote: boolean;
+    // (undocumented)
+    model?: string;
+    parsed: boolean;
+    // (undocumented)
+    software?: string;
+}
 
 // @public (undocumented)
 export interface ExportOptions {
@@ -370,6 +464,8 @@ export interface GalleryEncodeResult {
     keyBlock: Uint8Array;
     // (undocumented)
     m: number;
+    // Warning: (ae-forgotten-export) The symbol "GalleryNormalizationReport" needs to be exported by the entry point index.d.ts
+    normalization: GalleryNormalizationReport;
     // (undocumented)
     setId: Uint8Array;
     shares?: Uint8Array[] | undefined;
@@ -483,7 +579,16 @@ export function importVaultBinary(container: Uint8Array, password: string, opts?
 }>;
 
 // @public
+export function inspectCoverSet(entries: readonly CoverSetEntry[]): CoverSetReport;
+
+// @public
+export function inspectJpegCover(bytes: Uint8Array): CoverProfile;
+
+// @public
 export function installUserEntropy(text: string): Promise<void>;
+
+// @public
+export function isHeif(bytes: Uint8Array): boolean;
 
 // @public
 export function isJpeg(bytes: Uint8Array): boolean;
@@ -498,6 +603,9 @@ export function jpegStegoCapacityBits(jpegBytes: Uint8Array): number;
 export class JpegUnsupportedError extends Error {
     constructor(reason: string);
 }
+
+// @public
+export const JUMBF_APP11_PREFIX: readonly number[];
 
 // @public
 export const KEY_BLOCK_LEN: number;
@@ -549,7 +657,22 @@ export class MissingKeyError extends Error {
 }
 
 // @public
+export function normalizeCoverBytes(bytes: Uint8Array, label?: string): NormalizeResult;
+
+// @public
+export function normalizeJpegCover(bytes: Uint8Array, label?: string): NormalizeResult;
+
+// @public
 export function normalizePassword(password: string): string;
+
+// @public
+export interface NormalizeResult {
+    bytes: Uint8Array;
+    removed: {
+        segments: number;
+        bytes: number;
+    };
+}
 
 // @public (undocumented)
 export type OnProgress = (p: Progress) => void;
@@ -578,6 +701,11 @@ export function recoveryLines(codecName: string): string[];
 
 // @public (undocumented)
 export const SECRET_LEN = 32;
+
+// @public
+export type SegmentClass = 'jfif' | 'exif' | 'xmp' | 'xmp-extension' | 'icc' | 'mpf'
+/** An APP11 JUMBF box: a provenance manifest, and the one class that is removed. */
+| 'jumbf' | 'iptc' | 'adobe' | 'comment' | 'other-app';
 
 // @public
 export class SegmentedFormatError extends Error {
@@ -639,7 +767,7 @@ export interface StegoEmbedOptions {
 }
 
 // @public
-export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'STEGO_COVER_REUSE' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
+export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_STRUCTURE' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'PROVENANCE_NORMALIZE' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'STEGO_COVER_REUSE' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
 
 // @public
 export function stegoErrorCode(err: unknown): StegoErrorCode | null;
@@ -679,6 +807,17 @@ export class TooManyImagesError extends Error {
     // (undocumented)
     readonly limit: number;
 }
+
+// @public
+export type TrailerKind =
+/** Nothing follows EOI. */
+'none'
+/** A second JPEG stream: the MPO / Ultra HDR gain map. */
+| 'mpo'
+/** An ISOBMFF stream: an Android motion-photo video. */
+| 'mp4'
+/** Bytes that are neither. */
+| 'unknown';
 
 // @public
 export function unlockKeyBlock(block: KeyBlock, password: string): Promise<CryptoKey>;
@@ -729,6 +868,25 @@ export function wrapBinary(payload: Uint8Array, variant: BinaryVariant): Uint8Ar
 // @public
 export class WrongPasswordError extends Error {
     constructor();
+}
+
+// @public
+export interface XmpFindings {
+    appleDepth: boolean;
+    containerDirectory: boolean;
+    // (undocumented)
+    digitalSourceType: boolean;
+    // (undocumented)
+    documentId: boolean;
+    gcamera: boolean;
+    hdrGainMap: boolean;
+    // (undocumented)
+    history: boolean;
+    // (undocumented)
+    instanceId: boolean;
+    itemLengths: number[];
+    // (undocumented)
+    originalDocumentId: boolean;
 }
 
 // (No @packageDocumentation comment for this package)

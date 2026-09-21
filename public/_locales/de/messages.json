@@ -499,6 +499,19 @@
     "message": "Aus Fotos wiederherstellen",
     "description": "Gallery Mode: restore button."
   },
+  "warnProvenanceStripped": {
+    "message": "Aus $COUNT$ dieser Fotos wurde ein Herkunftsmanifest entfernt. Normalisieren Sie auch den Rest Ihrer Fotobibliothek: Fotos, die ihr Manifest behalten, verraten neben solchen, die es verloren haben, genauso viel.",
+    "description": "Gallery Mode: a C2PA provenance manifest was removed from some covers (SPEC 9.7).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnCoversNotUniform": {
+    "message": "Diese Fotos teilen kein gemeinsames Metadatenprofil und lassen sich daran weiterhin unterscheiden.",
+    "description": "Gallery Mode: the cover set does not share one metadata profile (SPEC 9.7)."
+  },
   "statusGallerySaving": {
     "message": "Geheimnis wird in Ihren Fotos versteckt…",
     "description": "Gallery Mode: status while saving."

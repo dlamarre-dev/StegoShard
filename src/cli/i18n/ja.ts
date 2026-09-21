@@ -48,6 +48,12 @@ export const ja: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy が空でした（追加エントロピーが不要ならオプションを外してください）',
   errEstimateMissing: 'estimate: <ファイル> がありません',
+  errNormalizeMissing: 'normalize: <写真|フォルダ ...> がありません',
+  errNoNormalizeFiles:
+    'normalize: 指定されたパスに写真が見つかりません（.jpg、.jpeg、.png、.heic、.heif、.avif を探しました）',
+  errNormalizeReportOut:
+    'normalize: --report と --out <ディレクトリ> は同時に指定できません' +
+    '（--report は何も書き出しません）',
   errUiPort: 'ui: --port はポート番号で指定してください（受け取った値: {value}）',
   errJsonUiUnsupported:
     '{command}: --json は使用できません。このコマンドは長時間動作するサーバーであり、結果を出力するコマンドではありません。',
@@ -86,6 +92,10 @@ export const ja: CliCatalog = {
   errNoReadableImages: '入力の中に読み取れる StegoShard の画像がありません',
   errNoCoversFound: 'ギャラリー: 指定されたパスにカバー画像が見つかりません',
   errNoGalleryImages: 'ギャラリー: 入力の中に画像が見つかりません',
+  errNormalizeOut:
+    'normalize: --out <ディレクトリ> は必須です。正規化した複製は指定したディレクトリに書き出し、' +
+    '元画像の隣には決して置きません。元画像こそ、取り除いたマニフェストが提供していた比較そのものだからです。' +
+    '書き込まずに調べるには --report を使ってください。',
 
   warnPasswordFlag:
     '警告: --password はシェルの履歴やプロセス一覧に見えてしまいます。' +
@@ -97,6 +107,14 @@ export const ja: CliCatalog = {
     '警告: {label}が弱いです（推定 {bits} ビット）。' +
     'オフラインの保管庫は、あなたに連絡せずに推測を試せます。',
   warnPrefix: '警告: {message}',
+  warnProvenanceStripped:
+    '警告: カバー写真 {covers} 枚から来歴マニフェストを取り除きました。' +
+    '写真ライブラリの残りも正規化してください。マニフェストを失った写真の周りに、' +
+    'マニフェストを保ったままの写真があること自体が同じくらい雄弁です。' +
+    'stegoshard normalize を実行してください。',
+  warnCoversNotUniform:
+    '警告: これらの写真はメタデータのプロファイルが揃っておらず、そこから見分けられます。' +
+    'この一式に stegoshard normalize --report を実行して、どこが違うか確認してください。',
   labelPassword: 'パスワード',
   promptPassword: 'パスワード: ',
   promptDuressPassword: '強要用パスワード: ',
@@ -132,6 +150,25 @@ export const ja: CliCatalog = {
   outDecoded: '{seen} 枚のうち {decoded} 枚を復号しました',
   outScanned: '{seen} 枚の写真を走査しました',
   outEstimate: '{images} 枚の画像  （k={k} データ + m={m} パリティ）',
+  outNormalized:
+    '{covers} 枚の写真を正規化し、うち {removed} 枚から来歴マニフェストを取り除きました（{bytes} バイト）。',
+  outNormalizeUniform: 'これらの写真はメタデータのプロファイルが揃っています。',
+  outNormalizeNotUniform:
+    'これらの写真はメタデータのプロファイルが揃っておらず、まだ見分けられます:',
+  outNormalizeDivergent: '{segmentClass}: {present} 枚にあり、{absent} 枚にありません',
+  outNormalizeReport:
+    '{covers} 枚の写真を確認し、うち {removed} 枚に来歴マニフェストがありました' +
+    '（{bytes} バイト）。書き出しは行っていません。',
+  outNormalizeRefused:
+    '{name}: ゲインマップを壊さずには取り除けないマニフェストがあるため、' +
+    'このファイルには何も書き出していません',
+  outNormalizeSkippedFile: '{name}: {kind} ファイルです。そのまま残し、この保証の対象外です',
+  outNormalizeProblem: '{name}: 読み取れないため、このファイルには何も書き出していません',
+  outNormalizeSkipped:
+    '{count} 個のファイルを飛ばしました。この保証の対象外です（JPEG ではない、または読み取れない）。',
+  outNormalizeOriginals:
+    '元画像は残っており、取り除いたマニフェストが提供していた比較そのものです。' +
+    'docs/THREAT-MODEL.md の否認可能性の節を参照してください。',
 
   helpTagline:
     'StegoShard: ファイルを、復元性の高い画像・中身の見えない単一ファイル・囮データベースのいずれかに暗号化し、元に戻します。',
@@ -154,6 +191,12 @@ export const ja: CliCatalog = {
     '（ギャラリーに duress はありません。--binary --disguise --mode duress をお使いください）',
   helpGalleryNote:
     'すべての写真が変更されます。最良の K+M 枚が Reed-Solomon の断片を持ち、残りはおとりになります（合計 5 枚以上、うちおとり 2 枚以上）。復元は手探りで行われ、認証できた写真がすべて使われ、K 個の断片があれば再構成できます。',
+  helpNormalizeHeading: 'カバーの正規化（カメラが埋め込む来歴マニフェストを取り除く）:',
+  helpNormalizeNote:
+    '保存時に渡したカバーはすでに正規化されます。このコマンドは写真ライブラリの残りのためのものです。' +
+    'マニフェストを保ったままの数百枚のなかに正規化された数枚があるのは、' +
+    '運搬役だけを正規化したギャラリーと同じくらい簡単に選り分けられます。' +
+    'JPEG のみが対象で、それ以外は報告のうえ飛ばします。',
   helpExamplesHeading: '例:',
 
   helpOut: '出力ディレクトリ（既定: カレントディレクトリ）',
@@ -203,6 +246,8 @@ export const ja: CliCatalog = {
   helpGalleryKey: 'keyfile/stego のギャラリー用の外部鍵（gallery-restore）',
   helpGalleryMode: 'ギャラリーをシェアで封じる（--threshold k-of-n と併用）',
   helpGalleryShare: 'gallery-restore 用のシェアファイル（繰り返し指定可）',
+  helpNormalizeOut: '正規化した複製の書き出し先（必須。元画像の場所は不可）',
+  helpNormalizeReport: '調べて報告するだけ: 何も書き出しません',
   helpUiPort: '空きポートではなく、このポートで配信する',
   helpUiOpen: 'アドレスを表示するだけでなく、ブラウザーでも開く',
 };

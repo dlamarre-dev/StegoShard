@@ -73,6 +73,12 @@ import { SEG_VERSION } from '../src/core/segmented';
 import { BINARY_VERSION } from '../src/core/binary-container';
 import { SHARE_VERSION } from '../src/core/shamir';
 import { DEFAULT_ARGON2 } from '../src/core/crypto';
+import { JUMBF_APP11_PREFIX } from '../src/core/normalize';
+
+/** `4A 50`: the §9.7 prefix as SPEC.md spells it. */
+const JUMBF_PREFIX_HEX = JUMBF_APP11_PREFIX.map((b) =>
+  b.toString(16).toUpperCase().padStart(2, '0'),
+).join(' ');
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -107,7 +113,17 @@ interface Rule {
    * when someone adds one.
    */
   count: number | 'any';
-  expected: number;
+  /**
+   * The value the captured group must equal.
+   *
+   * A number for the version claims this file was built for, compared
+   * numerically so `01` and `1` agree. A **string** for a claim whose truth is
+   * not a number: the §9.7 JUMBF prefix is two hex bytes, and comparing it
+   * numerically would mean either splitting it into two rules or inventing a
+   * decimal spelling nobody would write in a spec. Compared verbatim, case and
+   * all, because that is how a byte string is quoted.
+   */
+  expected: number | string;
   /** Where the truth lives, named in the failure message. */
   source: string;
 }
@@ -146,6 +162,19 @@ const RULES: Rule[] = [
     count: 1,
     expected: FORMAT_VERSION,
     source: 'FORMAT_VERSION in src/core/header.ts (written by src/core/vault.ts)',
+  },
+  {
+    // §9.7's removal rule is the one place in the spec where a *byte string*,
+    // not a version number, is the thing an independent implementer has to get
+    // exactly right: a prefix off by one byte silently removes nothing, and the
+    // carrier ships with the manifest that defeats it.
+    id: 'jumbf-prefix',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /JUMBF prefix `([0-9A-F ]+)` \(`"JP"`\)/g,
+    count: 1,
+    expected: JUMBF_PREFIX_HEX,
+    source: 'JUMBF_APP11_PREFIX in src/core/normalize.ts',
   },
   {
     id: 'segmented-diagram',
@@ -416,7 +445,7 @@ for (const rule of RULES) {
 
   for (const m of matches) {
     checked++;
-    const found = Number(m[1]);
+    const found = typeof rule.expected === 'string' ? m[1]! : Number(m[1]);
     if (found === rule.expected) continue;
     const where =
       rule.scope === 'raw'
@@ -484,6 +513,6 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `spec:check: ${checked} version claim(s) agree with the code, ` +
+  `spec:check: ${checked} constant claim(s) agree with the code, ` +
     `${refs} cross-reference(s) resolve.`,
 );

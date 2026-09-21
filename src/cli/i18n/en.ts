@@ -55,6 +55,11 @@ export const en = {
   errEntropyExclusive: '{flags} are mutually exclusive (pick one entropy source)',
   errEntropyFlagEmpty: '--entropy was empty (omit the flag if you do not want extra entropy)',
   errEstimateMissing: 'estimate: missing <file>',
+  errNormalizeMissing: 'normalize: missing <photos|folder ...>',
+  errNoNormalizeFiles:
+    'normalize: no photos found in the given paths (looked for .jpg, .jpeg, .png, .heic, .heif, .avif)',
+  errNormalizeReportOut:
+    'normalize: --report and --out <dir> cannot be used together (--report writes nothing)',
   errUiPort: 'ui: --port must be a port number (got "{value}")',
   errJsonUiUnsupported:
     '{command}: --json is not supported; this command is a long-running server, not a command that produces a result',
@@ -93,6 +98,10 @@ export const en = {
   errNoReadableImages: 'no readable StegoShard images found in the inputs',
   errNoCoversFound: 'gallery: no cover images found in the given paths',
   errNoGalleryImages: 'gallery: no images found in the inputs',
+  errNormalizeOut:
+    'normalize: --out <dir> is required. Normalized copies are written to a directory ' +
+    'you choose, never beside the originals: the original is the comparison the removed ' +
+    'manifest used to provide. Use --report to inspect without writing.',
 
   // --- warnings and prompts -----------------------------------------------
   warnPasswordFlag:
@@ -105,6 +114,13 @@ export const en = {
     'Warning: the {label} is weak (estimated {bits} bits). ' +
     'Offline vaults can be guessed without contacting you.',
   warnPrefix: 'Warning: {message}',
+  warnProvenanceStripped:
+    'Warning: a provenance manifest was removed from {covers} cover photo(s). ' +
+    'Normalize the rest of your photo library too: photos that keep their manifests ' +
+    'around ones that lost theirs are just as telling. Run: stegoshard normalize.',
+  warnCoversNotUniform:
+    'Warning: these photos do not share one metadata profile, so they can still be ' +
+    'told apart by it. Run stegoshard normalize --report on the set to see what differs.',
   labelPassword: 'password',
   promptPassword: 'Password: ',
   promptDuressPassword: 'Duress password: ',
@@ -143,6 +159,25 @@ export const en = {
   outDecoded: 'decoded {decoded} of {seen} image(s)',
   outScanned: 'scanned {seen} photo(s)',
   outEstimate: '{images} image(s)  (k={k} data + m={m} parity)',
+  outNormalized:
+    'Normalized {covers} photo(s); removed a provenance manifest from {removed} of them ({bytes} bytes).',
+  outNormalizeUniform: 'These photos share one metadata profile.',
+  outNormalizeNotUniform:
+    'These photos do NOT share one metadata profile, so they can still be told apart:',
+  outNormalizeDivergent: '{segmentClass}: present in {present}, absent from {absent}',
+  outNormalizeReport:
+    'Inspected {covers} photo(s); {removed} of them carry a provenance manifest ' +
+    '({bytes} bytes). Nothing was written.',
+  outNormalizeRefused:
+    '{name}: carries a manifest that cannot be removed without invalidating its gain ' +
+    'map, so nothing was written for it',
+  outNormalizeSkippedFile: '{name}: a {kind} file, left as it is and outside this claim',
+  outNormalizeProblem: '{name}: could not be read, so nothing was written for it',
+  outNormalizeSkipped:
+    '{count} file(s) were skipped and are outside this claim (not a JPEG, or unreadable).',
+  outNormalizeOriginals:
+    'The originals still exist and are exactly the comparison the removed manifests ' +
+    'used to provide. See the deniability section of docs/THREAT-MODEL.md.',
 
   // --- help: prose --------------------------------------------------------
   helpTagline:
@@ -166,6 +201,9 @@ export const en = {
     '(duress is not available on gallery; use --binary --disguise --mode duress)',
   helpGalleryNote:
     'Every photo is modified; the best K+M carry Reed-Solomon fragments and the rest become decoys (min 5 photos total, at least 2 decoys). Restore is blind: any photos that authenticate are used, and any K fragments reconstruct.',
+  helpNormalizeHeading: 'Cover normalization (strip the provenance manifest a camera embeds):',
+  helpNormalizeNote:
+    'Saving already normalizes the covers it is given. This command is for the rest of your photo library: a handful of normalized photos among hundreds that kept their manifests is just as sortable as a gallery where only the carriers were normalized. JPEG only; anything else is reported and skipped.',
   helpExamplesHeading: 'Examples:',
 
   // --- help: option descriptions ------------------------------------------
@@ -216,6 +254,8 @@ export const en = {
   helpGalleryKey: 'External key for a keyfile/stego gallery (gallery-restore)',
   helpGalleryMode: 'Gate the gallery on threshold shares (with --threshold k-of-n)',
   helpGalleryShare: 'A threshold share file (repeatable) for gallery-restore',
+  helpNormalizeOut: 'Where normalized copies go (required; never the originals)',
+  helpNormalizeReport: 'Inspect and report only: write nothing',
   helpUiPort: 'Serve on this port instead of a free one',
   helpUiOpen: 'Open the address in your browser as well as printing it',
 };
