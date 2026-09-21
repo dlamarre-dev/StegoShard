@@ -24,13 +24,17 @@ import {
   c2paSegment,
   gainMapTrailer,
   heicHeader,
+  mpfIndexSegment,
   mpfSegment,
+  patchMpfIndex,
   pixelXmp,
   spliceAfterSoi,
   spliceBeforeSos,
   withC2pa,
   withTrailer,
 } from '../../core/jpeg-fixtures';
+import { parseMpfIndex } from '../../core/mpf';
+import { parseJpegSegments } from '../../core/jpeg-segments';
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), 'ss-normalize-'));
@@ -138,11 +142,38 @@ describe('runNormalize', () => {
   });
 
   /**
-   * A photo that inventoried fine and then refused removal: a JUMBF segment
-   * behind the MPF index, with a gain map for that index to locate. The two
-   * steps shared a try block, so the successful inventory was thrown away and
-   * the row was filed as "did not parse" with no profile at all, which is the
-   * one photo in a library a user most needs the inventory of.
+   * An Ultra HDR photo, normalized: the manifest goes, the gain map stays where
+   * the index can still find it (SPEC §9.7.1), and the trailer comes through
+   * byte for byte. The manifest is placed *behind* the MPF index on purpose,
+   * which is the position that used to be refused outright.
+   */
+  it('normalizes an Ultra HDR photo and keeps its gain map resolvable', async () => {
+    const inDir = tmp();
+    const outDir = tmp();
+    const gainMap = gainMapTrailer();
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
+    const late = spliceBeforeSos(indexed, c2paSegment(2));
+    write(inDir, 'ultra.jpg', patchMpfIndex(withTrailer(late, gainMap), [gainMap.length]));
+
+    const res = await runNormalize({ inputs: [inDir], outDir });
+
+    // One APP11 fragment, carried behind the index rather than ahead of it.
+    expect(res.removed.segments).toBe(1);
+    expect(res.covers[0]!.problem).toBeUndefined();
+    const out = readFileSync(join(outDir, 'ultra.jpg'));
+    const index = parseMpfIndex(out)!;
+    const { trailerStart } = parseJpegSegments(out);
+    expect(index.endianAt + index.entries[1]!.offset).toBe(trailerStart);
+    expect([...out.subarray(trailerStart)]).toEqual([...gainMap]);
+    expect(index.entries[0]!.size).toBe(trailerStart);
+  });
+
+  /**
+   * A photo that inventoried fine and then refused removal: an MPF index this
+   * code cannot read, over a trailer it claims to locate. The two steps shared a
+   * try block, so the successful inventory was thrown away and the row was filed
+   * as "did not parse" with no profile at all, which is the one photo in a
+   * library a user most needs the inventory of.
    */
   it('keeps the inventory of a photo whose manifest cannot be removed', async () => {
     const inDir = tmp();

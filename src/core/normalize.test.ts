@@ -21,7 +21,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { decode as decodeJpeg } from './jpeg-coeff';
-import { JpegStructureError } from './jpeg-segments';
+import { JpegStructureError, parseJpegSegments } from './jpeg-segments';
+import { parseMpfIndex } from './mpf';
 import {
   ProvenanceNormalizeError,
   inspectCoverSet,
@@ -44,7 +45,11 @@ import {
   iptcSegment,
   jumbfSegment,
   mp4Trailer,
+  mpfEntryOffsetField,
+  mpfIndexSegment,
   mpfSegment,
+  patchMpfIndex,
+  pokeMpfIndex,
   pixelXmp,
   spliceAfterSoi,
   spliceBeforeSos,
@@ -194,45 +199,125 @@ describe('the trailer after EOI', () => {
   });
 });
 
-describe('the MPF offset assertion', () => {
-  it('accepts a removal that precedes the MPF index', () => {
-    // The real-world order: APP11 early, APP2/MPF later. Both shift together.
-    const jpg = spliceBeforeSos(spliceAfterSoi(baseJpeg(64, 64), c2paSegment(1)), mpfSegment());
+/**
+ * The MPF index over a removal (SPEC §9.7.1).
+ *
+ * Entry offsets are measured from the MP endian header, so a removal ahead of
+ * that header moves header and trailer together and leaves them correct, while
+ * one behind it moves only the trailer. The second case used to be refused and
+ * is now rewritten, which is what keeps an Ultra HDR photo whose manifest sits
+ * late usable. `mpf.test.ts` covers the arithmetic; these are the two positions
+ * a manifest can be in, end to end through the surgery, asserting on the bytes
+ * the rewritten offset resolves to rather than on the number itself.
+ */
+describe('the MPF index across a removal', () => {
+  const gainMap = gainMapTrailer();
+
+  /** Where the index says the gain map is, and what is actually there. */
+  function resolved(file: Uint8Array): { at: number; trailerStart: number; primary: number } {
+    const index = parseMpfIndex(file)!;
+    return {
+      at: index.endianAt + index.entries[1]!.offset,
+      trailerStart: parseJpegSegments(file).trailerStart,
+      primary: index.entries[0]!.size,
+    };
+  }
+
+  it('keeps the gain map resolvable when the removal precedes the index', () => {
+    // The real-world order: APP11 early, APP2/MPF later. Both shift together, so
+    // the offset needs no change; the primary image's size does.
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
+    const early = spliceAfterSoi(indexed, c2paSegment(1));
+    const jpg = patchMpfIndex(withTrailer(early, gainMap), [gainMap.length]);
+
     const out = normalizeJpegCover(jpg);
+
     expect(out.removed.segments).toBe(1);
-    expect(inspectJpegCover(out.bytes).mpf).toBe(true);
+    const after = resolved(out.bytes);
+    expect(after.at).toBe(after.trailerStart);
+    expect(after.primary).toBe(after.trailerStart);
+    expect([...out.bytes.subarray(after.at)]).toEqual([...gainMap]);
+  });
+
+  it('rewrites the offsets when the removal follows the index', () => {
+    // The case that used to be a refusal. The trailer moves and the endian
+    // header does not, so the offset has to come down by the removed bytes.
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
+    const late = spliceBeforeSos(indexed, c2paSegment(1)); // between index and SOS
+    const jpg = patchMpfIndex(withTrailer(late, gainMap), [gainMap.length]);
+    const before = resolved(jpg);
+
+    const out = normalizeJpegCover(jpg);
+
+    expect(out.removed.segments).toBe(1);
+    const after = resolved(out.bytes);
+    expect(after.at).toBeLessThan(before.at);
+    expect(after.at).toBe(after.trailerStart);
+    expect(after.primary).toBe(after.trailerStart);
+    // The gain map itself came through untouched, which is the point of all of it.
+    expect([...out.bytes.subarray(after.at)]).toEqual([...gainMap]);
   });
 
   /**
-   * Fails closed rather than emitting an Ultra HDR file whose gain map no longer
-   * resolves. Checked rather than assumed: "APP11 comes first in practice" is an
-   * observation about the files this was built for, not a guarantee.
+   * The refusal that remains: an index this code cannot read, over a trailer it
+   * claims to locate. Moving those bytes under offsets nobody understands is the
+   * outcome SPEC §9.7 is about, and a header-only index is malformed rather than
+   * merely unusual, so nothing a camera writes is turned away by it.
    */
-  /** An APP11 behind the MPF index, with a gain map for that index to locate. */
-  const lateRemovalOverGainMap = (): Uint8Array =>
-    withTrailer(
+  it('refuses a removal when the index cannot be read', () => {
+    const jpg = withTrailer(
       spliceBeforeSos(spliceAfterSoi(baseJpeg(64, 64), mpfSegment()), c2paSegment(1)),
-      gainMapTrailer(),
+      gainMap,
     );
-
-  it('refuses a removal that follows it', () => {
-    const jpg = lateRemovalOverGainMap();
     expect(() => normalizeJpegCover(jpg)).toThrow(ProvenanceNormalizeError);
     expect(() => normalizeJpegCover(jpg)).toThrow(/MPF/);
+    expect(() => normalizeJpegCover(jpg, 'IMG_2043.jpg')).toThrow(/IMG_2043\.jpg/);
   });
 
-  it('names the file when the caller supplied a label', () => {
-    expect(() => normalizeJpegCover(lateRemovalOverGainMap(), 'IMG_2043.jpg')).toThrow(
-      /IMG_2043\.jpg/,
-    );
+  /**
+   * A readable index whose entry does not locate the trailer. Refused rather than
+   * moved: either the producer measured that offset from somewhere other than the
+   * endian field, or the index was already pointing outside its own file, and
+   * both are numbers whose meaning a rewrite would have to guess at.
+   *
+   * Deterministic, unlike the same case on the embed path: a removal always
+   * changes the length, so the rewrite always runs.
+   */
+  it('refuses a removal when an entry does not locate the trailer', () => {
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
+    const late = spliceBeforeSos(indexed, c2paSegment(1));
+    const jpg = patchMpfIndex(withTrailer(late, gainMap), [gainMap.length]);
+    const odd = pokeMpfIndex(jpg, mpfEntryOffsetField(1), 0, 0, 0, 0x10);
+
+    expect(() => normalizeJpegCover(odd)).toThrow(ProvenanceNormalizeError);
+    expect(() => normalizeJpegCover(odd, 'IMG_9.jpg')).toThrow(/IMG_9\.jpg: MPF entry 2/);
+  });
+
+  /**
+   * What the embed paths see, which is not what the explicit API sees. A cover
+   * whose index cannot be kept correct is a cover, from their point of view, and
+   * `StegoCoverFormatError` is what every image adapter already translates
+   * `JpegUnsupportedError` into. The precise class stays available to a
+   * normalization report, which has a reason to tell these apart.
+   */
+  it('re-raises a refused removal as the class the cover paths translate', () => {
+    const indexed = spliceBeforeSos(baseJpeg(64, 64), mpfIndexSegment());
+    const late = spliceBeforeSos(indexed, c2paSegment(1));
+    const jpg = patchMpfIndex(withTrailer(late, gainMap), [gainMap.length]);
+    const odd = pokeMpfIndex(jpg, mpfEntryOffsetField(1), 0, 0, 0, 0x10);
+
+    expect(() => normalizeJpegCover(odd)).toThrow(ProvenanceNormalizeError);
+    // Matched on the message, like the structural case below: the class is not
+    // imported here, and the prefix is what tells the two vocabularies apart.
+    expect(() => normalizeCoverBytes(odd)).toThrow(/unsupported JPEG/);
+    expect(() => normalizeCoverBytes(odd)).toThrow(/MPF entry 2/);
   });
 
   /**
    * Nothing after EOI means the index locates no second image, so there is no
-   * offset for a shift to invalidate. Refusing this file turned away a cover
-   * that was never at risk, to protect a gain map that is not in it.
+   * offset for a shift to invalidate, and not even an unreadable one matters.
    */
-  it('allows a late removal when there is no trailer to break', () => {
+  it('does not care about the index when there is no trailer', () => {
     const jpg = spliceBeforeSos(spliceAfterSoi(baseJpeg(64, 64), mpfSegment()), c2paSegment(1));
     const out = normalizeJpegCover(jpg);
     expect(out.removed.segments).toBe(1);

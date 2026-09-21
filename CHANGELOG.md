@@ -45,30 +45,34 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   object. Over-removal does not threaten uniformity either, since the same rule runs over
   every photo in the set. An APP11 that is not box carriage at all is still left alone.
 
-  Three refusals are deliberate. An APP2 `MPF\0` index locates trailer images by offsets
-  relative to its own header, so removing a segment **after** that header would silently
-  break a gain map; the relationship is asserted rather than assumed, and a file that
-  fails it is refused. The assertion applies only when bytes actually follow EOI: an MPF
-  index with no trailer locates no second image, and refusing that file would turn away a
-  cover that was never at risk.
+  **Ultra HDR photos work, because the MPF index is rewritten rather than trusted**
+  (SPEC §9.7.1, `src/core/mpf.ts`). An APP2 `MPF\0` index locates the images after EOI by
+  offsets measured from its own endian field, which makes it the one part of a JPEG whose
+  correctness depends on where other bytes sit, and both things done to a cover move those
+  bytes: removing a manifest **behind** the field shifts only the trailer, and an embed
+  re-serializes the entropy scan, whose length drifts by the byte-stuffing it re-applies
+  (on the byte-faithful path as much as the restart-marker one), which moves the trailer
+  for reasons that have nothing to do with normalization.
 
-  The same invariant binds the **embed**, one layer out, so a cover whose MPF index
-  locates bytes after EOI is refused before anything is embedded into it. §5.4
-  re-serializes the entropy scan, whose length can drift by the byte-stuffing it re-applies
-  (and does, on both the byte-faithful and the restart-marker path), so head and tail are
-  spliced back around a scan of a different size and the trailer moves relative to the
-  header those offsets are measured from. Careful normalization cannot rescue that, because
-  the shift does not come from normalization: the refusal belongs where the shift happens.
-  It is decided from the cover alone rather than from the result, so the same photo is
-  accepted or refused independently of the password that chooses the carrier positions.
-  In practice this means an Ultra HDR photo carrying a gain map is not a usable JPEG cover
-  yet; rewriting the MPF offsets to follow the trailer would lift the restriction and is
-  not attempted here.
+  Both were refusals first. That was correct and useless: a recent Pixel writes a gain map
+  on every HDR shot, so refusing took the photos a user actually has out of the cover pool
+  to protect a property four lines of arithmetic can preserve. The index now follows the
+  trailer, in both byte orders, and the primary image's declared size follows with it. The
+  gain map itself is never touched, and neither is any other field, segment or scan byte.
+  SPEC §9.7.1 pins the formula so an independent implementation emits the same bytes.
 
-  And a JPEG whose marker structure does not parse is refused rather than passed through: a
-  file whose structure cannot be walked is one nothing can promise carries no manifest. On
-  the cover paths that refusal arrives as `StegoCoverFormatError`, the class every image
-  adapter already speaks, rather than a structural error class none of them handles.
+  Two refusals remain, both fail-closed. An index this code cannot read, over a trailer it
+  claims to locate, is refused from the cover alone, before any work: a file in that state
+  is malformed rather than unusual, and deciding from the result instead would accept the
+  same photo under one password and refuse it under another. And an entry whose offset does
+  not resolve into the trailer is refused rather than moved, because its meaning would be a
+  guess, and a guess there silently breaks a photo.
+
+  A JPEG whose marker structure does not parse is likewise refused rather than passed
+  through: a file whose structure cannot be walked is one nothing can promise carries no
+  manifest. On the cover paths that refusal arrives as `StegoCoverFormatError`, the class
+  every image adapter already speaks, rather than a structural error class none of them
+  handles.
 
 - **`stegoshard normalize <photos|folder ...>`**, with `--report` and `--json`. The
   automatic step reaches only the photos handed to StegoShard; uniformity is a property of

@@ -35,8 +35,11 @@ import {
   mpfSegment,
   spliceBeforeSos,
   withC2pa,
+  withMpfGainMap,
   withTrailer,
 } from './jpeg-fixtures';
+import { parseMpfIndex } from './mpf';
+import { parseJpegSegments } from './jpeg-segments';
 
 const FAST: Argon2Params = { iterations: 1, memoryKiB: 64, parallelism: 1 };
 
@@ -220,14 +223,44 @@ describe('key photo normalization', () => {
   });
 
   /**
-   * The gain map above survives because nothing locates it by offset. Add an MPF
-   * index that does, and the embed is refused instead: re-serializing the scan
-   * moves the trailer relative to the endian header those offsets are measured
-   * from, and SPEC §9.7 says to fail rather than emit a photo whose gain map no
-   * longer resolves. Refused up front, so the answer does not depend on which
-   * carriers the password happened to choose.
+   * The Ultra HDR shape: a gain map the MPF index locates by an offset measured
+   * from the MP endian field. Re-serializing the scan can move the trailer out
+   * from under that offset, so the index is rewritten to follow it (SPEC §9.7.1).
+   * This was a refusal first, which was correct and useless: a recent Pixel
+   * writes a gain map on every HDR shot, so refusing took the photos a user
+   * actually has out of the cover pool.
+   *
+   * Asserts the property that holds whatever the scan does, because on this path
+   * it is not knowable in advance: a key block carries fresh randomness, so the
+   * payload differs every run, and with it which carriers toggle and whether the
+   * re-stuffed scan comes out a byte longer, shorter or the same. Whether the
+   * rewrite *ran* is pinned on the gallery path in `stego.errors.test.ts`, where
+   * the seed and the payload are fixed and a cover can be chosen for its drift.
    */
-  it('refuses a cover whose MPF index locates its gain map', async () => {
+  it('keeps the gain map of an Ultra HDR cover resolvable', async () => {
+    const kb = await keyBlockBytes('pw');
+    const gainMap = gainMapTrailer();
+    const cover = withMpfGainMap(noisyJpeg(W, H));
+    const stego = await embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST);
+
+    // Follow the index in the *output* and find the gain map, byte for byte.
+    const index = parseMpfIndex(stego)!;
+    const { trailerStart } = parseJpegSegments(stego);
+    const at = index.endianAt + index.entries[1]!.offset;
+    expect(at).toBe(trailerStart);
+    expect([...stego.subarray(at)]).toEqual([...gainMap]);
+    expect(index.entries[0]!.size).toBe(trailerStart);
+    // And the payload is still there, which is what the cover was for.
+    expect([...(await extractKeyBlockStegoJpeg(stego, 'pw', FAST))!]).toEqual([...kb]);
+  });
+
+  /**
+   * An index this code cannot read, over a trailer it claims to locate: refused
+   * up front, from the cover alone. Whether the scan shifts at all depends on the
+   * keyed carrier positions, so deciding at the end would accept this photo under
+   * one password and refuse it under another.
+   */
+  it('refuses a cover whose MPF index cannot be read', async () => {
     const kb = await keyBlockBytes('pw');
     const cover = withTrailer(spliceBeforeSos(noisyJpeg(W, H), mpfSegment()), gainMapTrailer());
     await expect(embedKeyBlockStegoJpeg(cover, kb, 'pw', FAST)).rejects.toMatchObject({

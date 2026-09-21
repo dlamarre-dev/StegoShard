@@ -37,6 +37,7 @@
  */
 
 import { JpegUnsupportedError } from './jpeg-coeff';
+import { mpfTrailerLink, retargetMpfIndex } from './mpf';
 import {
   JpegStructureError,
   type JpegLayout,
@@ -485,22 +486,22 @@ export interface NormalizeResult {
  * (an Ultra HDR gain map, an Android motion-photo video) is likewise copied
  * verbatim, in full, always.
  *
- * MPF: THE OFFSET ASSERTION, AND WHY IT IS CHECKED RATHER THAN ASSUMED
+ * MPF: THE INDEX IS REWRITTEN, NOT ASSERTED AGAINST
  * An APP2 `MPF\0` index locates the trailer images by offsets relative to its
  * own endian header, not to the start of the file. Removing a segment that sits
  * *before* that header shifts the header and the trailer by the same amount, so
  * the offsets stay correct; removing one that sits *after* it shifts only the
- * trailer, and silently breaks the gain map. In practice APP11 precedes APP2 on
- * the files this was built for, which is what makes the removal safe; "in
- * practice" is not a guarantee, so the relationship is asserted here and the
- * function fails closed when it does not hold, rather than emitting an Ultra HDR
- * file whose gain map no longer resolves.
+ * trailer, which leaves the gain map unreachable.
  *
- * The assertion is conditioned on there *being* a trailer. An MPF index with
- * nothing after EOI locates no second image, so no offset it carries can be
- * invalidated by moving bytes that are not there, and refusing such a file would
- * be a refusal that buys nothing. `mpfLocatedTrailer` asks the same
- * question ahead of an embed, which moves the trailer for reasons of its own.
+ * That second case used to be refused. It is rewritten instead: `mpf.ts` reads
+ * the index before the surgery and puts the new positions back afterwards
+ * (SPEC §9.7.1), which keeps the photos the feature exists for usable instead of
+ * turning away every Ultra HDR file whose manifest happens to sit late. The
+ * refusal remains for an index this code cannot read, because moving a trailer
+ * under offsets nobody understands is the outcome §9.7 is about.
+ *
+ * None of this applies when nothing follows EOI: an index with no trailer
+ * locates no second image, so there is no offset a shift can invalidate.
  */
 export function normalizeJpegCover(bytes: Uint8Array, label?: string): NormalizeResult {
   let layout: JpegLayout;
@@ -512,22 +513,16 @@ export function normalizeJpegCover(bytes: Uint8Array, label?: string): Normalize
   const doomed = layout.segments.filter((s) => isJumbf(bytes, s));
   if (doomed.length === 0) return { bytes, removed: { segments: 0, bytes: 0 } };
 
-  // Only when bytes follow EOI: see the header note on why an MPF index with no
-  // trailer has nothing this removal can invalidate.
-  const mpf = layout.trailerStart < bytes.length ? firstOfClass(bytes, layout, 'mpf') : undefined;
-  if (mpf) {
-    const late = doomed.find((s) => s.start > mpf.payloadStart);
-    if (late) {
-      // `label` names the file when the caller has one. A gallery save normalizes
-      // many photos in a loop, and "one of your photos cannot be normalized" is
-      // not an actionable thing to be told.
-      throw new ProvenanceNormalizeError(
-        `${label ? `${label}: ` : ''}a JUMBF segment at offset ${late.start} follows the ` +
-          `MPF index at ${mpf.payloadStart}; removing it would invalidate the MPF ` +
-          'offsets of the trailer',
-      );
-    }
-  }
+  // What the index says about the trailer, read before the removal moves either
+  // of them. `none` for a file with no index or nothing after EOI, which is
+  // most of them; `unreadable` is the one case still refused.
+  //
+  // `label` names the file in whatever goes wrong with it. A gallery save
+  // normalizes many photos in a loop, and "one of your photos cannot be
+  // normalized" is not an actionable thing to be told.
+  const named = label ? `${label}: ` : '';
+  const link = mpfTrailerLink(bytes, layout);
+  if (link.kind === 'unreadable') throw new ProvenanceNormalizeError(`${named}${link.reason}`);
 
   let removedBytes = 0;
   for (const s of doomed) removedBytes += s.end - s.start;
@@ -543,44 +538,15 @@ export function normalizeJpegCover(bytes: Uint8Array, label?: string): Normalize
   // segments, the entropy scan, EOI, and the whole trailer, verbatim.
   out.set(bytes.subarray(read), write);
 
-  return { bytes: out, removed: { segments: doomed.length, bytes: removedBytes } };
-}
-
-/**
- * True when this JPEG carries an APP2 `MPF\0` index **and** bytes after EOI for
- * that index to locate: the one shape whose offsets break if the trailer moves.
- *
- * Asked by the JPEG embed paths, not by normalization. Removal here is
- * segment-level and leaves the trailer exactly where the MPF endian header
- * expects it (see {@link normalizeJpegCover}), but an embed re-serializes the
- * entropy scan. The byte-faithful path re-stuffs it, so a toggled bit that
- * creates or destroys an `FF` changes its length by one; the restart-marker path
- * re-encodes the scan outright. Either way head and tail are spliced back around
- * a scan of a different length, which shifts the trailer by exactly the kind of
- * delta the assertion in normalization refuses to introduce. SPEC §9.7 says to
- * fail rather than emit a file whose gain map no longer resolves, so the embed
- * paths refuse such a cover up front instead of writing one.
- *
- * Deliberately not conditioned on whether a *particular* embed would shift the
- * scan: that depends on the keyed carrier positions, so the same photo would
- * work under one password and fail under another. A refusal a user can predict
- * is worth more than the occasional cover it turns away.
- *
- * Answers false for anything that does not parse. A malformed JPEG is refused by
- * the decode that follows with a better message than this could give, and
- * answering "no gain map at risk" about a file that is about to be rejected
- * anyway cannot let one through.
- */
-export function mpfLocatedTrailer(bytes: Uint8Array): boolean {
-  if (!hasSoi(bytes)) return false;
-  let layout: JpegLayout;
-  try {
-    layout = parseJpegSegments(bytes);
-  } catch {
-    return false;
+  // The trailer is now `removedBytes` earlier in the file. Say so in the index,
+  // or refuse if that cannot be done, rather than return a file whose gain map
+  // points into the middle of the scan.
+  if (link.kind === 'index') {
+    const retarget = retargetMpfIndex(out, link);
+    if (!retarget.ok) throw new ProvenanceNormalizeError(`${named}${retarget.reason}`);
   }
-  if (layout.trailerStart >= bytes.length) return false;
-  return firstOfClass(bytes, layout, 'mpf') !== undefined;
+
+  return { bytes: out, removed: { segments: doomed.length, bytes: removedBytes } };
 }
 
 /**
@@ -594,22 +560,26 @@ export function mpfLocatedTrailer(bytes: Uint8Array): boolean {
  * while something that is not an image at all should be refused by the codec
  * rather than by a structural complaint from here.
  *
- * And it re-throws a structural failure as {@link JpegUnsupportedError}. A JPEG
- * whose marker structure cannot be walked is a JPEG this layer cannot promise
- * carries no manifest, so it must not be embedded into: fail closed. But from
- * the embed layer's point of view that is the same fact as "not a usable cover",
- * which is a refusal every adapter already translates to
- * `StegoCoverFormatError`. Raising a new error class here instead would leak an
- * unhandled type through four adapters to say something they already say. The
- * explicit API keeps the precise class, because a normalization *report* should
- * distinguish "malformed" from "not baseline".
+ * And it re-throws a structural failure, or a removal it had to refuse, as
+ * {@link JpegUnsupportedError}. A JPEG whose marker structure cannot be walked is
+ * a JPEG this layer cannot promise carries no manifest, and one whose MPF index
+ * cannot be kept correct is one it cannot promise still resolves its gain map;
+ * either way it must not be embedded into. From the embed layer's point of view
+ * both are the same fact as "not a usable cover", which is a refusal every
+ * adapter already translates to `StegoCoverFormatError`. Letting the precise
+ * class out here instead would leak an unhandled type through four adapters to
+ * say something they already say. The explicit API keeps that class, because a
+ * normalization *report* should distinguish "malformed" from "not baseline" from
+ * "could not be kept consistent".
  */
 export function normalizeCoverBytes(bytes: Uint8Array, label?: string): NormalizeResult {
   if (!hasSoi(bytes)) return { bytes, removed: { segments: 0, bytes: 0 } };
   try {
     return normalizeJpegCover(bytes, label);
   } catch (err) {
-    if (err instanceof JpegStructureError) throw new JpegUnsupportedError(err.message);
+    if (err instanceof JpegStructureError || err instanceof ProvenanceNormalizeError) {
+      throw new JpegUnsupportedError(err.message);
+    }
     throw err;
   }
 }

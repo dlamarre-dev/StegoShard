@@ -162,12 +162,13 @@ export function pixelXmp(gainMapLength: number): Uint8Array {
 }
 
 /**
- * A minimal APP2 `MPF\0` index.
+ * A **header-only** APP2 `MPF\0` index: a TIFF marker and nothing behind it.
  *
- * Only the header is modelled: a big-endian TIFF marker and an entry count. The
- * assertion under test is positional (is a removal before or after this header),
- * so the entry bodies are never read, and filling them with plausible-looking
- * offsets would suggest this validates more than it does.
+ * Deliberately unreadable as an index, and kept for exactly that: it is the
+ * cover shape `mpf.ts` answers `unreadable` for, and the embed paths refuse. A
+ * file like this is malformed rather than unusual, which is why refusing it turns
+ * away nothing a camera produces. Use {@link mpfIndexSegment} for an index with
+ * entries in it.
  */
 export function mpfSegment(): Uint8Array {
   const tiff = new Uint8Array(24);
@@ -176,6 +177,141 @@ export function mpfSegment(): Uint8Array {
   tiff[3] = 0x2a; // 42
   tiff[7] = 0x08; // offset to first IFD
   return appSegment(0xe2, concat(bytesOf('MPF\0'), tiff));
+}
+
+/** Where the MP Entry array sits: past the 8-byte header, the IFD, and its terminator. */
+const MP_ENTRIES_AT = 8 + 2 + 3 * 12 + 4;
+
+/**
+ * A complete APP2 `MPF\0` index for `images` pictures (CIPA DC-007), with the
+ * per-image sizes and offsets left at zero for {@link patchMpfIndex} to fill in
+ * once the file is assembled and the positions are known.
+ *
+ * Three IFD tags, which is what a phone writes: MPFVersion, NumberOfImages, and
+ * the MPEntry array the offsets live in. Both byte orders are legal and the
+ * reader branches on it, so `littleEndian` exists to reach the other arm.
+ */
+export function mpfIndexSegment(images = 2, littleEndian = false): Uint8Array {
+  const tiff = new Uint8Array(MP_ENTRIES_AT + images * 16);
+  const put16 = (o: number, v: number) => {
+    tiff[o] = littleEndian ? v & 0xff : (v >> 8) & 0xff;
+    tiff[o + 1] = littleEndian ? (v >> 8) & 0xff : v & 0xff;
+  };
+  const put32 = (o: number, v: number) => {
+    const b = [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+    tiff.set(littleEndian ? b.reverse() : b, o);
+  };
+
+  tiff.set(bytesOf(littleEndian ? 'II' : 'MM'), 0);
+  put16(2, 42);
+  put32(4, 8); // the MP Index IFD follows the header
+
+  put16(8, 3); // three tags
+  const tag = (i: number) => 8 + 2 + i * 12;
+  put16(tag(0), 0xb000); // MPFVersion
+  put16(tag(0) + 2, 7); // UNDEFINED
+  put32(tag(0) + 4, 4);
+  tiff.set(bytesOf('0100'), tag(0) + 8); // version 1.00, inline
+  put16(tag(1), 0xb001); // NumberOfImages
+  put16(tag(1) + 2, 4); // LONG
+  put32(tag(1) + 4, 1);
+  put32(tag(1) + 8, images);
+  put16(tag(2), 0xb002); // MPEntry
+  put16(tag(2) + 2, 7); // UNDEFINED
+  put32(tag(2) + 4, images * 16);
+  put32(tag(2) + 8, MP_ENTRIES_AT); // an offset, being longer than four bytes
+  put32(8 + 2 + 3 * 12, 0); // no MP Attribute IFD
+
+  return appSegment(0xe2, concat(bytesOf('MPF\0'), tiff));
+}
+
+/**
+ * Fill in the MP Entry array of an assembled file, given the length of each
+ * image that sits after EOI in order.
+ *
+ * Entry 1 is the primary image: its size spans SOI to EOI, which is where the
+ * trailer begins, and its offset is 0 by definition. Each later entry gets its
+ * own length and an offset **from the MP endian header**, which is the one place
+ * this format measures from and the whole reason the index has to be rewritten
+ * when anything ahead of the trailer changes length.
+ *
+ * The endian header is found by searching for `MPF\0` rather than by walking the
+ * markers: in a synthetic file the string appears once, and a fixture that used
+ * the parser under test to place its own bytes would be proving nothing.
+ */
+export function patchMpfIndex(file: Uint8Array, trailerLengths: number[]): Uint8Array {
+  const out = Uint8Array.from(file);
+  const marker = bytesOf('MPF\0');
+  let at = -1;
+  for (let i = 0; i + marker.length <= out.length && at < 0; i++) {
+    if (marker.every((b, k) => out[i + k] === b)) at = i;
+  }
+  if (at < 0) throw new Error('fixture: no MPF segment to patch');
+
+  const endianAt = at + marker.length;
+  const little = out[endianAt] === 0x49;
+  const put32 = (o: number, v: number) => {
+    const b = [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+    out.set(little ? b.reverse() : b, o);
+  };
+
+  const trailerStart = out.length - trailerLengths.reduce((n, len) => n + len, 0);
+  const entries = endianAt + MP_ENTRIES_AT;
+  put32(entries + 4, trailerStart); // primary image size
+  put32(entries + 8, 0); // primary image offset, always zero
+  let position = trailerStart;
+  trailerLengths.forEach((len, i) => {
+    const entry = entries + (i + 1) * 16;
+    put32(entry + 4, len);
+    put32(entry + 8, position - endianAt);
+    position += len;
+  });
+  return out;
+}
+
+/** Offset from the MP endian header of entry `i`'s Individual Image Size field. */
+export function mpfEntrySizeField(i: number): number {
+  return MP_ENTRIES_AT + i * 16 + 4;
+}
+
+/** Offset from the MP endian header of entry `i`'s Individual Image Data Offset. */
+export function mpfEntryOffsetField(i: number): number {
+  return MP_ENTRIES_AT + i * 16 + 8;
+}
+
+/**
+ * A copy of `file` with `values` written `fromHeader` bytes past the MP endian
+ * header: one field of an index broken, everything else intact.
+ *
+ * The header is found by searching for `MPF\0` rather than by walking the
+ * markers. In a synthetic file the string appears once, and a fixture that used
+ * the parser under test to place its own bytes would be proving nothing.
+ */
+export function pokeMpfIndex(
+  file: Uint8Array,
+  fromHeader: number,
+  ...values: number[]
+): Uint8Array {
+  const out = Uint8Array.from(file);
+  const marker = bytesOf('MPF\0');
+  for (let i = 0; i + marker.length <= out.length; i++) {
+    if (marker.every((b, k) => out[i + k] === b)) {
+      out.set(values, i + marker.length + fromHeader);
+      return out;
+    }
+  }
+  throw new Error('fixture: no MPF segment to poke');
+}
+
+/**
+ * An Ultra HDR photo: `base` with an MPF index that correctly locates a gain map
+ * after its EOI. The shape a recent Pixel writes on every HDR shot, and the one
+ * the embed paths used to refuse.
+ */
+export function withMpfGainMap(base: Uint8Array, littleEndian = false): Uint8Array {
+  const gainMap = gainMapTrailer();
+  const indexed = spliceBeforeSos(base, mpfIndexSegment(2, littleEndian));
+  return patchMpfIndex(withTrailer(indexed, gainMap), [gainMap.length]);
 }
 
 /** An EXIF APP1 whose IFD0 carries Make, Model, Software and a body serial. */

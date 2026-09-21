@@ -945,25 +945,24 @@ An encoder therefore:
 - **MUST** preserve every byte after EOI verbatim, including an Ultra HDR gain map
   (a second JPEG stream, MPO) and an Android motion-photo trailer (an ISOBMFF
   stream opening with `ftyp`).
-- **MUST** verify, rather than assume, that removal cannot invalidate an APP2
-  `MPF\0` index. MPF entry offsets are relative to the MPF endian header, so
-  removing a segment **before** that header shifts header and trailer together and
-  leaves the offsets correct, while removing one **after** it shifts only the
-  trailer. An implementation that cannot establish the first case **MUST** fail
-  rather than emit a file whose gain map no longer resolves. The requirement is
-  conditional on a trailer existing: an MPF index with nothing after EOI locates
-  no second image, and there is nothing for a shift to invalidate.
-- **MUST NOT** embed into a cover whose `MPF\0` index locates bytes after EOI.
-  This is the same invariant, one layer out, and it binds the **embed** rather than
-  the removal: §5.4 re-serializes the entropy scan, whose length may drift by the
-  byte-stuffing it re-applies, so head and tail are spliced back around a scan of a
-  different size and the trailer moves relative to the endian header the offsets are
-  measured from. Normalization cannot rescue this by being careful, because the
-  shift does not come from normalization. An encoder **MUST** refuse such a cover
-  for the same reason it refuses the removal: never emit a file whose gain map no
-  longer resolves. A conforming encoder refuses it **before** embedding, not by
-  inspecting the result, so that the same photo is accepted or refused
-  independently of the password, which chooses the carrier positions.
+- **MUST** keep an APP2 `MPF\0` index consistent with the file it describes, by
+  rewriting it (§9.7.1) or by failing. MPF entry offsets are measured from the MP
+  endian field, so removing a segment **before** that field shifts field and
+  trailer together and leaves the offsets correct, while removing one **after** it
+  shifts only the trailer. The same invariant binds the **embed**, one layer out:
+  §5.4 re-serializes the entropy scan, whose length may drift by the byte-stuffing
+  it re-applies, so head and tail are spliced back around a scan of a different
+  size and the trailer moves on its own, for reasons that have nothing to do with
+  normalization. Either way an implementation **MUST NOT** emit a file whose gain
+  map no longer resolves.
+
+  The requirement is conditional on a trailer existing: an index with nothing
+  after EOI locates no second image, and there is nothing for a shift to
+  invalidate. An implementation that refuses rather than rewrites **MUST** decide
+  from the cover alone rather than from the result, so that the same photo is
+  accepted or refused independently of the password, which chooses the carrier
+  positions and therefore how far the scan drifts.
+
 - **MUST** fail closed on a JPEG whose marker structure does not parse: a file
   whose structure cannot be walked is one no implementation can assert carries no
   manifest.
@@ -978,6 +977,46 @@ HDR gain map that is still physically present in the trailer, leaving a photo th
 renders SDR while carrying the bytes for HDR: a visible anomaly rather than a
 removed one. These are **reported** instead, so a policy for them can be written
 from an inventory of what devices actually emit rather than from the schema.
+
+#### 9.7.1 Rewriting the MPF index (normative)
+
+An implementation that rewrites rather than refuses **MUST** produce exactly these
+values, so that two implementations handed one photo emit the same bytes.
+`endianAt` is the file offset of the MP endian field, `trailerStart` is one past
+the outer EOI, `length` is the file size, and `old`/`new` are the file before and
+after the edit. The trailer is copied verbatim, so an image inside it keeps its
+position **within** the trailer, which is what makes the arithmetic local:
+
+```
+for each MP Entry whose Individual Image Data Offset is non-zero:
+    P_old      = endianAt_old + offset_old
+    offset_new = trailerStart_new + (P_old - trailerStart_old) - endianAt_new
+```
+
+The formula is the identity when field and trailer moved together, which is the
+case that needed no rewriting to begin with.
+
+The **first** entry describes the primary image: its offset is `0` by definition,
+and its Individual Image Size spans SOI to EOI, which is `trailerStart`. So
+
+```
+    size_new = trailerStart_new     only when size_old == trailerStart_old
+```
+
+A size that did not equal `trailerStart_old` **MUST** be left exactly as it was.
+The producer meant something a rewrite cannot infer, and turning one wrong number
+into a different wrong number is not a repair; the offsets are what locate the
+trailer, and they are still corrected.
+
+An implementation **MUST** fail rather than rewrite when the index cannot be
+parsed, when a non-zero data offset does not resolve into the old trailer
+(`P_old < trailerStart_old` or `P_old >= length_old`), or when a rewritten offset
+would not fit its unsigned 32-bit field. Byte order is the index's own, read from
+the MP endian field, never the host's.
+
+Both fields live in the APP2 payload. No other field of the index, no other
+segment, no byte of the entropy-coded scan and no byte of the trailer changes,
+which is what keeps §9.7's other guarantees intact across the rewrite.
 
 HEIF/HEIC/AVIF is **out of scope here and MUST NOT be transcoded** (§5.4). There
 are no JPEG DCT coefficients in an HEVC-coded image to carry a payload, so such a
