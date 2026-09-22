@@ -475,7 +475,7 @@
     "message": "숨길 파일"
   },
   "galleryCoversTitle": {
-    "message": "커버 사진(5장 이상)"
+    "message": "커버 사진"
   },
   "galleryRestoreHeading": {
     "message": "갤러리: 사진에서 복원"
@@ -517,7 +517,7 @@
     "message": "사진을 살펴보고 복원하는 중…"
   },
   "errNoCovers": {
-    "message": "커버 사진을 추가하세요(5장 이상)."
+    "message": "커버 사진을 추가하세요."
   },
   "errGalleryTooFew": {
     "message": "사진이 부족합니다. $COUNT$장 이상 추가하세요.",

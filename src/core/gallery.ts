@@ -89,6 +89,17 @@ export const GALLERY_CAPACITY_MARGIN = 4;
 export const GALLERY_MIN_IMAGES = 5;
 /** Minimum decoy photos, so winnowing always has chaff to reject. */
 export const GALLERY_MIN_DECOYS = 2;
+/**
+ * What a keyfile-mode gallery calls its loose key.
+ *
+ * The `.key` extension is a tell no name can remove — restore finds the file by
+ * it. What a name can avoid is naming the *project* and the *set*: the CLI wrote
+ * `stegoshard-18265a84.key` and the browser `18265a84d89ddadf.key`, either of
+ * which ties the key to exactly those photos, which is the one association a
+ * separately stored key exists to break. Shared here because the two surfaces
+ * were free to drift and did.
+ */
+export const GALLERY_KEYFILE_NAME = 'recovery.key';
 /** Max data shards, bounded so K + parity + decoys stays under the GF(256) limit of 256. */
 export const GALLERY_K_MAX = 190;
 /** Largest vault blob a gallery can carry. */

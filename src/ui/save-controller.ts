@@ -20,6 +20,7 @@ import {
   CODEC_QR_GRID,
   WrongPasswordError,
   clearUserEntropy,
+  galleryCoversForEnvelopeLen,
   installUserEntropy,
   parseKeyBlock,
   unlockKeyBlock,
@@ -31,6 +32,7 @@ import {
   saveGalleryToDisk,
 } from './disk';
 import { resolveSaveInput } from './bundle';
+import { envelopeLenFor } from './estimate';
 
 export type SaveDestination = 'disk' | 'paper' | 'binary' | 'sqlite' | 'gallery';
 
@@ -284,6 +286,12 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
     if (accessMode === 'nonpossession' && !req.threshold) {
       throw new Error(msg('errNoThreshold'));
     }
+    // Count the covers before spending the Argon2, not after. The refusal for a
+    // short set lives in `galleryEncode`, which only runs once the key has been
+    // derived, so a user who brought seven photos waited out the expensive part
+    // to be told they needed nine. One gzip answers it up front.
+    const needed = galleryCoversForEnvelopeLen(await envelopeLenFor(file)).needed;
+    if (covers.length < needed) throw new Error(msg('wizGalleryNeed', String(needed)));
     const res = await saveGalleryToDisk(file, covers, req.galleryPassword, {
       bundle,
       keyMode,

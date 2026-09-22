@@ -36,7 +36,8 @@ export function embedKeyFactorImage(coverBytes: Uint8Array, coverName: string, f
 export function embedKeyImage(coverBytes: Uint8Array, coverName: string, keyBlock: Uint8Array, password: string, opts?: StegoEmbedOptions): Promise<StegoKeyImage>;
 
 // @public (undocumented)
-export function estimate(inputFile: string, paper: boolean, codec?: CodecChoice): Promise<{
+export function estimate(inputFile: string, paper: boolean, codec?: CodecChoice,
+gallery?: boolean): Promise<{
     images: number;
     k: number;
     m: number;

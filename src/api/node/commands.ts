@@ -43,7 +43,9 @@ import {
   exportVaultBinaryDisguised,
   brandCaption,
   galleryDecode,
+  estimateGalleryCovers,
   galleryEncode,
+  GALLERY_KEYFILE_NAME,
   getCodec,
   importVault,
   importVaultBinary,
@@ -419,7 +421,14 @@ export function coverManifest(path: string): { segments: number; bytes: number }
 async function externalKey(
   keyMode: KeyMode,
   keyBlock: Uint8Array,
-  setHex: string,
+  /**
+   * What to call the `.key` file, when the mode produces one. Defaults to the
+   * branded, set-identified name the overt destinations want; a deniable
+   * destination passes `GALLERY_KEYFILE_NAME` instead, because
+   * `stegoshard-18265a84.key` sitting beside a gallery names both the project
+   * and the set those particular photos belong to.
+   */
+  keyfileName: string,
   password: string,
   cover: string | undefined,
   // Single-region paths (branded .ssbn, disk, paper) hide a 92-byte key block;
@@ -446,7 +455,7 @@ async function externalKey(
     return { name: basename(cover), bytes: key.bytes, mimicPath: cover, onLanded: landed };
   }
   if (keyMode !== 'embedded') {
-    return { name: `stegoshard-${setHex}.key`, bytes: keyBlock };
+    return { name: keyfileName, bytes: keyBlock };
   }
   return undefined;
 }
@@ -519,7 +528,7 @@ async function runSaveDisguisedImpl(
     const ext = await externalKey(
       'stego',
       keyFactor,
-      '',
+      binaryKeyName('disguised'),
       opts.password,
       opts.cover,
       'factor',
@@ -617,7 +626,7 @@ async function runSaveDisguisedImpl(
     const ext = await externalKey(
       'stego',
       keyBlock,
-      '',
+      binaryKeyName('disguised'),
       opts.password,
       opts.cover,
       'factor',
@@ -702,7 +711,7 @@ async function runSaveImpl(
       const ext = await externalKey(
         'stego',
         keyBlock,
-        '',
+        binaryKeyName(variant),
         opts.password,
         opts.cover,
         'block',
@@ -736,7 +745,8 @@ async function runSaveImpl(
   const ext = await externalKey(
     keyMode,
     keyBlock,
-    setHex,
+    // Disk and paper are overt destinations: the brand in the name is the point.
+    `stegoshard-${setHex}.key`,
     opts.password,
     opts.cover,
     'block',
@@ -1072,7 +1082,7 @@ async function runGallerySaveImpl(
   const ext = await externalKey(
     keyMode,
     res.keyBlock,
-    setHex,
+    GALLERY_KEYFILE_NAME,
     opts.password,
     opts.keyCover,
     'factor',
@@ -1397,8 +1407,22 @@ export async function runEstimate(
   inputFile: string,
   paper: boolean,
   codec: CodecChoice = 'color',
+  /**
+   * Count photos for a gallery instead of images for a vault.
+   *
+   * A different arithmetic, not a different profile: a gallery pads the secret
+   * into the §10.6 two-region blob, splits it at `SLOT_DATA` per photo, and adds
+   * the minimum decoys, so the answer is a step function that starts at nine. It
+   * costs one compression pass and no key derivation, which is the whole reason
+   * a user should be able to ask before gathering the photos.
+   */
+  gallery = false,
 ): Promise<{ images: number; k: number; m: number }> {
   const content = read(inputFile);
+  if (gallery) {
+    const { k, m, needed } = await estimateGalleryCovers(basename(inputFile), content);
+    return { images: needed, k, m };
+  }
   return estimateImages(basename(inputFile), content, {
     profile: paper ? PROFILE_PAPER : PROFILE_DISK,
     codecId: codecIdForSave(paper, codec),

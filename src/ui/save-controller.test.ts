@@ -33,6 +33,17 @@ const msg = (k: string, subs?: string | string[]): string =>
 const key = { dek: new Uint8Array(), keyBlock: new Uint8Array() } as unknown as VaultKey;
 const file = new File([new Uint8Array([1, 2, 3])], 'secret.txt');
 
+/**
+ * Enough covers to clear the count for a small secret.
+ *
+ * Nine, not five: the §10 two-region geometry pads any envelope up to 4 KiB into
+ * an 8 600-byte blob, which is five data shards plus two parity plus the two
+ * decoys the winnowing needs. The controller now checks that before spending the
+ * Argon2, so a routing test that passed one cover no longer reaches the mock.
+ */
+const galleryCovers = (): File[] =>
+  Array.from({ length: 9 }, (_, i) => new File([new Uint8Array([9])], `IMG_${i}.jpg`));
+
 beforeEach(() => {
   saveFileToDisk.mockClear();
   saveFileToBinary.mockClear();
@@ -81,7 +92,7 @@ describe('runSave routing', () => {
   });
 
   it('routes gallery saves with the covers + gallery password, no vault key needed', async () => {
-    const covers = [new File([new Uint8Array([9])], 'a.jpg')];
+    const covers = galleryCovers();
     const { note } = await runSave(
       { dest: 'gallery', files: [file], covers, galleryPassword: 'pw' },
       msg,
@@ -114,12 +125,26 @@ describe('runSave routing', () => {
       provenance: { covers: 3, segments: 3, bytes: 900, uniform: false },
     }));
     const { note } = await runSave(
-      { dest: 'gallery', files: [file], covers: [], galleryPassword: 'pw' },
+      { dest: 'gallery', files: [file], covers: galleryCovers(), galleryPassword: 'pw' },
       msg,
     );
     expect(note).toContain('statusGallerySaved:5');
     expect(note).toContain('warnProvenanceStripped:3');
     expect(note).toContain('warnCoversNotUniform');
+  });
+
+  /**
+   * The count is knowable from the secret alone, for one gzip and no key
+   * derivation. It used to be enforced in `galleryEncode`, after Argon2, so a
+   * user who brought seven photos paid the expensive part to learn they needed
+   * nine.
+   */
+  it('refuses a short cover set before deriving anything', async () => {
+    const short = galleryCovers().slice(0, 7);
+    await expect(
+      runSave({ dest: 'gallery', files: [file], covers: short, galleryPassword: 'pw' }, msg),
+    ).rejects.toThrow('wizGalleryNeed:9');
+    expect(saveGalleryToDisk).not.toHaveBeenCalled();
   });
 
   it('rejects a gallery save with no password', async () => {

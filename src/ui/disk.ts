@@ -21,6 +21,7 @@ import {
   exportVault,
   galleryDecode,
   galleryEncode,
+  GALLERY_KEYFILE_NAME,
   importVault,
   MAX_FILE_BYTES,
   MAX_FILE_BYTES_BINARY_UI,
@@ -104,18 +105,21 @@ const manifestOf = (downloads: readonly Download[]): ManifestEntry[] =>
   downloads.map(({ name, purpose }) => ({ name, purpose }));
 
 /**
- * Folder the browser drops a multi-file save into.
+ * Hand every artifact of one save to the browser, in order.
  *
- * Deniable destinations must not be filed under the project name: a `cache.db`
- * inside `stegoshard-a1b2c3d4/` is not deniable, whatever the file is called.
+ * There is no grouping folder. There used to be one, built from the set id, and
+ * it never worked: the browser flattened `folder/name` into `folder_name` and
+ * the id ended up welded to the front of every deniable artifact instead of
+ * filing it out of sight. Grouping the files of a deniable save was never worth
+ * much anyway — a folder named after the save is itself the association it was
+ * supposed to avoid — so the names stand on their own, which is what
+ * `manifestOf` has always reported to the user.
+ *
+ * The 150 ms spacing stays: browsers drop downloads fired in a tight loop.
  */
-const saveFolder = (id: string, deniable: boolean): string =>
-  deniable ? `app-data-${id}` : `stegoshard-${id}`;
-
-async function deliver(downloads: { name: string; blob: Blob }[], subdir: string): Promise<void> {
-  const multi = downloads.length > 1;
+async function deliver(downloads: { name: string; blob: Blob }[]): Promise<void> {
   for (let i = 0; i < downloads.length; i++) {
-    downloadBlob(downloads[i]!.blob, downloads[i]!.name, multi ? subdir : undefined);
+    downloadBlob(downloads[i]!.blob, downloads[i]!.name);
     if (i < downloads.length - 1) await new Promise((r) => setTimeout(r, 150));
   }
 }
@@ -143,7 +147,6 @@ async function deliverRestored(
       name: f.name,
       blob: new Blob([f.bytes as BufferSource]),
     })),
-    '',
   );
 }
 
@@ -261,7 +264,7 @@ export async function saveFileToDisk(
     );
   }
 
-  await deliver(downloads, saveFolder(setHex, false));
+  await deliver(downloads);
   return { imageCount: total, setId: setHex, keyMode, manifest: manifestOf(downloads) };
 }
 
@@ -445,7 +448,7 @@ export async function saveFileToBinary(
         id: modeId,
         bundle: options.bundle,
       });
-      await deliver(downloads, saveFolder(modeId, true));
+      await deliver(downloads);
       return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
     }
     const { container, keyBlock: keyFactor } = await encryptBinaryDisguisedInWorker(
@@ -490,7 +493,7 @@ export async function saveFileToBinary(
         purpose: 'keyfile',
       });
     }
-    await deliver(downloads, saveFolder(disguisedId, true));
+    await deliver(downloads);
     return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
   }
 
@@ -539,8 +542,7 @@ export async function saveFileToBinary(
       keyBlock,
     );
   }
-  // No setId on the binary path; group the vault + key under a random-id folder.
-  await deliver(downloads, saveFolder(id, false));
+  await deliver(downloads);
   return { keyMode, variant: options.variant, manifest: manifestOf(downloads) };
 }
 
@@ -624,10 +626,13 @@ export async function saveGalleryToDisk(
   } else if (keyMode === 'keyfile') {
     // Deniability caveat: a `.key` sitting beside the photos gives the gallery
     // away by its extension alone; restore finds it with `isKey()`, so it cannot
-    // become fully generic. Dropping the project name narrows the tell without
-    // removing it. keyfile trades deniability for a key you can store apart from
-    // the photos, opt-in unlike the deniable stego/embedded modes.
-    downloads.push({ name: `${setHex}.key`, blob: octet(res.keyBlock), purpose: 'keyfile' });
+    // become fully generic. What it can drop is the project name and the set id:
+    // a stem naming the set tied the key to those particular photos, which is the
+    // one association a separate key artifact exists to avoid. The name itself
+    // lives in core, so the CLI and this surface cannot drift apart. keyfile
+    // trades deniability for a key you can store apart from the photos, opt-in
+    // unlike the deniable stego/embedded modes.
+    downloads.push({ name: GALLERY_KEYFILE_NAME, blob: octet(res.keyBlock), purpose: 'keyfile' });
   }
 
   // Non-possession (Mode B): the shares recover the secret that gates verification.
@@ -660,9 +665,7 @@ export async function saveGalleryToDisk(
     downloads.push(...shareDownloads(res.shares, options.threshold.k, options.threshold.n));
   }
 
-  // Neutral folder name (the bare set id, no "stegoshard-" prefix) so grouping
-  // the photos doesn't itself betray the gallery.
-  await deliver(downloads, setHex);
+  await deliver(downloads);
   return {
     imageCount: res.images.length,
     k: res.k,

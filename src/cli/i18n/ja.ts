@@ -48,6 +48,8 @@ export const ja: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy が空でした（追加エントロピーが不要ならオプションを外してください）',
   errEstimateMissing: 'estimate: <ファイル> がありません',
+  errEstimateGalleryFlags:
+    'estimate: --gallery は写真を数えるため、--paper も --codec も受け付けません',
   errNormalizeMissing: 'normalize: <写真|フォルダ ...> がありません',
   errNoNormalizeFiles:
     'normalize: 指定されたパスに写真が見つかりません（.jpg、.jpeg、.png、.heic、.heif、.avif を探しました）',
@@ -149,6 +151,8 @@ export const ja: CliCatalog = {
   outRestoredMany: '{count} 個のファイルを復元しました:',
   outDecoded: '{seen} 枚のうち {decoded} 枚を復号しました',
   outScanned: '{seen} 枚の写真を走査しました',
+  outEstimateGallery:
+    '写真 {photos} 枚が必要です（k={k} データ + m={m} パリティ + おとり {decoys} 枚）',
   outEstimate: '{images} 枚の画像  （k={k} データ + m={m} パリティ）',
   outNormalized:
     '{covers} 枚の写真を正規化し、うち {removed} 枚から来歴マニフェストを取り除きました（{bytes} バイト）。',
