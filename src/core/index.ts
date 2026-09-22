@@ -18,6 +18,8 @@ export * from './progress';
 export * from './stego';
 export * from './stego-guard';
 export * from './jpeg-coeff';
+export * from './jpeg-profile';
+export * from './jpeg-encode';
 export * from './jpeg-segments';
 export * from './mpf';
 export * from './normalize';

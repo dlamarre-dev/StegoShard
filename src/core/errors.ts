@@ -31,6 +31,7 @@ import {
 import { CredentialsNotIndependentError, type CredentialRelation } from './access';
 import { BucketTooLargeError } from './buckets';
 import { JpegUnsupportedError } from './jpeg-coeff';
+import { JpegEncodeError } from './jpeg-encode';
 import { JpegStructureError } from './jpeg-segments';
 import { ProvenanceNormalizeError } from './normalize';
 import { SegmentedFormatError } from './segmented';
@@ -55,6 +56,7 @@ export type StegoErrorCode =
   | 'GALLERY_RESTORE_FAILED'
   | 'GALLERY_TOO_FEW_IMAGES'
   | 'GALLERY_TOO_MANY_IMAGES'
+  | 'JPEG_ENCODE'
   | 'JPEG_STRUCTURE'
   | 'JPEG_UNSUPPORTED'
   | 'MISSING_KEY'
@@ -233,6 +235,12 @@ const TABLE: readonly CodeRow[] = [
   ),
   // The constructor wraps its argument, so the argument is recovered from the
   // wrapped message rather than carried separately.
+  row(
+    JpegEncodeError,
+    'JpegEncodeError',
+    'JPEG_ENCODE',
+    (m) => new JpegEncodeError(unprefix(m, 'cannot encode JPEG: ')),
+  ),
   row(
     JpegStructureError,
     'JpegStructureError',
