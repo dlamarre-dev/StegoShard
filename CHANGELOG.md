@@ -20,7 +20,8 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   fraction of the total time. Each stage owns a share of the bar proportional to how long
   it takes on this device: a small calibration (milliseconds per Argon2 derivation, per
   megabyte re-encoded, per image rendered) lives in `localStorage` and is refined after
-  each successful save. Within a run, the bar also re-paces itself as stages finish, so a
+  each successful save, learning only from stages big enough to measure and never
+  drifting more than twenty times from its defaults. Within a run, the bar also re-paces itself as stages finish, so a
   device three times slower than the defaults is paced right after the first derivation.
   It never goes backwards.
 
@@ -424,8 +425,9 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   order files landed in, and their modification times, pointed at the photos holding the
   secret. Which covers carry which shard is now a CSPRNG permutation. And the CLI copied a
   gallery key photo's timestamps from its cover, which dated it years before the photos
-  beside it; it now takes the delivery's date like them. An as-is key photo (`.db`, image
-  set, paper) still copies them, since it keeps its cover's EXIF and the two should agree.
+  beside it; it now takes the delivery's date like them, under `--preserve-container` too.
+  An as-is key photo delivered on its own (`.db`, image set, paper) still copies them, since
+  it keeps its cover's EXIF and the two should agree.
   SPEC §9 states all three as requirements, and §5.4 no longer says the filename is kept.
 
 - **Deniable artifacts saved from the browser carried the set id in their filename.**

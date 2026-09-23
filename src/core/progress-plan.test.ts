@@ -226,6 +226,37 @@ describe('calibration', () => {
     expect(next.argon2).toBeCloseTo(DEFAULT_CALIBRATION.argon2 * 5);
   });
 
+  /**
+   * A small save's stages are almost all fixed overhead: a few kilobytes are a
+   * sliver of a megabyte, and the elapsed time divided by that sliver reads as a
+   * rate hundreds of times too slow. Learned from, it ratcheted the stored rate
+   * upward by about 2.2x on every small save, without bound.
+   */
+  it('does not learn a rate from a stage that is mostly fixed overhead', () => {
+    let t = 0;
+    const tiny: Stage = {
+      phase: 'encrypt',
+      label: 'encrypting',
+      cost: 'cryptoPerMB',
+      units: 5 / 1024, // 5 KB
+      baseMs: 20,
+    };
+    const tracker = new ProgressTracker([tiny], DEFAULT_CALIBRATION, () => t);
+    tracker.onEvent({ phase: 'encrypt', done: 0, total: 1 });
+    t = 200;
+    tracker.onEvent({ phase: 'encrypt', done: 1, total: 1 });
+    expect(tracker.samples()).toEqual([]);
+  });
+
+  it('never drifts more than twenty times from the default, however many bad samples', () => {
+    let c = DEFAULT_CALIBRATION;
+    for (let i = 0; i < 50; i++)
+      c = updateCalibration(c, [{ cost: 'cryptoPerMB', msPerUnit: 1e9 }]);
+    expect(c.cryptoPerMB).toBeCloseTo(DEFAULT_CALIBRATION.cryptoPerMB * 20);
+    for (let i = 0; i < 50; i++) c = updateCalibration(c, [{ cost: 'cryptoPerMB', msPerUnit: 0 }]);
+    expect(c.cryptoPerMB).toBeCloseTo(DEFAULT_CALIBRATION.cryptoPerMB / 20);
+  });
+
   it('reads back only what it wrote, falling back field by field', () => {
     expect(parseCalibration(null)).toBeNull();
     expect(parseCalibration({ v: 2, argon2: 1 })).toBeNull();

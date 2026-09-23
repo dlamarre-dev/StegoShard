@@ -482,9 +482,15 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // manifest and there is nothing left to count. See `coverManifest`.
     const coverProvenance = keyMode === 'stego' ? coverManifest(values.cover as string) : undefined;
 
+    // The first stage is printed at once, so the line has to be closed on a
+    // failure too, or the error lands on the end of it (see gallery-save).
     const progress = present.progress(Boolean(values.quiet), savePlan(opts));
-    const res = await runSave(opts, progress.onProgress);
-    progress.done();
+    let res: Awaited<ReturnType<typeof runSave>>;
+    try {
+      res = await runSave(opts, progress.onProgress);
+    } finally {
+      progress.done();
+    }
     if (coverProvenance && coverProvenance.segments > 0) {
       present.warn({
         code: 'PROVENANCE_STRIPPED',
@@ -518,19 +524,23 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     if (positionals.length === 0) fail(t('errRestoreMissing'));
     const password = await resolvePassword(io, present, values);
     const progress = present.progress(Boolean(values.quiet));
-    const res = await runRestore(
-      {
-        inputs: positionals,
-        outDir,
-        password,
-        keyPath: values.key as string | undefined,
-        sharePaths: values.share as string[] | undefined,
-        force,
-        maxBytes: MAX_FILE_BYTES_BINARY_CLI, // see the save path above
-      },
-      progress.onProgress,
-    );
-    progress.done();
+    let res: Awaited<ReturnType<typeof runRestore>>;
+    try {
+      res = await runRestore(
+        {
+          inputs: positionals,
+          outDir,
+          password,
+          keyPath: values.key as string | undefined,
+          sharePaths: values.share as string[] | undefined,
+          force,
+          maxBytes: MAX_FILE_BYTES_BINARY_CLI, // see the save path above
+        },
+        progress.onProgress,
+      );
+    } finally {
+      progress.done();
+    }
 
     // Print the number whenever the vault carries one, and compare nothing: the
     // person who chose it is the only thing that knows what it should be. A tool

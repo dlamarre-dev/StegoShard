@@ -128,6 +128,44 @@ describe('CLI gallery save with --preserve-container', () => {
   });
 });
 
+/**
+ * `--preserve-container` keeps the key photo's container as-is, and an as-is
+ * key photo normally copies its cover's timestamps to agree with the EXIF it
+ * keeps. Not in a gallery: every photo beside it is written today, so a key
+ * photo dated like its years-old cover would be the one file to look at. The
+ * container is preserved; the date is not.
+ */
+describe('CLI gallery key photo under --preserve-container', () => {
+  it('is dated like the photos beside it, not like its cover', SLOW, async () => {
+    const coverDir = tmp();
+    for (let i = 0; i < 12; i++) writeJpegCover(coverDir, `photo-${i}.jpg`, i + 200);
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    writeFileSync(secretPath, Buffer.from('an old photo, delivered today'));
+    const keyDir = tmp();
+    writeJpegCover(keyDir, 'old.jpg', 299);
+    const keyCover = join(keyDir, 'old.jpg');
+    utimesSync(keyCover, new Date('2001-01-01'), new Date('2001-01-01'));
+
+    const save = await runGallerySave({
+      secretFile: secretPath,
+      covers: [coverDir],
+      outDir: tmp(),
+      password: PW,
+      keyMode: 'stego',
+      keyCover,
+      preserveContainer: true,
+    });
+    const keyPath = save.manifest.find((m) => m.purpose === 'stegoCover')!.name;
+    const fd = openSync(keyPath, 'r');
+    try {
+      expect(fstatSync(fd).mtime.getFullYear()).toBeGreaterThan(2001);
+    } finally {
+      closeSync(fd);
+    }
+  });
+});
+
 describe('CLI gallery round-trip', () => {
   it('saves a secret across a folder of photos and restores it blindly', SLOW, async () => {
     // The §10 geometry doubles the blob, so a tiny secret spans ~5 data shards;

@@ -192,6 +192,24 @@ describe('the stdout / stderr split', () => {
     expect(io2.stderr).not.toMatch(/Restored/);
   });
 
+  /**
+   * On a terminal the first stage is drawn at once, before anything can fail.
+   * A save that then failed used to leave that line open, and the error was
+   * printed onto the end of it (`Deriving the key… 0%stegoshard: …`).
+   */
+  it('closes the progress line on a terminal when the save fails', SLOW, async () => {
+    const io = fakeIo({ env: { STEGOSHARD_PASSWORD: PW } });
+    io.isStderrTty = true;
+    const missing = join(tmp(), 'no-such-file.txt');
+    // `run` rethrows what it cannot map; `main` prints it after this returns.
+    await expect(run(['save', missing, '--out', tmp()], io)).rejects.toThrow(/ENOENT/);
+    const CLEAR_LINE = `${String.fromCharCode(27)}[2K`;
+    const lastPct = io.stderr.lastIndexOf('%');
+    expect(lastPct, 'the first stage was drawn').toBeGreaterThan(-1);
+    // Straight after the percentage: the line is cleared before anything else.
+    expect(io.stderr.slice(lastPct + 1).startsWith(`\r${CLEAR_LINE}`)).toBe(true);
+  });
+
   it('--quiet silences progress but not the result', SLOW, async () => {
     const io = fakeIo({ env: { STEGOSHARD_PASSWORD: PW } });
     await expect(run(['save', secret(), '--out', tmp(), '--quiet'], io)).resolves.toBe(0);

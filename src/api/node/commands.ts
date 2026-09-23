@@ -1317,8 +1317,19 @@ async function runGallerySaveImpl(
   const outs: OutFile[] = files.map((f, i) => emit(opts, names[i]!, f.bytes, 'photos'));
   // Deliver the external key alongside the photos for keyfile/stego galleries.
   // Gallery is a multi-region path → the external artifact is the 32-byte factor.
+  //
+  // Never back-dated, whatever the container: the photos beside it are all
+  // written today, so a key photo carrying its cover's old timestamps would be
+  // the one file in the folder dated years ago. That holds under
+  // `--preserve-container` too, which keeps the key photo's container as-is and
+  // would otherwise take `externalKey`'s as-is rule of copying the dates.
   if (ext) {
-    outs.push(writeExternalKey(opts, ext.photoExt ? { ...ext, name: names[files.length]! } : ext));
+    outs.push(
+      writeExternalKey(
+        opts,
+        ext.photoExt ? { ...ext, name: names[files.length]!, mimicPath: undefined } : ext,
+      ),
+    );
   }
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {
