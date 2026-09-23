@@ -25,6 +25,7 @@ export * from './mpf';
 export * from './normalize';
 export * from './exif-scrub';
 export * from './exif-orientation';
+export * from './deniable-names';
 export * from './header';
 export * from './erasure';
 export * from './binary-container';

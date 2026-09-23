@@ -13,6 +13,7 @@ import {
   openSync,
   readFileSync,
   readSync,
+  readdirSync,
   renameSync,
   statSync,
   unlinkSync,
@@ -58,6 +59,9 @@ import {
   verifyGalleryExport,
   verifyImageExport,
   wrapBinary,
+  photoExt,
+  photoNames,
+  type PhotoExt,
   buildDuressDbContainer,
   buildNonPossessionDbContainer,
   shareFileText,
@@ -239,8 +243,18 @@ const asFiles = (outs: readonly OutFile[]) => ({
 });
 
 /** Write the external key artifact, copying the cover's timestamps when stego. */
+/** The names already in `dir`, which a drawn `IMG_nnnn` must not reuse. */
+function namesIn(dir: string): Set<string> {
+  try {
+    return new Set(readdirSync(dir));
+  } catch {
+    return new Set(); // not created yet: nothing to collide with
+  }
+}
+
 function writeExternalKey(target: WriteTarget, ext: KeyArtifact): OutFile {
-  const path = writeOut(target, ext.name, ext.bytes);
+  const name = ext.name || photoNames([ext.photoExt ?? 'jpg'], namesIn(target.outDir))[0]!;
+  const path = writeOut(target, name, ext.bytes);
   // The artifact exists from here on, so the cover claim is real regardless of
   // what else the save does afterwards -- and other writes DO follow on some
   // paths (recovery-N.txt on the non-possession and gallery paths).
@@ -253,8 +267,7 @@ function writeExternalKey(target: WriteTarget, ext: KeyArtifact): OutFile {
       // timestamp mimicry is best-effort
     }
   }
-  // `mimicPath` is set only when the key rode inside the user's cover photo.
-  return { path, purpose: ext.mimicPath ? 'stegoCover' : 'keyfile' };
+  return { path, purpose: ext.photoExt ? 'stegoCover' : 'keyfile' };
 }
 
 /**
@@ -359,9 +372,14 @@ export interface SaveResult {
 }
 
 /**
- * Produce the external key artifact for non-embedded modes. Stego keeps the
- * cover's format and reuses its **filename** (to blend into a photo library);
- * `mimicPath` is the cover whose mtime/atime the output should copy.
+ * Produce the external key artifact for non-embedded modes.
+ *
+ * A stego key photo is never named after its cover: the cover's name is the
+ * device's, and says which phone took it and when. It is named `IMG_nnnn` where
+ * it is written (see `deniable-names.ts`). An as-is key photo still copies its
+ * cover's timestamps, which agree with the EXIF it keeps; a profile key photo
+ * does not, because it is delivered beside a gallery written today, and one
+ * file dated years ago among them would be the one to look at.
  */
 /**
  * Lift the caller's cover-reuse decision into the shape the stego layer takes.
@@ -391,9 +409,17 @@ function reuseOpt(o: { allowCoverReuse?: boolean | undefined }): StegoEmbedOptio
  * surfaced.
  */
 interface KeyArtifact {
+  /**
+   * The file name, or `''` for a stego key photo, which is named where it is
+   * written: `IMG_nnnn`, drawn so as not to collide with what is already in the
+   * output folder (see `deniable-names.ts`).
+   */
   name: string;
   bytes: Uint8Array;
-  mimicPath?: string;
+  /** Set for a stego key photo: the extension its bytes call for. */
+  photoExt?: PhotoExt;
+  /** An as-is key photo copies its cover's timestamps; see `externalKey`. */
+  mimicPath?: string | undefined;
   /** Set by `externalKey`; called by `writeExternalKey` once the bytes are on disk. */
   onLanded?: (() => void) | undefined;
 }
@@ -488,14 +514,20 @@ async function externalKey(
             basename(cover),
           )
         : raw;
-    // The name follows the bytes: a PNG key cover re-encoded into the profile is
-    // a JPEG, and a set of JPEGs with one `.png` in it sorts on exactly that.
-    const name = coverContainer === 'profile' ? asJpegName(basename(cover)) : basename(cover);
+    // This name only picks the decoder for the embed: a PNG key cover re-encoded
+    // into the profile is a JPEG. The delivered name is drawn at write time.
+    const decodeAs = coverContainer === 'profile' ? asJpegName(basename(cover)) : basename(cover);
     const key =
       variant === 'factor'
-        ? await embedKeyFactorImage(source, name, keyBlock, password, embedOpts)
-        : await embedKeyImage(source, name, keyBlock, password, embedOpts);
-    return { name, bytes: key.bytes, mimicPath: cover, onLanded: landed };
+        ? await embedKeyFactorImage(source, decodeAs, keyBlock, password, embedOpts)
+        : await embedKeyImage(source, decodeAs, keyBlock, password, embedOpts);
+    return {
+      name: '',
+      bytes: key.bytes,
+      photoExt: key.ext,
+      mimicPath: coverContainer === 'as-is' ? cover : undefined,
+      onLanded: landed,
+    };
   }
   if (keyMode !== 'embedded') {
     return { name: keyfileName, bytes: keyBlock };
@@ -1143,22 +1175,10 @@ async function runGallerySaveImpl(
   }
   const setHex = toHex(res.setId);
 
-  // Two covers can share a basename, and so can a cover and the key photo (a
-  // `--key-cover IMG_1.png` re-encoded to `IMG_1.jpg` beside a gallery
-  // `IMG_1.jpg`); disambiguate so nothing is overwritten.
-  const used = new Set<string>();
-  const claimName = (wanted: string): string => {
-    let name = wanted;
-    for (let n = 2; used.has(name); n++) name = wanted.replace(/(\.[^.]+)?$/, `-${n}$1`);
-    used.add(name);
-    return name;
-  };
-  const outs: OutFile[] = res.images.map((img) => {
-    const f = galleryImageToFile(img);
-    return emit(opts, claimName(f.name), f.bytes, 'photos');
-  });
-  // Deliver the external key alongside the photos for keyfile/stego galleries.
-  // Gallery is a multi-region path → the external artifact is the 32-byte factor.
+  // The key photo, when there is one, is made before any name is drawn, so that
+  // it can draw from the same set: `IMG_nnnn` like every photo beside it, at no
+  // position that sets it apart (see `deniable-names.ts`). Its cover claim is
+  // held from here, and released by `withKeyClaim` if nothing reaches disk.
   const ext = await externalKey(
     keyMode,
     res.keyBlock,
@@ -1174,7 +1194,16 @@ async function runGallerySaveImpl(
     hold,
     landed,
   );
-  if (ext) outs.push(writeExternalKey(opts, { ...ext, name: claimName(ext.name) }));
+  const files = res.images.map((img) => galleryImageToFile(img));
+  const exts: PhotoExt[] = files.map((f) => photoExt(f.bytes));
+  if (ext?.photoExt) exts.push(ext.photoExt);
+  const names = photoNames(exts, namesIn(opts.outDir));
+  const outs: OutFile[] = files.map((f, i) => emit(opts, names[i]!, f.bytes, 'photos'));
+  // Deliver the external key alongside the photos for keyfile/stego galleries.
+  // Gallery is a multi-region path → the external artifact is the 32-byte factor.
+  if (ext) {
+    outs.push(writeExternalKey(opts, ext.photoExt ? { ...ext, name: names[files.length]! } : ext));
+  }
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {
     const { k, n } = opts.threshold;

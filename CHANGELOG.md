@@ -381,6 +381,25 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **Delivered photos no longer carry their cover's name, and their order no longer points
+  at the carriers.** A gallery photo kept the name of the photo it was made from, and so did
+  every stego key photo. That name is the device's: `PXL_20260921_143012.jpg` says a Pixel
+  took it and at which second, `20260921_143012.jpg` says the same of a Samsung, and even
+  `IMG_2043.jpg` places it in one camera roll. Every delivered photo, gallery or key, on the
+  CLI and in the browser, is now named `IMG_` and four digits drawn by the CSPRNG, distinct
+  within the delivery and clear of what is already in the output folder
+  (`src/core/deniable-names.ts`). In a gallery, the key photo draws from the same set, so its
+  name does not single it out; the save summary is what says which file it is.
+
+  Two leaks of the same kind went with it. `galleryEncode` made the first K+M covers, in
+  input order, the carriers, and every surface writes the photos in that order, so the
+  order files landed in, and their modification times, pointed at the photos holding the
+  secret. Which covers carry which shard is now a CSPRNG permutation. And the CLI copied a
+  gallery key photo's timestamps from its cover, which dated it years before the photos
+  beside it; it now takes the delivery's date like them. An as-is key photo (`.db`, image
+  set, paper) still copies them, since it keeps its cover's EXIF and the two should agree.
+  SPEC §9 states all three as requirements, and §5.4 no longer says the filename is kept.
+
 - **Deniable artifacts saved from the browser carried the set id in their filename.**
   A gallery photo landed as `18265a84d89ddadf_IMG_2043.jpg`, a disguised database as
   `app-data-3f9c1e20_cache.db` — the one thing those destinations exist to avoid, welded

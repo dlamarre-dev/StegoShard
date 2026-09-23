@@ -3,7 +3,15 @@
  * production `@core` pipeline (blind winnowing, folder in / folder out).
  */
 
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -227,13 +235,14 @@ describe('CLI gallery round-trip', () => {
         keyCover: keyCoverPath,
       });
       expect(save.keyMode).toBe('stego');
-      // The produced stego key image keeps the cover's own stem, which is what
-      // makes it blend in, and follows the set's format, which is what keeps it
-      // from being the one file in the delivery that does not match. A PNG key
-      // photo among twelve profile JPEGs would be the single most interesting
-      // file in the folder, and it is the one holding the key (SPEC §9.8).
-      const stegoKeyPath = save.files.find((f) => f.endsWith('keycover.jpg'));
+      // The produced stego key image follows the set's format, which is what
+      // keeps it from being the one file in the delivery that does not match. A
+      // PNG key photo among twelve profile JPEGs would be the single most
+      // interesting file in the folder, and it is the one holding the key
+      // (SPEC §9.8). Its name is drawn like theirs; the manifest says which.
+      const stegoKeyPath = save.manifest.find((m) => m.purpose === 'stegoCover')?.name;
       expect(stegoKeyPath).toBeTruthy();
+      expect(basename(stegoKeyPath!)).toMatch(/^IMG_\d{4}\.jpg$/);
       expect(profileMismatch(new Uint8Array(readFileSync(stegoKeyPath!)))).toBeNull();
 
       // Without the key cover, restore fails (the factor is not embedded in fragments).
@@ -353,10 +362,12 @@ describe('CLI gallery round-trip', () => {
 
 describe('CLI gallery save: the key photo', () => {
   /**
-   * A PNG key cover is re-encoded to `.jpg`, so `photo-0.png` as the key and
-   * `photo-0.png` among the covers both leave as `photo-0.jpg`. The photos are
-   * written first, so the key's write used to be refused with the save half
-   * done, or with `--force` to overwrite one of the gallery's own photos.
+   * Every delivered file is named `IMG_nnnn`, the key photo included, drawn from
+   * one set so that its name does not single it out; the manifest is what says
+   * which one is the key. Nothing of a cover's own name survives, since that
+   * name is the device's. The key photo is dated like its neighbours rather than
+   * copying its cover's timestamps: one file dated years ago in a folder written
+   * today would be the one to look at.
    *
    * The same save then restores through the library's default loader, which is
    * what a third-party caller reaches for. Delivered photos are already in the
@@ -364,17 +375,19 @@ describe('CLI gallery save: the key photo', () => {
    * out of them.
    */
   it(
-    'is named apart from a gallery photo it collides with, and the set restores through the default loader',
+    'names every photo and the key IMG_nnnn from one set, dates the key like the rest, and restores through the default loader',
     SLOW,
     async () => {
       const coverDir = tmp();
-      for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 70);
+      for (let i = 0; i < 12; i++) writePngCover(coverDir, `PXL_20260921_14301${i}.png`, i + 70);
       const secretDir = tmp();
       const secretPath = join(secretDir, 'note.txt');
-      const secret = Buffer.from('two photos, one name');
+      const secret = Buffer.from('twelve photos and a key, all alike');
       writeFileSync(secretPath, secret);
       const keyDir = tmp();
-      writePngCover(keyDir, 'photo-0.png', 998);
+      const keyCover = join(keyDir, 'PXL_20010101_000000.png');
+      writePngCover(keyDir, basename(keyCover), 998);
+      utimesSync(keyCover, new Date('2001-01-01'), new Date('2001-01-01'));
 
       const albumDir = tmp();
       const save = await runGallerySave({
@@ -383,19 +396,25 @@ describe('CLI gallery save: the key photo', () => {
         outDir: albumDir,
         password: PW,
         keyMode: 'stego',
-        keyCover: join(keyDir, 'photo-0.png'),
+        keyCover,
       });
-      expect(new Set(save.files).size).toBe(13);
-      const photos = save.files.slice(0, 12);
-      const keyPath = save.files[12]!;
-      expect(photos.map((f) => basename(f))).toContain('photo-0.jpg');
-      expect(basename(keyPath)).toBe('photo-0-2.jpg');
+      const names = save.files.map((f) => basename(f));
+      expect(new Set(names).size).toBe(13);
+      for (const n of names) expect(n).toMatch(/^IMG_\d{4}\.jpg$/);
+      const keyPath = save.manifest.find((m) => m.purpose === 'stegoCover')!.name;
+      const photos = save.manifest.filter((m) => m.purpose === 'photos').map((m) => m.name);
+      expect(photos).toHaveLength(12);
+      // One descriptor for both the date and the bytes, so they describe one file.
+      const fd = openSync(keyPath, 'r');
+      let keyBytes: Uint8Array;
+      try {
+        expect(fstatSync(fd).mtime.getFullYear()).toBeGreaterThan(2001);
+        keyBytes = new Uint8Array(readFileSync(fd));
+      } finally {
+        closeSync(fd);
+      }
 
-      const keyBlock = await extractKeyFactorImage(
-        new Uint8Array(readFileSync(keyPath)),
-        basename(keyPath),
-        PW,
-      );
+      const keyBlock = await extractKeyFactorImage(keyBytes, basename(keyPath), PW);
       expect(keyBlock).not.toBeNull();
       const covers = photos.map((p) =>
         fileToGalleryCover(new Uint8Array(readFileSync(p)), basename(p)),

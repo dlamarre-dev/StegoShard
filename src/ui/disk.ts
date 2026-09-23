@@ -37,8 +37,10 @@ import {
   verifyGalleryExport,
   wrapBinary,
   verifyImageExport,
+  photoNames,
   type KeyMode,
   type OnProgress,
+  type PhotoExt,
   type VaultKey,
 } from '@core';
 import type { AccessMode } from './save-controller';
@@ -50,7 +52,6 @@ import {
 import { Unzip, UnzipInflate, zipSync } from 'fflate';
 import { unpackBundle } from './bundle';
 import {
-  asJpegName,
   decodeImageBytes,
   downloadBlob,
   embedKeyImage,
@@ -221,7 +222,7 @@ export async function saveFileToDisk(
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
     externalKey = {
-      name: stegoKeyName(options.stego.cover.name, key.ext, setHex),
+      name: stegoKeyName(key.ext),
       bytes: key.bytes,
       mime: key.mime,
     };
@@ -300,8 +301,6 @@ async function buildDisguisedMode(
     decoy?: File | undefined;
     threshold?: { k: number; n: number } | undefined;
     onProgress?: OnProgress | undefined;
-    /** Random id for this save, so a nameless cover still yields a stable filename. */
-    id: string;
     /** The content is a .zip of several files (SPEC §4 FLAGS bit1). */
     bundle?: boolean | undefined;
   },
@@ -333,7 +332,7 @@ async function buildDisguisedMode(
       'as-is',
     );
     const dl: Download = {
-      name: stegoKeyName(options.stego.cover.name, k.ext, options.id),
+      name: stegoKeyName(k.ext),
       blob: octet(k.bytes, k.mime),
       purpose: 'stegoCover',
     };
@@ -443,9 +442,6 @@ export async function saveFileToBinary(
     // plain path stays on the worker. keyfile/stego compose with these modes as an
     // extra external key factor (§10.3) layered on top of the duress password / shares.
     if (mode !== 'plain') {
-      // Minted before the downloads so a cover photo with no filename still gets
-      // a stable, brand-free name from `stegoKeyName`.
-      const modeId = toHex(randomBytes(4));
       const downloads = await buildDisguisedMode(file, content, {
         mode,
         password: options.password,
@@ -455,7 +451,6 @@ export async function saveFileToBinary(
         decoy: options.decoy,
         threshold: options.threshold,
         onProgress: options.onProgress,
-        id: modeId,
         bundle: options.bundle,
       });
       await deliver(downloads);
@@ -470,7 +465,6 @@ export async function saveFileToBinary(
       options.onProgress,
       options.bundle,
     );
-    const disguisedId = toHex(randomBytes(4));
     const downloads: Download[] = [
       { name: binaryVaultName('disguised'), blob: octet(container), purpose: 'vault' },
     ];
@@ -485,7 +479,7 @@ export async function saveFileToBinary(
         'as-is',
       );
       const dl: Download = {
-        name: stegoKeyName(options.stego.cover.name, stegoKey.ext, disguisedId),
+        name: stegoKeyName(stegoKey.ext),
         blob: octet(stegoKey.bytes, stegoKey.mime),
         purpose: 'stegoCover',
       };
@@ -522,7 +516,6 @@ export async function saveFileToBinary(
     options.bundle,
   );
   // Only the branded .ssbn reaches here; every disguised path returned above.
-  const id = toHex(randomBytes(4));
   const downloads: Download[] = [
     { name: binaryVaultName(options.variant), blob: octet(container), purpose: 'vault' },
   ];
@@ -531,7 +524,7 @@ export async function saveFileToBinary(
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const stegoKey = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
     downloads.push({
-      name: stegoKeyName(options.stego.cover.name, stegoKey.ext, id),
+      name: stegoKeyName(stegoKey.ext),
       blob: octet(stegoKey.bytes, stegoKey.mime),
       purpose: 'stegoCover',
     });
@@ -588,8 +581,9 @@ export interface GallerySaveResult {
 
 /**
  * Gallery Mode (SPEC §9): hide a secret fragmented across the given cover photos
- * plus decoys, then download every (modified) photo, keeping each cover's own
- * filename so the set blends into a photo library (no telltale zip). By default
+ * plus decoys, then download every (modified) photo as its own file (no telltale
+ * zip), each named `IMG_nnnn` rather than after its cover (see
+ * `deniable-names.ts`). By default
  * the key is embedded in the fragments; keyMode 'keyfile'/'stego' deliver it
  * separately (a loose .key or hidden in a cover photo), a deniability trade-off.
  */
@@ -625,38 +619,39 @@ export async function saveGalleryToDisk(
   });
   const setHex = toHex(res.setId);
 
-  // Two covers can share a basename, and gallery reuses cover names, so disambiguate.
-  // The key photo goes through the same set: a PNG key cover re-encoded to
-  // `IMG_1.jpg` would otherwise share a name with a gallery `IMG_1.jpg`.
-  const downloads: Download[] = [];
-  const used = new Set<string>();
-  const claimName = (wanted: string): string => {
-    let name = wanted;
-    for (let n = 2; used.has(name); n++) name = wanted.replace(/(\.[^.]+)?$/, `-${n}$1`);
-    used.add(name);
-    return name;
-  };
-  for (const img of res.images) {
-    const { name, blob } = await galleryImageToBlob(img);
-    downloads.push({ name: claimName(name), blob, purpose: 'photos' });
-  }
+  // Every delivered photo is named `IMG_nnnn`, drawn fresh, and the key photo
+  // draws from the same set so that nothing about its name sets it apart. The
+  // cover's own name is the device's: it says which phone took it and when
+  // (see `deniable-names.ts`). The manifest is what tells the user which file
+  // is the key.
+  const blobs = await Promise.all(res.images.map((img) => galleryImageToBlob(img)));
   // A separate key rides alongside the photos when not embedded.
+  let keyPhoto: { bytes: Uint8Array; mime: string; ext: PhotoExt } | undefined;
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     // Gallery is a multi-region path: the external artifact is the 32-byte key
     // factor (§10.3), hidden in its own SSKF envelope, not a 92-byte key block.
     // 'profile': this key photo is delivered *with* the gallery, so it takes the
-    // gallery's container rule. Its name follows its bytes, or a PNG cover would
-    // arrive as a `.png` full of JPEG.
-    const k = await embedKeyFactorImage(
+    // gallery's container rule.
+    keyPhoto = await embedKeyFactorImage(
       options.stego.cover,
       res.keyBlock,
       options.stego.password,
       'profile',
     );
+  }
+  const exts: PhotoExt[] = res.images.map((img) => (img.kind === 'jpeg' ? 'jpg' : 'png'));
+  if (keyPhoto) exts.push(keyPhoto.ext);
+  const names = photoNames(exts);
+  const downloads: Download[] = blobs.map(({ blob }, i) => ({
+    name: names[i]!,
+    blob,
+    purpose: 'photos',
+  }));
+  if (keyPhoto) {
     downloads.push({
-      name: claimName(asJpegName(stegoKeyName(options.stego.cover.name, k.ext, setHex))),
-      blob: octet(k.bytes, k.mime),
+      name: names[blobs.length]!,
+      blob: octet(keyPhoto.bytes, keyPhoto.mime),
       purpose: 'stegoCover',
     });
   } else if (keyMode === 'keyfile') {

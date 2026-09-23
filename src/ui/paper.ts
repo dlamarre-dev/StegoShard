@@ -182,7 +182,7 @@ export async function saveFileToPaper(
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
-    const name = stegoKeyName(options.stego.cover.name, key.ext, setHex);
+    const name = stegoKeyName(key.ext);
     manifest.push({ name, purpose: 'stegoCover' });
     downloadBlob(new Blob([key.bytes as BufferSource], { type: key.mime }), name);
   } else if (keyMode !== 'embedded') {

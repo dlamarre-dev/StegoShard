@@ -1,26 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { stegoKeyName } from './image-io';
 
-/**
- * The stego key rides inside a photo the user already had, so reusing that
- * photo's own filename is what makes it blend in. The fallback only runs when
- * the picked file has no usable name (a browser File can carry an empty one)
- * and it must not announce the project either.
- */
 describe('stegoKeyName', () => {
-  it("keeps the cover's own filename, which is the deniable choice", () => {
-    expect(stegoKeyName('IMG_2043.png', 'png', 'a1b2c3d4')).toBe('IMG_2043.png');
+  it('draws an IMG_nnnn name with the extension its bytes call for', () => {
+    expect(stegoKeyName('png')).toMatch(/^IMG_\d{4}\.png$/);
+    expect(stegoKeyName('jpg')).toMatch(/^IMG_\d{4}\.jpg$/);
   });
 
-  it('trims a padded name rather than falling through', () => {
-    expect(stegoKeyName('  holiday.jpg  ', 'jpg', 'a1b2c3d4')).toBe('holiday.jpg');
-  });
-
-  it('falls back to a generic image name, never the project name', () => {
-    for (const blank of [undefined, '', '   ']) {
-      const name = stegoKeyName(blank, 'png', 'a1b2c3d4');
-      expect(name).toBe('image-a1b2c3d4.png');
-      expect(name).not.toMatch(/stegoshard/i);
-    }
+  // The cover's own name is the device's (which phone, which second), so it is
+  // no longer an input at all; and a set id would tie the key to its files.
+  it('is drawn fresh rather than derived from anything', () => {
+    const names = new Set(Array.from({ length: 50 }, () => stegoKeyName('jpg')));
+    expect(names.size).toBeGreaterThan(40);
   });
 });
