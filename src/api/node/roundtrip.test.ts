@@ -6,7 +6,7 @@
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetStegoCoverGuard } from '@core';
 import { encode as encodePng } from 'fast-png';
@@ -74,6 +74,13 @@ function writeJpegCover(dir: string): string {
   const path = join(dir, 'photo.jpg');
   writeFileSync(path, jpeg.encode({ data, width: w, height: h }, 85).data);
   return path;
+}
+
+/** The stego key photo a save wrote: named IMG_nnnn, so found by purpose, not by name. */
+function stegoKeyPath(manifest: readonly { name: string; purpose: string }[]): string {
+  const entry = manifest.find((m) => m.purpose === 'stegoCover');
+  if (!entry) throw new Error('the save wrote no stego key photo');
+  return entry.name;
 }
 
 const PW = 'correct horse battery staple';
@@ -182,7 +189,7 @@ describe('CLI round-trips', () => {
     const content = pattern(1200, 11);
     const input = writeSecret(dir, content);
     const cover = writeCover(dir);
-    const { files } = await runSave({
+    const { files, manifest } = await runSave({
       inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
@@ -191,9 +198,11 @@ describe('CLI round-trips', () => {
       keyMode: 'stego',
       cover,
     });
-    // The stego key image reuses the cover's own filename (deniability), not a
-    // "-key" name; the vault images are the stegoshard-*.png set.
-    const keyImage = files.find((f) => f.endsWith('cover.png'))!;
+    // The stego key image is named IMG_nnnn, never after its cover, whose name is
+    // the device's; the manifest says which file it is. The vault images are the
+    // stegoshard-*.png set.
+    const keyImage = stegoKeyPath(manifest);
+    expect(basename(keyImage)).toMatch(/^IMG_\d{4}\.png$/);
     const images = files.filter((f) => /stegoshard-.*\.png$/.test(f));
 
     // Wrong password against the stego image → cannot restore.
@@ -215,7 +224,7 @@ describe('CLI round-trips', () => {
     const content = pattern(1200, 13);
     const input = writeSecret(dir, content);
     const cover = writeJpegCover(dir); // named photo.jpg
-    const { files } = await runSave({
+    const { files, manifest } = await runSave({
       inputs: [input],
       outDir: join(dir, 'out'),
       password: PW,
@@ -224,9 +233,9 @@ describe('CLI round-trips', () => {
       keyMode: 'stego',
       cover,
     });
-    // Output keeps the cover's format and filename.
-    const keyImage = files.find((f) => f.endsWith('photo.jpg'))!;
-    expect(keyImage).toBeTruthy();
+    // Output keeps the cover's format; the name is drawn, not the cover's.
+    const keyImage = stegoKeyPath(manifest);
+    expect(basename(keyImage)).toMatch(/^IMG_\d{4}\.jpg$/);
     const images = files.filter((f) => /stegoshard-.*\.png$/.test(f));
 
     const { outPath } = await runRestore({
@@ -303,7 +312,7 @@ describe('CLI round-trips', () => {
       const content = pattern(2000, 41);
       const input = writeSecret(dir, content);
       const cover = writeCover(dir); // named cover.png
-      const { files } = await runSave({
+      const { files, manifest } = await runSave({
         inputs: [input],
         outDir: join(dir, 'out'),
         password: PW,
@@ -314,8 +323,8 @@ describe('CLI round-trips', () => {
         cover,
       });
       const vault = files.find((f) => f.endsWith('cache.db'))!;
-      // The stego key image keeps the cover's own filename (blends into a photo roll).
-      const keyImage = files.find((f) => f.endsWith('cover.png'))!;
+      // The stego key image is named IMG_nnnn; the manifest says which file it is.
+      const keyImage = stegoKeyPath(manifest);
       expect(vault).toBeTruthy();
       expect(keyImage).toBeTruthy();
 

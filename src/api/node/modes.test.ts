@@ -13,6 +13,13 @@ import { encode as encodePng } from 'fast-png';
 import { runRestore, runSave } from './commands';
 import { StegoShardApiError } from '../errors';
 
+/** The stego key photo a save wrote: named IMG_nnnn, so found by purpose, not by name. */
+function stegoKeyPath(manifest: readonly { name: string; purpose: string }[]): string {
+  const entry = manifest.find((m) => m.purpose === 'stegoCover');
+  if (!entry) throw new Error('the save wrote no stego key photo');
+  return entry.name;
+}
+
 // The cover-reuse guard (src/core/stego-guard.ts) is realm-scoped state, so
 // without this one test's covers would refuse the next test's embeds. That is
 // pollution between independent scenarios rather than the behaviour under test:
@@ -105,7 +112,7 @@ describe('CLI .db duress (Mode A)', () => {
       cover,
     });
     const vault = save.files.find((f) => f.endsWith('.db'))!;
-    const keyImage = save.files.find((f) => f.endsWith('cover.png'))!;
+    const keyImage = stegoKeyPath(save.manifest);
     expect(vault && keyImage).toBeTruthy();
 
     // The real region needs BOTH the real password and the stego cover (the extra
@@ -210,7 +217,7 @@ describe('CLI .db non-possession (Mode B)', () => {
       cover,
     });
     const vault = save.files.find((f) => f.endsWith('.db'))!;
-    const keyImage = save.files.find((f) => f.endsWith('cover.png'))!;
+    const keyImage = stegoKeyPath(save.manifest);
     const shares = readdirSync(outDir)
       .filter((f) => basename(f).startsWith('recovery-'))
       .map((f) => join(outDir, f));

@@ -139,14 +139,14 @@ describe('deniable destinations name nothing after the project', () => {
    * exercised keyfile mode on this path, so nothing caught it.
    */
   it(
-    'gallery with a keyfile: the loose key names neither the project nor the set',
+    'gallery with a keyfile: neither the key nor the photos name the project, the set or the device',
     SLOW,
     async () => {
       const dir = tmp();
       const outDir = join(dir, 'out');
       const secret = write(dir, 'secret.txt', 'gallery keyfile naming check\n');
       const covers = Array.from({ length: 10 }, (_, i) =>
-        writeCover(dir, `IMG_3${i}00.png`, 40 + i),
+        writeCover(dir, `PXL_20260921_14300${i}.png`, 40 + i),
       );
 
       const res = await runGallerySave({
@@ -164,11 +164,17 @@ describe('deniable destinations name nothing after the project', () => {
         expect(name).not.toMatch(/[0-9a-f]{8}/i);
       }
       expect(written).toContain('recovery.key');
-      // And the photos still came out under their own names. The extension
-      // follows the re-encode into the profile; the stem does not, and the stem
-      // is what deniability turns on: the file is still called what the user
-      // called it, not what the tool is called.
-      expect(written.filter((n) => /^IMG_3\d00\.jpg$/.test(n))).toHaveLength(10);
+      // And the photos do not keep their covers' names. `PXL_20260921_143000`
+      // says a Pixel took it and at which second; every delivered photo is
+      // `IMG_` and four drawn digits instead, all distinct, nothing of the
+      // source left in them (see `deniable-names.ts`).
+      const photos = written.filter((n) => n !== 'recovery.key');
+      expect(photos).toHaveLength(10);
+      for (const n of photos) {
+        expect(n).toMatch(/^IMG_\d{4}\.jpg$/);
+        expect(n).not.toMatch(/PXL|2026/);
+      }
+      expect(new Set(photos).size).toBe(10);
     },
   );
 });

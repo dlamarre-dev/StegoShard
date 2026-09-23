@@ -20,14 +20,16 @@ Key modes and paper output mirror the apps:
 ```bash
 # Hybrid mode (🔗): the archive is stored resiliently as images, and only the
 # recovery key is hidden deniably inside an ordinary photo. A baseline JPEG
-# cover stays a JPEG with its coefficients, metadata, and filename intact (the
-# key rides in its DCT coefficients); a PNG cover stays a PNG. One exception:
+# cover stays a JPEG with its coefficients and metadata intact (the key rides
+# in its DCT coefficients); a PNG cover stays a PNG. One exception:
 # a C2PA provenance manifest is removed first (SPEC §9.7), so the key photo is
 # smaller than the cover by the manifest. That is the point: a manifest hashes
 # the image content, so keeping it would both fail validation and publish the
-# exact byte distance from the original. The key image is named after
-# the cover, so restore points --key at that file. If the cover photo is later
-# recompressed, only the key is lost; the resilient archive survives.
+# exact byte distance from the original. The key image is named IMG_ and four
+# random digits, never after the cover, whose name is the device's (which phone,
+# which second); the save summary says which file it is, so note it: restore
+# points --key at that file. If the cover photo is later recompressed, only the
+# key is lost; the resilient archive survives.
 npm run cli -- save wallet.dat --key-mode stego --cover cat.jpg --out ./vault
 #
 # One photo, one password, one save. The cover's CONTENT keys the hiding place, so
@@ -82,6 +84,11 @@ npm run cli -- estimate note.txt --gallery
 
 npm run cli -- gallery-save note.txt ./photos --out ./album
 npm run cli -- gallery-restore ./album --out ./restored
+# Every delivered photo is named IMG_ and four random digits, all distinct: a
+# cover's own name (PXL_20260921_143012.jpg) says which phone took it and when.
+# Which photos carry the secret is drawn at random too, so neither the names nor
+# the order the files are written in say which ones matter. A --key-mode stego
+# key photo draws its name from the same set; the summary says which one it is.
 
 # Every cover is re-encoded into one pinned encoder profile before anything is
 # hidden in it (SPEC §9.8), carriers and decoys alike, and the stego key photo

@@ -18,10 +18,26 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import jpeg from 'jpeg-js';
 import { StegoCoverReuseError, resetStegoCoverGuard } from '../../core';
 import { runSave, type SaveOptions } from './commands';
+
+/**
+ * The key photo's name is drawn, and drawn so as not to collide with anything
+ * already in the output folder, so a collision can no longer be arranged by
+ * pre-creating a file. This pins the draw for the one test that needs one;
+ * every other call gets the real, random names.
+ */
+const forced = vi.hoisted(() => ({ name: undefined as string | undefined }));
+vi.mock('../../core', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../core')>();
+  return {
+    ...real,
+    photoNames: (exts: readonly ('jpg' | 'png')[], taken?: ReadonlySet<string>) =>
+      forced.name ? exts.map(() => forced.name!) : real.photoNames(exts, taken),
+  };
+});
 
 const SLOW = { timeout: 120_000 };
 const PW = 'a long unrelated passphrase for these tests';
@@ -78,16 +94,19 @@ describe('a claim made by a save that failed', () => {
     // the vault is written BEFORE `externalKey` runs, so pre-creating it throws
     // before any embed happens and before any claim exists -- which is what the
     // first version of this test did, making it pass whether or not release
-    // worked. The key image is written after the embed and is named after the
-    // cover, so colliding on `cover.jpg` is the failure that actually has a claim
-    // outstanding.
+    // worked. The key image is written after the embed, so colliding on its name
+    // is the failure that actually has a claim outstanding.
     const f = fixture();
     const out = join(f.dir, 'out');
     mkdirSync(out, { recursive: true });
-    writeFileSync(join(out, 'cover.jpg'), 'in the way');
-
-    await expect(runSave(opts(f, out))).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
-    await expect(runSave({ ...opts(f, out), force: true })).resolves.toBeTruthy();
+    writeFileSync(join(out, 'IMG_0001.jpg'), 'in the way');
+    forced.name = 'IMG_0001.jpg';
+    try {
+      await expect(runSave(opts(f, out))).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
+      await expect(runSave({ ...opts(f, out), force: true })).resolves.toBeTruthy();
+    } finally {
+      forced.name = undefined;
+    }
     expect(readdirSync(out).length).toBeGreaterThan(1);
   });
 

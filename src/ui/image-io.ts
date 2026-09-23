@@ -23,6 +23,8 @@ import {
   extractKeyFactorStegoJpeg,
   isHeif,
   isJpeg,
+  photoNames,
+  type PhotoExt,
   recoveryLines,
   reencodeCover,
   type GalleryCover,
@@ -41,16 +43,13 @@ export interface StegoKeyImage {
 const isPngBytes = (b: Uint8Array): boolean => b[0] === 0x89 && b[1] === 0x50;
 
 /**
- * Default filename for a stego key image. To blend into a camera roll it reuses
- * the cover's own filename; a synthetic fallback is used only when the cover has
- * no usable name. (Restore takes the key image explicitly, so the name is free.)
+ * Filename for a stego key image: `IMG_nnnn`, drawn fresh (see
+ * `deniable-names.ts`). Never the cover's own name, which is the device's and
+ * says which phone took it and when; never a set id, which would tie the key
+ * to the files it opens.
  */
-export function stegoKeyName(coverName: string | undefined, ext: string, setHex: string): string {
-  const trimmed = coverName?.trim();
-  // The cover's own filename is the deniable choice; it is an ordinary photo
-  // the user already had. The fallback only runs when the picked file has no
-  // usable name, so it must not announce the project either.
-  return trimmed ? trimmed : `image-${setHex}.${ext}`;
+export function stegoKeyName(ext: PhotoExt): string {
+  return photoNames([ext])[0]!;
 }
 
 /** Optional human-readable label band drawn above the QR (cleartext; plan §1). */

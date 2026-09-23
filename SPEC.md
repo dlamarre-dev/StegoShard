@@ -528,8 +528,10 @@ DCT coefficients so the carrier stays a JPEG of the same size and metadata, a
 `.png` in a phone's photo library would itself be an anomaly. One deliberate
 exception: cover normalization (§9.7) removes any embedded C2PA provenance
 manifest first, so the carrier matches the cover **after** that removal, not the
-file as it came off the camera. The coefficients and the filename are unchanged;
-the size differs by the manifest, which is the point. Only baseline
+file as it came off the camera. The coefficients are unchanged and the size
+differs by the manifest, which is the point. The filename is **not** kept: a
+camera's name for a photo states the device and the second it was taken, so the
+key photo is delivered as `IMG_` and four CSPRNG digits (§9, delivered names). Only baseline
 sequential Huffman (SOF0), 8-bit, is supported; progressive (SOF2), arithmetic
 coding, and other formats (HEIC, WebP) MUST be rejected, never transcoded, which
 would change the file's size/appearance and defeat deniability.
@@ -888,8 +890,22 @@ rejected.
 2. `k = ceil(blobLen / SLOT_DATA)`, `m = max(ceil(k·0.3), 2)` (§7.2). Require
    `blobLen ≤ 389120` (`SLOT_DATA·190`) so `k + m + 2 ≤ 256` (GF limit, §7.1).
 3. RS-encode into `k + m` shards (§7). For each shard `i`, build `P` (§9.2), seal
-   it, and embed the slot into a distinct cover photo.
+   it, and embed the slot into a distinct cover photo. Which covers carry shards,
+   and which shard each carries, **MUST** be drawn by a CSPRNG permutation, never
+   taken from the order the covers were supplied in: an implementation writes the
+   photos in some order, and if the first `k + m` were always the carriers, that
+   order, and the files' modification times, would point at them.
 4. The remaining covers (≥ 2) become decoys. Total covers ≤ 256.
+
+   **Delivered names.** A delivered photo's filename **MUST NOT** derive from its
+   cover's name, or from the device or time it was taken: a camera's name for a
+   photo (`PXL_20260921_143012.jpg`, `20260921_143012.jpg`) states both. The
+   reference implementations name every delivered photo `IMG_` and four digits
+   drawn by the CSPRNG, distinct within the delivery and clear of names already
+   in the output folder, with an extension that follows the bytes. A stego key
+   photo delivered with the set (§5.2) is named from the same set, so its name
+   does not single it out, and is dated like the photos beside it rather than
+   copying its cover's timestamps.
 
    The floor is a consequence, not a constant: the smallest ladder rung is 4 KiB
    and **both** regions are padded to it, so any envelope up to 4 092 bytes yields

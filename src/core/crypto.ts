@@ -988,7 +988,7 @@ export function secureShuffle<T>(arr: T[]): void {
 }
 
 /** Uniform integer in [0, n) via rejection sampling over a u32 (no modulo bias). */
-function randomIntBelow(n: number): number {
+export function randomIntBelow(n: number): number {
   if (n <= 0) throw new RangeError('randomIntBelow: n must be positive');
   if (n === 1) return 0;
   const limit = Math.floor(0x1_0000_0000 / n) * n; // largest multiple of n ≤ 2^32

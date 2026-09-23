@@ -39,6 +39,7 @@ import {
   hkdf,
   normalizePassword,
   randomBytes,
+  secureShuffle,
 } from './crypto';
 import { galleryFragAad } from './aad';
 import { buildPayload } from './payload';
@@ -677,14 +678,24 @@ export async function galleryEncode(
   const hash = await sha256Short(blob);
   const { posKey, aeadKey } = await galleryKeys(password, params);
 
+  // Which covers carry which shard is a CSPRNG permutation, never the input
+  // order. The images come back in input order and are written in it, so if the
+  // first K+M inputs were the carriers, the order files land on disk, and their
+  // modification times, would say which photos hold the secret (SPEC §9).
+  const roles = Array.from({ length: covers.length }, (_, i) => i);
+  secureShuffle(roles);
+  const shardOf = new Array<number>(covers.length).fill(-1);
+  for (let s = 0; s < carriers; s++) shardOf[roles[s]!] = s;
+
   const images: GalleryImage[] = [];
   for (let i = 0; i < covers.length; i++) {
     let slot: Uint8Array;
-    if (i < carriers) {
+    const shard = shardOf[i]!;
+    if (shard >= 0) {
       const header: Header = {
         version: FORMAT_VERSION,
         setId,
-        shardIndex: i,
+        shardIndex: shard,
         k,
         m,
         codecId: CODEC_GALLERY,
@@ -695,7 +706,7 @@ export async function galleryEncode(
       };
       // header||shard, zero-padded to the fixed fragment length, then sealed.
       const frag = new Uint8Array(GALLERY_FRAG_LEN);
-      frag.set(encodeImagePayload(header, shards[i]!), 0);
+      frag.set(encodeImagePayload(header, shards[shard]!), 0);
       const { iv, ciphertext } = await encryptBytes(aeadKey, frag, galleryFragAad());
       slot = concatBytes(iv, ciphertext);
     } else {

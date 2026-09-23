@@ -380,6 +380,40 @@ describe('gallery deniability', () => {
   });
 });
 
+/**
+ * Which covers carry the shards is drawn, not taken from the input order.
+ *
+ * Images come back in input order and every surface writes them in it, so if the
+ * first K+M inputs were the carriers, the order files land in, and their
+ * modification times, would point at the photos holding the secret. Checked
+ * without reaching inside: drop the first m+1 images. Under the old rule those
+ * were always carriers, leaving k-1 of the k needed, and the restore failed
+ * every time. With twenty photos and drawn roles, all m+1 being carriers is a
+ * few-percent event, so across three independent saves at least one restores.
+ */
+describe('gallery role assignment', () => {
+  it('does not make the first K+M covers the carriers', async () => {
+    const secret = enc.encode('the order says nothing');
+    let restored = 0;
+    for (let run = 0; run < 3 && restored === 0; run++) {
+      const { covers } = await coversFor(
+        'r.txt',
+        secret,
+        (n, s) => rgbaCover(`${n}.png`, s + run * 100),
+        11,
+      );
+      const { images, m } = await galleryEncode('r.txt', secret, 'pw', covers, { params: FAST });
+      const kept = images.slice(m + 1);
+      const ok = await galleryDecode(kept, 'pw', { params: FAST }).then(
+        (r) => r.content.length === secret.length,
+        () => false,
+      );
+      if (ok) restored++;
+    }
+    expect(restored).toBe(1);
+  }, 180000);
+});
+
 describe('gallery grouping and validation', () => {
   it('resolves the majority set when two same-password galleries are mixed', async () => {
     // A carries a larger secret (more shards) than B, so A wins the majority.
