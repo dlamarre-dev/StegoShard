@@ -284,6 +284,13 @@ export interface CostSample {
 
 /** How close to a stage's end the bar may creep before the stage reports it. */
 const CREEP = 0.97;
+/** A stage whose per-unit work is estimated below this is not learned from. */
+const MIN_LEARN_MS = 100;
+/**
+ * How far a learned cost may drift from its default, either way. A phone several
+ * times slower than a desktop is well inside it; a runaway estimate is not.
+ */
+const CALIBRATION_RANGE = 20;
 /** Bounds on the in-run pace correction. */
 const PACE_MIN = 1 / 3;
 const PACE_MAX = 3;
@@ -315,7 +322,7 @@ export class ProgressTracker {
 
   constructor(
     stages: readonly Stage[],
-    calibration: Calibration,
+    private readonly calibration: Calibration,
     private readonly now: () => number,
   ) {
     this.stages = stages.filter((s) => estimateMs(s, calibration) > 0);
@@ -344,7 +351,13 @@ export class ProgressTracker {
     const s = this.stages[this.cursor]!;
     const elapsed = Math.max(0, this.now() - this.stageStart);
     if (measure) {
-      if (s.units > 0) {
+      // Learned from only when the per-unit work is the bulk of the stage. For a
+      // few kilobytes of secret the units are a sliver, the elapsed time is all
+      // fixed overhead (and the UI's own frame waits), and dividing it by that
+      // sliver reads as a rate hundreds of times too slow; learning from it
+      // would ratchet the calibration upward on every small save.
+      const variable = s.units * this.calibration[s.cost];
+      if (s.units > 0 && variable >= Math.max(s.baseMs, MIN_LEARN_MS)) {
         const perUnit = Math.max(0, elapsed - s.baseMs) / s.units;
         this.measured.push({ cost: s.cost, msPerUnit: perUnit });
       }
@@ -451,7 +464,9 @@ export class ProgressTracker {
  * Fold measured durations into a calibration: an exponential moving average,
  * with each sample clamped to between a fifth and five times the current value
  * so that one save run in a background tab, or on a machine busy with something
- * else, cannot drag the estimates far in one go.
+ * else, cannot drag the estimates far in one go. The result stays within
+ * `CALIBRATION_RANGE` of the default, so no sequence of bad samples can walk it
+ * off without bound.
  */
 export function updateCalibration(
   c: Calibration,
@@ -463,7 +478,9 @@ export function updateCalibration(
     const cur = next[s.cost];
     if (!Number.isFinite(s.msPerUnit) || s.msPerUnit < 0 || cur <= 0) continue;
     const clamped = Math.min(cur * 5, Math.max(cur / 5, s.msPerUnit));
-    next[s.cost] = cur + alpha * (clamped - cur);
+    const base = DEFAULT_CALIBRATION[s.cost];
+    const moved = cur + alpha * (clamped - cur);
+    next[s.cost] = Math.min(base * CALIBRATION_RANGE, Math.max(base / CALIBRATION_RANGE, moved));
   }
   return next;
 }
