@@ -1134,7 +1134,20 @@ Under this mode:
   the sum of the source's luma table against the profile's **1109**, read from its
   DQT without touching the entropy-coded scan, so the decision is a property of
   the cover alone. The refusal **MUST** name the photo, because the remedy is to
-  use a different one.
+  use a different one. A JPEG source whose luma table **cannot be read** (a
+  truncated file a decoder still renders, or one that files luma under another
+  table id) **MUST** be refused the same way: a coarseness that cannot be measured
+  is not a coarseness that is safe.
+- An implementation **MUST** apply a JPEG source's EXIF Orientation to the pixels
+  before re-encoding. The profile carries no EXIF, so the tag that told a viewer
+  to turn a portrait photo upright does not survive, and every surface has to
+  decode the same photo to the same pixels: browsers apply the tag on decode, so
+  a decoder that does not has to apply it itself.
+- An implementation **MAY** pass a cover through unchanged when it already is a
+  file this profile wrote: every byte before the scan identical to what the
+  encoder would write for its dimensions, and nothing after EOI. Re-encoding such
+  a file could only lose a generation, and a delivered gallery photo is exactly
+  such a file, with its payload in the coefficients a re-encode would rewrite.
 
 #### 9.8.1 The sparseness bar, and how it was derived
 
@@ -1205,6 +1218,12 @@ coefficients preserved. If it does:
 
 - it **MUST** remove the EXIF GPS block from every cover in the set, including
   the values addressed from the GPS IFD and not merely the pointer to it;
+- it **MUST** remove GPS coordinates wherever else the container carries them:
+  GPS properties in XMP (any prefix, including Extended XMP), the EXIF and XMP of
+  every JPEG stream after EOI (an MPF secondary image, a gain map), and the
+  QuickTime `©xyz` location of a motion-photo video after EOI. It **MUST NOT**
+  move a byte to do so, so every MPF offset stays true, and it **MUST** fail
+  closed on a coordinate-bearing structure it cannot walk;
 - it **MUST NOT** claim the uniformity property, and **SHOULD** say plainly what
   is being kept: quantization tables, ICC profile, makernote, XMP dialect,
   timestamps and camera model all survive, and a set gathered from several devices

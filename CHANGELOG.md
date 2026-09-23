@@ -37,11 +37,28 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   **It applies to the whole set, and that is the point.** Carriers, decoys, and the
   `--key-mode stego` key photo, which used to be delivered in its own container and would
   have been the single file in the folder not matching its neighbours. A PNG cover comes
-  out a `.jpg`, name included.
+  out a `.jpg`, name included, and when that name meets a gallery photo's (a key cover
+  `IMG_1.png` beside a cover `IMG_1.jpg`) the key photo is numbered apart rather than
+  refused halfway through the save or, with `--force`, written over the photo.
+
+  **Portraits stay upright on every surface.** The browser applies a photo's EXIF
+  Orientation when it decodes; jpeg-js, which decodes for the CLI and the library, does
+  not, and the profile writes no EXIF to carry the tag forward. The CLI now applies it
+  itself (`src/core/exif-orientation.ts`), so a phone portrait is not delivered sideways
+  from one surface and upright from another.
+
+  **A photo already in the profile passes through untouched.** A delivered gallery photo
+  is one, and its payload lives in the coefficients a re-encode would rewrite: a library
+  caller loading a delivered set with `fileToGalleryCover(bytes, name)`, the default, would
+  otherwise have wiped what `galleryDecode` was about to read. The check is strict (every
+  byte before the scan equal to what the encoder would write, nothing after EOI), so it
+  lets through nothing the profile did not produce.
 
   **Two refusals come with it.** A photo already recompressed by a messaging service is
   coarser than the profile, and re-encoding it would imprint a double-quantization comb in
-  its histogram: a detector signal introduced by the tool. It is refused by name. And a
+  its histogram: a detector signal introduced by the tool. It is refused by name, and so is
+  a JPEG whose quantization table cannot be read at all, since a coarseness nobody can
+  measure is not one anybody can call safe. And a
   photo too smooth to carry a fragment sparsely is refused by name too, over the whole set
   rather than the carriers, because "passes the filter" must not be a test that finds the
   carriers.
@@ -77,6 +94,19 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   an opaque maker note: the file keeps its length, the freed entry is left as unreferenced
   padding, and a whole class of offset bugs is impossible rather than rare. An EXIF block it
   cannot walk is a refusal, not a pass.
+
+  The EXIF GPS IFD is not the only place a coordinate sits, and the scrub covers the
+  others under the same no-byte-moves rule: GPS properties in XMP, attribute or element,
+  any prefix (`exif:GPSLatitude`, `drone-dji:GpsLongitude`), with Extended XMP read as one
+  text so a property split across chunks is still found; the EXIF and XMP of every JPEG
+  after EOI, which is where an MPF secondary image or a gain map keeps its own; and the
+  `©xyz` location atom of a motion-photo video. EXIF in the trailer that sits in no image
+  it can walk is refused.
+
+  A progressive JPEG, which only this mode can hand to the core, is refused as the
+  unsupported format it is. The capacity screen used to read "cannot decode" as zero
+  carriers and name it too smooth, telling the user to drop a textured photo for the wrong
+  reason.
 
 - **Cover normalization: the C2PA provenance manifest is removed before embedding**
   (SPEC §9.7, new). Recent phones and cameras embed a signed manifest carrying a hash of

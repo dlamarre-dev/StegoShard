@@ -44,6 +44,7 @@ import {
   serializeKeyBlock,
   type GalleryImage,
 } from '../../core';
+import { exifSegmentWithOrientation, spliceAfterSoi } from '../../core/jpeg-fixtures';
 import {
   decodeImageToPayload,
   decodePixelsToPayload,
@@ -59,6 +60,23 @@ import {
 const PW = 'a cover password, unrelated to anything else';
 
 /** A baseline JPEG with enough texture to carry a key block. */
+/** RGBA whose red channel ramps with x and green with y, so a turn is visible. */
+function gradient(
+  width: number,
+  height: number,
+): { data: Uint8Array; width: number; height: number } {
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = (y * width + x) * 4;
+      data[p] = Math.round((x / (width - 1)) * 255);
+      data[p + 1] = Math.round((y / (height - 1)) * 255);
+      data[p + 3] = 255;
+    }
+  }
+  return { data, width, height };
+}
+
 function baselineJpeg(side = 96, quality = 92): Uint8Array {
   const data = new Uint8Array(side * side * 4);
   for (let i = 0; i < side * side; i++) {
@@ -296,6 +314,45 @@ describe('gallery covers converge on one profile', () => {
     const other = fileToGalleryCover(noisyPng(16), 'holiday.png', { preserveContainer: true });
     expect(other.kind).toBe('rgba');
     expect(other.kind === 'rgba' && other.width).toBe(16);
+  });
+
+  /**
+   * A portrait phone photo is landscape sensor data plus an Orientation tag. The
+   * browser applies the tag on decode; jpeg-js does not, and the profile writes
+   * no EXIF, so without this the CLI delivered the photo sideways for good while
+   * the web app delivered it upright.
+   */
+  it('applies EXIF Orientation before re-encoding, as the browser does', () => {
+    const stored = new Uint8Array(jpeg.encode(gradient(48, 32), 90).data);
+    const portrait = spliceAfterSoi(stored, exifSegmentWithOrientation(6));
+    expect([
+      fileToImageData(portrait, 'p.jpg').width,
+      fileToImageData(portrait, 'p.jpg').height,
+    ]).toEqual([32, 48]);
+    const cover = fileToGalleryCover(portrait, 'IMG_0001.jpg');
+    const out = jpeg.decode(cover.kind === 'jpeg' ? cover.jpeg : new Uint8Array(), {
+      useTArray: true,
+    });
+    expect([out.width, out.height]).toEqual([32, 48]);
+    // Turned the right way: the stored top-left corner is now the top-right.
+    const up = fileToImageData(portrait, 'p.jpg');
+    const flat = fileToImageData(stored, 's.jpg');
+    const px = (img: { data: ArrayLike<number>; width: number }, x: number, y: number) =>
+      img.data[(y * img.width + x) * 4]!;
+    expect(Math.abs(px(up, up.width - 1, 0) - px(flat, 0, 0))).toBeLessThanOrEqual(4);
+  });
+
+  /**
+   * A delivered gallery photo is already in the profile, and its payload is in
+   * the coefficients. Loading one with the default options used to re-encode it
+   * and wipe that payload, which broke restore for any library caller that did
+   * not know to pass `preserveContainer`.
+   */
+  it('passes a photo already in the profile through untouched', () => {
+    const first = fileToGalleryCover(noisyPng(32), 'holiday.png');
+    const again = first.kind === 'jpeg' ? first.jpeg : new Uint8Array();
+    const second = fileToGalleryCover(again, 'holiday.jpg');
+    expect(second.kind === 'jpeg' && second.jpeg).toBe(again);
   });
 
   it('writes a produced JPEG back unchanged', () => {

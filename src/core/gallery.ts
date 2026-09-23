@@ -61,8 +61,8 @@ import {
   embedBytesStegoRgba,
   extractBytesStegoJpeg,
   extractBytesStegoRgba,
-  jpegStegoCapacityBits,
 } from './stego';
+import { decode as decodeJpeg, eligibleCoefficients } from './jpeg-coeff';
 import {
   MAX_FILE_BYTES,
   VerificationError,
@@ -551,9 +551,13 @@ function screenCovers(covers: readonly GalleryCover[]): void {
   const needed = GALLERY_SLOT_BITS * GALLERY_EMBED_MARGIN;
   const rejected: string[] = [];
   for (const cover of covers) {
+    // The strict decode, not `jpegStegoCapacityBits`: that one reads "cannot
+    // decode" as zero carriers, which would name a progressive JPEG (reachable
+    // under `preserveContainer`) as too smooth. Its `JpegUnsupportedError`
+    // propagates instead, and the adapters report it as the format it is.
     const carriers =
       cover.kind === 'jpeg'
-        ? jpegStegoCapacityBits(cover.jpeg)
+        ? eligibleCoefficients(decodeJpeg(cover.jpeg)).count
         : cover.width * cover.height * RGB_CHANNELS;
     if (carriers < needed) rejected.push(cover.name);
   }

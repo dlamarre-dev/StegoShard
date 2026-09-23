@@ -22,6 +22,7 @@ import {
   GalleryRestoreError,
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
+  JpegUnsupportedError,
   decode as decodeJpeg,
   estimateGalleryCovers,
   galleryCoversForEnvelopeLen,
@@ -470,6 +471,29 @@ describe('gallery guardrails', () => {
     );
     expect(err).toBeInstanceOf(GalleryCoversRejectedError);
     expect((err as GalleryCoversRejectedError).names).toEqual(['flat-decoy.jpg']);
+  });
+
+  /**
+   * A progressive JPEG reaches the core under `preserveContainer`. It cannot be
+   * embedded into, and the refusal has to say so: the capacity count used to
+   * read "cannot decode" as zero carriers and call it too smooth, which tells a
+   * user to drop a textured photo for the wrong reason.
+   */
+  it('reports a progressive JPEG as unsupported, not as too smooth', async () => {
+    const secret = enc.encode('hi');
+    const { needed } = await estimateGalleryCovers('x', secret, 'embedded');
+    const progressive = noisyJpeg(64, 64);
+    const sof = progressive.findIndex((b, i) => b === 0xff && progressive[i + 1] === 0xc0);
+    progressive[sof + 1] = 0xc2; // SOF0 -> SOF2
+    const covers: GalleryCover[] = [
+      { kind: 'jpeg', name: 'progressive.jpg', jpeg: progressive },
+      ...Array.from({ length: needed }, (_, i) => rgbaCover(`p${i}.png`, i + 1)),
+    ];
+    const err = await galleryEncode('x', secret, 'pw', covers, { params: FAST }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(JpegUnsupportedError);
+    expect(err).not.toBeInstanceOf(GalleryCoversRejectedError);
   });
 
   /**

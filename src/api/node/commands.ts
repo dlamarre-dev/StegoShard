@@ -67,6 +67,7 @@ import {
   KEY_FACTOR_LEN,
   inspectCoverSet,
   inspectJpegCover,
+  StegoCoverFormatError,
   isHeif,
   isJpeg as isJpegBytes,
   normalizeJpegCover,
@@ -469,6 +470,12 @@ async function externalKey(
     // anything else in this function can throw.
     const embedOpts: StegoEmbedOptions = { ...opts, onClaim: hold };
     const raw = read(cover);
+    // The profile path decodes the cover, and the decoder here reads PNG and JPEG
+    // only. Anything else (HEIC above all, which StegoShard never ingests, SPEC
+    // §5.4) is refused by name, as the as-is path and the covers already are,
+    // rather than surfacing as a jpeg-js "SOI not found".
+    const decodable = isJpegBytes(raw) || (raw[0] === 0x89 && raw[1] === 0x50);
+    if (coverContainer === 'profile' && !decodable) throw new StegoCoverFormatError();
     // Into the profile first, where the delivery asks for it, so the embed writes
     // into the coefficients that will actually be delivered. A re-encode after
     // the embed would destroy the payload; this is the only order that works,
@@ -1136,14 +1143,19 @@ async function runGallerySaveImpl(
   }
   const setHex = toHex(res.setId);
 
+  // Two covers can share a basename, and so can a cover and the key photo (a
+  // `--key-cover IMG_1.png` re-encoded to `IMG_1.jpg` beside a gallery
+  // `IMG_1.jpg`); disambiguate so nothing is overwritten.
   const used = new Set<string>();
+  const claimName = (wanted: string): string => {
+    let name = wanted;
+    for (let n = 2; used.has(name); n++) name = wanted.replace(/(\.[^.]+)?$/, `-${n}$1`);
+    used.add(name);
+    return name;
+  };
   const outs: OutFile[] = res.images.map((img) => {
     const f = galleryImageToFile(img);
-    let name = f.name;
-    // Two covers can share a basename; disambiguate so nothing is overwritten.
-    for (let n = 2; used.has(name); n++) name = f.name.replace(/(\.[^.]+)?$/, `-${n}$1`);
-    used.add(name);
-    return emit(opts, name, f.bytes, 'photos');
+    return emit(opts, claimName(f.name), f.bytes, 'photos');
   });
   // Deliver the external key alongside the photos for keyfile/stego galleries.
   // Gallery is a multi-region path → the external artifact is the 32-byte factor.
@@ -1162,7 +1174,7 @@ async function runGallerySaveImpl(
     hold,
     landed,
   );
-  if (ext) outs.push(writeExternalKey(opts, ext));
+  if (ext) outs.push(writeExternalKey(opts, { ...ext, name: claimName(ext.name) }));
   // Non-possession: write the n threshold share files to hand to holders.
   if (res.shares && opts.threshold) {
     const { k, n } = opts.threshold;

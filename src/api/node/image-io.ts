@@ -21,12 +21,14 @@ import {
   type StegoEmbedOptions,
   embedKeyFactorStego,
   embedKeyFactorStegoJpeg,
+  exifOrientation,
   extractKeyBlockStego,
   extractKeyBlockStegoJpeg,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
   isHeif,
   isJpeg as isJpegBytes,
+  orientImage,
   reencodeCover,
 } from '../../core';
 
@@ -80,7 +82,15 @@ function toRgba(
 const isPng = (name: string) => /\.png$/i.test(name);
 const isJpeg = (name: string) => /\.jpe?g$/i.test(name);
 
-/** Decode PNG/JPEG file bytes into RGBA pixels. Throws on an unsupported format. */
+/**
+ * Decode PNG/JPEG file bytes into upright RGBA pixels. Throws on an unsupported
+ * format.
+ *
+ * A JPEG's EXIF Orientation is applied, as every browser applies it on decode:
+ * without it a portrait phone photo decodes sideways here and upright in the web
+ * app, and once re-encoded (the profile writes no EXIF) it is delivered sideways
+ * for good. See `exif-orientation.ts`.
+ */
 export function fileToImageData(bytes: Uint8Array, filename: string): ImageDataLike {
   // Prefer the extension, but fall back to signature sniffing (PNG magic).
   const looksPng = isPng(filename) || (bytes[0] === 0x89 && bytes[1] === 0x50);
@@ -89,7 +99,8 @@ export function fileToImageData(bytes: Uint8Array, filename: string): ImageDataL
     return toRgba(d.data, d.width, d.height, d.channels, d.depth);
   }
   const d = jpeg.decode(bytes, { useTArray: true, formatAsRGBA: true });
-  return { data: new Uint8ClampedArray(d.data), width: d.width, height: d.height };
+  const img = { data: new Uint8ClampedArray(d.data), width: d.width, height: d.height };
+  return orientImage(img, exifOrientation(bytes));
 }
 
 /**
@@ -215,6 +226,10 @@ export async function embedKeyImage(
  * source's quantization tables, its ICC profile, its makernote and its XMP
  * dialect all survive, and a mixed-device set stays mixed. It is a flag, never
  * the default.
+ *
+ * A JPEG already in the profile, which is what every delivered gallery photo
+ * is, passes through unchanged on either path (see `reencodeCover`), so the
+ * default is also safe for loading a delivered set to restore.
  */
 export function fileToGalleryCover(
   bytes: Uint8Array,

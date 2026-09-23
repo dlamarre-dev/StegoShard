@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import jpeg from 'jpeg-js';
 import { decode as decodeCoeff } from './jpeg-coeff';
 
-import { JpegEncodeError, encodeJpegProfile, reencodeCover } from './jpeg-encode';
+import { JpegEncodeError, encodeJpegProfile, isProfileJpeg, reencodeCover } from './jpeg-encode';
 import { lumaQuantSum, parseJpegSegments } from './jpeg-segments';
 import {
   HUFF_AC_CHROMA_COUNTS,
@@ -210,6 +210,16 @@ describe('the encoder', () => {
     // A buffer shorter than the dimensions claim would otherwise read undefined.
     expect(() => encodeJpegProfile({ ...img, width: 64, height: 64 })).toThrow(/RGBA buffer/);
   });
+
+  // SOF0 holds each side in 16 bits. A 70000x1 strip is well under the pixel
+  // ceiling, and without this check its width was silently truncated to 4464.
+  it('refuses a side SOF0 cannot record', () => {
+    const strip = { data: new Uint8ClampedArray(70_000 * 4), width: 70_000, height: 1 };
+    expect(() => encodeJpegProfile(strip)).toThrow(/65535-pixel side limit/);
+    expect(() => encodeJpegProfile({ ...strip, width: 1, height: 70_000 })).toThrow(
+      JpegEncodeError,
+    );
+  });
 });
 
 describe('the source a re-encode refuses', () => {
@@ -245,10 +255,44 @@ describe('the source a re-encode refuses', () => {
     );
   });
 
-  it('accepts a source at the profile’s own coarseness, and one with no table', () => {
-    // Equal, not finer: re-encoding our own output is the idempotent case.
-    expect(reencodeCover(pixels, encodeJpegProfile(pixels)).length).toBeGreaterThan(0);
-    // A PNG cover has no quantization table, so there is no comb to create.
+  it('accepts a source with no table: a PNG cover has no comb to create', () => {
     expect(reencodeCover(pixels).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * "Cannot measure" is not "nothing to measure". jpeg-js decodes a JPEG cut
+   * off before its EOI, the segment walk does not, and the comb check used to
+   * read the resulting null as "not a JPEG" and re-encode regardless.
+   */
+  it('refuses a JPEG source whose table cannot be read', () => {
+    const coarse = encodedAt(80);
+    const truncated = coarse.subarray(0, coarse.length - 2);
+    expect(lumaQuantSum(truncated)).toBeNull();
+    expect(() => reencodeCover(pixels, truncated, 'IMG_2044.jpg')).toThrow(
+      /IMG_2044\.jpg: its quantization table could not be read/,
+    );
+  });
+
+  /**
+   * A file already in the profile passes through untouched. A delivered gallery
+   * photo is one, and its payload is in the coefficients a re-encode would
+   * rewrite: a library caller loading a delivered set with the default options
+   * would otherwise wipe what restore is about to read.
+   */
+  it('returns a source already in the profile unchanged', () => {
+    const profiled = encodeJpegProfile(pixels);
+    expect(reencodeCover(pixels, profiled)).toBe(profiled);
+    expect(isProfileJpeg(profiled)).toBe(true);
+  });
+
+  it('re-encodes a profile lookalike that differs anywhere in its header or after EOI', () => {
+    const profiled = encodeJpegProfile(pixels);
+    const trailing = new Uint8Array([...profiled, 0x00]);
+    expect(isProfileJpeg(trailing)).toBe(false);
+    expect(reencodeCover(pixels, trailing)).not.toBe(trailing);
+    // A JFIF density of 72 dpi instead of the profile's 1:1 aspect ratio.
+    const dpi = Uint8Array.from(profiled);
+    dpi[13] = 1;
+    expect(isProfileJpeg(dpi)).toBe(false);
   });
 });

@@ -25,8 +25,10 @@ import {
   exifSegmentWithGps,
   gainMapTrailer,
   iccSegment,
+  mp4Trailer,
   spliceBeforeSos,
   withTrailer,
+  xmpSegment,
 } from './jpeg-fixtures';
 
 /** The latitude value as it sits in the file: three big-endian RATIONALs. */
@@ -174,5 +176,130 @@ describe('EXIF it cannot walk', () => {
     expect(() => scrubGps(broken((t) => t.set([0xff, 0xff, 0xff, 0xf0], 8 + 2 + 8)))).toThrow(
       ExifScrubError,
     );
+  });
+});
+
+const enc = new TextEncoder();
+
+/** An Extended XMP chunk: prefix, GUID, the full length, this chunk's offset, then the text. */
+function xmpChunk(text: string, offset: number, total: number): Uint8Array {
+  const head = new Uint8Array(40);
+  head.set(enc.encode('0123456789ABCDEF0123456789ABCDEF'), 0);
+  new DataView(head.buffer).setUint32(32, total);
+  new DataView(head.buffer).setUint32(36, offset);
+  const prefix = enc.encode('http://ns.adobe.com/xmp/extension/\0');
+  const body = enc.encode(text);
+  const payload = new Uint8Array(prefix.length + head.length + body.length);
+  payload.set(prefix, 0);
+  payload.set(head, prefix.length);
+  payload.set(body, prefix.length + head.length);
+  return appSegment(0xe1, payload);
+}
+
+/** The coordinate as XMP writes it, which is text rather than rationals. */
+const XMP_LAT = '45,30.25N';
+const XMP_LON = '73,34.1W';
+
+/**
+ * EXIF is where a coordinate is expected, and not where it only is. Lightroom,
+ * Apple Photos and most phone galleries write it into XMP as well, and a flag
+ * that promises "GPS is removed" has to find it there.
+ */
+describe('coordinates outside the EXIF GPS IFD', () => {
+  it('blanks GPS properties written as XMP attributes', () => {
+    const xmp = xmpSegment(
+      `<rdf:Description xmlns:exif="http://ns.adobe.com/exif/1.0/" ` +
+        `exif:GPSLatitude="${XMP_LAT}" exif:GPSLongitude='${XMP_LON}' exif:ExposureTime="1/60"/>`,
+    );
+    const photo = spliceBeforeSos(baseJpeg(64, 64), xmp);
+    const { bytes, removed } = scrubGps(photo);
+    expect(removed).toBe(true);
+    expect(bytes.length).toBe(photo.length);
+    expect(contains(bytes, enc.encode(XMP_LAT))).toBe(false);
+    expect(contains(bytes, enc.encode(XMP_LON))).toBe(false);
+    // What is not a coordinate stays, and the packet is still XML.
+    expect(contains(bytes, enc.encode('exif:ExposureTime="1/60"'))).toBe(true);
+    expect(contains(bytes, enc.encode('<rdf:Description'))).toBe(true);
+  });
+
+  it('blanks GPS properties written as elements, in any case and any prefix', () => {
+    const xmp = xmpSegment(
+      `<rdf:Description><exif:GPSLatitude>${XMP_LAT}</exif:GPSLatitude>` +
+        `<drone-dji:GpsLongitude>${XMP_LON}</drone-dji:GpsLongitude>` +
+        `<exif:GPSVersionID/><tiff:Make>Google</tiff:Make></rdf:Description>`,
+    );
+    const { bytes, removed } = scrubGps(spliceBeforeSos(baseJpeg(64, 64), xmp));
+    expect(removed).toBe(true);
+    expect(contains(bytes, enc.encode(XMP_LAT))).toBe(false);
+    expect(contains(bytes, enc.encode(XMP_LON))).toBe(false);
+    expect(contains(bytes, enc.encode('GPSVersionID'))).toBe(false);
+    expect(contains(bytes, enc.encode('<tiff:Make>Google</tiff:Make>'))).toBe(true);
+  });
+
+  it('finds a property split across two Extended XMP chunks', () => {
+    const text = `<rdf:Description exif:GPSLatitude="${XMP_LAT}"/>`;
+    const cut = text.indexOf('GPS') + 2; // "...exif:GP" | "SLatitude=..."
+    // Written out of order: the scrub has to reassemble by offset, not by position.
+    const photo = spliceBeforeSos(
+      spliceBeforeSos(baseJpeg(64, 64), xmpChunk(text.slice(cut), cut, text.length)),
+      xmpChunk(text.slice(0, cut), 0, text.length),
+    );
+    const { bytes, removed } = scrubGps(photo);
+    expect(removed).toBe(true);
+    expect(bytes.length).toBe(photo.length);
+    expect(contains(bytes, enc.encode(XMP_LAT))).toBe(false);
+  });
+
+  it('refuses an XMP packet that names GPS in a form it cannot remove', () => {
+    // An element that is opened and never closed: no pattern matches it, and it
+    // must not pass as clean.
+    const xmp = xmpSegment(`<rdf:Description><exif:GPSLatitude>${XMP_LAT}</rdf:Description>`);
+    expect(() => scrubGps(spliceBeforeSos(baseJpeg(64, 64), xmp))).toThrow(ExifScrubError);
+  });
+
+  /**
+   * An MPF secondary image or a gain map is a JPEG of its own, after EOI, with
+   * its own EXIF. The scrub used to leave every byte after EOI untouched.
+   */
+  it('scrubs the EXIF of an image after EOI, without moving it', () => {
+    const secondary = spliceBeforeSos(baseJpeg(32, 32, 70, 9), exifSegmentWithGps(true));
+    const photo = withTrailer(spliceBeforeSos(baseJpeg(64, 64), exifSegment()), secondary);
+    expect(contains(photo, coordinateBytes(true))).toBe(true);
+    const { bytes, removed } = scrubGps(photo);
+    expect(removed).toBe(true);
+    expect(bytes.length).toBe(photo.length);
+    expect(contains(bytes, coordinateBytes(true))).toBe(false);
+    // The secondary image still starts where the MPF index says it does.
+    const trailer = parseJpegSegments(photo).trailerStart;
+    expect(Array.from(bytes.subarray(trailer, trailer + 3))).toEqual([0xff, 0xd8, 0xff]);
+    expect(decodeCoeff(bytes.subarray(trailer)).width).toBe(32);
+  });
+
+  it('refuses EXIF after EOI that is not inside an image it can walk', () => {
+    const loose = new Uint8Array([...enc.encode('junk'), ...exifSegmentWithGps().subarray(4)]);
+    expect(() => scrubGps(withTrailer(baseJpeg(64, 64), loose))).toThrow(ExifScrubError);
+  });
+
+  it('zeroes the location atom of a motion-photo video', () => {
+    const where = enc.encode('+45.5042-073.5683/');
+    const atom = new Uint8Array(12 + where.length);
+    new DataView(atom.buffer).setUint32(0, atom.length);
+    atom.set([0xa9, 0x78, 0x79, 0x7a], 4); // ©xyz
+    new DataView(atom.buffer).setUint16(8, where.length);
+    new DataView(atom.buffer).setUint16(10, 0x15c7); // language
+    atom.set(where, 12);
+    const video = new Uint8Array([...mp4Trailer(), ...atom]);
+    const photo = withTrailer(baseJpeg(64, 64), video);
+    const { bytes, removed } = scrubGps(photo);
+    expect(removed).toBe(true);
+    expect(bytes.length).toBe(photo.length);
+    expect(contains(bytes, where)).toBe(false);
+    // The box itself stays, so the video still parses.
+    expect(contains(bytes, new Uint8Array([0xa9, 0x78, 0x79, 0x7a]))).toBe(true);
+  });
+
+  it('leaves a trailer with nothing to scrub byte for byte, and returns the original', () => {
+    const photo = withTrailer(spliceBeforeSos(baseJpeg(64, 64), exifSegment()), gainMapTrailer());
+    expect(scrubGps(photo).bytes).toBe(photo);
   });
 });

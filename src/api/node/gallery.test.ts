@@ -8,9 +8,22 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
-import { decode as decodeCoeff, hasGps, inspectJpegCover, profileMismatch } from '../../core';
-import { baseJpeg, exifSegmentWithGps, spliceBeforeSos } from '../../core/jpeg-fixtures';
+import {
+  StegoCoverFormatError,
+  decode as decodeCoeff,
+  galleryDecode,
+  hasGps,
+  inspectJpegCover,
+  profileMismatch,
+} from '../../core';
+import {
+  baseJpeg,
+  exifSegmentWithGps,
+  heicHeader,
+  spliceBeforeSos,
+} from '../../core/jpeg-fixtures';
 import { runGalleryRestore, runGallerySave } from './commands';
+import { extractKeyFactorImage, fileToGalleryCover } from './image-io';
 
 // Production Argon2 (64 MiB) runs on save and restore; give CI room.
 //
@@ -335,5 +348,80 @@ describe('CLI gallery round-trip', () => {
       sharePaths: [shares[0]!, shares[2]!],
     });
     expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+  });
+});
+
+describe('CLI gallery save: the key photo', () => {
+  /**
+   * A PNG key cover is re-encoded to `.jpg`, so `photo-0.png` as the key and
+   * `photo-0.png` among the covers both leave as `photo-0.jpg`. The photos are
+   * written first, so the key's write used to be refused with the save half
+   * done, or with `--force` to overwrite one of the gallery's own photos.
+   *
+   * The same save then restores through the library's default loader, which is
+   * what a third-party caller reaches for. Delivered photos are already in the
+   * profile, so it hands them over untouched instead of re-encoding the payload
+   * out of them.
+   */
+  it(
+    'is named apart from a gallery photo it collides with, and the set restores through the default loader',
+    SLOW,
+    async () => {
+      const coverDir = tmp();
+      for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 70);
+      const secretDir = tmp();
+      const secretPath = join(secretDir, 'note.txt');
+      const secret = Buffer.from('two photos, one name');
+      writeFileSync(secretPath, secret);
+      const keyDir = tmp();
+      writePngCover(keyDir, 'photo-0.png', 998);
+
+      const albumDir = tmp();
+      const save = await runGallerySave({
+        secretFile: secretPath,
+        covers: [coverDir],
+        outDir: albumDir,
+        password: PW,
+        keyMode: 'stego',
+        keyCover: join(keyDir, 'photo-0.png'),
+      });
+      expect(new Set(save.files).size).toBe(13);
+      const photos = save.files.slice(0, 12);
+      const keyPath = save.files[12]!;
+      expect(photos.map((f) => basename(f))).toContain('photo-0.jpg');
+      expect(basename(keyPath)).toBe('photo-0-2.jpg');
+
+      const keyBlock = await extractKeyFactorImage(
+        new Uint8Array(readFileSync(keyPath)),
+        basename(keyPath),
+        PW,
+      );
+      expect(keyBlock).not.toBeNull();
+      const covers = photos.map((p) =>
+        fileToGalleryCover(new Uint8Array(readFileSync(p)), basename(p)),
+      );
+      const { content } = await galleryDecode(covers, PW, { keyBlock: keyBlock! });
+      expect(content).toEqual(new Uint8Array(secret));
+    },
+  );
+
+  it('refuses a HEIC key cover by name, not as a jpeg-js stack trace', SLOW, async () => {
+    const coverDir = tmp();
+    for (let i = 0; i < 12; i++) writePngCover(coverDir, `photo-${i}.png`, i + 90);
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    writeFileSync(secretPath, Buffer.from('never ingested'));
+    writeFileSync(join(secretDir, 'IMG_0001.HEIC'), heicHeader());
+
+    await expect(
+      runGallerySave({
+        secretFile: secretPath,
+        covers: [coverDir],
+        outDir: tmp(),
+        password: PW,
+        keyMode: 'stego',
+        keyCover: join(secretDir, 'IMG_0001.HEIC'),
+      }),
+    ).rejects.toBeInstanceOf(StegoCoverFormatError);
   });
 });

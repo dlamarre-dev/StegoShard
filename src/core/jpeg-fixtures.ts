@@ -506,6 +506,29 @@ export function exifSegmentLE(software = 'Adobe Lightroom'): Uint8Array {
   return appSegment(0xe1, concat(bytesOf('Exif\0\0'), tiff));
 }
 
+/**
+ * An EXIF APP1 carrying only an Orientation tag, as a phone writes one for a
+ * portrait photo stored as landscape sensor data (6 is "rotate 90 clockwise to
+ * display").
+ */
+export function exifSegmentWithOrientation(orientation: number, littleEndian = false): Uint8Array {
+  const le = littleEndian;
+  const tiff = new Uint8Array(8 + 2 + 12 + 4);
+  const put16 = (o: number, v: number) => {
+    tiff[o] = le ? v & 0xff : (v >> 8) & 0xff;
+    tiff[o + 1] = le ? (v >> 8) & 0xff : v & 0xff;
+  };
+  tiff.set(bytesOf(le ? 'II' : 'MM'), 0);
+  put16(2, 42);
+  tiff[le ? 4 : 7] = 8; // IFD0 at offset 8
+  put16(8, 1); // one entry
+  put16(10, 0x0112); // Orientation
+  put16(12, 3); // SHORT
+  tiff[le ? 14 : 17] = 1; // count 1
+  put16(18, orientation); // inlined, in the first two bytes of the value field
+  return appSegment(0xe1, concat(bytesOf('Exif\0\0'), tiff));
+}
+
 /** An ICC colour profile segment: present on most camera JPEGs, always kept. */
 export function iccSegment(): Uint8Array {
   return appSegment(0xe2, concat(bytesOf('ICC_PROFILE\0'), new Uint8Array([1, 1, 0, 0, 0, 0])));

@@ -58,7 +58,7 @@ await restore({ inputs: ['./vault'], outDir: './restored', password: … });
 ### What is in it, and what is not
 
 The published surface is **curated**, not the internal barrel. `src/core/index.ts`
-re-exports 310 runtime values; the library exports 127 across both entries. What a
+re-exports 313 runtime values; the library exports 127 across both entries. What a
 consumer needs to save and restore a vault is there. What is deliberately not:
 
 - the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,

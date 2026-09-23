@@ -153,6 +153,10 @@ export async function fileToImageData(
   maxSide: number = Infinity,
 ): Promise<ImageDataLike> {
   assertBlobSize(file, MAX_BROWSER_MEDIA_BYTES);
+  // The default `imageOrientation` is 'from-image': EXIF Orientation applied, so
+  // a portrait photo decodes upright. The CLI's decoder applies it too, to match
+  // (see `exif-orientation.ts`). Left implicit on purpose: a browser that predates
+  // the 'from-image' enum value would throw on the option, and decode nothing.
   const bitmap = await createImageBitmap(file);
   try {
     // Bounds the canvas + getImageData allocations below, not the decode above.
@@ -265,6 +269,10 @@ export async function embedKeyFactorImage(
 ): Promise<StegoKeyImage> {
   const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
   if (container === 'profile') {
+    // Named before the decode, as `fileToGalleryCover` names it for the covers: a
+    // browser that happens to decode HEIC (Safari) would otherwise transcode it
+    // silently, and StegoShard never ingests one (SPEC §5.4). See `isHeif`.
+    if (isHeif(bytes)) throw new StegoCoverFormatError();
     // Re-encode first, then embed: the payload lives in the coefficients, so a
     // re-encode after the embed would destroy it. Same order the covers take.
     const img = await fileToImageData(cover); // full resolution (no cap)
@@ -331,6 +339,10 @@ export async function extractKeyFactorImage(
  * source's quantization tables, its ICC profile, its makernote and its XMP
  * dialect all survive, and a mixed-device set stays mixed. It is a flag, never
  * the default.
+ *
+ * A JPEG already in the profile, which is what every delivered gallery photo
+ * is, passes through unchanged on either path (see `reencodeCover`), so the
+ * default is also safe for loading a delivered set to restore.
  */
 export async function fileToGalleryCover(
   file: File,

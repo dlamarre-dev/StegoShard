@@ -85,6 +85,13 @@ const MCU = 16;
 const MAX_PIXELS = 100_000_000;
 
 /**
+ * SOF0 stores each dimension in 16 bits. A wider or taller image fits under the
+ * pixel ceiling (a 70000x100 strip is 7 megapixels) and would have its size
+ * truncated by the frame header, producing a JPEG that decodes as something else.
+ */
+const MAX_SIDE = 0xffff;
+
+/**
  * Re-encode `img` into the pinned profile.
  *
  * The output is baseline sequential, 4:2:0, with the profile's quantization and
@@ -97,6 +104,9 @@ export function encodeJpegProfile(img: ImageDataLike): Uint8Array {
   const { width, height } = img;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new JpegEncodeError(`dimensions must be positive integers, got ${width}x${height}`);
+  }
+  if (width > MAX_SIDE || height > MAX_SIDE) {
+    throw new JpegEncodeError(`${width}x${height} is past JPEG's ${MAX_SIDE}-pixel side limit`);
   }
   if (width * height > MAX_PIXELS) {
     throw new JpegEncodeError(`${width}x${height} is past the ${MAX_PIXELS}-pixel ceiling`);
@@ -165,24 +175,69 @@ export const PROFILE_QUANT_SUM = QUANT_LUMA.reduce((a, b) => a + b, 0);
  * would arrive with a detectable artifact is not a cover, which is the same rule
  * the complexity filter applies to texture.
  *
- * `source` may be pixels that never were a JPEG (a PNG cover): with no table to
- * compare against there is no comb to create, and the re-encode goes ahead.
+ * `source` is omitted for pixels that never were a JPEG (a PNG cover): with no
+ * table to compare against there is no comb to create, and the re-encode goes
+ * ahead. A `source` that *is* given but whose luma table cannot be read (a
+ * truncated file jpeg-js still decodes, or one that files luma under another
+ * table id) is refused: "cannot measure" is not "nothing to measure", and the
+ * refusal is the only safe answer to a question this cannot ask.
+ *
+ * A source already in the profile is returned unchanged. Re-encoding it could
+ * only lose a generation, and it is the one case where the input matters beyond
+ * its pixels: a delivered gallery photo is exactly such a file, its payload lives
+ * in the coefficients a re-encode would rewrite, and a library caller loading a
+ * delivered set with the default options would otherwise wipe what restore is
+ * about to read. Passing it through keeps that call working and costs no
+ * uniformity, since the bytes already are the profile.
  */
 export function reencodeCover(
   pixels: ImageDataLike,
   source?: Uint8Array,
   label?: string,
 ): Uint8Array {
-  const coarseness = source ? lumaQuantSum(source) : null;
-  if (coarseness !== null && coarseness > PROFILE_QUANT_SUM) {
-    throw new JpegEncodeError(
-      `${label ? `${label}: ` : ''}the source was quantized more coarsely than this profile ` +
-        `(${coarseness} against ${PROFILE_QUANT_SUM}), so re-encoding it would leave a ` +
-        'double-quantization comb in the histogram. It has probably been through a ' +
-        'messaging app or another re-encode; use the original if you still have it.',
-    );
+  const named = label ? `${label}: ` : '';
+  if (source) {
+    if (isProfileJpeg(source)) return source;
+    const coarseness = lumaQuantSum(source);
+    if (coarseness === null) {
+      throw new JpegEncodeError(
+        `${named}its quantization table could not be read, so there is no telling whether ` +
+          're-encoding it would leave a double-quantization comb in the histogram. The file ' +
+          'may be truncated; use the original if you still have it.',
+      );
+    }
+    if (coarseness > PROFILE_QUANT_SUM) {
+      throw new JpegEncodeError(
+        `${named}the source was quantized more coarsely than this profile ` +
+          `(${coarseness} against ${PROFILE_QUANT_SUM}), so re-encoding it would leave a ` +
+          'double-quantization comb in the histogram. It has probably been through a ' +
+          'messaging app or another re-encode; use the original if you still have it.',
+      );
+    }
   }
   return encodeJpegProfile(pixels);
+}
+
+/**
+ * True when `bytes` is, header byte for byte, a file `encodeJpegProfile` wrote.
+ *
+ * Stricter than `profileMismatch`, deliberately: that one reports on uniformity,
+ * this one decides that a file skips the re-encode, so it compares everything
+ * before the scan against the header the encoder would write for those
+ * dimensions. A JFIF thumbnail, a different chroma or Huffman table, or a byte
+ * after EOI all fail it, and such a file is re-encoded like any other.
+ */
+export function isProfileJpeg(bytes: Uint8Array): boolean {
+  if (profileMismatch(bytes) !== null) return false;
+  const sof = parseJpegSegments(bytes).segments[2]!.payloadStart;
+  const height = (bytes[sof + 1]! << 8) | bytes[sof + 2]!;
+  const width = (bytes[sof + 3]! << 8) | bytes[sof + 4]!;
+  if (width < 1 || height < 1) return false;
+  const header = assemble(width, height, new Uint8Array(0));
+  const headLen = header.length - 2; // everything but the EOI
+  if (bytes.length < headLen) return false;
+  for (let i = 0; i < headLen; i++) if (bytes[i] !== header[i]) return false;
+  return true;
 }
 
 /**

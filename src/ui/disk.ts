@@ -626,14 +626,19 @@ export async function saveGalleryToDisk(
   const setHex = toHex(res.setId);
 
   // Two covers can share a basename, and gallery reuses cover names, so disambiguate.
+  // The key photo goes through the same set: a PNG key cover re-encoded to
+  // `IMG_1.jpg` would otherwise share a name with a gallery `IMG_1.jpg`.
   const downloads: Download[] = [];
   const used = new Set<string>();
+  const claimName = (wanted: string): string => {
+    let name = wanted;
+    for (let n = 2; used.has(name); n++) name = wanted.replace(/(\.[^.]+)?$/, `-${n}$1`);
+    used.add(name);
+    return name;
+  };
   for (const img of res.images) {
     const { name, blob } = await galleryImageToBlob(img);
-    let unique = name;
-    for (let n = 2; used.has(unique); n++) unique = name.replace(/(\.[^.]+)?$/, `-${n}$1`);
-    used.add(unique);
-    downloads.push({ name: unique, blob, purpose: 'photos' });
+    downloads.push({ name: claimName(name), blob, purpose: 'photos' });
   }
   // A separate key rides alongside the photos when not embedded.
   if (keyMode === 'stego') {
@@ -650,7 +655,7 @@ export async function saveGalleryToDisk(
       'profile',
     );
     downloads.push({
-      name: asJpegName(stegoKeyName(options.stego.cover.name, k.ext, setHex)),
+      name: claimName(asJpegName(stegoKeyName(options.stego.cover.name, k.ext, setHex))),
       blob: octet(k.bytes, k.mime),
       purpose: 'stegoCover',
     });
