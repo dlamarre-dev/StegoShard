@@ -3,7 +3,15 @@
  * production `@core` pipeline (blind winnowing, folder in / folder out).
  */
 
-import { mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -396,13 +404,17 @@ describe('CLI gallery save: the key photo', () => {
       const keyPath = save.manifest.find((m) => m.purpose === 'stegoCover')!.name;
       const photos = save.manifest.filter((m) => m.purpose === 'photos').map((m) => m.name);
       expect(photos).toHaveLength(12);
-      expect(statSync(keyPath).mtime.getFullYear()).toBeGreaterThan(2001);
+      // One descriptor for both the date and the bytes, so they describe one file.
+      const fd = openSync(keyPath, 'r');
+      let keyBytes: Uint8Array;
+      try {
+        expect(fstatSync(fd).mtime.getFullYear()).toBeGreaterThan(2001);
+        keyBytes = new Uint8Array(readFileSync(fd));
+      } finally {
+        closeSync(fd);
+      }
 
-      const keyBlock = await extractKeyFactorImage(
-        new Uint8Array(readFileSync(keyPath)),
-        basename(keyPath),
-        PW,
-      );
+      const keyBlock = await extractKeyFactorImage(keyBytes, basename(keyPath), PW);
       expect(keyBlock).not.toBeNull();
       const covers = photos.map((p) =>
         fileToGalleryCover(new Uint8Array(readFileSync(p)), basename(p)),
