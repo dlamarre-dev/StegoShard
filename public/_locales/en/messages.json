@@ -185,8 +185,16 @@
     "description": "Popup: key file input label."
   },
   "keyFileHint": {
-    "message": "Only needed for sets you saved as a separate .key file (skip if it is inside the .zip).",
+    "message": "Only needed if the key was saved as a separate file: a .key file or a key photo. Skip this if that file is already among the files above, or inside the .zip.",
     "description": "Popup: hint for the restore key file input."
+  },
+  "galleryRestoreIntro": {
+    "message": "Add the photos the secret was hidden in, or a .zip of them. Order does not matter, and any other photos mixed in are simply skipped.",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "The photos (JPEG or PNG), or a .zip of them",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "Threshold share files (non-possession)",
@@ -611,10 +619,6 @@
   "galleryRestoreHeading": {
     "message": "Gallery: restore from photos",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "The photos (a folder or selection)",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "Hide across photos",

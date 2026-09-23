@@ -116,7 +116,15 @@
     "message": "Archivo de clave (.key)"
   },
   "keyFileHint": {
-    "message": "Solo necesario para conjuntos guardados con un archivo .key aparte (ignóralo si está en el .zip)."
+    "message": "Solo necesario si la clave se guardó en un archivo aparte: un archivo .key o una foto de la clave. Ignóralo si ese archivo ya está entre los de arriba, o dentro del .zip."
+  },
+  "galleryRestoreIntro": {
+    "message": "Añade las fotos en las que se ocultó el secreto, o un .zip que las contenga. El orden no importa, y cualquier otra foto mezclada simplemente se ignora.",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "Las fotos (JPEG o PNG), o un .zip que las contenga",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "Archivos de partes de umbral (no posesión)",
@@ -486,10 +494,6 @@
   "galleryRestoreHeading": {
     "message": "Galería: restaurar desde fotos",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "Las fotos (una carpeta o una selección)",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "Ocultar en las fotos",

@@ -87,6 +87,8 @@ import {
   type GalleryCover,
   type OnProgress,
   type Stage,
+  GalleryRestoreError,
+  withStegoSeedCache,
   estimateImageCount,
   planSave,
   opaqueStage,
@@ -1114,9 +1116,17 @@ export async function runGallerySave(
  *
  * For a stego key photo given with the vault instead of with `--key`. Delivered
  * photos are all named `IMG_nnnn`, so nothing about the name marks the key photo
- * out. Only image files are tried; each attempt costs one key derivation.
+ * out. Only image files are tried, and one key derivation covers all of them
+ * (`withStegoSeedCache`).
  */
 async function keyFromPhotos(
+  paths: readonly string[],
+  password: string,
+): Promise<Uint8Array | undefined> {
+  return withStegoSeedCache(() => firstKeyIn(paths, password));
+}
+
+async function firstKeyIn(
   paths: readonly string[],
   password: string,
 ): Promise<Uint8Array | undefined> {
@@ -1434,7 +1444,19 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
   // A non-possession gallery is gated on threshold shares (--share).
   const secret = await recoverSecret(opts.sharePaths);
-  const { filename, content } = await galleryDecode(covers, opts.password, { keyBlock, secret });
+  let restored: Awaited<ReturnType<typeof galleryDecode>>;
+  try {
+    restored = await galleryDecode(covers, opts.password, { keyBlock, secret });
+  } catch (err) {
+    // A stego gallery's key photo given among the photos instead of with --key:
+    // the missing factor reads as a failed restore, so the photos are searched
+    // for it, for one key derivation in all. Only on this failure path.
+    if (!(err instanceof GalleryRestoreError) || keyBlock) throw err;
+    const found = await keyFromPhotos(coverPaths, opts.password);
+    if (!found) throw err;
+    restored = await galleryDecode(covers, opts.password, { keyBlock: found, secret });
+  }
+  const { filename, content } = restored;
   const outName = basename(filename) || 'restored.bin';
   const outPath = writeOut(opts, outName, content);
   return { outPath, files: [outPath], filename, seen: covers.length };

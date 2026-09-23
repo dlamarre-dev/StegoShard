@@ -168,6 +168,7 @@ const restoreResult = el('restore-result');
 const restoreResultNote = el('restore-result-note');
 const restoreAdvanced = el('restore-advanced');
 const restoreGalleryHint = el('restore-gallery-hint');
+const restoreDzTitle = el('restore-dz-title');
 
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
 const selectedGalleryKeyMode = () => pick<KeyMode>('gallery-keymode', 'embedded');
@@ -289,10 +290,18 @@ function reflectGalleryKeyMode(): void {
 }
 
 /** Both modes can take a key: standard vaults, and keyfile/stego galleries. */
+/**
+ * Fit the restore card to the mode. A gallery is a set of photos, loose or
+ * zipped, so its field asks for exactly that, and a printed PDF is not offered.
+ */
 function reflectRestoreMode(): void {
   const gallery = selectedRestoreMode() === 'gallery';
   show(restoreGalleryHint, gallery);
   show(restoreAdvanced, true);
+  const title = gallery ? 'labelPhotosOrZip' : 'labelImagesOrZip';
+  restoreDzTitle.dataset.i18n = title;
+  restoreDzTitle.textContent = msg(title);
+  restoreFiles.accept = gallery ? 'image/jpeg,image/png,.zip' : 'image/*,.zip,.pdf,application/pdf';
 }
 
 async function loadPrefs(): Promise<void> {
