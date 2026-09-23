@@ -15,6 +15,7 @@ export * from './compress';
 export * from './payload';
 export * from './crypto';
 export * from './progress';
+export * from './progress-plan';
 export * from './stego';
 export * from './stego-guard';
 export * from './jpeg-coeff';

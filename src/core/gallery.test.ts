@@ -23,6 +23,10 @@ import {
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
   JpegUnsupportedError,
+  DEFAULT_CALIBRATION,
+  ProgressTracker,
+  planSave,
+  type Progress,
   decode as decodeJpeg,
   estimateGalleryCovers,
   galleryCoversForEnvelopeLen,
@@ -412,6 +416,50 @@ describe('gallery role assignment', () => {
     }
     expect(restored).toBe(1);
   }, 180000);
+});
+
+/**
+ * The events a gallery save reports, replayed into its progress plan.
+ *
+ * The plan (`planSave`) and the code have to agree stage for stage: an event
+ * the plan does not expect where it expects it makes the tracker skip ahead,
+ * and the bar jumps. So the real stream is recorded and fed in, and the plan
+ * must reach the end with no stage skipped. The CLI's plan is the one whose
+ * stages are all core's (the browser adds its own around them).
+ */
+describe('gallery progress', () => {
+  it('reports every stage of its plan, in order', async () => {
+    const secret = enc.encode('progress');
+    const { covers } = await coversFor('p.txt', secret, (n, s) => rgbaCover(`${n}.png`, s));
+    const events: Progress[] = [];
+    const onProgress = (p: Progress): void => {
+      events.push(p);
+    };
+    const res = await galleryEncode('p.txt', secret, 'pw', covers, { params: FAST, onProgress });
+    // What `verifyGalleryExport` runs, with this test's cheap Argon2 parameters.
+    await galleryDecode(res.images as GalleryCover[], 'pw', { params: FAST, onProgress });
+
+    const plan = planSave({
+      surface: 'cli',
+      dest: 'gallery',
+      keyMode: 'embedded',
+      secretBytes: secret.length,
+      coverBytes: covers.map(() => 100_000),
+      preserveContainer: true, // no re-encode: these covers are handed in as pixels
+      argon2: FAST,
+    });
+    const tracker = new ProgressTracker(plan, DEFAULT_CALIBRATION, () => 0);
+    let last = 0;
+    for (const e of events) {
+      const f = tracker.onEvent(e).fraction;
+      expect(f).toBeGreaterThanOrEqual(last);
+      last = f;
+    }
+    expect(tracker.skipped()).toBe(0);
+    expect(tracker.view().finished).toBe(true);
+    // Two derivations to save, two to verify.
+    expect(events.filter((e) => e.phase === 'derive' && e.done === 1)).toHaveLength(4);
+  }, 60000);
 });
 
 describe('gallery grouping and validation', () => {

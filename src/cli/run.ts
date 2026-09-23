@@ -20,10 +20,12 @@ import {
   coverManifest,
   runEstimate,
   runGalleryRestore,
+  gallerySavePlan,
   runGallerySave,
   runNormalize,
   runRestore,
   runSave,
+  savePlan,
   type CodecChoice,
   type SaveOptions,
 } from '../api/node/commands';
@@ -480,7 +482,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     // manifest and there is nothing left to count. See `coverManifest`.
     const coverProvenance = keyMode === 'stego' ? coverManifest(values.cover as string) : undefined;
 
-    const progress = present.progress(Boolean(values.quiet));
+    const progress = present.progress(Boolean(values.quiet), savePlan(opts));
     const res = await runSave(opts, progress.onProgress);
     progress.done();
     if (coverProvenance && coverProvenance.segments > 0) {
@@ -572,7 +574,7 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     const password = await resolvePassword(io, present, values);
     await requireStrongOrAcknowledged(io, present, password, values);
     await installEntropy(io, present, values);
-    const res = await runGallerySave({
+    const galleryOpts = {
       secretFile,
       covers,
       outDir,
@@ -584,7 +586,14 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       force,
       allowCoverReuse: Boolean(values['allow-cover-reuse']),
       preserveContainer: Boolean(values['preserve-container']),
-    });
+    };
+    const galleryProgress = present.progress(Boolean(values.quiet), gallerySavePlan(galleryOpts));
+    let res: Awaited<ReturnType<typeof runGallerySave>>;
+    try {
+      res = await runGallerySave(galleryOpts, galleryProgress.onProgress);
+    } finally {
+      galleryProgress.done();
+    }
     // Said on every run that asks for it, not only when something was found:
     // what the flag costs is what it *leaves* in place, and a set can keep every
     // identifying tag and every encoder quirk while producing no finding at all.

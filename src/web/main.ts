@@ -11,6 +11,7 @@ import {
   clearUserEntropy,
   createKeyBlock,
   installUserEntropy,
+  opaqueStage,
   serializeKeyBlock,
   type KeyMode,
   type VaultKey,
@@ -39,6 +40,7 @@ import {
   type CodecChoice,
   codecApplies,
   destKey,
+  planForRequest,
   runSave,
   writesOneFile,
   type AccessMode,
@@ -548,23 +550,35 @@ async function makeKey(password: string): Promise<VaultKey> {
   return { dek, keyBlock: serializeKeyBlock(block) };
 }
 
-/** Build a save request (creating a fresh key inside the try) and run it. */
-async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
+/**
+ * Run a save behind one progress bar.
+ *
+ * `mintKeyFrom` is the password a fresh vault key is derived from, for every
+ * destination but the gallery (which derives its own). The derivation is one
+ * Argon2 run, so it happens here, after the bar is up, rather than before the
+ * call: the bar appears within a frame of the click, before anything slow.
+ */
+async function doSave(req: SaveRequest, mintKeyFrom?: string): Promise<void> {
   saveBtn.disabled = true;
   show(saveResult, false);
   const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
   setStatus(saveStatus, msg(destKey('statusSaving', selectedDest())));
-  // On the web the vault key is minted here, inside `build()`, ahead of
-  // `runSave`, so the extra entropy has to be installed before that, or the key
-  // block's own salt and DEK would miss the layer. `runSave` re-seeds it for the
-  // rest of the save; the request still carries the string for the worker thread.
+  // On the web the vault key is minted here, ahead of `runSave`, so the extra
+  // entropy has to be installed before that, or the key block's own salt and DEK
+  // would miss the layer. `runSave` re-seeds it for the rest of the save; the
+  // request still carries the string for the worker thread.
   const entropy = extraEntropy.value.trim();
   if (entropy) await installUserEntropy(entropy);
+  let ok = false;
   try {
-    const req = await build();
     req.userEntropy = entropy || undefined;
     req.onProgress = prog.onProgress;
+    await prog.begin(planForRequest(req, 'web', { mintsKey: mintKeyFrom !== undefined }));
+    if (mintKeyFrom !== undefined) {
+      req.key = await opaqueStage(prog.onProgress, 'derive', () => makeKey(mintKeyFrom));
+    }
     const { note, manifest } = await runSave(req, msg);
+    ok = true;
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
     // Name every file that was just written. On the deniable destinations the
@@ -587,7 +601,7 @@ async function doSave(build: () => Promise<SaveRequest>): Promise<void> {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
     clearUserEntropy();
-    prog.done();
+    prog.done(ok);
     saveBtn.disabled = false;
   }
 }
@@ -618,7 +632,7 @@ saveBtn.addEventListener('click', async () => {
       if (!t) return setStatus(saveStatus, msg('errNoThreshold'), true);
       gThreshold = t;
     }
-    await doSave(async () => ({
+    await doSave({
       dest,
       files: pickedFiles(),
       covers,
@@ -627,7 +641,7 @@ saveBtn.addEventListener('click', async () => {
       stego: gStego,
       accessMode: gMode === 'duress' ? 'plain' : gMode,
       threshold: gThreshold,
-    }));
+    });
     return;
   }
 
@@ -664,26 +678,28 @@ saveBtn.addEventListener('click', async () => {
   // made and how many others belong with it.
   const title = dest === 'paper' || addBand.checked ? bandTitle.value.trim() : '';
 
-  await doSave(async () => ({
-    dest,
-    files: pickedFiles(),
-    key: await makeKey(savePw.value),
-    // The disguised .db path derives its slot KEK from the per-save password.
-    password: dest === 'sqlite' ? savePw.value : undefined,
-    keyMode,
-    codec: selectedCodec(),
-    accessMode,
-    duressPassword,
-    decoy,
-    threshold,
-    label: { title: title || undefined, date },
-    asZip: asZip.checked,
-    includeInstructions: addInstructions.checked,
-    passwordHint: pwHint.value.trim() || undefined,
-    keyLocation: keyLocation.value.trim() || undefined,
-    stego,
-    locale: currentLocale(),
-  }));
+  await doSave(
+    {
+      dest,
+      files: pickedFiles(),
+      // The disguised .db path derives its slot KEK from the per-save password.
+      password: dest === 'sqlite' ? savePw.value : undefined,
+      keyMode,
+      codec: selectedCodec(),
+      accessMode,
+      duressPassword,
+      decoy,
+      threshold,
+      label: { title: title || undefined, date },
+      asZip: asZip.checked,
+      includeInstructions: addInstructions.checked,
+      passwordHint: pwHint.value.trim() || undefined,
+      keyLocation: keyLocation.value.trim() || undefined,
+      stego,
+      locale: currentLocale(),
+    },
+    savePw.value,
+  );
 });
 
 restoreBtn.addEventListener('click', async () => {
@@ -742,6 +758,7 @@ let wizard: Wizard | null = null;
 const wizardEnv: WizardEnv = {
   msg,
   locale: currentLocale,
+  surface: 'web',
   saveDestinations: ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
   getSaveKey: (pw) => makeKey(pw),
   needsSavePassword: true,

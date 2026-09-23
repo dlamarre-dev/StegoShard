@@ -15,17 +15,23 @@ import {
   type KeyMode,
   type ManifestEntry,
   type OnProgress,
+  type Stage,
   type VaultKey,
   CODEC_COLOR_GRID,
   CODEC_QR_GRID,
   GALLERY_LADDER,
   GalleryFileTooLargeError,
+  PROFILE_DISK,
+  PROFILE_PAPER,
   WrongPasswordError,
   clearUserEntropy,
   envelopeFitsLadder,
+  estimateImageCount,
   galleryCoversForEnvelopeLen,
   installUserEntropy,
+  opaqueStage,
   parseKeyBlock,
+  planSave,
   unlockKeyBlock,
 } from '@core';
 import {
@@ -143,8 +149,46 @@ export interface SaveRequest {
    * string is a reused one.
    */
   userEntropy?: string | undefined;
-  /** Progress callback for the binary path (the slow, large-file destination). */
+  /**
+   * Progress, forwarded to every destination. Pair it with `planForRequest` and
+   * `ProgressUI.begin` for one bar weighted across the whole save.
+   */
   onProgress?: OnProgress;
+}
+
+/**
+ * The stages a request will go through, for `ProgressUI.begin` (see `planSave`).
+ *
+ * Built from file sizes alone, before anything is read, so the bar can appear
+ * the instant the user clicks. `mintsKey` is the web app deriving a fresh vault
+ * key before the save; `checksStegoPassword` is the extension testing the stego
+ * password against its managed key. Both are one Argon2 derivation the caller
+ * runs itself, ahead of `runSave`, and wraps in an opaque `derive` stage.
+ */
+export function planForRequest(
+  req: SaveRequest,
+  surface: 'extension' | 'web',
+  extra: { mintsKey?: boolean; checksStegoPassword?: boolean } = {},
+): Stage[] {
+  const secretBytes = req.files.reduce((n, f) => n + f.size, 0);
+  const paper = req.dest === 'paper';
+  return planSave({
+    surface,
+    dest: req.dest,
+    keyMode: req.keyMode ?? 'embedded',
+    accessMode: req.accessMode,
+    secretBytes,
+    coverBytes: req.covers?.map((f) => f.size),
+    stegoCoverBytes: req.stego?.cover.size,
+    imageCount: estimateImageCount(
+      secretBytes,
+      paper ? PROFILE_PAPER : PROFILE_DISK,
+      codecIdFor(paper ? 'paper' : 'disk', req.codec),
+    ),
+    asZip: req.asZip ?? true,
+    mintsKey: extra.mintsKey,
+    checksStegoPassword: extra.checksStegoPassword,
+  });
 }
 
 /**
@@ -297,7 +341,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
     // The ladder is checked first because the count reaches `pickBucket`, which
     // throws a bare `BucketTooLargeError` past the top rung. `galleryEncode`
     // translates that into the error the UI localizes; this check has to as well.
-    const envelopeLen = await envelopeLenFor(file);
+    const envelopeLen = await opaqueStage(req.onProgress, 'compress', () => envelopeLenFor(file));
     if (!envelopeFitsLadder(envelopeLen, GALLERY_LADDER)) {
       throw new GalleryFileTooLargeError(file.size, GALLERY_LADDER[GALLERY_LADDER.length - 1]!);
     }
@@ -309,6 +353,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
       stego: req.stego,
       mode: accessMode,
       threshold: req.threshold,
+      onProgress: req.onProgress,
     });
     return { note: galleryNote(msg, keyMode, res), manifest: res.manifest };
   }
@@ -328,6 +373,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
       keyLocation: req.keyLocation,
       stego: req.stego,
       locale: req.locale,
+      onProgress: req.onProgress,
     });
     return { note: msg('statusSavedPdf', String(imageCount)), manifest };
   }
@@ -371,6 +417,7 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
     label: req.label,
     asZip: req.asZip ?? true,
     stego: req.stego,
+    onProgress: req.onProgress,
   });
   return { note: diskNote(msg, keyMode, imageCount), manifest };
 }

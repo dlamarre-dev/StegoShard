@@ -58,7 +58,7 @@ await restore({ inputs: ['./vault'], outDir: './restored', password: … });
 ### What is in it, and what is not
 
 The published surface is **curated**, not the internal barrel. `src/core/index.ts`
-re-exports 317 runtime values; the library exports 127 across both entries. What a
+re-exports 325 runtime values; the library exports 127 across both entries. What a
 consumer needs to save and restore a vault is there. What is deliberately not:
 
 - the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,
@@ -237,7 +237,7 @@ hint. The others are localized like any other CLI output.
 ### Progress
 
 ```json
-{"schema":"stegoshard.cli/1","event":"progress","phase":"encrypt","done":1024,"total":65536}
+{"schema":"stegoshard.cli/1","event":"progress","phase":"encrypt","done":1024,"total":65536,"fraction":0.412,"stage":"encrypting"}
 {"schema":"stegoshard.cli/1","event":"warning","code":"PASSWORD_FLAG_VISIBLE","message":"…"}
 {"schema":"stegoshard.cli/1","event":"error","code":"WRONG_PASSWORD","message":"…"}
 ```
@@ -247,8 +247,24 @@ Events are throttled to at most one per 100 ms within a phase, and every phase
 change is reported, so a 1 GiB save does not emit tens of thousands of lines.
 `--quiet` suppresses progress but not warnings or errors.
 
-The image and paper paths emit **no** progress at all: they are capped at 1 MiB
-and effectively instant. Only the binary paths report phases.
+On `save` and `gallery-save`, every event also carries `fraction` and `stage`.
+`fraction` is how far through the **whole** save it is, from 0 to 1, weighted by
+how long each stage takes and never decreasing; `stage` names the step
+(`deriving`, `compressing`, `preparingPhotos`, `hiding`, `hidingKey`,
+`encrypting`, `rendering`, `verifying`, `delivering`). Both were added without a
+schema change: the fields `stegoshard.cli/1` always had mean what they meant.
+
+Every save path reports progress: the image, paper and gallery paths used to be
+silent. The phases are `compress`, `encrypt`, `decrypt`, `verify`, `unlock`,
+`render`, `derive` (a password key derivation), `prepare` and `reencode` (the
+gallery's covers), `embed`, `extract` and `deliver`.
+
+The library's `onProgress` callbacks see the same events. A callback may return
+a promise, which the core awaits at the start of an opaque stage, such as a key
+derivation: that is how the browser gets a frame to animate its bar in before
+the derivation blocks the page. The apps and the CLI turn the events into one
+weighted fraction with `src/core/progress-plan.ts`, which is not part of the
+library's published surface.
 
 ### `--json` never waits for a human
 

@@ -84,7 +84,13 @@ import {
   type ImageDataLike,
   type KeyMode,
   type ManifestEntry,
+  type GalleryCover,
   type OnProgress,
+  type Stage,
+  estimateImageCount,
+  planSave,
+  opaqueStage,
+  report,
   type VaultIdentity,
   type StegoEmbedOptions,
   type CoverClaim,
@@ -382,6 +388,18 @@ export interface SaveResult {
  * file dated years ago among them would be the one to look at.
  */
 /**
+ * Run `make` as a progress stage when it derives a key: a stego key photo costs
+ * one Argon2 derivation for its keystream, a `.key` file costs nothing.
+ */
+function keyStage<T>(
+  keyMode: KeyMode,
+  on: OnProgress | undefined,
+  make: () => Promise<T>,
+): Promise<T> {
+  return keyMode === 'stego' ? opaqueStage(on, 'derive', make) : make();
+}
+
+/**
  * Lift the caller's cover-reuse decision into the shape the stego layer takes.
  *
  * Kept as a helper rather than inlined so there is one place asserting that this
@@ -600,17 +618,19 @@ async function runSaveDisguisedImpl(
         emit(opts, binaryKeyName('disguised'), wrapBinary(keyFactor, 'disguised'), 'keyfile'),
       ];
     }
-    const ext = await externalKey(
-      'stego',
-      keyFactor,
-      binaryKeyName('disguised'),
-      opts.password,
-      opts.cover,
-      'as-is',
-      'factor',
-      reuseOpt(opts),
-      hold,
-      landed,
+    const ext = await keyStage('stego', onProgress, () =>
+      externalKey(
+        'stego',
+        keyFactor,
+        binaryKeyName('disguised'),
+        opts.password,
+        opts.cover,
+        'as-is',
+        'factor',
+        reuseOpt(opts),
+        hold,
+        landed,
+      ),
     );
     return ext ? [writeExternalKey(opts, ext)] : [];
   }
@@ -699,17 +719,19 @@ async function runSaveDisguisedImpl(
   } else if (keyMode === 'stego') {
     // The .db is a multi-region path → hide the 32-byte key factor (SSKF) in the
     // cover, keyed by the same per-save password that derives the slot KEK.
-    const ext = await externalKey(
-      'stego',
-      keyBlock,
-      binaryKeyName('disguised'),
-      opts.password,
-      opts.cover,
-      'as-is',
-      'factor',
-      reuseOpt(opts),
-      hold,
-      landed,
+    const ext = await keyStage('stego', onProgress, () =>
+      externalKey(
+        'stego',
+        keyBlock,
+        binaryKeyName('disguised'),
+        opts.password,
+        opts.cover,
+        'as-is',
+        'factor',
+        reuseOpt(opts),
+        hold,
+        landed,
+      ),
     );
     if (ext) outs.push(writeExternalKey(opts, ext));
   }
@@ -785,17 +807,19 @@ async function runSaveImpl(
     await verifyBinaryExport(container, key.dek, input.name, content, onProgress);
     const outs = [emit(opts, binaryVaultName(variant), container, 'vault')];
     if (keyMode === 'stego') {
-      const ext = await externalKey(
-        'stego',
-        keyBlock,
-        binaryKeyName(variant),
-        opts.password,
-        opts.cover,
-        'as-is',
-        'block',
-        reuseOpt(opts),
-        hold,
-        landed,
+      const ext = await keyStage('stego', onProgress, () =>
+        externalKey(
+          'stego',
+          keyBlock,
+          binaryKeyName(variant),
+          opts.password,
+          opts.cover,
+          'as-is',
+          'block',
+          reuseOpt(opts),
+          hold,
+          landed,
+        ),
       );
       if (ext) outs.push(writeExternalKey(opts, ext));
     } else if (keyMode === 'keyfile') {
@@ -807,31 +831,37 @@ async function runSaveImpl(
   const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
   const codecId = codecIdForSave(opts.paper, opts.codec);
 
-  const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(input.name, content, key, {
-    profile,
-    codecId,
-    keyMode: opts.keyMode,
-    bundle: input.bundle,
-    identity: opts.identity,
-  });
+  const { imagePayloads, setId, keyBlock, keyMode } = await opaqueStage(onProgress, 'encrypt', () =>
+    exportVault(input.name, content, key, {
+      profile,
+      codecId,
+      keyMode: opts.keyMode,
+      bundle: input.bundle,
+      identity: opts.identity,
+    }),
+  );
   // Read it back from the header rather than trusting the request, so the
   // rendered pixels and the recovery line can never disagree with the payload.
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
-  await verifyImageExport(imagePayloads, key.dek, input.name, content);
+  await opaqueStage(onProgress, 'verify', () =>
+    verifyImageExport(imagePayloads, key.dek, input.name, content),
+  );
   const setHex = toHex(setId);
   const outs: OutFile[] = [];
-  const ext = await externalKey(
-    keyMode,
-    keyBlock,
-    // Disk and paper are overt destinations: the brand in the name is the point.
-    `stegoshard-${setHex}.key`,
-    opts.password,
-    opts.cover,
-    'as-is',
-    'block',
-    reuseOpt(opts),
-    hold,
-    landed,
+  const ext = await keyStage(keyMode, onProgress, () =>
+    externalKey(
+      keyMode,
+      keyBlock,
+      // Disk and paper are overt destinations: the brand in the name is the point.
+      `stegoshard-${setHex}.key`,
+      opts.password,
+      opts.cover,
+      'as-is',
+      'block',
+      reuseOpt(opts),
+      hold,
+      landed,
+    ),
   );
   // Large secrets sprawl into many images; nudge toward --binary before writing.
   const sizeWarning =
@@ -848,6 +878,7 @@ async function runSaveImpl(
     const { buildCliPaperPdf } = await import('./paper');
     const encodeQr = (p: Uint8Array): ImageDataLike => codec.encode(p, PROFILE_PAPER);
     const built = await buildCliPaperPdf(imagePayloads, encodeQr, imageDataToPng, {
+      onProgress,
       title: opts.title,
       date: opts.date,
       locale: opts.locale,
@@ -873,7 +904,9 @@ async function runSaveImpl(
   // the browser stamps (shared renderer in @core), so the two agree pixel for
   // pixel. --title/--date land here too.
   const recovery = recoveryLines(codecName(codecId));
-  const pngs = imagePayloads.map((payload, i) => {
+  const pngs: { name: string; bytes: Uint8Array }[] = [];
+  for (const [i, payload] of imagePayloads.entries()) {
+    await report(onProgress, { phase: 'render', done: i, total: imagePayloads.length });
     // Composed in @core, so the CLI and the browser stamp the same lines. A
     // title the ASCII font cannot draw is folded first (`--title "Sauvegarde
     // clé"` used to be dropped whole over the accent) and skipped if it still
@@ -885,10 +918,15 @@ async function runSaveImpl(
       total: imagePayloads.length,
     });
     const img = drawBrandBand(codec.encode(payload, PROFILE_DISK), { recovery, lines });
-    return {
+    pngs.push({
       name: `stegoshard-${setHex}-${String(i + 1).padStart(2, '0')}.png`,
       bytes: imageDataToPng(img),
-    };
+    });
+  }
+  await report(onProgress, {
+    phase: 'render',
+    done: imagePayloads.length,
+    total: imagePayloads.length,
   });
 
   if (opts.zip) {
@@ -1000,14 +1038,74 @@ async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8
   return recovered ?? undefined;
 }
 
+/** Total size of files and directory trees, for a progress plan. Best-effort. */
+function bytesOnDisk(paths: readonly string[]): number {
+  let total = 0;
+  for (const p of paths) {
+    try {
+      const st = statSync(p);
+      total += st.isDirectory() ? bytesOnDisk(walk(p)) : st.size;
+    } catch {
+      // Missing here means the save itself will report it.
+    }
+  }
+  return total;
+}
+
+/**
+ * The stages `runSave` will go through, for a weighted progress display (see
+ * `planSave`). Read from sizes on disk, before the save starts, so it costs a
+ * few `stat` calls and nothing else.
+ */
+export function savePlan(opts: SaveOptions): Stage[] {
+  const secretBytes = bytesOnDisk(opts.inputs);
+  const dest =
+    opts.binary === 'disguised' ? 'sqlite' : opts.binary ? 'binary' : opts.paper ? 'paper' : 'disk';
+  const profile = opts.paper ? PROFILE_PAPER : PROFILE_DISK;
+  return planSave({
+    surface: 'cli',
+    dest,
+    keyMode: opts.keyMode,
+    accessMode: opts.mode,
+    secretBytes,
+    imageCount: estimateImageCount(secretBytes, profile, codecIdForSave(opts.paper, opts.codec)),
+    // `makeKey` derives the vault key from the password before anything is
+    // reported, on every path but the password-keyed .db.
+    mintsKey: dest !== 'sqlite',
+  });
+}
+
+/** The stages `runGallerySave` will go through; see `savePlan`. */
+export function gallerySavePlan(opts: GallerySaveOptions): Stage[] {
+  let coverBytes: number[] = [];
+  try {
+    coverBytes = gatherImageFiles(opts.covers).map((p) => bytesOnDisk([p]));
+  } catch {
+    // The save reports an unreadable cover folder itself.
+  }
+  return planSave({
+    surface: 'cli',
+    dest: 'gallery',
+    keyMode: opts.keyMode ?? 'embedded',
+    accessMode: opts.mode,
+    secretBytes: bytesOnDisk([opts.secretFile]),
+    coverBytes,
+    stegoCoverBytes: opts.keyCover ? bytesOnDisk([opts.keyCover]) : undefined,
+    preserveContainer: opts.preserveContainer,
+  });
+}
+
 /** Save a vault. See {@link SaveOptions}. */
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   return withKeyClaim((hold, landed) => runSaveImpl(opts, onProgress, hold, landed));
 }
 
 /** Save a gallery. See {@link GallerySaveOptions}. */
-export async function runGallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult> {
-  return withKeyClaim((hold, landed) => runGallerySaveImpl(opts, hold, landed));
+export async function runGallerySave(
+  opts: GallerySaveOptions,
+  onProgress?: OnProgress,
+): Promise<GallerySaveResult> {
+  return withKeyClaim((hold, landed) => runGallerySaveImpl(opts, onProgress, hold, landed));
 }
 
 export async function runRestore(
@@ -1130,6 +1228,7 @@ export interface GallerySaveResult {
 
 async function runGallerySaveImpl(
   opts: GallerySaveOptions,
+  onProgress: OnProgress | undefined,
   hold: (claim: CoverClaim) => void,
   landed: () => void,
 ): Promise<GallerySaveResult> {
@@ -1139,9 +1238,20 @@ async function runGallerySaveImpl(
   if (coverPaths.length === 0) {
     throw new StegoShardApiError('NO_COVERS_FOUND', 'no usable cover photos found');
   }
-  const covers = coverPaths.map((p) =>
-    fileToGalleryCover(read(p), basename(p), { preserveContainer: opts.preserveContainer }),
-  );
+  // One `reencode` step per cover: decoding and re-encoding a phone photo in
+  // pure JavaScript is the longest per-photo cost of a save.
+  const covers: GalleryCover[] = [];
+  for (const [i, p] of coverPaths.entries()) {
+    await report(onProgress, { phase: 'reencode', done: i, total: coverPaths.length });
+    covers.push(
+      fileToGalleryCover(read(p), basename(p), { preserveContainer: opts.preserveContainer }),
+    );
+  }
+  await report(onProgress, {
+    phase: 'reencode',
+    done: coverPaths.length,
+    total: coverPaths.length,
+  });
 
   const mode = opts.mode ?? 'plain';
   const secretName = basename(opts.secretFile);
@@ -1149,6 +1259,7 @@ async function runGallerySaveImpl(
     keyMode,
     mode,
     threshold: opts.threshold,
+    onProgress,
   });
   if (mode === 'nonpossession') {
     // Verify by winnowing + recovering S from the freshly minted shares. A
@@ -1163,6 +1274,7 @@ async function runGallerySaveImpl(
       secretName,
       content,
       s,
+      onProgress,
     );
   } else {
     await verifyGalleryExport(
@@ -1171,6 +1283,8 @@ async function runGallerySaveImpl(
       keyMode === 'embedded' ? undefined : res.keyBlock,
       secretName,
       content,
+      undefined,
+      onProgress,
     );
   }
   const setHex = toHex(res.setId);
@@ -1179,20 +1293,22 @@ async function runGallerySaveImpl(
   // it can draw from the same set: `IMG_nnnn` like every photo beside it, at no
   // position that sets it apart (see `deniable-names.ts`). Its cover claim is
   // held from here, and released by `withKeyClaim` if nothing reaches disk.
-  const ext = await externalKey(
-    keyMode,
-    res.keyBlock,
-    GALLERY_KEYFILE_NAME,
-    opts.password,
-    opts.keyCover,
-    // The key photo is delivered beside the gallery, so it takes the gallery's
-    // container rule, not §5.4's. `--preserve-container` turns it off for the
-    // whole delivery, key photo included: one flag, one set, one answer.
-    opts.preserveContainer ? 'as-is' : 'profile',
-    'factor',
-    reuseOpt(opts),
-    hold,
-    landed,
+  const ext = await keyStage(keyMode, onProgress, () =>
+    externalKey(
+      keyMode,
+      res.keyBlock,
+      GALLERY_KEYFILE_NAME,
+      opts.password,
+      opts.keyCover,
+      // The key photo is delivered beside the gallery, so it takes the gallery's
+      // container rule, not §5.4's. `--preserve-container` turns it off for the
+      // whole delivery, key photo included: one flag, one set, one answer.
+      opts.preserveContainer ? 'as-is' : 'profile',
+      'factor',
+      reuseOpt(opts),
+      hold,
+      landed,
+    ),
   );
   const files = res.images.map((img) => galleryImageToFile(img));
   const exts: PhotoExt[] = files.map((f) => photoExt(f.bytes));

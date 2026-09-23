@@ -980,6 +980,26 @@
   "statusRendering": {
     "message": "產生中…"
   },
+  "statusCheckingPassword": {
+    "message": "檢查密碼中…",
+    "description": "Progress stage label: checking the password of the key photo."
+  },
+  "statusDeriving": {
+    "message": "正在由密碼產生金鑰…",
+    "description": "Progress stage label: deriving the key from the password (the slow step)."
+  },
+  "statusPreparingPhotos": {
+    "message": "準備你的照片中…",
+    "description": "Progress stage label: preparing the cover photos of a gallery."
+  },
+  "statusHidingKey": {
+    "message": "正在將金鑰藏入你的照片…",
+    "description": "Progress stage label: hiding the key inside the chosen photo."
+  },
+  "statusDelivering": {
+    "message": "開始下載中…",
+    "description": "Progress stage label: handing the files to the browser as downloads."
+  },
   "accessModeHeading": {
     "message": "存取模式",
     "description": "Heading for the §10 access-mode selector (deniable paths)."

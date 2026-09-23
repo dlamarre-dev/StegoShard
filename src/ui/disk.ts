@@ -41,6 +41,8 @@ import {
   type KeyMode,
   type OnProgress,
   type PhotoExt,
+  opaqueStage,
+  report,
   type VaultKey,
 } from '@core';
 import type { AccessMode } from './save-controller';
@@ -89,6 +91,8 @@ export interface SaveOptions {
    * password that keys the embedding (the same one that unlocks the vault).
    */
   stego?: { cover: File; password: string } | undefined;
+  /** Progress; see `planSave` for the stages this path reports. */
+  onProgress?: OnProgress | undefined;
 }
 
 async function blobBytes(blob: Blob): Promise<Uint8Array> {
@@ -120,11 +124,16 @@ const manifestOf = (downloads: readonly Download[]): ManifestEntry[] =>
  *
  * The 150 ms spacing stays: browsers drop downloads fired in a tight loop.
  */
-async function deliver(downloads: { name: string; blob: Blob }[]): Promise<void> {
+async function deliver(
+  downloads: { name: string; blob: Blob }[],
+  onProgress?: OnProgress,
+): Promise<void> {
   for (let i = 0; i < downloads.length; i++) {
+    await report(onProgress, { phase: 'deliver', done: i, total: downloads.length });
     downloadBlob(downloads[i]!.blob, downloads[i]!.name);
     if (i < downloads.length - 1) await new Promise((r) => setTimeout(r, 150));
   }
+  await report(onProgress, { phase: 'deliver', done: downloads.length, total: downloads.length });
 }
 
 /**
@@ -168,12 +177,13 @@ async function verifyStegoKeyCover(
   // The single-region paths (disk/paper/branded .ssbn) hide a 92-byte key block;
   // the multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
   variant: 'block' | 'factor' = 'block',
+  onProgress?: OnProgress,
 ): Promise<void> {
   const file = new File([bytes as BlobPart], name);
-  const recovered =
-    variant === 'factor'
-      ? await extractKeyFactorImage(file, password)
-      : await extractKeyImage(file, password);
+  // One Argon2 derivation for the extraction keystream: an opaque stage.
+  const recovered = await opaqueStage(onProgress, 'derive', () =>
+    variant === 'factor' ? extractKeyFactorImage(file, password) : extractKeyImage(file, password),
+  );
   if (!recovered || recovered.length !== expected.length) throw new VerificationError();
   for (let i = 0; i < expected.length; i++)
     if (recovered[i] !== expected[i]) throw new VerificationError();
@@ -188,12 +198,15 @@ export async function saveFileToDisk(
   assertBlobSize(file, MAX_FILE_BYTES);
   if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
-  const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
-    profile: PROFILE_DISK,
-    codecId: options.codecId,
-    keyMode: options.keyMode,
-    bundle: options.bundle,
-  });
+  const on = options.onProgress;
+  const { imagePayloads, setId, keyBlock, keyMode } = await opaqueStage(on, 'encrypt', () =>
+    exportVault(file.name, content, key, {
+      profile: PROFILE_DISK,
+      codecId: options.codecId,
+      keyMode: options.keyMode,
+      bundle: options.bundle,
+    }),
+  );
   const codecId = decodeHeader(imagePayloads[0]!).codecId;
   const codec = getCodec(codecId);
   const setHex = toHex(setId);
@@ -201,6 +214,7 @@ export async function saveFileToDisk(
 
   const pngs: { name: string; bytes: Uint8Array }[] = [];
   for (let i = 0; i < total; i++) {
+    await report(on, { phase: 'render', done: i, total });
     const img = codec.encode(imagePayloads[i]!, PROFILE_DISK);
     // Always a band: the date and "3 / 12" are stamped whether or not a title
     // was asked for, so a page found on its own says when it was made and how
@@ -212,6 +226,7 @@ export async function saveFileToDisk(
       bytes: await blobBytes(await imageWithLabelToPngBlob(img, band, codecId)),
     });
   }
+  await report(on, { phase: 'render', done: total, total });
   // The key block is external for keyfile/stego modes. In stego mode it is
   // hidden inside the user's cover photo (a lossless PNG); otherwise it is a
   // plain .key file. Bundled into the .zip only for the .key case; the stego
@@ -220,7 +235,10 @@ export async function saveFileToDisk(
   let externalKey: { name: string; bytes: Uint8Array; mime: string } | undefined;
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    const stego = options.stego;
+    const key = await opaqueStage(on, 'derive', () =>
+      embedKeyImage(stego.cover, keyBlock, stego.password),
+    );
     externalKey = {
       name: stegoKeyName(key.ext),
       bytes: key.bytes,
@@ -257,17 +275,21 @@ export async function saveFileToDisk(
   }
 
   // Prove the set (and, for stego, the key cover) restores before handing it over.
-  await verifyImageExport(imagePayloads, key.dek, file.name, content);
+  await opaqueStage(on, 'verify', () =>
+    verifyImageExport(imagePayloads, key.dek, file.name, content),
+  );
   if (keyMode === 'stego' && externalKey && options.stego) {
     await verifyStegoKeyCover(
       externalKey.bytes,
       externalKey.name,
       options.stego.password,
       keyBlock,
+      'block',
+      on,
     );
   }
 
-  await deliver(downloads);
+  await deliver(downloads, on);
   return { imageCount: total, setId: setHex, keyMode, manifest: manifestOf(downloads) };
 }
 
@@ -322,14 +344,17 @@ async function buildDisguisedMode(
       ];
     }
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const k = await embedKeyFactorImage(
-      options.stego.cover,
-      keyFactor,
-      options.stego.password,
-      // A .db is not a set of photos: this key image sits in the user's own
-      // library, where SPEC 5.4's rule holds and transcoding it would make it
-      // the one file that does not match its neighbours.
-      'as-is',
+    const stego = options.stego;
+    const k = await opaqueStage(options.onProgress, 'derive', () =>
+      embedKeyFactorImage(
+        stego.cover,
+        keyFactor,
+        stego.password,
+        // A .db is not a set of photos: this key image sits in the user's own
+        // library, where SPEC 5.4's rule holds and transcoding it would make it
+        // the one file that does not match its neighbours.
+        'as-is',
+      ),
     );
     const dl: Download = {
       name: stegoKeyName(k.ext),
@@ -339,9 +364,10 @@ async function buildDisguisedMode(
     await verifyStegoKeyCover(
       await blobBytes(dl.blob),
       dl.name,
-      options.stego.password,
+      stego.password,
       keyFactor,
       'factor',
+      options.onProgress,
     );
     return [dl];
   }
@@ -453,7 +479,7 @@ export async function saveFileToBinary(
         onProgress: options.onProgress,
         bundle: options.bundle,
       });
-      await deliver(downloads);
+      await deliver(downloads, options.onProgress);
       return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
     }
     const { container, keyBlock: keyFactor } = await encryptBinaryDisguisedInWorker(
@@ -472,11 +498,9 @@ export async function saveFileToBinary(
       if (!options.stego) throw new Error('stego mode requires a cover image and password');
       // The .db is a multi-region path → hide the 32-byte key factor (SSKF), not a
       // 92-byte key block.
-      const stegoKey = await embedKeyFactorImage(
-        options.stego.cover,
-        keyFactor,
-        options.stego.password,
-        'as-is',
+      const stego = options.stego;
+      const stegoKey = await opaqueStage(options.onProgress, 'derive', () =>
+        embedKeyFactorImage(stego.cover, keyFactor, stego.password, 'as-is'),
       );
       const dl: Download = {
         name: stegoKeyName(stegoKey.ext),
@@ -487,9 +511,10 @@ export async function saveFileToBinary(
       await verifyStegoKeyCover(
         await blobBytes(dl.blob),
         dl.name,
-        options.stego.password,
+        stego.password,
         keyFactor,
         'factor',
+        options.onProgress,
       );
     } else if (keyMode === 'keyfile') {
       downloads.push({
@@ -498,7 +523,7 @@ export async function saveFileToBinary(
         purpose: 'keyfile',
       });
     }
-    await deliver(downloads);
+    await deliver(downloads, options.onProgress);
     return { keyMode, variant: 'disguised', manifest: manifestOf(downloads) };
   }
 
@@ -522,7 +547,10 @@ export async function saveFileToBinary(
 
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const stegoKey = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    const stego = options.stego;
+    const stegoKey = await opaqueStage(options.onProgress, 'derive', () =>
+      embedKeyImage(stego.cover, keyBlock, stego.password),
+    );
     downloads.push({
       name: stegoKeyName(stegoKey.ext),
       blob: octet(stegoKey.bytes, stegoKey.mime),
@@ -544,9 +572,11 @@ export async function saveFileToBinary(
       stegoDownload.name,
       options.stego.password,
       keyBlock,
+      'block',
+      options.onProgress,
     );
   }
-  await deliver(downloads);
+  await deliver(downloads, options.onProgress);
   return { keyMode, variant: options.variant, manifest: manifestOf(downloads) };
 }
 
@@ -597,8 +627,11 @@ export async function saveGalleryToDisk(
     mode?: AccessMode;
     threshold?: { k: number; n: number } | undefined;
     bundle?: boolean | undefined;
+    /** Progress; see `planSave` for the stages this path reports. */
+    onProgress?: OnProgress | undefined;
   } = {},
 ): Promise<GallerySaveResult> {
+  const on = options.onProgress;
   assertBlobSize(secret, MAX_FILE_BYTES);
   assertBrowserInputs([...covers, ...(options.stego ? [options.stego.cover] : [])]);
   const keyMode = options.keyMode ?? 'embedded';
@@ -609,13 +642,18 @@ export async function saveGalleryToDisk(
   // of pixels. Nine of those live at once is a quarter of a gigabyte for no
   // reason — the re-encoded JPEG is what is kept, and it is small.
   const galleryCovers: GalleryCover[] = [];
-  for (const file of covers) galleryCovers.push(await fileToGalleryCover(file));
+  for (const [i, file] of covers.entries()) {
+    await report(on, { phase: 'reencode', done: i, total: covers.length });
+    galleryCovers.push(await fileToGalleryCover(file));
+  }
+  await report(on, { phase: 'reencode', done: covers.length, total: covers.length });
   const res = await galleryEncode(secret.name, content, password, galleryCovers, {
     keyMode,
     bundle: options.bundle,
     // Duress is refused upstream (winnowing block); gallery does plain + Mode B.
     mode: mode === 'nonpossession' ? 'nonpossession' : 'plain',
     threshold: options.threshold,
+    onProgress: on,
   });
   const setHex = toHex(res.setId);
 
@@ -633,11 +671,9 @@ export async function saveGalleryToDisk(
     // factor (§10.3), hidden in its own SSKF envelope, not a 92-byte key block.
     // 'profile': this key photo is delivered *with* the gallery, so it takes the
     // gallery's container rule.
-    keyPhoto = await embedKeyFactorImage(
-      options.stego.cover,
-      res.keyBlock,
-      options.stego.password,
-      'profile',
+    const stego = options.stego;
+    keyPhoto = await opaqueStage(on, 'derive', () =>
+      embedKeyFactorImage(stego.cover, res.keyBlock, stego.password, 'profile'),
     );
   }
   const exts: PhotoExt[] = res.images.map((img) => (img.kind === 'jpeg' ? 'jpg' : 'png'));
@@ -679,6 +715,7 @@ export async function saveGalleryToDisk(
     secret.name,
     content,
     thresholdSecret,
+    on,
   );
   if (keyMode === 'stego' && options.stego) {
     const cover = downloads[downloads.length - 1]!;
@@ -688,6 +725,7 @@ export async function saveGalleryToDisk(
       options.stego.password,
       res.keyBlock,
       'factor',
+      on,
     );
   }
 
@@ -696,7 +734,7 @@ export async function saveGalleryToDisk(
     downloads.push(...shareDownloads(res.shares, options.threshold.k, options.threshold.n));
   }
 
-  await deliver(downloads);
+  await deliver(downloads, on);
   return {
     imageCount: res.images.length,
     k: res.k,

@@ -18,6 +18,8 @@ import {
   MAX_FILE_BYTES,
   toHex,
   verifyImageExport,
+  opaqueStage,
+  type OnProgress,
   type KeyMode,
   type ManifestEntry,
   type VaultKey,
@@ -49,6 +51,8 @@ export interface PaperOptions {
   stego?: { cover: File; password: string } | undefined;
   /** Active UI locale, so the instruction sheet matches the chosen language. */
   locale?: string | undefined;
+  /** Progress; see `planSave` for the stages this path reports. */
+  onProgress?: OnProgress | undefined;
 }
 
 /** Canvas pixels per PDF point; 3× keeps printed text crisp. */
@@ -145,17 +149,23 @@ export async function saveFileToPaper(
   assertBlobSize(file, MAX_FILE_BYTES);
   if (options.stego) assertBrowserInputs([options.stego.cover]);
   const content = new Uint8Array(await file.arrayBuffer());
-  const { imagePayloads, setId, keyBlock, keyMode } = await exportVault(file.name, content, key, {
-    profile: PROFILE_PAPER,
-    keyMode: options.keyMode,
-    bundle: options.bundle,
-  });
+  const on = options.onProgress;
+  const { imagePayloads, setId, keyBlock, keyMode } = await opaqueStage(on, 'encrypt', () =>
+    exportVault(file.name, content, key, {
+      profile: PROFILE_PAPER,
+      keyMode: options.keyMode,
+      bundle: options.bundle,
+    }),
+  );
   const codec = getCodec(decodeHeader(imagePayloads[0]!).codecId);
-  await verifyImageExport(imagePayloads, key.dek, file.name, content);
+  await opaqueStage(on, 'verify', () =>
+    verifyImageExport(imagePayloads, key.dek, file.name, content),
+  );
   const setHex = toHex(setId);
 
   const pdfBytes = await buildPaperPdf({
     imagePayloads,
+    onProgress: on,
     encodeQr: (p) => codec.encode(p, PROFILE_PAPER),
     pngEncode: async (img) => new Uint8Array(await (await imageDataToPngBlob(img)).arrayBuffer()),
     createTextEngine: async (pdf) =>
@@ -181,7 +191,10 @@ export async function saveFileToPaper(
   // hidden in the cover photo (stego) or as a plain .key file (keyfile).
   if (keyMode === 'stego') {
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const key = await embedKeyImage(options.stego.cover, keyBlock, options.stego.password);
+    const stego = options.stego;
+    const key = await opaqueStage(on, 'derive', () =>
+      embedKeyImage(stego.cover, keyBlock, stego.password),
+    );
     const name = stegoKeyName(key.ext);
     manifest.push({ name, purpose: 'stegoCover' });
     downloadBlob(new Blob([key.bytes as BufferSource], { type: key.mime }), name);

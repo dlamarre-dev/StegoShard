@@ -9,6 +9,34 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **One progress bar for the whole save, on every destination, up within a frame of
+  the click.** Only the `.ssbn` and `.db` paths used to report anything. A gallery save
+  showed a static line of text through four Argon2 derivations (six with a key photo) and
+  a pure-JavaScript re-encode of every cover, which is most of a minute on a phone and
+  reads as frozen. Where a bar did exist it filled during encryption, emptied, and filled
+  again during verification.
+
+  Every path now reports its stages, and `src/core/progress-plan.ts` turns them into one
+  fraction of the total time. Each stage owns a share of the bar proportional to how long
+  it takes on this device: a small calibration (milliseconds per Argon2 derivation, per
+  megabyte re-encoded, per image rendered) lives in `localStorage` and is refined after
+  each successful save. Within a run, the bar also re-paces itself as stages finish, so a
+  device three times slower than the defaults is paced right after the first derivation.
+  It never goes backwards.
+
+  It keeps moving through the steps that report nothing. The fill is animated toward the
+  end of the current stage with the Web Animations API on `transform`, which browsers run
+  off the main thread, so it creeps on while an Argon2 derivation blocks the page, without
+  ever claiming the stage is done before it is. With reduced motion it only steps. The bar
+  appears before the web app derives its vault key and before the extension checks a stego
+  password, both of which used to run with nothing on screen. The CSP is unchanged: the
+  bar is driven through the CSSOM and the Web Animations API, which `style-src` does not
+  govern.
+
+  The CLI prints one weighted percentage with the stage's name, naming the first stage at
+  once. `--json` progress events gain `fraction` and `stage`, additively. The image, paper
+  and gallery paths now write progress to stderr where they used to write nothing.
+
 - **Gallery covers are re-encoded into one pinned encoder profile** (SPEC §9.8, new).
   Removing the C2PA manifest was the right first step and a small one. It left the GPS,
   the maker notes, the vendor ICC profile and, most of all, the device's own quantization

@@ -146,6 +146,10 @@ export const en = {
   phaseVerify: 'Verifying',
   phaseUnlock: 'Unlocking',
   phaseRender: 'Rendering',
+  phaseDerive: 'Deriving the key',
+  phasePrepare: 'Preparing photos',
+  phaseEmbed: 'Hiding in photos',
+  phaseDeliver: 'Writing files',
 
   // --- what each written file is for --------------------------------------
   purposeVault: 'the vault: holds your file',

@@ -873,6 +873,26 @@
   "statusRendering": {
     "message": "만드는 중…"
   },
+  "statusCheckingPassword": {
+    "message": "비밀번호를 확인하는 중…",
+    "description": "Progress stage label: checking the password of the key photo."
+  },
+  "statusDeriving": {
+    "message": "비밀번호에서 키를 만드는 중…",
+    "description": "Progress stage label: deriving the key from the password (the slow step)."
+  },
+  "statusPreparingPhotos": {
+    "message": "사진을 준비하는 중…",
+    "description": "Progress stage label: preparing the cover photos of a gallery."
+  },
+  "statusHidingKey": {
+    "message": "사진에 키를 숨기는 중…",
+    "description": "Progress stage label: hiding the key inside the chosen photo."
+  },
+  "statusDelivering": {
+    "message": "다운로드를 시작하는 중…",
+    "description": "Progress stage label: handing the files to the browser as downloads."
+  },
   "accessModeHeading": {
     "message": "접근 방식"
   },

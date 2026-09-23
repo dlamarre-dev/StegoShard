@@ -16,11 +16,15 @@
  */
 
 import {
+  DEFAULT_CALIBRATION,
+  ProgressTracker,
   collapseManifest,
   type FilePurpose,
   type ManifestEntry,
   type OnProgress,
   type Progress,
+  type Stage,
+  type StageLabel,
 } from '@core';
 import type {
   GalleryRestoreResult,
@@ -109,7 +113,14 @@ export interface Presenter {
    * schema.
    */
   note(text: string): void;
-  progress(quiet: boolean): { onProgress?: OnProgress; done: () => void };
+  /**
+   * A progress reporter. With `stages` (see `planSave`) it reports one weighted
+   * percentage of the whole operation; without, one percentage per phase.
+   */
+  progress(
+    quiet: boolean,
+    stages?: readonly Stage[],
+  ): { onProgress?: OnProgress; done: () => void };
   save(res: SaveResult): void;
   restore(res: RestoreResult): void;
   gallerySave(res: GallerySaveResult): void;
@@ -177,7 +188,67 @@ const PHASE_KEYS = {
   verify: 'phaseVerify',
   unlock: 'phaseUnlock',
   render: 'phaseRender',
+  derive: 'phaseDerive',
+  prepare: 'phasePrepare',
+  reencode: 'phasePrepare',
+  embed: 'phaseEmbed',
+  extract: 'phaseVerify',
+  deliver: 'phaseDeliver',
 } as const satisfies Record<Progress['phase'], CliKey>;
+
+/** What the status line says during each stage of a planned operation. */
+const STAGE_KEYS = {
+  checkingPassword: 'phaseUnlock',
+  deriving: 'phaseDerive',
+  compressing: 'phaseCompress',
+  preparingPhotos: 'phasePrepare',
+  hiding: 'phaseEmbed',
+  hidingKey: 'phaseEmbed',
+  encrypting: 'phaseEncrypt',
+  rendering: 'phaseRender',
+  verifying: 'phaseVerify',
+  delivering: 'phaseDeliver',
+} as const satisfies Record<StageLabel, CliKey>;
+
+/**
+ * Map phase events to what the terminal shows: a label and a percentage.
+ *
+ * With a plan, the percentage is of the whole operation, weighted by how long
+ * each stage takes (`ProgressTracker`), and the label is the stage's, so the
+ * percentage no longer restarts at 0 for every phase. Without one, it is the old
+ * per-phase reading. The CLI keeps no calibration between runs: it paces itself
+ * from the defaults and corrects as stages finish.
+ */
+type Reading = { label: string; pct: number | undefined };
+
+function progressReader(stages: readonly Stage[] | undefined): {
+  read: (p: Progress) => Reading;
+  /** What to show before the first event, when a plan says what comes first. */
+  first: Reading | undefined;
+} {
+  if (!stages || stages.length === 0) {
+    return {
+      read: (p) => ({
+        label: t(PHASE_KEYS[p.phase]),
+        pct: p.total > 0 ? Math.floor((p.done / p.total) * 100) : undefined,
+      }),
+      first: undefined,
+    };
+  }
+  const tracker = new ProgressTracker(stages, DEFAULT_CALIBRATION, () => Date.now());
+  const reading = (label: StageLabel, fraction: number): Reading => ({
+    label: t(STAGE_KEYS[label]),
+    pct: Math.floor(fraction * 100),
+  });
+  const start = tracker.view();
+  return {
+    read: (p) => {
+      const v = tracker.onEvent(p);
+      return reading(v.label, v.fraction);
+    },
+    first: reading(start.label, start.fraction),
+  };
+}
 
 /**
  * The terminal presenter: exactly the output StegoShard has always produced.
@@ -200,16 +271,15 @@ export function humanPresenter(io: CliIo): Presenter {
      * live percentage; when piped it emits one plain line per phase change.
      * Returns no callback when quiet, plus a `done()` to finish the line.
      */
-    progress(quiet) {
+    progress(quiet, stages) {
       if (quiet) return { done: () => {} };
       const tty = Boolean(io.isStderrTty);
+      const { read, first } = progressReader(stages);
       let lastLabel = '';
       let wroteTty = false;
-      const onProgress: OnProgress = (p) => {
-        const key = PHASE_KEYS[p.phase];
-        const label = key ? t(key) : p.phase;
+      const show = ({ label, pct }: Reading): void => {
         if (tty) {
-          const suffix = p.total > 0 ? `… ${Math.floor((p.done / p.total) * 100)}%` : '…';
+          const suffix = pct === undefined ? '…' : `… ${pct}%`;
           io.err(`\r\x1b[2K${label}${suffix}`);
           wroteTty = true;
         } else if (label !== lastLabel) {
@@ -217,6 +287,10 @@ export function humanPresenter(io: CliIo): Presenter {
           lastLabel = label;
         }
       };
+      // With a plan, the first stage is named at once: the first event may be
+      // an Argon2 derivation away, and a silent terminal reads as a hang.
+      if (first) show(first);
+      const onProgress: OnProgress = (p) => show(read(p));
       return {
         onProgress,
         done: () => {

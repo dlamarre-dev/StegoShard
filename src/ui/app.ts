@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { WARN_FILE_BYTES, type KeyMode, type ManifestEntry } from '@core';
+import { WARN_FILE_BYTES, opaqueStage, type KeyMode, type ManifestEntry } from '@core';
 import {
   type Estimates,
   envelopeLenForEstimate,
@@ -35,6 +35,7 @@ import {
   destKey,
   recoveryGuidance,
   writesOneFile,
+  planForRequest,
   runSave,
   verifyStegoPassword,
   type SaveRequest,
@@ -325,6 +326,7 @@ let wizard: Wizard | null = null;
 const wizardEnv: WizardEnv = {
   msg,
   locale: () => browser.i18n.getUILanguage(),
+  surface: 'extension',
   saveDestinations: ['disk', 'paper', 'binary', 'sqlite', 'gallery'],
   getSaveKey: async () => {
     const s = await getSession();
@@ -733,14 +735,30 @@ function renderRecovery(
   }
 }
 
-async function doSave(req: SaveRequest): Promise<void> {
+/**
+ * Run a save behind one progress bar.
+ *
+ * `checkStego` is the stego password check against the managed key, one Argon2
+ * derivation. It runs here rather than before the call so the bar is already
+ * on screen for it: shown within a frame of the click, before anything slow.
+ */
+async function doSave(req: SaveRequest, checkStego?: () => Promise<boolean>): Promise<void> {
   saveBtn.disabled = true;
   show(saveResult, false);
   const prog = makeProgressUI(saveProgress, saveProgressBar, saveStatus, msg);
   req.onProgress = prog.onProgress;
   setStatus(saveStatus, msg(destKey('statusSaving', req.dest)));
+  let ok = false;
   try {
+    await prog.begin(
+      planForRequest(req, 'extension', { checksStegoPassword: Boolean(checkStego) }),
+    );
+    if (checkStego && !(await opaqueStage(prog.onProgress, 'derive', checkStego))) {
+      setStatus(saveStatus, msg('errWrongPassword'), true);
+      return;
+    }
     const { note, manifest } = await runSave(req, msg);
+    ok = true;
     setStatus(saveStatus, '');
     saveResultNote.textContent = note;
     renderRecovery(recoveryGuidance(req.dest, req.keyMode ?? 'embedded'), manifest);
@@ -760,7 +778,7 @@ async function doSave(req: SaveRequest): Promise<void> {
   } catch (err) {
     setStatus(saveStatus, friendlyError(err), true);
   } finally {
-    prog.done();
+    prog.done(ok);
     saveBtn.disabled = false;
   }
 }
@@ -847,6 +865,7 @@ saveBtn.addEventListener('click', async () => {
   // a separate stego password, verified against the managed key); on the .db path
   // it is the 32-byte key factor, keyed by the same per-save .db password.
   let stego: StegoInput | undefined;
+  let checkStego: (() => Promise<boolean>) | undefined;
   if (keyMode === 'stego') {
     const cover = coverFile.files?.[0];
     if (!cover) return setStatus(saveStatus, msg('errNoCover'), true);
@@ -854,37 +873,36 @@ saveBtn.addEventListener('click', async () => {
       stego = { cover, password: sqliteSavePw.value };
     } else {
       if (!stegoPw.value) return setStatus(saveStatus, msg('errNoPassword'), true);
-      try {
-        if (!(await verifyStegoPassword(session.keyBlock, stegoPw.value))) {
-          return setStatus(saveStatus, msg('errWrongPassword'), true);
-        }
-      } catch (err) {
-        return setStatus(saveStatus, friendlyError(err), true);
-      }
-      stego = { cover, password: stegoPw.value };
+      const stegoPassword = stegoPw.value;
+      // Checked inside `doSave`, behind the progress bar: see there.
+      checkStego = () => verifyStegoPassword(session.keyBlock, stegoPassword);
+      stego = { cover, password: stegoPassword };
     }
   }
 
-  await doSave({
-    dest,
-    files: pickedFiles(),
-    key: session,
-    password: dest === 'sqlite' ? sqliteSavePw.value : undefined,
-    keyMode,
-    codec: selectedCodec(),
-    accessMode,
-    duressPassword,
-    decoy,
-    threshold,
-    label: { title: title || undefined, date },
-    asZip: asZip.checked,
-    includeInstructions: addInstructions.checked,
-    passwordHint: pwHint.value.trim() || undefined,
-    keyLocation: keyLocation.value.trim() || undefined,
-    stego,
-    userEntropy: extraEntropy.value.trim() || undefined,
-    locale: browser.i18n.getUILanguage(),
-  });
+  await doSave(
+    {
+      dest,
+      files: pickedFiles(),
+      key: session,
+      password: dest === 'sqlite' ? sqliteSavePw.value : undefined,
+      keyMode,
+      codec: selectedCodec(),
+      accessMode,
+      duressPassword,
+      decoy,
+      threshold,
+      label: { title: title || undefined, date },
+      asZip: asZip.checked,
+      includeInstructions: addInstructions.checked,
+      passwordHint: pwHint.value.trim() || undefined,
+      keyLocation: keyLocation.value.trim() || undefined,
+      stego,
+      userEntropy: extraEntropy.value.trim() || undefined,
+      locale: browser.i18n.getUILanguage(),
+    },
+    checkStego,
+  );
 });
 
 restoreBtn.addEventListener('click', async () => {
