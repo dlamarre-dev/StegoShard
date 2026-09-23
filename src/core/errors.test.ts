@@ -22,12 +22,15 @@ import {
 import {
   BucketTooLargeError,
   CredentialsNotIndependentError,
+  ExifScrubError,
   FileTooLargeError,
   GalleryCoverCapacityError,
+  GalleryCoversRejectedError,
   GalleryFileTooLargeError,
   GalleryRestoreError,
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
+  JpegEncodeError,
   JpegStructureError,
   JpegUnsupportedError,
   MissingKeyError,
@@ -48,12 +51,15 @@ import {
 const INSTANCES: readonly Error[] = [
   new BucketTooLargeError(5000, 4096),
   new CredentialsNotIndependentError('equal'),
+  new ExifScrubError('EXIF block has no byte-order mark'),
   new FileTooLargeError(2_000_000, 1_048_576),
   new GalleryCoverCapacityError('IMG_2043.jpg', 120, 800),
+  new GalleryCoversRejectedError(['IMG_2043.jpg', 'IMG_2044.jpg'], 269_952),
   new GalleryFileTooLargeError(70_000, 65_536),
   new GalleryRestoreError(),
   new GalleryTooFewImagesError(3, 5),
   new GalleryTooManyImagesError(300, 256),
+  new JpegEncodeError('dimensions must be positive integers, got 0x0'),
   new JpegStructureError('segment runs past end of file'),
   new JpegUnsupportedError('progressive scan'),
   new MissingKeyError(),
@@ -167,6 +173,17 @@ describe('error details', () => {
     expect(stegoErrorDetails(new CredentialsNotIndependentError('equal'))).toEqual({
       reason: 'equal',
     });
+  });
+
+  // The one error that carries a list. `details` takes strings and numbers, so
+  // the list travels joined and comes back split; the names are what a user acts
+  // on, so losing them to the wire would make the refusal unactionable.
+  it('carries a rejected set as names a caller can split back out', () => {
+    const err = new GalleryCoversRejectedError(['a.jpg', 'b.jpg'], 800);
+    expect(stegoErrorDetails(err)).toEqual({ coverNames: 'a.jpg, b.jpg', neededBits: 800 });
+    const back = stegoErrorFromWire(stegoErrorToWire(err));
+    expect(back).toBeInstanceOf(GalleryCoversRejectedError);
+    expect((back as GalleryCoversRejectedError).names).toEqual(['a.jpg', 'b.jpg']);
   });
 
   it('is undefined when there is nothing to report', () => {

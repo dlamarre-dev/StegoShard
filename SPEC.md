@@ -534,6 +534,17 @@ sequential Huffman (SOF0), 8-bit, is supported; progressive (SOF2), arithmetic
 coding, and other formats (HEIC, WebP) MUST be rejected, never transcoded, which
 would change the file's size/appearance and defeat deniability.
 
+**That prohibition binds this section, not Gallery Mode.** The reasoning above is
+about **one** cover sitting in a library of files the device wrote: transcoding it
+alone would make it the one file that does not match its neighbours, which is the
+anomaly the rule exists to prevent. §9.8 re-encodes **every** photo in a gallery
+into one profile, carriers and decoys alike, and the same reasoning inverts: what
+an analyst can sort on is difference, and a set where every file has the same
+tables, the same sampling and no metadata offers none. The rule is therefore
+"never transcode one file out of a set", and §9.8 does not transcode one file out
+of a set. Here in §5.4 the cover stays as the camera wrote it, because a key photo
+travels alone.
+
 The keyed selection, whitening pad, MSB-first bit order, per-cover keystream
 binding (step 1a), and §5.1 validation are **identical to §5.3**; only the
 carrier and the cover fingerprint differ. For a JPEG the fingerprint is
@@ -950,6 +961,13 @@ An encoder therefore:
   object. Over-removal also does not threaten the uniformity requirement above,
   since the same rule runs over every photo in the set.
 
+The three rules that follow govern **container-preserving** normalization, which
+is what this section describes: the file stays the file the device wrote, minus
+its manifest. §9.8 defines a second mode that does not preserve the container at
+all, and says so where each of these stops applying. An implementation is
+conforming under whichever mode it is operating in, and **MUST** apply one mode
+to a whole set rather than mixing them within one.
+
 - **MUST NOT** alter the entropy-coded scan. Removal is segment-level; the
   quantized DCT coefficients are bit-identical across normalization, which is what
   lets it run before an embed without changing what the embed hides.
@@ -1045,6 +1063,172 @@ are no JPEG DCT coefficients in an HEVC-coded image to carry a payload, so such 
 file is not a cover. The uniformity rule above still bears on it: a library that is
 HEIC everywhere except the handful of photos converted to JPEG to carry something
 sorts on exactly that. Convert the whole set or use one that was JPEG already.
+
+### 9.8 Re-encoding to one profile (normative, default for Gallery Mode)
+
+§9.7 removes a manifest and leaves everything else. That is the wrong shape of
+answer for a gallery, and the reason is worth stating before the rules.
+
+A cover set has to survive being **sorted**, and almost everything a device writes
+is sortable. Removing EXIF is not enough: a JPEG with no EXIF but Google's
+quantization tables reads as a camera file someone scrubbed, which is a louder
+signal than the EXIF was. Removing everything is not enough either; §9.7 already
+says a bare image among camera originals is its own anomaly. And chasing the
+difference device by device does not terminate — every vendor's tables, ICC
+profile, makernote dialect and sampling choice is another axis, and new ones ship
+with new phones.
+
+So the default is to stop preserving and start **converging**: every cover in the
+set is decoded to pixels and re-encoded by one pinned encoder, so that the
+delivered photos are not similar files but _the same kind of file_. What an
+analyst can sort on is difference, and there is none left inside the set.
+
+**The profile.** A conforming encoder **MUST** pin, as literal values rather than
+as a quality parameter handed to a library:
+
+| Property            | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Quantization tables | ITU T.81 Annex K, scaled to quality **85**, zig-zag order, both in one DQT |
+| Chroma subsampling  | 4:2:0 (sampling factors `22 11 11`)                                        |
+| Huffman tables      | the four Annex K standard tables, written out, all in one DHT              |
+| Frame type          | baseline sequential (SOF0), 8-bit, three components                        |
+| Restart interval    | 0 (no DRI, no RST markers)                                                 |
+| APP0                | JFIF 1.1, units 0 (aspect ratio only), density 1:1, no thumbnail           |
+| Segments            | SOI, APP0, DQT, SOF0, DHT, SOS, EOI, in that order, and nothing else       |
+| After EOI           | nothing                                                                    |
+
+The JFIF APP0 is kept rather than dropped, on the same reasoning as everything
+else here: a baseline JPEG _without_ one is the unusual file. It carries nothing
+identifying.
+
+"Quality 85" names where the numbers came from; it is not the specification. Two
+libraries at `quality: 85` do not agree, and a library's default tables are a
+fingerprint of the library. The tables in `src/core/jpeg-profile.ts` are the
+normative values, their luma sum is **1109** and their chroma sum **1666**, and
+`scripts/check-spec.ts` holds this document to the code.
+
+Under this mode:
+
+- An implementation **MUST** re-encode **every** cover in the set, carriers and
+  decoys alike, and **MUST NOT** deliver a set in which some covers were re-encoded
+  and others were not. This is §9.7's uniformity rule applied one level down: a set
+  where only the carriers share a profile sorts exactly as well as one where only
+  the carriers lack a manifest.
+- A cover that arrives as a raster (PNG) **MUST** be re-encoded into the same
+  profile, and its filename extension **MUST** follow, because a set that is JPEG
+  except for two `.png` files sorts on that.
+- A key photo delivered **with** the set (§5.2 stego key mode) **MUST** be
+  re-encoded into the profile like any other photo in that delivery. It is the one
+  file whose singularity would be worth the most to an analyst.
+- §9.7's requirement to preserve bytes after EOI, and its requirement to keep an
+  MPF index consistent, **do not apply**: this mode produces a new file with no
+  trailer and no MPF index, so there is no gain map to orphan and no offset to
+  invalidate. An Ultra HDR gain map **is** lost, which is a real cost and is why
+  the container-preserving mode remains available.
+- An implementation **MUST** refuse a cover whose source was quantized **more
+  coarsely** than the profile, rather than re-encode it. Quantizing finely over a
+  coarse original leaves a double-quantization comb in the coefficient histogram:
+  the coarse step's gaps survive the finer one, which is a well-known detector
+  input and a louder signal than anything this mode removes. In practice such a
+  photo has already been through a messaging service. Coarseness is compared as
+  the sum of the source's luma table against the profile's **1109**, read from its
+  DQT without touching the entropy-coded scan, so the decision is a property of
+  the cover alone. The refusal **MUST** name the photo, because the remedy is to
+  use a different one. A JPEG source whose luma table **cannot be read** (a
+  truncated file a decoder still renders, or one that files luma under another
+  table id) **MUST** be refused the same way: a coarseness that cannot be measured
+  is not a coarseness that is safe.
+- An implementation **MUST** apply a JPEG source's EXIF Orientation to the pixels
+  before re-encoding. The profile carries no EXIF, so the tag that told a viewer
+  to turn a portrait photo upright does not survive, and every surface has to
+  decode the same photo to the same pixels: browsers apply the tag on decode, so
+  a decoder that does not has to apply it itself.
+- An implementation **MAY** pass a cover through unchanged when it already is a
+  file this profile wrote: every byte before the scan identical to what the
+  encoder would write for its dimensions, and nothing after EOI. Re-encoding such
+  a file could only lose a generation, and a delivered gallery photo is exactly
+  such a file, with its payload in the coefficients a re-encode would rewrite.
+
+#### 9.8.1 The sparseness bar, and how it was derived
+
+A cover must also be able to _hold_ a slot without becoming remarkable. The
+quantity that governs that is the **modification rate**: changed carriers over
+total carriers, which for a fixed slot is `1 / (2 · margin)`, since half the
+payload bits already match the carrier they land on.
+
+The bar was measured, not chosen, on the five single-compressed camera
+photographs in `tests/steganalysis/covers-jpeg/`. The method:
+
+1. Re-encode the photo into the profile.
+2. For a range of modification rates, embed and measure the **total-variation
+   distance** between the cover's AC-magnitude histogram and the carrier's.
+3. Compare that distance against the photo's **own** noise floor: the same
+   distance measured between two interleaved halves of the photo itself
+   (even-indexed blocks against odd-indexed ones). Same scene, same quantization
+   grid, same encoder, so whatever separates those two samples is the level below
+   which a histogram-based detector has nothing to key on.
+
+The distance grows linearly with the rate and crosses that floor between **5.5%
+and 10%**, about **6%** across the corpus. `GALLERY_EMBED_MARGIN = 16` puts the
+rate at **3.1%**, a factor of two under the crossing. The previous value of 4 put
+it at 12.5%, comfortably above: the margin was the defect, not the re-encoding
+that exposed it.
+
+**What this does not claim.** A first-order chi-square (Westfeld-Pfitzmann
+pair-of-values) attack does not move at any rate up to 20% on this corpus; it
+fires only near saturation. It therefore constrains nothing, and no number here
+was derived from it. Stating that matters: a threshold justified by a detector
+that would have accepted any threshold is not a justification.
+
+**A reader applies the older, looser bar.** An implementation reading a gallery
+**MUST NOT** require more than the margin galleries were written with, or it will
+refuse files a conforming implementation produced. The reference implementation
+reads at margin 4 and writes at 16.
+
+#### 9.8.2 Concentration: measured, and deliberately not a rule
+
+An average rate cannot see concentration, and the obvious worry is a photo whose
+carriers are massed in one textured patch: the average looks healthy while the
+changes pile into a corner.
+
+It was measured on the same corpus, at the production rate, in 64×64 pixel tiles.
+The per-tile modification rate equals the global rate on every photo, with a
+spread of **1.05× to 1.45×** the binomial spread expected from drawing positions
+uniformly. That is sampling noise and nothing else, and it is structural rather
+than lucky: §9.3 draws carrier positions uniformly over the eligible set, so a
+tile holding 1% of the carriers takes 1% of the changes, by construction.
+
+A per-tile threshold would therefore reject nothing a global count does not
+already reject, and this specification **does not define one**. What is recorded
+instead is the dependency: the conclusion holds because the draw is uniform, and
+an implementation that biases position selection — toward high-magnitude
+coefficients, or toward locality — invalidates it and **MUST** re-derive the bar.
+
+Carrier _density_ does vary, and widely: across the corpus a photo yields between
+**8 000 and 124 000** eligible carriers per megapixel, the low end being a
+near-black frame. A slot needs 269 952 of them, so a dark or smooth photo is
+refused however large it is. That is the filter working: a photo with almost no
+texture is not a cover, and no margin can make it one.
+
+#### 9.8.3 The container-preserving mode
+
+An implementation **MAY** offer §9.7's behaviour as an explicit, non-default
+option, for the caller who needs an Ultra HDR gain map or the device's own
+coefficients preserved. If it does:
+
+- it **MUST** remove the EXIF GPS block from every cover in the set, including
+  the values addressed from the GPS IFD and not merely the pointer to it;
+- it **MUST** remove GPS coordinates wherever else the container carries them:
+  GPS properties in XMP (any prefix, including Extended XMP), the EXIF and XMP of
+  every JPEG stream after EOI (an MPF secondary image, a gain map), and the
+  QuickTime `©xyz` location of a motion-photo video after EOI. It **MUST NOT**
+  move a byte to do so, so every MPF offset stays true, and it **MUST** fail
+  closed on a coordinate-bearing structure it cannot walk;
+- it **MUST NOT** claim the uniformity property, and **SHOULD** say plainly what
+  is being kept: quantization tables, ICC profile, makernote, XMP dialect,
+  timestamps and camera model all survive, and a set gathered from several devices
+  stays as sortable as it was;
+- it **MUST** apply the choice to the whole delivery, key photo included.
 
 ---
 

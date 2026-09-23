@@ -67,7 +67,13 @@ export function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
 }
 
-function buildHuff(bits: number[], values: number[]): HuffTable {
+/**
+ * Build the decode and encode maps for one Huffman table.
+ *
+ * Exported for `jpeg-encode.ts`, which installs the pinned standard tables the
+ * same way this module installs a file's own: internal to core, not published.
+ */
+export function buildHuff(bits: number[], values: number[]): HuffTable {
   const dec = new Map<number, number>();
   const enc = new Map<number, { code: number; len: number }>();
   let code = 0;
@@ -400,7 +406,8 @@ function mantissa(v: number, size: number): number {
   return v >= 0 ? v : v + (1 << size) - 1;
 }
 
-class BitWriter {
+/** Shared with `jpeg-encode.ts`, which writes a scan from scratch. */
+export class BitWriter {
   private out: number[] = [];
   private acc = 0;
   private nbits = 0;
@@ -522,7 +529,8 @@ function huffCode(table: HuffTable, symbol: number, what: string): { code: numbe
   return found;
 }
 
-function encodeBlock(
+/** Shared with `jpeg-encode.ts`: one block of quantized coefficients, entropy-coded. */
+export function encodeBlock(
   bw: BitWriter,
   block: Int16Array,
   dc: HuffTable,

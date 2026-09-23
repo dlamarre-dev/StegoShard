@@ -63,7 +63,17 @@ export type WarningCode =
    * property the feature exists to deliver, so a set that misses it must not
    * pass silently.
    */
-  | 'COVERS_NOT_UNIFORM';
+  | 'COVERS_NOT_UNIFORM'
+  /**
+   * A gallery was written with `--preserve-container`, so the set was not
+   * re-encoded into one profile (SPEC §9.8).
+   *
+   * Raised on every such run, found or not: what the flag costs is what it
+   * leaves behind, and a set can keep every identifying tag and every encoder
+   * quirk while producing no finding at all. A user who chose the flag for the
+   * gain map should still be told what came with it.
+   */
+  | 'CONTAINER_PRESERVED';
 
 export interface CliWarning {
   code: WarningCode;

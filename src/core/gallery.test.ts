@@ -17,11 +17,12 @@ import {
   type GalleryCover,
   type GalleryImage,
   GALLERY_SLOT_BYTES,
-  GalleryCoverCapacityError,
+  GalleryCoversRejectedError,
   GalleryFileTooLargeError,
   GalleryRestoreError,
   GalleryTooFewImagesError,
   GalleryTooManyImagesError,
+  JpegUnsupportedError,
   decode as decodeJpeg,
   estimateGalleryCovers,
   galleryCoversForEnvelopeLen,
@@ -48,11 +49,20 @@ function noisyJpeg(width: number, height: number, quality = 85, seed = 1): Uint8
   return new Uint8Array(jpeg.encode({ data, width, height }, quality).data);
 }
 
-function jpegCover(name: string, seed: number, size = 256): GalleryCover {
+/**
+ * Cover sizes are set by the embed margin, not by taste.
+ *
+ * `GALLERY_EMBED_MARGIN` asks for 16 eligible carriers per payload bit — 269 952
+ * of them for one slot — so a cover has to be big enough to hold that many.
+ * Noise at q85 yields roughly 680k carriers per megapixel, and a raster cover
+ * yields three per pixel, which is where 768² and 384² come from. The old 256²
+ * fixtures were sized for the 4× margin and now fail the screen, correctly.
+ */
+function jpegCover(name: string, seed: number, size = 768): GalleryCover {
   return { kind: 'jpeg', name, jpeg: noisyJpeg(size, size, 85, seed) };
 }
 
-function rgbaCover(name: string, seed: number, w = 256, h = 256): GalleryCover {
+function rgbaCover(name: string, seed: number, w = 384, h = 384): GalleryCover {
   const rgba = new Uint8Array(w * h * 4);
   let s = seed >>> 0;
   for (let p = 0; p < w * h; p++) {
@@ -112,7 +122,7 @@ describe('gallery cover normalization', () => {
     expect(res.images.length).toBeGreaterThan(k + m);
     expect(res.normalization.removed.covers).toBe(dirty.length);
     expect(res.normalization.uniform).toBe(true);
-  }, 45000);
+  }, 120000);
 
   it('normalizes a mixed set down to one profile, not just the dirty half', async () => {
     const secret = enc.encode('half and half');
@@ -128,7 +138,7 @@ describe('gallery cover normalization', () => {
     expect(res.normalization.covers?.withManifest).toEqual([]);
     expect(res.normalization.covers?.divergent).toEqual([]);
     expect(res.normalization.uniform).toBe(true);
-  }, 45000);
+  }, 120000);
 
   it('still restores after the manifests are gone', async () => {
     const secret = enc.encode('round trip through normalization');
@@ -137,7 +147,7 @@ describe('gallery cover normalization', () => {
     const { images } = await galleryEncode('n.txt', secret, 'pw', dirty, { params: FAST });
     const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('round trip through normalization');
-  }, 45000);
+  }, 120000);
 
   it('reports a raster cover set as non-uniform when it is mixed with JPEGs', async () => {
     const secret = enc.encode('mixed formats');
@@ -147,7 +157,7 @@ describe('gallery cover normalization', () => {
     const res = await galleryEncode('n.txt', secret, 'pw', mixed, { params: FAST });
     expect(res.normalization.raster).toBe(1);
     expect(res.normalization.uniform).toBe(false);
-  }, 45000);
+  }, 120000);
 
   /**
    * `fileToGalleryCover` calls anything with an SOI a JPEG, so a truncated photo
@@ -198,11 +208,11 @@ describe('gallery round-trip', () => {
     const { covers } = await coversFor('s.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
     const { images } = await galleryEncode('s.txt', secret, 'hunter2', covers, { params: FAST });
     for (const img of images) {
-      if (img.kind === 'jpeg') expect(decodeJpeg(img.jpeg).width).toBe(256);
+      if (img.kind === 'jpeg') expect(decodeJpeg(img.jpeg).width).toBe(768);
     }
     const out = await galleryDecode(images as GalleryCover[], 'hunter2', { params: FAST });
     expect(dec.decode(out.content)).toBe('gallery jpeg secret');
-  }, 45000);
+  }, 120000);
 
   it('round-trips a compressible secret larger than the compressed-blob ceiling', async () => {
     // 20 KB of repetition gzips to well under a gallery bucket but inflates back on
@@ -300,7 +310,7 @@ describe('gallery resilience', () => {
     });
     const out = await galleryDecode(damaged as GalleryCover[], 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('resilient secret');
-  }, 45000);
+  }, 120000);
 
   it('noise: foreign and undersized images are ignored, not fatal', async () => {
     const secret = enc.encode('ignore the noise');
@@ -314,7 +324,7 @@ describe('gallery resilience', () => {
     ];
     const out = await galleryDecode(withNoise, 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('ignore the noise');
-  }, 45000);
+  }, 120000);
 
   it('a mid-capacity foreign photo is skipped, not fatal (keystream guard)', async () => {
     const secret = enc.encode('guarded');
@@ -328,7 +338,7 @@ describe('gallery resilience', () => {
       params: FAST,
     });
     expect(dec.decode(out.content)).toBe('guarded');
-  }, 45000);
+  }, 120000);
 });
 
 describe('gallery deniability', () => {
@@ -344,7 +354,7 @@ describe('gallery deniability', () => {
         expect(drift).toBeLessThan(64);
       }
     });
-  }, 45000);
+  }, 120000);
 
   it('the Huffman size-category histogram is identical before and after embedding', async () => {
     const secret = enc.encode('histogram');
@@ -356,7 +366,7 @@ describe('gallery deniability', () => {
         expect(acHistogram(img.jpeg)).toEqual(acHistogram(cover.jpeg));
       }
     });
-  }, 45000);
+  }, 120000);
 
   it('decoy payloads look like ciphertext (Shannon entropy ≈ 8 bits/byte)', async () => {
     const secret = enc.encode('small');
@@ -424,7 +434,7 @@ describe('gallery guardrails', () => {
     ).rejects.toBeInstanceOf(GalleryTooManyImagesError);
   });
 
-  it('rejects a cover without enough carriers', async () => {
+  it('rejects a cover without enough carriers, naming it and only it', async () => {
     // Enough covers to clear the count floor, with a too-small carrier at index 0.
     const secret = enc.encode('hi');
     const { needed } = await estimateGalleryCovers('x', secret, 'embedded');
@@ -432,9 +442,75 @@ describe('gallery guardrails', () => {
       { kind: 'jpeg', name: 'smooth.jpg', jpeg: noisyJpeg(16, 16, 20) }, // too small, a carrier
       ...Array.from({ length: needed }, (_, i) => rgbaCover(`p${i}.png`, i + 1)),
     ];
-    await expect(galleryEncode('x', secret, 'pw', covers, { params: FAST })).rejects.toBeInstanceOf(
-      GalleryCoverCapacityError,
+    const err = await galleryEncode('x', secret, 'pw', covers, { params: FAST }).catch(
+      (e: unknown) => e,
     );
+    expect(err).toBeInstanceOf(GalleryCoversRejectedError);
+    // Only the offender is named: a refusal that listed the whole folder would
+    // tell the user to throw away photos that are fine.
+    expect((err as GalleryCoversRejectedError).names).toEqual(['smooth.jpg']);
+  });
+
+  /**
+   * The screen runs over the whole set, so a decoy that cannot take a slot
+   * sparsely is refused exactly like a carrier would be. That is the point: if
+   * "passes the screen" were true only of the carriers, it would be a test an
+   * analyst could run to find them.
+   */
+  it('rejects a smooth decoy as readily as a smooth carrier', async () => {
+    const secret = enc.encode('hi');
+    const { needed } = await estimateGalleryCovers('x', secret, 'embedded');
+    const covers: GalleryCover[] = [
+      ...Array.from({ length: needed }, (_, i) => rgbaCover(`p${i}.png`, i + 1)),
+      // Past the K+M carriers, so this one would have held nothing but chaff.
+      { kind: 'jpeg', name: 'flat-decoy.jpg', jpeg: noisyJpeg(16, 16, 20) },
+      ...Array.from({ length: 2 }, (_, i) => rgbaCover(`q${i}.png`, i + 60)),
+    ];
+    const err = await galleryEncode('x', secret, 'pw', covers, { params: FAST }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(GalleryCoversRejectedError);
+    expect((err as GalleryCoversRejectedError).names).toEqual(['flat-decoy.jpg']);
+  });
+
+  /**
+   * A progressive JPEG reaches the core under `preserveContainer`. It cannot be
+   * embedded into, and the refusal has to say so: the capacity count used to
+   * read "cannot decode" as zero carriers and call it too smooth, which tells a
+   * user to drop a textured photo for the wrong reason.
+   */
+  it('reports a progressive JPEG as unsupported, not as too smooth', async () => {
+    const secret = enc.encode('hi');
+    const { needed } = await estimateGalleryCovers('x', secret, 'embedded');
+    const progressive = noisyJpeg(64, 64);
+    const sof = progressive.findIndex((b, i) => b === 0xff && progressive[i + 1] === 0xc0);
+    progressive[sof + 1] = 0xc2; // SOF0 -> SOF2
+    const covers: GalleryCover[] = [
+      { kind: 'jpeg', name: 'progressive.jpg', jpeg: progressive },
+      ...Array.from({ length: needed }, (_, i) => rgbaCover(`p${i}.png`, i + 1)),
+    ];
+    const err = await galleryEncode('x', secret, 'pw', covers, { params: FAST }).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(JpegUnsupportedError);
+    expect(err).not.toBeInstanceOf(GalleryCoversRejectedError);
+  });
+
+  /**
+   * The screen is a floor, not a ranking. A folder of photos that all clear the
+   * margin comes out whole, however differently textured they are: selecting the
+   * best of a folder would make the delivered set the textured tail of it, which
+   * is a property an analyst could look for (SPEC §9.8).
+   */
+  it('keeps every cover that clears the bar, however far it clears it', async () => {
+    const secret = enc.encode('hi');
+    const { needed } = await estimateGalleryCovers('x', secret, 'embedded');
+    const covers: GalleryCover[] = Array.from({ length: needed }, (_, i) =>
+      // Alternating 384² and 768²: a 4x spread in carriers, all of it above the bar.
+      i % 2 === 0 ? rgbaCover(`p${i}.png`, i + 1) : rgbaCover(`p${i}.png`, i + 1, 768, 768),
+    );
+    const res = await galleryEncode('x', secret, 'pw', covers, { params: FAST });
+    expect(res.images.length).toBe(needed);
   });
 });
 

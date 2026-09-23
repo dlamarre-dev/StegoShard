@@ -23,6 +23,7 @@
 import { WrongPasswordError } from './crypto';
 import {
   GalleryCoverCapacityError,
+  GalleryCoversRejectedError,
   GalleryFileTooLargeError,
   GalleryRestoreError,
   GalleryTooFewImagesError,
@@ -30,7 +31,9 @@ import {
 } from './gallery';
 import { CredentialsNotIndependentError, type CredentialRelation } from './access';
 import { BucketTooLargeError } from './buckets';
+import { ExifScrubError } from './exif-scrub';
 import { JpegUnsupportedError } from './jpeg-coeff';
+import { JpegEncodeError } from './jpeg-encode';
 import { JpegStructureError } from './jpeg-segments';
 import { ProvenanceNormalizeError } from './normalize';
 import { SegmentedFormatError } from './segmented';
@@ -49,12 +52,15 @@ import {
 export type StegoErrorCode =
   | 'BUCKET_TOO_LARGE'
   | 'CREDENTIALS_NOT_INDEPENDENT'
+  | 'EXIF_SCRUB'
   | 'FILE_TOO_LARGE'
   | 'GALLERY_COVER_CAPACITY'
+  | 'GALLERY_COVERS_REJECTED'
   | 'GALLERY_FILE_TOO_LARGE'
   | 'GALLERY_RESTORE_FAILED'
   | 'GALLERY_TOO_FEW_IMAGES'
   | 'GALLERY_TOO_MANY_IMAGES'
+  | 'JPEG_ENCODE'
   | 'JPEG_STRUCTURE'
   | 'JPEG_UNSUPPORTED'
   | 'MISSING_KEY'
@@ -162,6 +168,12 @@ const TABLE: readonly CodeRow[] = [
     'reason',
   ),
   row(
+    ExifScrubError,
+    'ExifScrubError',
+    'EXIF_SCRUB',
+    (m) => new ExifScrubError(unprefix(m, 'cannot scrub EXIF: ')),
+  ),
+  row(
     FileTooLargeError,
     'FileTooLargeError',
     'FILE_TOO_LARGE',
@@ -187,6 +199,20 @@ const TABLE: readonly CodeRow[] = [
     },
     'coverName',
     'capacityBits',
+    'neededBits',
+  ),
+  row(
+    GalleryCoversRejectedError,
+    'GalleryCoversRejectedError',
+    'GALLERY_COVERS_REJECTED',
+    (_m, d) => {
+      const names = str(d, 'coverNames');
+      const needed = num(d, 'neededBits');
+      return names === undefined || needed === undefined
+        ? null
+        : GalleryCoversRejectedError.fromNames(names, needed);
+    },
+    'coverNames',
     'neededBits',
   ),
   row(
@@ -233,6 +259,12 @@ const TABLE: readonly CodeRow[] = [
   ),
   // The constructor wraps its argument, so the argument is recovered from the
   // wrapped message rather than carried separately.
+  row(
+    JpegEncodeError,
+    'JpegEncodeError',
+    'JPEG_ENCODE',
+    (m) => new JpegEncodeError(unprefix(m, 'cannot encode JPEG: ')),
+  ),
   row(
     JpegStructureError,
     'JpegStructureError',

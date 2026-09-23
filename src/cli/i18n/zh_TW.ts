@@ -38,6 +38,10 @@ export const zhTW: CliCatalog = {
     '--allow-cover-reuse 對 {command} 沒有作用（只有 save 會嵌入封面圖片）',
   hintAllowCoverReuse: '若確實有意，可加上 --allow-cover-reuse 覆寫。',
   helpAllowCoverReuse: '允許一張封面照片以相同密碼攜帶第二個祕密（兩者都會被削弱；見 docs/CLI.md）',
+  errPreserveContainerWrongCommand:
+    '--preserve-container 對 {command} 沒有作用（只有 gallery-save 會重新編碼封面照片）',
+  helpPreserveContainer:
+    '讓每張相片保留自己的容器，不把整組重新編碼成單一輪廓。會清除 GPS。會保留 Ultra HDR gain map，以及裝置寫入的其他一切（gallery-save）',
   errExportNumberInvalid: '--export-number 必須是 1 到 4294967295 之間的整數（收到「{value}」）',
   errExportNumberWrongCommand: '--export-number 對 {command} 沒有作用（只有 save 會為匯出編號）',
   errCodecColorPaper: '--codec color 不能與 --paper 並用（列印頁面使用 QR）',
@@ -103,6 +107,10 @@ export const zhTW: CliCatalog = {
   warnCoversNotUniform:
     '警告：這些相片沒有共用同一份中繼資料輪廓，仍可據此分辨。' +
     '請對這一組執行 stegoshard normalize --report，看看差異在哪裡。',
+  warnPreserveContainer:
+    '警告：--preserve-container 讓每張相片保留自己的容器，因此這一組沒有重新編碼成單一輪廓。' +
+    'GPS 已移除；相機型號、時間戳記、maker note 以及裝置編碼器自己的量化表則沒有。' +
+    '來自不同裝置的相片仍可據此分辨，這台裝置拍的相片也仍可與不是它拍的分辨開來。',
   labelPassword: '密碼',
   promptPassword: '密碼：',
   promptDuressPassword: '脅迫密碼：',

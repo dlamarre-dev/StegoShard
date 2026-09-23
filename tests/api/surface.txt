@@ -34,6 +34,7 @@ stegoshard:GALLERY_MAX_IMAGES
 stegoshard:GALLERY_MIN_DECOYS
 stegoshard:GALLERY_MIN_IMAGES
 stegoshard:GalleryCoverCapacityError
+stegoshard:GalleryCoversRejectedError
 stegoshard:GalleryFileTooLargeError
 stegoshard:GalleryRestoreError
 stegoshard:GalleryTooFewImagesError

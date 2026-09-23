@@ -74,6 +74,9 @@ import { BINARY_VERSION } from '../src/core/binary-container';
 import { SHARE_VERSION } from '../src/core/shamir';
 import { DEFAULT_ARGON2 } from '../src/core/crypto';
 import { JUMBF_APP11_PREFIX } from '../src/core/normalize';
+import { PROFILE_QUANT_SUM } from '../src/core/jpeg-encode';
+import { PROFILE_QUALITY, QUANT_CHROMA } from '../src/core/jpeg-profile';
+import { GALLERY_EMBED_MARGIN, GALLERY_READ_MARGIN } from '../src/core/gallery';
 
 /** `4A 50`: the §9.7 prefix as SPEC.md spells it. */
 const JUMBF_PREFIX_HEX = JUMBF_APP11_PREFIX.map((b) =>
@@ -175,6 +178,58 @@ const RULES: Rule[] = [
     count: 1,
     expected: JUMBF_PREFIX_HEX,
     source: 'JUMBF_APP11_PREFIX in src/core/normalize.ts',
+  },
+  {
+    // §9.8 pins an encoder, and the one number an independent implementer can
+    // check their tables against in a line is the luma sum. If this document and
+    // the code ever disagree about it, two implementations produce two profiles,
+    // which is the exact failure the section exists to prevent.
+    id: 'profile-quant-sum',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /(?:luma sum is|profile's) \*\*(\d+)\*\*/g,
+    count: 2,
+    expected: PROFILE_QUANT_SUM,
+    source: 'PROFILE_QUANT_SUM in src/core/jpeg-encode.ts',
+  },
+  {
+    id: 'profile-chroma-sum',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /chroma sum \*\*(\d+)\*\*/g,
+    count: 1,
+    expected: QUANT_CHROMA.reduce((a, b) => a + b, 0),
+    source: 'QUANT_CHROMA in src/core/jpeg-profile.ts',
+  },
+  {
+    id: 'profile-quality',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /scaled to quality \*\*(\d+)\*\*/g,
+    count: 1,
+    expected: PROFILE_QUALITY,
+    source: 'PROFILE_QUALITY in src/core/jpeg-profile.ts',
+  },
+  {
+    // The sparseness bar, and the rate it implies. Both are written out in §9.8
+    // because the derivation is the argument; a margin that drifted from the
+    // code would leave the document justifying a number nothing uses.
+    id: 'gallery-embed-margin',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /`GALLERY_EMBED_MARGIN = (\d+)`/g,
+    count: 1,
+    expected: GALLERY_EMBED_MARGIN,
+    source: 'GALLERY_EMBED_MARGIN in src/core/gallery.ts',
+  },
+  {
+    id: 'gallery-read-margin',
+    file: SPEC,
+    scope: 'flat',
+    pattern: /reads at margin (\d+) and writes at/g,
+    count: 1,
+    expected: GALLERY_READ_MARGIN,
+    source: 'GALLERY_READ_MARGIN in src/core/gallery.ts',
   },
   {
     id: 'segmented-diagram',

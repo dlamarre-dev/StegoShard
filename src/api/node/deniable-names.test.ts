@@ -30,8 +30,10 @@ function write(dir: string, name: string, data: Uint8Array | string): string {
 
 /** A PNG with ample LSB capacity for a hidden key factor. */
 function writeCover(dir: string, name: string, seed = 11): string {
-  const w = 160;
-  const h = 160;
+  // Sized to clear the capacity margin after the cover is re-encoded into the
+  // profile, not before: normalization is what decides how many carriers remain.
+  const w = 768;
+  const h = 768;
   const data = new Uint8Array(w * h * 4);
   let s = seed >>> 0;
   for (let i = 0; i < data.length; i += 4) {
@@ -162,8 +164,11 @@ describe('deniable destinations name nothing after the project', () => {
         expect(name).not.toMatch(/[0-9a-f]{8}/i);
       }
       expect(written).toContain('recovery.key');
-      // And the photos still came out under their own names.
-      expect(written.filter((n) => /^IMG_3\d00\.png$/.test(n))).toHaveLength(10);
+      // And the photos still came out under their own names. The extension
+      // follows the re-encode into the profile; the stem does not, and the stem
+      // is what deniability turns on: the file is still called what the user
+      // called it, not what the tool is called.
+      expect(written.filter((n) => /^IMG_3\d00\.jpg$/.test(n))).toHaveLength(10);
     },
   );
 });

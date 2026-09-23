@@ -62,6 +62,7 @@ import {
   extractBytesStegoJpeg,
   extractBytesStegoRgba,
 } from './stego';
+import { decode as decodeJpeg, eligibleCoefficients } from './jpeg-coeff';
 import {
   MAX_FILE_BYTES,
   VerificationError,
@@ -73,6 +74,7 @@ import {
 import { buildNonPossessionVaultBlob } from './access';
 import { BucketTooLargeError, GALLERY_LADDER } from './buckets';
 import { type CoverSetReport, inspectCoverSet, normalizeCoverBytes } from './normalize';
+import { scrubGps } from './exif-scrub';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -83,8 +85,43 @@ export const GALLERY_FRAG_LEN = HEADER_LEN + GALLERY_SLOT_DATA;
 /** Fixed embedded slot size: 12-byte nonce + AES-GCM(header||shard) + 16-byte tag. */
 export const GALLERY_SLOT_BYTES = IV_LEN + GALLERY_FRAG_LEN + GCM_TAG_LEN;
 const GALLERY_SLOT_BITS = GALLERY_SLOT_BYTES * 8;
-/** Eligible carriers must exceed the slot size by this factor (keeps embedding sparse). */
-export const GALLERY_CAPACITY_MARGIN = 4;
+/**
+ * How many eligible carriers a cover must have per payload bit, to write into it.
+ *
+ * Derived by measurement, not chosen. The quantity that matters is the
+ * modification rate — changed carriers over total carriers — which for a slot of
+ * `GALLERY_SLOT_BITS` is `1 / (2 · margin)`, since half the payload bits already
+ * match the carrier they land on.
+ *
+ * Measured on the five camera photographs in `tests/steganalysis/covers-jpeg/`:
+ * the total-variation distance between a cover's coefficient histogram and its
+ * carrier's grows linearly with that rate, and crosses the photo's *own* noise
+ * floor — the distance between two interleaved samples of itself — between 5.5%
+ * and 10%, about 6% across the set. Below that crossing the embedding moves the
+ * histogram less than the photo already varies against itself, so a
+ * histogram-based detector has nothing to key on.
+ *
+ * 16 puts the rate at 3.1%, a factor of two under the crossing, which leaves room
+ * for a detector better than the ones measured. The old value of 4 put it at
+ * 12.5%, comfortably *above* the crossing: the margin was the defect, not the
+ * re-encoding that exposed it.
+ *
+ * Note what this does not claim. A first-order chi-square attack does not move at
+ * any rate up to 20% on that corpus — it fires only at saturation — so it
+ * constrains nothing, and no threshold here was derived from it. See SPEC §9.8.
+ */
+export const GALLERY_EMBED_MARGIN = 16;
+
+/**
+ * The margin a *reader* applies, which is deliberately the old, looser one.
+ *
+ * A reader must stay able to open anything a writer once produced — the same rule
+ * `extractBytesStegoJpeg` states for its own default. Galleries written before the
+ * margin rose used covers that cleared 4×, and raising the read guard to match the
+ * write guard would make those unreadable: a change to the format, dressed up as a
+ * safety improvement.
+ */
+export const GALLERY_READ_MARGIN = 4;
 /** Minimum total photos (≥ 1 data + 2 parity + 2 decoy). */
 export const GALLERY_MIN_IMAGES = 5;
 /** Minimum decoy photos, so winnowing always has chaff to reject. */
@@ -161,6 +198,15 @@ export interface GalleryNormalizationReport {
   raster: number;
   /** Covers a manifest was removed from, and how much came out. */
   removed: { covers: number; segments: number; bytes: number };
+  /**
+   * Covers a GPS block was removed from (SPEC §9.8).
+   *
+   * Zero on the default path, and not because nothing was checked: a re-encoded
+   * cover is a new file with no metadata to hold a coordinate. It counts on the
+   * `preserveContainer` path, which is the one that keeps the device's own
+   * container and therefore the one where a coordinate could survive.
+   */
+  gpsScrubbed: number;
   /**
    * False when the set mixes JPEG and raster covers, or when the JPEG covers do
    * not share one profile. A set that fails this is one an adversary can sort,
@@ -321,25 +367,18 @@ async function embedSlot(
       return {
         kind: 'jpeg',
         name: cover.name,
-        jpeg: await embedBytesStegoJpeg(cover.jpeg, slot, posKey, GALLERY_CAPACITY_MARGIN),
+        jpeg: await embedBytesStegoJpeg(cover.jpeg, slot, posKey, GALLERY_EMBED_MARGIN),
       };
     }
     const rgba = Uint8Array.from(cover.rgba);
-    await embedBytesStegoRgba(
-      rgba,
-      cover.width,
-      cover.height,
-      slot,
-      posKey,
-      GALLERY_CAPACITY_MARGIN,
-    );
+    await embedBytesStegoRgba(rgba, cover.width, cover.height, slot, posKey, GALLERY_EMBED_MARGIN);
     return { kind: 'rgba', name: cover.name, rgba, width: cover.width, height: cover.height };
   } catch (err) {
     if (err instanceof StegoCapacityError) {
       throw new GalleryCoverCapacityError(
         cover.name,
         err.capacityBits,
-        GALLERY_SLOT_BITS * GALLERY_CAPACITY_MARGIN,
+        GALLERY_SLOT_BITS * GALLERY_EMBED_MARGIN,
       );
     }
     throw err;
@@ -347,20 +386,23 @@ async function embedSlot(
 }
 
 /**
- * Read a fixed-size slot out of a cover; null if it cannot hold one. The same
- * capacity margin as embedding is required, so a real carrier always passes and a
- * smaller image is skipped rather than draining the position keystream.
+ * Read a fixed-size slot out of a cover; null if it cannot hold one.
+ *
+ * `GALLERY_READ_MARGIN`, not the margin embedding now uses: the guard exists to
+ * skip an image too small to plausibly hold a slot without draining the position
+ * keystream, and a reader that applied the *write* margin would refuse to open
+ * galleries this project itself produced before that margin rose.
  */
 async function extractSlot(cover: GalleryCover, posKey: Uint8Array): Promise<Uint8Array | null> {
   return cover.kind === 'jpeg'
-    ? extractBytesStegoJpeg(cover.jpeg, posKey, GALLERY_SLOT_BYTES, GALLERY_CAPACITY_MARGIN)
+    ? extractBytesStegoJpeg(cover.jpeg, posKey, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN)
     : extractBytesStegoRgba(
         cover.rgba,
         cover.width,
         cover.height,
         posKey,
         GALLERY_SLOT_BYTES,
-        GALLERY_CAPACITY_MARGIN,
+        GALLERY_READ_MARGIN,
       );
 }
 
@@ -379,6 +421,13 @@ async function extractSlot(cover: GalleryCover, posKey: Uint8Array): Promise<Uin
  * Raster covers (a PNG, carried as pixels) are counted but not touched: their
  * metadata is already gone, dropped by the decode that turned them into pixels.
  * A set mixing the two is reported as non-uniform, because it is.
+ *
+ * The GPS scrub runs here too, and unconditionally, though it can only ever find
+ * something on the `preserveContainer` path: a re-encoded cover arrives as a new
+ * file with no metadata at all, so the scrub is a parse that finds no APP1 and
+ * returns the same array. Unconditional because this function is the set-wide
+ * pass, and a scrub wired to the mode instead would be a second thing to
+ * remember on a path that already exists to not need remembering (SPEC §9.8).
  */
 function normalizeCovers(covers: GalleryCover[]): {
   covers: GalleryCover[];
@@ -390,6 +439,7 @@ function normalizeCovers(covers: GalleryCover[]): {
   let removedCovers = 0;
   let removedSegments = 0;
   let removedBytes = 0;
+  let gpsScrubbed = 0;
 
   for (const cover of covers) {
     if (cover.kind !== 'jpeg') {
@@ -412,8 +462,10 @@ function normalizeCovers(covers: GalleryCover[]): {
       removedSegments += res.removed.segments;
       removedBytes += res.removed.bytes;
     }
-    out.push({ kind: 'jpeg', name: cover.name, jpeg: res.bytes });
-    entries.push({ name: cover.name, bytes: res.bytes });
+    const scrubbed = scrubGps(res.bytes);
+    if (scrubbed.removed) gpsScrubbed++;
+    out.push({ kind: 'jpeg', name: cover.name, jpeg: scrubbed.bytes });
+    entries.push({ name: cover.name, bytes: scrubbed.bytes });
   }
 
   // Inspected AFTER normalization, so the report describes the photos that will
@@ -425,9 +477,91 @@ function normalizeCovers(covers: GalleryCover[]): {
       covers: inspected,
       raster,
       removed: { covers: removedCovers, segments: removedSegments, bytes: removedBytes },
+      gpsScrubbed,
       uniform: (inspected?.uniform ?? true) && (raster === 0 || entries.length === 0),
     },
   };
+}
+
+/** A raster cover carries one bit per colour channel; alpha is never touched. */
+const RGB_CHANNELS = 3;
+
+/** How photo names are joined into the one refusal, and split back out of it. */
+const NAME_SEP = ', ';
+
+/**
+ * Thrown when covers cannot carry a slot sparsely enough to stay unremarkable.
+ *
+ * Carries the names and the bar, and not each photo's own carrier count: the bar
+ * is fixed, the decision is binary against it, and "this one has 41 902 of
+ * 269 952" tells a user nothing they can act on. Which photos to take out does.
+ *
+ * `coverNames` is the joined form because `details` on the wire carries strings
+ * and numbers only; `names` is the split form, for a caller that wants the list.
+ * A filename containing `, ` would split wrong after a Worker crossing, which
+ * costs a caller an over-long entry in that list and leaves the message — the
+ * part a user reads — exact either way.
+ */
+export class GalleryCoversRejectedError extends Error {
+  /** The rejected photos, in the order they were supplied. */
+  readonly names: readonly string[];
+  /** The same names as one string, which is the form `details` can carry. */
+  readonly coverNames: string;
+
+  constructor(
+    names: readonly string[],
+    readonly neededBits: number,
+  ) {
+    const joined = names.join(NAME_SEP);
+    super(
+      `these photos are too smooth to carry a fragment: ${joined} (each needs ${neededBits} eligible carriers)`,
+    );
+    this.name = 'GalleryCoversRejectedError';
+    this.names = names;
+    this.coverNames = joined;
+  }
+
+  /** Rebuild from the joined form, for `stegoErrorFromWire`. */
+  static fromNames(coverNames: string, neededBits: number): GalleryCoversRejectedError {
+    return new GalleryCoversRejectedError(coverNames.split(NAME_SEP), neededBits);
+  }
+}
+
+/**
+ * Turn away every cover too smooth to carry a slot without standing out.
+ *
+ * **The whole set, carriers and decoys alike.** Not because a decoy carries less
+ * — it carries a full slot of random bytes, so it needs exactly what a carrier
+ * needs — but because of what a partial rule would leak. If only the carriers had
+ * to qualify, "qualifies" would be a property an analyst could test for, and the
+ * carriers would be the textured subset of the delivered set. Requiring it of
+ * everything delivered makes the test say nothing, which is the same argument
+ * §9.7 makes about metadata: uniformity, not cleanliness.
+ *
+ * The bar is the embed margin and nothing more. It rejects what is genuinely
+ * risky rather than selecting the best of a folder: a photo that clears 16×
+ * passes whether it clears it by a hair or by twenty times over, so the set that
+ * comes out is not the textured tail of the set that went in.
+ *
+ * Every failing photo is named in one refusal. Naming them one at a time would
+ * mean a user removing a photo, waiting through a save, and being told about the
+ * next one.
+ */
+function screenCovers(covers: readonly GalleryCover[]): void {
+  const needed = GALLERY_SLOT_BITS * GALLERY_EMBED_MARGIN;
+  const rejected: string[] = [];
+  for (const cover of covers) {
+    // The strict decode, not `jpegStegoCapacityBits`: that one reads "cannot
+    // decode" as zero carriers, which would name a progressive JPEG (reachable
+    // under `preserveContainer`) as too smooth. Its `JpegUnsupportedError`
+    // propagates instead, and the adapters report it as the format it is.
+    const carriers =
+      cover.kind === 'jpeg'
+        ? eligibleCoefficients(decodeJpeg(cover.jpeg)).count
+        : cover.width * cover.height * RGB_CHANNELS;
+    if (carriers < needed) rejected.push(cover.name);
+  }
+  if (rejected.length > 0) throw new GalleryCoversRejectedError(rejected, needed);
 }
 
 /**
@@ -469,6 +603,11 @@ export async function galleryEncode(
   // a structural problem with a photo is knowable now, for free, and is a fact
   // about that photo rather than about how many photos were supplied.
   const { covers: clean, report: normalization } = normalizeCovers(covers);
+
+  // Before the Argon2, and before the shard arithmetic below: a photo too smooth
+  // to take a slot sparsely is not a cover, and the whole set has to pass, or the
+  // ones that did would be identifiable as the ones that did (SPEC §9.8).
+  screenCovers(clean);
 
   // One self-contained, password-encrypted MULTI-REGION blob (§10.4): the mandatory
   // 4-slot / 2-region geometry, always embedded in the fragments. embedded mode is

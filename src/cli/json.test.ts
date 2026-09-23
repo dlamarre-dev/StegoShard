@@ -144,7 +144,7 @@ describe('result shapes', () => {
       decoys: 2,
       setId: 'deadbeef',
       keyMode: 'embedded',
-      provenance: { covers: 1, segments: 2, bytes: 640, uniform: true },
+      provenance: { covers: 1, segments: 2, bytes: 640, gpsScrubbed: 0, uniform: true },
     });
     expect(keysOf(io)).toEqual([
       'decoys',

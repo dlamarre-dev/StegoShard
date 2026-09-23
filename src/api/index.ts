@@ -9,7 +9,7 @@
  * in the import rather than decided by a resolver condition.
  *
  * **This is a curated facade, not the internal barrel.** `src/core/index.ts`
- * re-exports 284 runtime values, including the erasure-coding matrices, the Galois field,
+ * re-exports 313 runtime values, including the erasure-coding matrices, the Galois field,
  * the SPEC §10 slot layer, the region geometry, and a bare `decode`/`encode` pair
  * that means "JPEG coefficient model". Publishing that would freeze all of it and
  * make every internal rename a breaking change. What is here is what a consumer
@@ -302,6 +302,7 @@ export {
   CredentialsNotIndependentError,
   FileTooLargeError,
   GalleryCoverCapacityError,
+  GalleryCoversRejectedError,
   GalleryFileTooLargeError,
   GalleryRestoreError,
   GalleryTooFewImagesError,

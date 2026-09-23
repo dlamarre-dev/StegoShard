@@ -91,6 +91,23 @@ describe('contradictory normalize flags', () => {
   });
 });
 
+/**
+ * `--preserve-container` names what happens to a *set* of cover photos, and
+ * gallery-save is the only command that re-encodes one. Refused elsewhere rather
+ * than ignored: a flag that quietly does nothing is the bug this project has
+ * shipped twice already (`--track` on restore, `--allow-cover-reuse` before it).
+ *
+ * `save` is in the list on purpose. It takes a `--cover` too, but §5.4 carries
+ * that cover through untouched, so there is no re-encoding there to turn off.
+ */
+describe('--preserve-container is refused where nothing re-encodes', () => {
+  for (const command of ['save', 'restore', 'gallery-restore', 'normalize', 'estimate']) {
+    it(`refuses it on ${command}`, async () => {
+      expect((await refusal([command, './x', '--preserve-container'])).code).toBe('USAGE');
+    });
+  }
+});
+
 describe('contradictory save flags', () => {
   it('refuses --binary with --paper', async () => {
     expect((await refusal(['save', secret(), '--binary', '--paper'])).code).toBe('USAGE');

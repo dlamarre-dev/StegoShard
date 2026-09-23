@@ -133,6 +133,7 @@ const GALLERY_ROWS: Row[] = [
   ['--key <file|image>', 'helpGalleryKey'],
   ['--mode nonpossession', 'helpGalleryMode'],
   ['--share <file>', 'helpGalleryShare'],
+  ['--preserve-container', 'helpPreserveContainer'],
 ];
 
 const NORMALIZE_ROWS: Row[] = [

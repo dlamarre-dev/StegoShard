@@ -21,12 +21,15 @@ import {
   type StegoEmbedOptions,
   embedKeyFactorStego,
   embedKeyFactorStegoJpeg,
+  exifOrientation,
   extractKeyBlockStego,
   extractKeyBlockStegoJpeg,
   extractKeyFactorStego,
   extractKeyFactorStegoJpeg,
   isHeif,
   isJpeg as isJpegBytes,
+  orientImage,
+  reencodeCover,
 } from '../../core';
 
 /** A produced stego key image: raw bytes plus how to name it. */
@@ -79,7 +82,15 @@ function toRgba(
 const isPng = (name: string) => /\.png$/i.test(name);
 const isJpeg = (name: string) => /\.jpe?g$/i.test(name);
 
-/** Decode PNG/JPEG file bytes into RGBA pixels. Throws on an unsupported format. */
+/**
+ * Decode PNG/JPEG file bytes into upright RGBA pixels. Throws on an unsupported
+ * format.
+ *
+ * A JPEG's EXIF Orientation is applied, as every browser applies it on decode:
+ * without it a portrait phone photo decodes sideways here and upright in the web
+ * app, and once re-encoded (the profile writes no EXIF) it is delivered sideways
+ * for good. See `exif-orientation.ts`.
+ */
 export function fileToImageData(bytes: Uint8Array, filename: string): ImageDataLike {
   // Prefer the extension, but fall back to signature sniffing (PNG magic).
   const looksPng = isPng(filename) || (bytes[0] === 0x89 && bytes[1] === 0x50);
@@ -88,7 +99,8 @@ export function fileToImageData(bytes: Uint8Array, filename: string): ImageDataL
     return toRgba(d.data, d.width, d.height, d.channels, d.depth);
   }
   const d = jpeg.decode(bytes, { useTArray: true, formatAsRGBA: true });
-  return { data: new Uint8ClampedArray(d.data), width: d.width, height: d.height };
+  const img = { data: new Uint8ClampedArray(d.data), width: d.width, height: d.height };
+  return orientImage(img, exifOrientation(bytes));
 }
 
 /**
@@ -201,19 +213,47 @@ export async function embedKeyImage(
 // --- Gallery Mode cover I/O (SPEC §9) ----------------------------------------
 
 /**
- * Turn image file bytes into a gallery cover: a baseline JPEG is carried as-is
- * (its DCT coefficients are the carrier), anything else is decoded to RGBA (PNG
- * spatial LSBs). A non-baseline JPEG fails later, at the capacity check.
+ * Turn image file bytes into a gallery cover.
+ *
+ * By default every cover, whatever it arrived as, is decoded to pixels and
+ * re-encoded into the one profile (SPEC §9.8): that is what makes a set of
+ * photos from three devices one kind of file instead of three. A PNG becomes a
+ * JPEG, and its name follows, because a set that is JPEG except for the PNGs
+ * sorts on exactly that.
+ *
+ * `preserveContainer` keeps the old behaviour — a baseline JPEG carried as-is,
+ * anything else decoded to RGBA — for the caller who knows what it costs: the
+ * source's quantization tables, its ICC profile, its makernote and its XMP
+ * dialect all survive, and a mixed-device set stays mixed. It is a flag, never
+ * the default.
+ *
+ * A JPEG already in the profile, which is what every delivered gallery photo
+ * is, passes through unchanged on either path (see `reencodeCover`), so the
+ * default is also safe for loading a delivered set to restore.
  */
-export function fileToGalleryCover(bytes: Uint8Array, name: string): GalleryCover {
-  if (isJpegBytes(bytes)) return { kind: 'jpeg', name, jpeg: bytes };
+export function fileToGalleryCover(
+  bytes: Uint8Array,
+  name: string,
+  opts: { preserveContainer?: boolean | undefined } = {},
+): GalleryCover {
   // HEIC/HEIF/AVIF named before the decode attempt, which would otherwise fail
   // as a jpeg-js stack trace. StegoShard never ingests one (SPEC §5.4), and the
   // useful half of that answer is what to do instead: convert the whole set, not
   // the carriers. See `isHeif`.
   if (isHeif(bytes)) throw new StegoCoverFormatError();
+  if (opts.preserveContainer) {
+    if (isJpegBytes(bytes)) return { kind: 'jpeg', name, jpeg: bytes };
+    const img = fileToImageData(bytes, name);
+    return { kind: 'rgba', name, rgba: img.data, width: img.width, height: img.height };
+  }
   const img = fileToImageData(bytes, name);
-  return { kind: 'rgba', name, rgba: img.data, width: img.width, height: img.height };
+  const jpeg = reencodeCover(img, isJpegBytes(bytes) ? bytes : undefined, name);
+  return { kind: 'jpeg', name: asJpegName(name), jpeg };
+}
+
+/** A re-encoded cover is a JPEG whatever it arrived as, so its name says so. */
+export function asJpegName(name: string): string {
+  return /\.jpe?g$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, '')}.jpg`;
 }
 
 /** Serialize a produced gallery image back to file bytes, keeping its format. */

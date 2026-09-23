@@ -39,6 +39,10 @@ export const ko: CliCatalog = {
   hintAllowCoverReuse: '의도한 것이라면 --allow-cover-reuse 를 지정해 무시할 수 있습니다.',
   helpAllowCoverReuse:
     '커버 사진이 같은 비밀번호로 두 번째 비밀을 담도록 허용합니다(둘 다 약해집니다. docs/CLI.md 참고)',
+  errPreserveContainerWrongCommand:
+    '--preserve-container 는 {command} 에서 아무 효과가 없습니다(커버 사진을 다시 인코딩하는 것은 gallery-save 뿐입니다)',
+  helpPreserveContainer:
+    '묶음을 하나의 프로필로 다시 인코딩하지 않고 각 사진을 원래 컨테이너 그대로 둡니다. GPS 는 지웁니다. Ultra HDR 게인 맵과 기기가 기록한 나머지는 그대로 남습니다(gallery-save)',
   errExportNumberInvalid:
     '--export-number 는 1 부터 4294967295 까지의 정수여야 합니다(입력값: 「{value}」)',
   errExportNumberWrongCommand:
@@ -113,6 +117,11 @@ export const ko: CliCatalog = {
   warnCoversNotUniform:
     '경고: 이 사진들은 메타데이터 프로필이 서로 달라 여전히 그것으로 구별됩니다. 이 묶음에 ' +
     'stegoshard normalize --report 를 실행해 무엇이 다른지 확인하세요.',
+  warnPreserveContainer:
+    '경고: --preserve-container 로 각 사진을 원래 컨테이너 그대로 두었으므로 이 묶음은 ' +
+    '하나의 프로필로 다시 인코딩되지 않았습니다. GPS 는 제거했지만 카메라 모델, 촬영 시각, ' +
+    '메이커 노트, 기기 인코더 고유의 양자화 표는 남아 있습니다. 서로 다른 기기로 찍은 사진은 ' +
+    '그것으로 여전히 구별되고, 그 기기가 만든 사진과 아닌 사진도 구별됩니다.',
   labelPassword: '비밀번호',
   promptPassword: '비밀번호: ',
   promptDuressPassword: '강요용 비밀번호: ',

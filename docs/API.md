@@ -58,7 +58,7 @@ await restore({ inputs: ['./vault'], outDir: './restored', password: … });
 ### What is in it, and what is not
 
 The published surface is **curated**, not the internal barrel. `src/core/index.ts`
-re-exports 284 runtime values; the library exports 126 across both entries. What a
+re-exports 313 runtime values; the library exports 127 across both entries. What a
 consumer needs to save and restore a vault is there. What is deliberately not:
 
 - the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,
@@ -277,10 +277,11 @@ something a caller should need to know.
 **Format and crypto** (`src/core/errors.ts`): `WRONG_PASSWORD`, `MISSING_KEY`,
 `FILE_TOO_LARGE`, `TOO_MANY_IMAGES`, `TOO_MANY_FILES`, `VERIFICATION_FAILED`,
 `STEGO_CAPACITY`, `STEGO_COVER_FORMAT`, `STEGO_COVER_REUSE`, `JPEG_UNSUPPORTED`,
-`JPEG_STRUCTURE`, `PROVENANCE_NORMALIZE`, `CREDENTIALS_NOT_INDEPENDENT`,
+`JPEG_STRUCTURE`, `JPEG_ENCODE`, `PROVENANCE_NORMALIZE`, `EXIF_SCRUB`,
+`CREDENTIALS_NOT_INDEPENDENT`,
 `SHARE_CHECKSUM`, `SHARE_SET`, `BUCKET_TOO_LARGE`, `SEGMENTED_FORMAT`,
 `GALLERY_TOO_FEW_IMAGES`, `GALLERY_TOO_MANY_IMAGES`, `GALLERY_FILE_TOO_LARGE`,
-`GALLERY_COVER_CAPACITY`, `GALLERY_RESTORE_FAILED`.
+`GALLERY_COVER_CAPACITY`, `GALLERY_COVERS_REJECTED`, `GALLERY_RESTORE_FAILED`.
 
 **Unusable request** (`src/api/errors.ts`): `OUTPUT_EXISTS`, `STEGO_NEEDS_COVER`,
 `DURESS_DECOY_REQUIRED`, `DURESS_PASSWORD_REQUIRED`, `THRESHOLD_REQUIRED`,

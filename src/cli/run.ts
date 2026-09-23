@@ -299,6 +299,7 @@ const OPTIONS = {
   gallery: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
   'allow-cover-reuse': { type: 'boolean' },
+  'preserve-container': { type: 'boolean' },
   json: { type: 'boolean' },
 } as const;
 
@@ -370,6 +371,15 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
     if (values['allow-cover-reuse']) {
       fail(t('errCoverReuseWrongCommand', { command }), 'USAGE');
     }
+  }
+
+  // Same rule again, one command narrower: `--preserve-container` names what
+  // happens to a *set* of cover photos, and `gallery-save` is the only command
+  // that re-encodes one. `save` is excluded too, which is why this sits outside
+  // the block above: its cover is carried through §5.4 untouched, so there is no
+  // re-encoding there for the flag to turn off.
+  if (command !== 'gallery-save' && values['preserve-container']) {
+    fail(t('errPreserveContainerWrongCommand', { command }), 'USAGE');
   }
 
   const force = Boolean(values.force);
@@ -573,7 +583,14 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
       threshold: gThreshold,
       force,
       allowCoverReuse: Boolean(values['allow-cover-reuse']),
+      preserveContainer: Boolean(values['preserve-container']),
     });
+    // Said on every run that asks for it, not only when something was found:
+    // what the flag costs is what it *leaves* in place, and a set can keep every
+    // identifying tag and every encoder quirk while producing no finding at all.
+    if (values['preserve-container']) {
+      present.warn({ code: 'CONTAINER_PRESERVED', message: t('warnPreserveContainer') });
+    }
     if (res.provenance.covers > 0) {
       present.warn({
         code: 'PROVENANCE_STRIPPED',
