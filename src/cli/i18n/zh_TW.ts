@@ -44,6 +44,7 @@ export const zhTW: CliCatalog = {
   errEntropyExclusive: '{flags} 不能同時指定（亂度來源只能選一個）',
   errEntropyFlagEmpty: '--entropy 是空的（若不需要額外亂度，請不要加這個選項）',
   errEstimateMissing: 'estimate：缺少 <檔案>',
+  errEstimateGalleryFlags: 'estimate：--gallery 計算相片數量，因此不接受 --paper 或 --codec',
   errNormalizeMissing: 'normalize：缺少 <相片|資料夾 ...>',
   errNoNormalizeFiles:
     'normalize：在指定的路徑中找不到相片（已尋找 .jpg、.jpeg、.png、.heic、.heif、.avif）',
@@ -136,6 +137,7 @@ export const zhTW: CliCatalog = {
   outRestoredMany: '已還原 {count} 個檔案：',
   outDecoded: '已解碼 {seen} 張中的 {decoded} 張',
   outScanned: '已掃描 {seen} 張照片',
+  outEstimateGallery: '需要 {photos} 張相片（k={k} 資料 + m={m} 同位 + {decoys} 張誘餌）',
   outEstimate: '{images} 張圖片  （k={k} 資料 + m={m} 同位）',
   outNormalized: '已正規化 {covers} 張相片；其中 {removed} 張移除了來源聲明（{bytes} 位元組）。',
   outNormalizeUniform: '這些相片共用同一份中繼資料輪廓。',

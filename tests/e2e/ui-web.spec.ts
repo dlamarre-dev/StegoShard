@@ -202,3 +202,25 @@ test('the entropy field is folded away and grows to at most four lines', async (
     await ta.evaluate((el: HTMLTextAreaElement) => el.scrollHeight > el.clientHeight + 1),
   ).toBe(true);
 });
+
+/**
+ * The count a gallery needs, on screen before the user goes looking for photos.
+ *
+ * It follows from the secret alone and costs one compression pass, and the app
+ * was already computing it for every file picked — then discarding it on the
+ * gallery path, so the only way to learn the number was to bring too few photos
+ * and wait out an Argon2 to be refused. Nine is the floor for any secret up to
+ * 4 KiB (SPEC §9.4), which is what a short text file is.
+ */
+test('the gallery picker says how many photos are needed', async ({ page }) => {
+  await page.goto('./');
+  await page.locator('#choose-expert').click();
+  await page.locator('#save-file').setInputFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('un petit secret\n'),
+  });
+  await page.locator('input[name="dest"][value="gallery"]').check({ force: true });
+
+  await expect(page.locator('#gallery-covers-need')).toContainText('9');
+});

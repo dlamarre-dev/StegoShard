@@ -129,6 +129,43 @@ describe('deniable destinations name nothing after the project', () => {
       }
     },
   );
+  /**
+   * The keyfile mode is where the brand survived longest: every destination,
+   * deniable or not, went through one helper that named the file
+   * `stegoshard-<set id>.key`. Beside a gallery that is two tells in one stem —
+   * the project, and which photos the key belongs to — and the suite above never
+   * exercised keyfile mode on this path, so nothing caught it.
+   */
+  it(
+    'gallery with a keyfile: the loose key names neither the project nor the set',
+    SLOW,
+    async () => {
+      const dir = tmp();
+      const outDir = join(dir, 'out');
+      const secret = write(dir, 'secret.txt', 'gallery keyfile naming check\n');
+      const covers = Array.from({ length: 10 }, (_, i) =>
+        writeCover(dir, `IMG_3${i}00.png`, 40 + i),
+      );
+
+      const res = await runGallerySave({
+        secretFile: secret,
+        covers,
+        outDir,
+        password: PW,
+        keyMode: 'keyfile',
+      });
+
+      const written = names(res.files);
+      for (const name of written) {
+        expect(name).not.toMatch(/stegoshard/i);
+        // No set id either: a 8+ hex stem ties the key to those exact photos.
+        expect(name).not.toMatch(/[0-9a-f]{8}/i);
+      }
+      expect(written).toContain('recovery.key');
+      // And the photos still came out under their own names.
+      expect(written.filter((n) => /^IMG_3\d00\.png$/.test(n))).toHaveLength(10);
+    },
+  );
 });
 
 describe('overt destinations stay branded', () => {

@@ -107,6 +107,7 @@ const galleryFields = el('gallery-fields');
 const galleryCovers = el<HTMLInputElement>('gallery-covers');
 const galleryCoversDrop = el('gallery-covers-drop');
 const galleryCoversName = el('gallery-covers-name');
+const galleryCoversNeed = el('gallery-covers-need');
 const galleryStegoFields = el('gallery-stego-fields');
 const galleryCover = el<HTMLInputElement>('gallery-cover');
 const galleryCoverDrop = el('gallery-cover-drop');
@@ -385,7 +386,34 @@ function renderCodecCounts(): void {
 }
 
 /** Render the size line and the estimate / no-format line. */
+/**
+ * How many cover photos this gallery needs, and how many are in hand.
+ *
+ * The count is exact and was already being computed for every file picked, at
+ * the cost of one gzip and no Argon2 (`estimateFor('gallery', …)`). It was then
+ * thrown away here, so the only way to learn that nine photos were required was
+ * to supply too few, wait out the key derivation and read the refusal. The
+ * guided wizard has always shown it.
+ *
+ * It belongs beside the picker rather than on the estimate line, which counts
+ * the files a save *produces*: for a gallery that is however many photos you
+ * hand it, not the minimum it needs.
+ */
+function reflectGalleryCovers(): void {
+  reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers);
+  const needed = estimates?.gallery?.needed;
+  const have = galleryCovers.files?.length ?? 0;
+  if (!needed) return show(galleryCoversNeed, false);
+  // The chip counts against the target once there is something to count.
+  if (have > 0) galleryCoversName.textContent = `${have} / ${needed}`;
+  galleryCoversNeed.textContent = msg('wizGalleryNeed', String(needed));
+  show(galleryCoversNeed, have < needed);
+}
+
 function renderEstimate(): void {
+  // Before the early returns below: the gallery line is about the covers, which
+  // the estimate line deliberately says nothing about.
+  reflectGalleryCovers();
   // The bundle's size once resolved, else the raw pick while it is computing.
   const file = envelope?.file ?? pickedFiles()[0];
   saveSize.textContent = file ? formatSize(file.size) : '—';
@@ -467,9 +495,7 @@ dropzone(fileDrop, saveFile, () => {
   void refreshEstimates();
 });
 dropzone(coverDrop, coverFile, () => reflectFile(coverDrop, coverDzFile, coverFile));
-dropzone(galleryCoversDrop, galleryCovers, () =>
-  reflectFiles(galleryCoversDrop, galleryCoversName, galleryCovers),
-);
+dropzone(galleryCoversDrop, galleryCovers, reflectGalleryCovers);
 dropzone(galleryCoverDrop, galleryCover, () =>
   reflectFile(galleryCoverDrop, galleryCoverName, galleryCover),
 );

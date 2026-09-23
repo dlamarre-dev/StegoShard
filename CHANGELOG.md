@@ -282,6 +282,44 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **Deniable artifacts saved from the browser carried the set id in their filename.**
+  A gallery photo landed as `18265a84d89ddadf_IMG_2043.jpg`, a disguised database as
+  `app-data-3f9c1e20_cache.db` — the one thing those destinations exist to avoid, welded
+  to the front of the name. The cause was not a naming decision anywhere: `downloadBlob`
+  wrote `folder/name` into the `download` attribute on the belief that Chromium would
+  file the save in that folder. It does not. Only `chrome.downloads.download({filename})`
+  honours a relative path, and the extension does not even request that permission, so
+  every browser sanitised the separator and the folder became a prefix. The folder
+  mechanism never worked on any browser and is gone; the names stand on their own, which
+  is what the manifest shown to the user had been reporting all along.
+
+  Two related names went with it. The gallery's loose key was `<set id>.key` in the
+  browser and `stegoshard-<set id>.key` from the CLI, either of which ties the key to
+  exactly those photos; both now use one shared constant, `recovery.key`, matching the
+  neutral vocabulary the threshold shares already use. The `.key` extension remains a
+  tell no name can remove, and the code says so.
+
+  Nothing asserted a delivered filename on any surface, which is how this shipped: a new
+  end-to-end test watches a real browser write a disguised database and its key, and a
+  unit test pins that the download attribute is a basename. The CLI gained the gallery
+  keyfile case its deniable-names suite had been missing.
+
+- **The apps never said how many photos a gallery needs.** The number is exact, follows
+  from the secret alone, and was already computed on every file pick for the cost of one
+  compression pass — then thrown away on the gallery path. A user learned it by supplying
+  too few photos, waiting out an Argon2 at 256 MiB, and reading the refusal. It now shows
+  beside the cover picker as `7 / 9` with the requirement underneath, in the expert popup
+  and the web app (the guided wizard always had it), and a short set is refused before any
+  key derivation. `stegoshard estimate <file> --gallery` answers the same question from
+  the command line.
+
+  The floor itself was also misdocumented everywhere. Both apps said "5 or more" and
+  SPEC §9.4 said "total covers ≥ 5"; the real minimum is **9**, and it is nine for a
+  one-byte secret as much as for a 4 KiB one, because the §10 two-region geometry pads
+  both regions to the smallest 4 KiB ladder rung and writes them both. `GALLERY_MIN_IMAGES`
+  = 5 is a floor no input can reach. SPEC §9.4 now derives the number instead of asserting
+  a wrong one, and its step-function shape (9, 25, 87) is stated.
+
 - **The claims register still called `SHA256SUMS.txt` unattested** a day after it started
   being attested. `docs/CLI.md` and the entry above had both moved; the release-integrity
   row in `docs/CLAIMS.md` had not, and still ended “`SHA256SUMS.txt` is itself neither

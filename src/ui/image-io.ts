@@ -322,16 +322,23 @@ export async function galleryImageToBlob(img: GalleryImage): Promise<{ name: str
 }
 
 /**
- * Trigger a browser download for a blob. When `subdir` is given, the file is
- * placed in that folder under the browser's download directory; Chromium
- * honors a relative path in the `download` attribute (Firefox/Safari flatten to
- * the basename, so it degrades gracefully).
+ * Trigger a browser download for a blob.
+ *
+ * The filename is a **basename**, never a path. This used to accept a `subdir`
+ * and write `subdir/filename` into the `download` attribute, on the belief that
+ * Chromium would file the download in that folder. It does not: only
+ * `chrome.downloads.download({filename})` honours a relative path, and this
+ * extension does not even request that permission. Every browser sanitises the
+ * separator instead, so a gallery photo landed as
+ * `18265a84d89ddadf_IMG_2043.jpg` and a disguised database as
+ * `app-data-3f9c1e20_cache.db` — the set id welded to the front of artifacts
+ * whose whole purpose is to look like nothing in particular.
  */
-export function downloadBlob(blob: Blob, filename: string, subdir?: string): void {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = subdir ? `${subdir}/${filename}` : filename;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();

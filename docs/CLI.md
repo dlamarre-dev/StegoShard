@@ -71,7 +71,15 @@ npm run cli -- restore ./vault/cache.db --out ./restored
 # Gallery Mode (SPEC §9): hide a small secret fragmented across a folder of
 # ordinary photos (plus decoys), Reed-Solomon-protected. The output photos look
 # unchanged; restore is blind: any photos that authenticate are used, and any K
-# fragments rebuild the secret. Needs 5+ photos (at least 2 become decoys).
+# fragments rebuild the secret.
+#
+# How many photos it needs follows from the secret alone (one compression pass,
+# no key derivation), so ask before going to look for them. The answer starts at
+# nine and never drops below it: the §10 geometry pads any secret up to 4 KiB
+# into an 8 600-byte blob, which is 5 data shards + 2 parity + the 2 decoys
+# blind winnowing needs to have something to reject.
+npm run cli -- estimate note.txt --gallery
+
 npm run cli -- gallery-save note.txt ./photos --out ./album
 npm run cli -- gallery-restore ./album --out ./restored
 

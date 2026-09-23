@@ -480,7 +480,7 @@
     "description": "Gallery Mode: label for the file-to-hide dropzone."
   },
   "galleryCoversTitle": {
-    "message": "カバー写真（5枚以上）",
+    "message": "カバー写真",
     "description": "Gallery Mode: label for the cover-photos picker."
   },
   "galleryRestoreHeading": {
@@ -530,7 +530,7 @@
     "description": "Gallery Mode: status while restoring."
   },
   "errNoCovers": {
-    "message": "カバー写真を追加してください（5枚以上）。",
+    "message": "カバー写真を追加してください。",
     "description": "Gallery Mode validation: no cover photos chosen."
   },
   "errGalleryTooFew": {

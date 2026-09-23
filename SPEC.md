@@ -864,19 +864,30 @@ rejected.
 
 ### 9.4 Encode
 
-1. Build the standard vault blob (§6). By default this is **embedded key mode**
-   (`KB_LEN = 92`), from the gzip-compressed envelope (§4) encrypted under a fresh
-   DEK. A gallery may instead use **keyfile** or **stego** key mode (`KB_LEN = 0`),
-   in which case the key block is not carried in the fragments but delivered
-   separately: a loose `.key` file, or hidden in an ordinary cover photo (§5).
-   This shrinks the blob by 92 bytes; the `blobLen ≤ 389120` bound (step 2) is
-   unchanged. Deniability note: a separate key artifact is itself a tell, so this
-   is opt-in.
+1. Build the **multi-region** vault blob of §10.6, not the single-region blob of
+   §6: every gallery carries the mandatory 4-slot / 2-region geometry, as the
+   preamble to this section says. Its length is therefore
+   `16 + 304 + 2 × (44 + bucket)`, where `bucket` is the smallest gallery ladder
+   rung (§10.5) that holds the larger of the two regions. By default the key lives
+   in the slot array (**embedded** key mode); a gallery may instead use **keyfile**
+   or **stego** key mode, in which case the 32-byte key factor (§10.3) is not
+   carried in the fragments but delivered separately: a loose `.key` file, or
+   hidden in an ordinary cover photo (§5). Deniability note: a separate key
+   artifact is itself a tell, so this is opt-in.
 2. `k = ceil(blobLen / SLOT_DATA)`, `m = max(ceil(k·0.3), 2)` (§7.2). Require
    `blobLen ≤ 389120` (`SLOT_DATA·190`) so `k + m + 2 ≤ 256` (GF limit, §7.1).
 3. RS-encode into `k + m` shards (§7). For each shard `i`, build `P` (§9.2), seal
    it, and embed the slot into a distinct cover photo.
-4. The remaining covers (≥ 2) become decoys. Total covers ≥ 5, ≤ 256.
+4. The remaining covers (≥ 2) become decoys. Total covers ≤ 256.
+
+   The floor is a consequence, not a constant: the smallest ladder rung is 4 KiB
+   and **both** regions are padded to it, so any envelope up to 4 092 bytes yields
+   an 8 600-byte blob, hence `k = 5`, `m = 2`, and **9 photos** once the two
+   decoys are counted. A one-byte secret needs nine photos for the same reason a
+   4 KiB one does; the count is a step function of the rung, taking only the
+   values 9, 25 and 87. An implementation SHOULD tell the user that number before
+   it asks for the photos, since it follows from the secret alone and costs one
+   compression pass to compute.
 
 ### 9.5 Decode (blind winnowing)
 

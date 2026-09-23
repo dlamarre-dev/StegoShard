@@ -55,6 +55,8 @@ export const en = {
   errEntropyExclusive: '{flags} are mutually exclusive (pick one entropy source)',
   errEntropyFlagEmpty: '--entropy was empty (omit the flag if you do not want extra entropy)',
   errEstimateMissing: 'estimate: missing <file>',
+  errEstimateGalleryFlags:
+    'estimate: --gallery counts photos, so it takes neither --paper nor --codec',
   errNormalizeMissing: 'normalize: missing <photos|folder ...>',
   errNoNormalizeFiles:
     'normalize: no photos found in the given paths (looked for .jpg, .jpeg, .png, .heic, .heif, .avif)',
@@ -158,6 +160,7 @@ export const en = {
   outRestoredMany: 'Restored {count} files:',
   outDecoded: 'decoded {decoded} of {seen} image(s)',
   outScanned: 'scanned {seen} photo(s)',
+  outEstimateGallery: '{photos} photo(s) needed  (k={k} data + m={m} parity + {decoys} decoys)',
   outEstimate: '{images} image(s)  (k={k} data + m={m} parity)',
   outNormalized:
     'Normalized {covers} photo(s); removed a provenance manifest from {removed} of them ({bytes} bytes).',

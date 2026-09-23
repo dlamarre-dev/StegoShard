@@ -48,6 +48,8 @@ export const ko: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy 가 비어 있습니다(추가 엔트로피를 원하지 않으면 이 플래그를 빼세요)',
   errEstimateMissing: 'estimate: <파일> 이 없습니다',
+  errEstimateGalleryFlags:
+    'estimate: --gallery 는 사진을 세므로 --paper 도 --codec 도 받지 않습니다',
   errNormalizeMissing: 'normalize: <사진|폴더 ...> 가 없습니다',
   errNoNormalizeFiles:
     'normalize: 지정한 경로에서 사진을 찾지 못했습니다(.jpg, .jpeg, .png, .heic, .heif, .avif 를 찾았습니다)',
@@ -142,6 +144,7 @@ export const ko: CliCatalog = {
   outRestoredMany: '파일 {count}개를 복원했습니다:',
   outDecoded: '이미지 {seen}개 중 {decoded}개 해독',
   outScanned: '사진 {seen}장 확인',
+  outEstimateGallery: '사진 {photos}장이 필요합니다(k={k} 데이터 + m={m} 패리티 + 미끼 {decoys}장)',
   outEstimate: '이미지 {images}개  (k={k} 데이터 + m={m} 패리티)',
   outNormalized:
     '사진 {covers}장을 정규화했고, 그중 {removed}장에서 출처 매니페스트를 제거했습니다({bytes} 바이트).',

@@ -47,6 +47,8 @@ export const fr: CliCatalog = {
   errEntropyFlagEmpty:
     '--entropy était vide (omettez l’option si vous ne voulez pas d’entropie supplémentaire)',
   errEstimateMissing: 'estimate : <fichier> manquant',
+  errEstimateGalleryFlags:
+    'estimate : --gallery compte des photos, il ne prend donc ni --paper ni --codec',
   errNormalizeMissing: 'normalize : <photos|dossier ...> manquant',
   errNoNormalizeFiles:
     'normalize : aucune photo trouvée dans les chemins indiqués (recherche de .jpg, .jpeg, .png, .heic, .heif, .avif)',
@@ -150,6 +152,8 @@ export const fr: CliCatalog = {
   outRestoredMany: '{count} fichiers restaurés :',
   outDecoded: '{decoded} image(s) décodée(s) sur {seen}',
   outScanned: '{seen} photo(s) analysée(s)',
+  outEstimateGallery:
+    '{photos} photo(s) nécessaires  (k={k} données + m={m} parité + {decoys} leurres)',
   outEstimate: '{images} image(s)  (k={k} données + m={m} parité)',
   outNormalized:
     'Normalisé {covers} photo(s) ; manifeste de provenance retiré de {removed} ' +

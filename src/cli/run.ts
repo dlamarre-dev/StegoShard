@@ -296,6 +296,7 @@ const OPTIONS = {
   'export-number': { type: 'string' },
   quiet: { type: 'boolean' },
   report: { type: 'boolean' },
+  gallery: { type: 'boolean' },
   'allow-weak-password': { type: 'boolean' },
   'allow-cover-reuse': { type: 'boolean' },
   json: { type: 'boolean' },
@@ -635,11 +636,18 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
   if (command === 'estimate') {
     const inputFile = positionals[0];
     if (!inputFile) fail(t('errEstimateMissing'));
+    const gallery = Boolean(values.gallery);
+    // Refused rather than ignored, like every other contradictory pair here: a
+    // gallery has no codec and no printed form, so `--gallery --paper` is a
+    // question with no answer rather than a preference to resolve.
+    if (gallery && (values.paper || values.codec !== undefined)) {
+      fail(t('errEstimateGalleryFlags'));
+    }
     const estProblem = codecArgError(values.codec as string | undefined, Boolean(values.paper));
     if (estProblem) fail(`estimate: ${estProblem}`);
     const estCodec = ((values.codec as string | undefined) ?? 'color') as CodecChoice;
-    const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper), estCodec);
-    present.estimate({ images, k, m });
+    const { images, k, m } = await runEstimate(inputFile, Boolean(values.paper), estCodec, gallery);
+    present.estimate({ images, k, m, gallery });
     return 0;
   }
 

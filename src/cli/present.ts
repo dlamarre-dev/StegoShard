@@ -76,6 +76,13 @@ export interface EstimateResult {
   images: number;
   k: number;
   m: number;
+  /**
+   * True when the count is photos for a gallery rather than images for a vault.
+   * The two are not interchangeable prose: `k + m` is the whole story for a
+   * vault, while a gallery adds decoys on top, so a line that named only the
+   * shards would not add up.
+   */
+  gallery?: boolean;
 }
 
 /**
@@ -241,6 +248,17 @@ export function humanPresenter(io: CliIo): Presenter {
     },
 
     estimate(res) {
+      if (res.gallery) {
+        io.out(
+          `${t('outEstimateGallery', {
+            photos: res.images,
+            k: res.k,
+            m: res.m,
+            decoys: res.images - res.k - res.m,
+          })}\n`,
+        );
+        return;
+      }
       io.out(`${t('outEstimate', { images: res.images, k: res.k, m: res.m })}\n`);
     },
 
