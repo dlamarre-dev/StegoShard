@@ -283,13 +283,23 @@ describe('CLI gallery round-trip', () => {
       expect(basename(stegoKeyPath!)).toMatch(/^IMG_\d{4}\.jpg$/);
       expect(profileMismatch(new Uint8Array(readFileSync(stegoKeyPath!)))).toBeNull();
 
-      // Without the key cover, restore fails (the factor is not embedded in fragments).
+      // Without the key photo, restore fails (the factor is not embedded in fragments).
+      const photos = save.files.filter((f) => f !== stegoKeyPath);
       await expect(
-        runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW }),
+        runGalleryRestore({ inputs: photos, outDir: tmp(), password: PW }),
       ).rejects.toThrow();
 
-      // With the stego cover as the key, it restores.
-      const photos = save.files.filter((f) => f !== stegoKeyPath);
+      // With the key photo simply left in the folder with the others, it is found:
+      // every delivered photo is named IMG_nnnn, so nothing marks it out, and
+      // handing over the whole folder is the natural thing to do.
+      const fromFolder = await runGalleryRestore({
+        inputs: [albumDir],
+        outDir: tmp(),
+        password: PW,
+      });
+      expect(new Uint8Array(readFileSync(fromFolder.outPath))).toEqual(new Uint8Array(secret));
+
+      // And with the key photo given explicitly, as before.
       const res = await runGalleryRestore({
         inputs: photos,
         outDir: tmp(),

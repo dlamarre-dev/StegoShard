@@ -185,8 +185,16 @@
     "description": "Popup: key file input label."
   },
   "keyFileHint": {
-    "message": "Requis seulement pour les jeux sauvegardés avec un fichier .key séparé (ignorez-le s'il est dans le .zip).",
+    "message": "Requis seulement si la clé a été sauvegardée dans un fichier séparé : un fichier .key ou une photo-clé. Ignorez ce champ si ce fichier est déjà parmi les fichiers ci-dessus, ou dans le .zip.",
     "description": "Popup: hint for the restore key file input."
+  },
+  "galleryRestoreIntro": {
+    "message": "Déposez les photos dans lesquelles le secret a été caché, ou un .zip qui les contient. L'ordre n'a pas d'importance, et les autres photos mêlées sont simplement ignorées.",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "Les photos (JPEG ou PNG), ou un .zip qui les contient",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "Fichiers de parts à seuil (non-possession)",
@@ -575,10 +583,6 @@
   "galleryRestoreHeading": {
     "message": "Galerie : restaurer depuis des photos",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "Les photos (un dossier ou une sélection)",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "Cacher dans les photos",

@@ -726,11 +726,13 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           ),
         };
       case 'restore-files': {
+        // A gallery is a set of photos, loose or zipped; a printed PDF or a camera
+        // scan of QR codes means nothing to it, so neither is offered.
         const title =
-          state.restoreMode === 'gallery' ? msg('galleryPhotosTitle') : msg('labelImagesOrZip');
+          state.restoreMode === 'gallery' ? msg('labelPhotosOrZip') : msg('labelImagesOrZip');
         const accept =
           state.restoreMode === 'gallery'
-            ? 'image/png,image/jpeg'
+            ? 'image/png,image/jpeg,.zip'
             : 'image/*,.zip,.pdf,application/pdf';
         const body = h(
           'div',

@@ -140,7 +140,15 @@
     "message": "키 파일(.key)"
   },
   "keyFileHint": {
-    "message": "별도의 .key 파일로 저장한 세트에만 필요합니다(.zip 안에 들어 있다면 건너뛰세요)."
+    "message": "키를 별도 파일(.key 파일 또는 키 사진)로 저장한 경우에만 필요합니다. 그 파일이 이미 위의 파일들 중에 있거나 .zip 안에 있다면 건너뛰세요."
+  },
+  "galleryRestoreIntro": {
+    "message": "비밀을 숨긴 사진들, 또는 그것을 담은 .zip 을 추가하세요. 순서는 상관없고, 섞여 있는 다른 사진은 그냥 건너뜁니다.",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "사진(JPEG 또는 PNG), 또는 그것을 담은 .zip",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "임계값 공유 파일(비소지 모드)"
@@ -479,9 +487,6 @@
   },
   "galleryRestoreHeading": {
     "message": "갤러리: 사진에서 복원"
-  },
-  "galleryPhotosTitle": {
-    "message": "사진(폴더 또는 선택한 파일)"
   },
   "btnGallerySave": {
     "message": "사진에 나눠 숨기기"

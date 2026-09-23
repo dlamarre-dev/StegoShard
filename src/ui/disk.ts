@@ -37,8 +37,10 @@ import {
   verifyGalleryExport,
   wrapBinary,
   verifyImageExport,
+  GalleryRestoreError,
   MissingKeyError,
   photoNames,
+  withStegoSeedCache,
   type KeyMode,
   type OnProgress,
   type PhotoExt,
@@ -759,16 +761,32 @@ export async function restoreGalleryFromDisk(
   secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
   assertBrowserInputs([...files, ...(keyFile ? [keyFile] : [])]);
+  // The photos may come loose, in a .zip, or both; a .key may ride in the zip or
+  // among the loose files. Everything that is not a key is treated as a photo.
+  const photos: File[] = [];
+  let keyBlock: Uint8Array | undefined;
+  for (const file of files) {
+    if (isZip(file.name)) {
+      const extracted = extractZip(await boundedBlobBytes(file, MAX_BROWSER_CONTAINER_BYTES));
+      extracted.images.forEach((bytes, i) =>
+        photos.push(new File([bytes as BlobPart], `${file.name}#${i + 1}`)),
+      );
+      if (extracted.keyBlock) keyBlock = extracted.keyBlock;
+    } else if (isKey(file.name)) {
+      keyBlock = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
+    } else {
+      photos.push(file);
+    }
+  }
   // `preserveContainer` on the way *in*: these photos carry a payload in their
   // coefficients, and re-encoding one would destroy exactly what restore is here
   // to read. The flag means the same thing it means on the save path — hand me
   // the file as it is — and this is the path where it is not optional.
   const covers: GalleryCover[] = [];
-  for (const file of files)
+  for (const file of photos)
     covers.push(await fileToGalleryCover(file, { preserveContainer: true }));
   // Optional external key (keyfile/stego galleries): a .key, a binary key
   // container, or a stego cover de-embedded with the restore password.
-  let keyBlock: Uint8Array | undefined;
   if (keyFile) {
     const bytes = await blobBytes(keyFile);
     const unwrapped = unwrapBinary(bytes);
@@ -779,10 +797,27 @@ export async function restoreGalleryFromDisk(
         : ((await extractKeyFactorImage(keyFile, password)) ?? undefined);
   }
   // Mode B (non-possession): `secret` is recovered from a threshold share quorum.
-  const { filename, content, bundled } = await galleryDecode(covers, password, {
-    keyBlock,
-    secret,
-  });
+  let restored: Awaited<ReturnType<typeof galleryDecode>>;
+  try {
+    restored = await galleryDecode(covers, password, { keyBlock, secret });
+  } catch (err) {
+    // A stego gallery whose key photo was put in with the other photos (loose or
+    // zipped) rather than in the key field: its missing key factor reads as a
+    // failed restore, so the photos are searched for it. One key derivation
+    // covers all of them (`withStegoSeedCache`); the search runs only on this
+    // failure path, so an embedded gallery never pays for it.
+    if (!(err instanceof GalleryRestoreError) || keyBlock || photos.length === 0) throw err;
+    const found = await withStegoSeedCache(async () => {
+      for (const photo of photos) {
+        const factor = await extractKeyFactorImage(photo, password);
+        if (factor) return factor;
+      }
+      return undefined;
+    });
+    if (!found) throw err;
+    restored = await galleryDecode(covers, password, { keyBlock: found, secret });
+  }
+  const { filename, content, bundled } = restored;
   await deliverRestored(filename, content, bundled);
   return { filename };
 }
@@ -869,9 +904,14 @@ function concatChunks(parts: Uint8Array[], total: number): Uint8Array {
  * Since delivered photos are all named `IMG_nnnn`, nothing about the name marks
  * the key photo out, so putting it in with everything else is the natural thing
  * to do. A photo carries either a 92-byte key block or a 32-byte key factor; the
- * two self-distinguish, so both are tried. Each attempt costs one derivation.
+ * two self-distinguish, so both are tried. One key derivation covers all the
+ * attempts (`withStegoSeedCache`).
  */
 async function keyFromPhotos(files: File[], password: string): Promise<Uint8Array | undefined> {
+  return withStegoSeedCache(() => firstKeyIn(files, password));
+}
+
+async function firstKeyIn(files: File[], password: string): Promise<Uint8Array | undefined> {
   for (const file of files) {
     const key =
       (await extractKeyImage(file, password)) ?? (await extractKeyFactorImage(file, password));

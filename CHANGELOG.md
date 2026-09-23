@@ -410,6 +410,18 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **Gallery restore asked for the wrong things, and could not open a `.zip`.** The
+  restore card showed the gallery _save_ explanation, asked for "image files, a .zip, or a
+  printed PDF", offered the camera scanner, and then failed on a `.zip`. In gallery mode it
+  now says what to drop (the photos the secret was hidden in, or a `.zip` of them), takes
+  only JPEG, PNG or `.zip`, and hides the camera, in the web app, the extension and the
+  guided wizard. The zip is opened, a `.key` is found wherever it is (loose or zipped), and
+  a stego key photo left among the photos is found too, in the browser and the CLI: when a
+  restore fails without a key, the photos are searched for one. That search costs a single
+  key derivation for the whole set, since the stego seed depends on the password alone
+  (`withStegoSeedCache`, which zeroes it when the search ends). The key-field hint, which
+  spoke only of a `.key` file, now matches what restore actually does in both modes.
+
 - **A key photo picked together with its vault was never read as a key.** Restoring a
   `.ssbn` saved with a stego key photo, with the vault and the photo picked in the same
   file field, failed with "This image set needs its separate .key file". Only the key

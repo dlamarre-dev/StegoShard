@@ -197,6 +197,55 @@ async function keystreamFromSeed(seed: Uint8Array, len: number): Promise<Uint8Ar
 }
 
 /**
+ * The password seeds derived while `withStegoSeedCache` runs, or null outside it.
+ *
+ * The Argon2id seed depends on the password and the cost only: `STEGO_SALT` is
+ * fixed, and what makes a keystream unique to a cover is `coverKey`, applied
+ * after. So searching many photos for the one carrying a key costs the same
+ * derivation for each of them, and a gallery of twenty photos would pay twenty
+ * Argon2 runs to find one key photo. Inside the scope it pays one.
+ */
+let seedCache: Map<string, Uint8Array> | null = null;
+
+/** The Argon2id seed for `password`, from the scope's cache when there is one. */
+async function stegoSeed(password: string, params: Argon2Params): Promise<Uint8Array> {
+  const id = `${params.iterations}:${params.memoryKiB}:${params.parallelism}:${password}`;
+  const cached = seedCache?.get(id);
+  // A copy: the caller zeroes what it is given, and the cached seed must survive it.
+  if (cached) return Uint8Array.from(cached);
+  const seed = (await argon2id({
+    password: normalizePassword(password),
+    salt: STEGO_SALT,
+    iterations: params.iterations,
+    memorySize: params.memoryKiB,
+    parallelism: params.parallelism,
+    hashLength: 32,
+    outputType: 'binary',
+  })) as Uint8Array;
+  seedCache?.set(id, Uint8Array.from(seed));
+  return seed;
+}
+
+/**
+ * Run `fn` with stego seeds derived at most once per password.
+ *
+ * For a search: trying every photo of a set for the one that hides a key. The
+ * seeds live only while `fn` runs and are zeroed when it settles, so nothing
+ * password-derived outlasts the operation that needed it. Scopes do not nest;
+ * an inner one reuses the outer cache.
+ */
+export async function withStegoSeedCache<T>(fn: () => Promise<T>): Promise<T> {
+  if (seedCache) return fn();
+  seedCache = new Map();
+  try {
+    return await fn();
+  } finally {
+    for (const seed of seedCache.values()) seed.fill(0);
+    seedCache = null;
+  }
+}
+
+/**
  * Deterministic keystream of `len` bytes from the password via Argon2id + AES-CTR,
  * plus the guard tag for this (cover, password, cost) combination.
  *
@@ -211,15 +260,7 @@ async function keystream(
   params: Argon2Params,
   fingerprint: Uint8Array,
 ): Promise<{ stream: Uint8Array; tag: Uint8Array }> {
-  const seed = (await argon2id({
-    password: normalizePassword(password),
-    salt: STEGO_SALT,
-    iterations: params.iterations,
-    memorySize: params.memoryKiB,
-    parallelism: params.parallelism,
-    hashLength: 32,
-    outputType: 'binary',
-  })) as Uint8Array;
+  const seed = await stegoSeed(password, params);
   // Bind the keystream to this specific cover (SPEC §5.3): whitening pad and
   // carrier positions become unique per cover even under a reused password.
   const ckey = await coverKey(seed, fingerprint);

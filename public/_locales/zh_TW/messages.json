@@ -116,7 +116,15 @@
     "message": "金鑰檔案（.key）"
   },
   "keyFileHint": {
-    "message": "僅在以獨立 .key 檔案儲存的組合才需要（若已在 .zip 中則略過）。"
+    "message": "僅在金鑰另存為獨立檔案（.key 檔案或金鑰照片）時才需要。若該檔案已在上方的檔案中，或在 .zip 內，則略過。"
+  },
+  "galleryRestoreIntro": {
+    "message": "加入藏有秘密的照片，或包含它們的 .zip。順序不重要，混入的其他照片會直接略過。",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "照片（JPEG 或 PNG），或包含它們的 .zip",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "門檻分片檔案（非持有）",
@@ -486,10 +494,6 @@
   "galleryRestoreHeading": {
     "message": "相簿：從照片還原",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "照片（資料夾或選取）",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "藏入照片",

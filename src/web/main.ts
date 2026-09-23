@@ -59,7 +59,13 @@ import { createWizard, type Wizard, type WizardEnv } from '../ui/wizard';
 import { currentLocale, localizeDom, msg, friendlyError, wireLanguageSelect } from './i18n';
 import { wireTooltips } from '../ui/tooltips';
 import { resolveSaveInput } from '../ui/bundle';
-import { capturedCount, capturedPayloads, clearCaptured, wireCamera } from './camera';
+import {
+  cameraSupported,
+  capturedCount,
+  capturedPayloads,
+  clearCaptured,
+  wireCamera,
+} from './camera';
 
 if (window.top !== window.self) {
   document.body.textContent = 'StegoShard refuses to run while embedded in another page.';
@@ -179,6 +185,7 @@ const restoreResult = el('restore-result');
 const restoreResultNote = el('restore-result-note');
 const restoreAdvanced = el('restore-advanced');
 const restoreGalleryHint = el('restore-gallery-hint');
+const restoreDzTitle = el('restore-dz-title');
 
 const selectedDest = () => pick<Dest>('dest', 'disk');
 const selectedKeyMode = () => pick<KeyMode>('keymode', 'embedded');
@@ -449,11 +456,23 @@ function reflectGalleryKeyMode(): void {
   show(galleryStegoFields, selectedDest() === 'gallery' && selectedGalleryKeyMode() === 'stego');
 }
 
-/** Both modes can take a key: standard vaults, and keyfile/stego galleries. */
+/**
+ * Fit the restore card to the mode. Both modes can take a key: standard vaults,
+ * and keyfile/stego galleries. A gallery is a set of photos, loose or zipped, so
+ * its field asks for exactly that; a printed PDF or a camera scan of QR codes
+ * means nothing to it, so neither is offered.
+ */
 function reflectRestoreMode(): void {
   const gallery = selectedRestoreMode() === 'gallery';
   show(restoreGalleryHint, gallery);
   show(restoreAdvanced, true);
+  const title = gallery ? 'labelPhotosOrZip' : 'labelImagesOrZip';
+  restoreDzTitle.dataset.i18n = title; // so a language switch keeps the right label
+  restoreDzTitle.textContent = msg(title);
+  restoreFiles.accept = gallery ? 'image/jpeg,image/png,.zip' : 'image/*,.zip,.pdf,application/pdf';
+  el<HTMLButtonElement>('camera-btn').hidden = gallery || !cameraSupported();
+  if (gallery) show(cameraCaptured, false);
+  else reflectCaptured(capturedCount());
 }
 
 addBand.addEventListener('change', () => show(bandFields, addBand.checked));

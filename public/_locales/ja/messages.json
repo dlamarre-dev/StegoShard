@@ -116,7 +116,15 @@
     "message": "鍵ファイル（.key）"
   },
   "keyFileHint": {
-    "message": ".key ファイルを別に保存したセットにのみ必要です（.zip に含まれている場合は不要）。"
+    "message": "鍵を別ファイル（.key ファイルまたは鍵の写真）として保存した場合にのみ必要です。そのファイルが上のファイルに含まれているか .zip の中にある場合は不要です。"
+  },
+  "galleryRestoreIntro": {
+    "message": "秘密を隠した写真、またはそれをまとめた .zip を追加してください。順番は関係なく、混ざったほかの写真は単に無視されます。",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "写真（JPEG または PNG）、またはそれをまとめた .zip",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "しきい値シェアファイル（非保持）",
@@ -486,10 +494,6 @@
   "galleryRestoreHeading": {
     "message": "ギャラリー：写真から復元",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "写真（フォルダまたは選択）",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "写真に隠す",

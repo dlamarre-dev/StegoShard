@@ -116,7 +116,15 @@
     "message": "Schlüsseldatei (.key)"
   },
   "keyFileHint": {
-    "message": "Nur nötig für Sätze, die du als separate .key-Datei gespeichert hast (überspringen, wenn sie im .zip ist)."
+    "message": "Nur nötig, wenn der Schlüssel als separate Datei gespeichert wurde: eine .key-Datei oder ein Schlüsselfoto. Überspringen, wenn diese Datei schon oben dabei ist oder im .zip steckt."
+  },
+  "galleryRestoreIntro": {
+    "message": "Füge die Fotos hinzu, in denen das Geheimnis versteckt wurde, oder ein .zip davon. Die Reihenfolge spielt keine Rolle, und andere beigemischte Fotos werden einfach übersprungen.",
+    "description": "Restore mode: the photos a secret was hidden in (Gallery Mode)."
+  },
+  "labelPhotosOrZip": {
+    "message": "Die Fotos (JPEG oder PNG) oder ein .zip davon",
+    "description": "Restore mode (Gallery): what the first file field takes."
   },
   "labelShareFiles": {
     "message": "Schwellenwert-Anteilsdateien (Nicht-Besitz)",
@@ -486,10 +494,6 @@
   "galleryRestoreHeading": {
     "message": "Galerie: aus Fotos wiederherstellen",
     "description": "Gallery Mode: restore card heading."
-  },
-  "galleryPhotosTitle": {
-    "message": "Die Fotos (ein Ordner oder eine Auswahl)",
-    "description": "Gallery Mode: label for the restore photo picker."
   },
   "btnGallerySave": {
     "message": "In Fotos verstecken",
