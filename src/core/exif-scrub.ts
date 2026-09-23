@@ -352,17 +352,10 @@ function scrubTiff(out: Uint8Array, from: number, to: number): boolean {
 
   if (pointers.length === 0) return false;
 
-  const write = (o: number, v: number, wide: boolean): void => {
-    const base = from + o;
-    if (wide) {
-      out[base + (le ? 0 : 3)] = v & 0xff;
-      out[base + (le ? 1 : 2)] = (v >>> 8) & 0xff;
-      out[base + (le ? 2 : 1)] = (v >>> 16) & 0xff;
-      out[base + (le ? 3 : 0)] = (v >>> 24) & 0xff;
-    } else {
-      out[base + (le ? 0 : 1)] = v & 0xff;
-      out[base + (le ? 1 : 0)] = (v >>> 8) & 0xff;
-    }
+  // The one field ever rewritten is an IFD's u16 entry count.
+  const write16 = (o: number, v: number): void => {
+    out[from + o + (le ? 0 : 1)] = v & 0xff;
+    out[from + o + (le ? 1 : 0)] = (v >>> 8) & 0xff;
   };
 
   // The GPS IFD and its values, gone from the bytes and not merely unreachable.
@@ -384,7 +377,7 @@ function scrubTiff(out: Uint8Array, from: number, to: number): boolean {
     const tailTo = p.ifd + 2 + count * 12 + 4;
     out.copyWithin(from + p.entry, from + tailFrom, from + tailTo);
     out.fill(0, from + tailTo - 12, from + tailTo);
-    write(p.ifd, count - 1, false);
+    write16(p.ifd, count - 1);
   }
   return true;
 }

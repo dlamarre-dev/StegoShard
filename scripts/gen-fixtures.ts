@@ -112,6 +112,9 @@ function makeRgbaCover(w: number, h: number, seed: number): Uint8Array {
   return rgba;
 }
 
+/** Side of a gallery fixture cover, sized to clear `GALLERY_EMBED_MARGIN`. */
+const GALLERY_COVER_SIDE = 448;
+
 /** Gallery Mode fixture (SPEC §9): a secret fragmented + decoy-padded across
  * photos, which the Python decoder must restore blindly. Uses the frozen default
  * gallery Argon2 cost (not stored), so the decoder derives with those defaults. */
@@ -129,21 +132,25 @@ async function generateGallery(
   // Provision enough covers for the multi-region carrier + decoy floor (+2 spare
   // so the "drop some photos" conformance test still leaves ≥ k carriers).
   const { needed } = await estimateGalleryCovers(FILENAME, gallerySecret, 'embedded');
+  // Every cover must clear the embed margin (SPEC §9.8.1): a slot needs 269 952
+  // eligible carriers. 256 square cleared the old margin of 4 and clears neither
+  // kind at 16; at 448 the noise JPEG yields ~285k carriers and the raster 602k.
+  const side = GALLERY_COVER_SIDE;
   const covers: GalleryCover[] = [];
   for (let i = 0; i < needed + 2; i++) {
     if (coverJpeg) {
       covers.push({
         kind: 'jpeg',
         name: `cover-${i}.jpg`,
-        jpeg: makeJpegCover(256, 256, 0x100 + i),
+        jpeg: makeJpegCover(side, side, 0x100 + i),
       });
     } else {
       covers.push({
         kind: 'rgba',
         name: `cover-${i}.png`,
-        rgba: makeRgbaCover(256, 256, 0x200 + i),
-        width: 256,
-        height: 256,
+        rgba: makeRgbaCover(side, side, 0x200 + i),
+        width: side,
+        height: side,
       });
     }
   }

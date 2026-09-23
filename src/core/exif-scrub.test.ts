@@ -298,6 +298,66 @@ describe('coordinates outside the EXIF GPS IFD', () => {
     expect(contains(bytes, new Uint8Array([0xa9, 0x78, 0x79, 0x7a]))).toBe(true);
   });
 
+  /**
+   * The trailer walk: bytes that merely look like an SOI are skipped, loose
+   * bytes before an embedded image are searched on their own, and the image is
+   * still found and scrubbed after them.
+   */
+  it('skips a false SOI in the trailer and still scrubs the image after it', () => {
+    const secondary = spliceBeforeSos(baseJpeg(32, 32, 70, 9), exifSegmentWithGps());
+    const junk = new Uint8Array([0x00, 0x11, 0xff, 0xd8, 0xff, 0x00, 0x22]);
+    const photo = withTrailer(baseJpeg(64, 64), new Uint8Array([...junk, ...secondary]));
+    const { bytes, removed } = scrubGps(photo);
+    expect(removed).toBe(true);
+    expect(contains(bytes, coordinateBytes(false))).toBe(false);
+  });
+
+  /** A motion-photo video can carry its own XMP packet; it is scrubbed in place. */
+  it('scrubs an XMP packet sitting loose in the trailer, closed or cut off', () => {
+    const packet = `<x:xmpmeta><rdf:Description exif:GPSLatitude="${XMP_LAT}"/></x:xmpmeta>`;
+    for (const text of [packet, packet.slice(0, -12)]) {
+      const photo = withTrailer(
+        baseJpeg(64, 64),
+        new Uint8Array([...mp4Trailer(), ...enc.encode(text)]),
+      );
+      const { bytes, removed } = scrubGps(photo);
+      expect(removed).toBe(true);
+      expect(bytes.length).toBe(photo.length);
+      expect(contains(bytes, enc.encode(XMP_LAT))).toBe(false);
+    }
+  });
+
+  it('leaves four bytes that spell ©xyz alone unless they are a well-formed box', () => {
+    const xyz = [0xa9, 0x78, 0x79, 0x7a];
+    // At the very start of the trailer (no room for a size), with a size that
+    // does not match its length, and a real box whose string is already empty.
+    const empty = new Uint8Array(12 + 4);
+    new DataView(empty.buffer).setUint32(0, empty.length);
+    empty.set(xyz, 4);
+    new DataView(empty.buffer).setUint16(8, 4);
+    for (const trailer of [
+      new Uint8Array([...xyz, 0, 0, 0, 0, 1, 2, 3, 4]),
+      new Uint8Array([0, 0, 0, 99, ...xyz, 0, 4, 0, 0, 1, 2, 3, 4]),
+      empty,
+    ]) {
+      const photo = withTrailer(baseJpeg(64, 64), trailer);
+      expect(scrubGps(photo).bytes).toBe(photo);
+    }
+  });
+
+  it('leaves Extended XMP with no coordinate unchanged', () => {
+    const text = '<rdf:Description exif:ExposureTime="1/60"/>';
+    const photo = spliceBeforeSos(baseJpeg(64, 64), xmpChunk(text, 0, text.length));
+    expect(scrubGps(photo).bytes).toBe(photo);
+  });
+
+  it('refuses an EXIF or Extended XMP segment too short to hold its own header', () => {
+    const shortExif = appSegment(0xe1, enc.encode('Exif  MM *'));
+    expect(() => scrubGps(spliceBeforeSos(baseJpeg(64, 64), shortExif))).toThrow(ExifScrubError);
+    const shortExt = appSegment(0xe1, enc.encode('http://ns.adobe.com/xmp/extension/ short'));
+    expect(() => scrubGps(spliceBeforeSos(baseJpeg(64, 64), shortExt))).toThrow(ExifScrubError);
+  });
+
   it('leaves a trailer with nothing to scrub byte for byte, and returns the original', () => {
     const photo = withTrailer(spliceBeforeSos(baseJpeg(64, 64), exifSegment()), gainMapTrailer());
     expect(scrubGps(photo).bytes).toBe(photo);
