@@ -7,7 +7,7 @@
  * each supplies its differences through a `WizardEnv`.
  */
 
-import { type KeyMode, type ManifestEntry, type VaultKey } from '@core';
+import { opaqueStage, type KeyMode, type ManifestEntry, type VaultKey } from '@core';
 import {
   friendlyError as friendlyErrorWith,
   reflectFiles,
@@ -20,6 +20,7 @@ import {
   codecApplies,
   destKey,
   recoveryGuidance,
+  planForRequest,
   runSave,
   type SaveDestination,
   type SaveRequest,
@@ -57,6 +58,11 @@ export interface WizardCamera {
 export interface WizardEnv {
   msg: Msg;
   locale: () => string;
+  /**
+   * Which host this is, for the progress plan: the web app derives a fresh vault
+   * key from the password (one Argon2 run) before a non-gallery save.
+   */
+  surface: 'extension' | 'web';
   /** Save destinations to offer, in display order. */
   saveDestinations: SaveDestination[];
   /**
@@ -824,7 +830,12 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
 
   // --- run the actual save / restore -----------------------------------------
 
-  async function buildSaveRequest(): Promise<SaveRequest> {
+  /**
+   * The request for this save, without its vault key. Everything a progress plan
+   * needs is here, so the bar can go up before the key is derived; see
+   * `run`, which adds the key afterwards.
+   */
+  function draftSaveRequest(): SaveRequest {
     // The stego cover (when chosen) is keyed by the same password the user typed.
     const stego =
       state.keyMode === 'stego' && state.stegoCover
@@ -840,11 +851,9 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         stego,
       };
     }
-    const key = await env.getSaveKey(state.savePassword);
     return {
       dest: state.dest,
       files: state.files,
-      key,
       // The disguised .db path derives its slot KEK from this per-save password.
       password: state.dest === 'sqlite' ? state.savePassword : undefined,
       keyMode: state.keyMode,
@@ -927,19 +936,36 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
           status.textContent = '';
           return;
         }
+        // The bar goes up first, within a frame of the click, and then covers
+        // every slow step, including the two that run before `runSave`.
+        const req = draftSaveRequest();
+        req.onProgress = prog.onProgress;
+        const checkStego =
+          state.dest !== 'gallery' && state.keyMode === 'stego'
+            ? env.verifyStegoPassword
+            : undefined;
+        const mintsKey = state.dest !== 'gallery' && env.surface === 'web';
+        await prog.begin(
+          planForRequest(req, env.surface, {
+            mintsKey,
+            checksStegoPassword: Boolean(checkStego),
+          }),
+        );
         // Extension stego: confirm the password unlocks the managed key first.
         if (
-          state.dest !== 'gallery' &&
-          state.keyMode === 'stego' &&
-          env.verifyStegoPassword &&
-          !(await env.verifyStegoPassword(state.savePassword))
+          checkStego &&
+          !(await opaqueStage(prog.onProgress, 'derive', () => checkStego(state.savePassword)))
         ) {
           throw new Error(msg('errWrongPassword'));
         }
-        const req = await buildSaveRequest();
-        req.onProgress = prog.onProgress;
+        if (state.dest !== 'gallery') {
+          const password = state.savePassword;
+          req.key = mintsKey
+            ? await opaqueStage(prog.onProgress, 'derive', () => env.getSaveKey(password))
+            : await env.getSaveKey(password);
+        }
         const { note, manifest } = await runSave(req, msg);
-        prog.done();
+        prog.done(true);
         showDone(note, manifest);
       } else {
         const { note } = await runRestore(

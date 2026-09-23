@@ -9,7 +9,7 @@
  */
 
 import { type PDFDocument, type PDFPage, rgb } from 'pdf-lib';
-import { ACCENT_TOP, STEGO_PATH, type ImageDataLike } from '@core';
+import { ACCENT_TOP, STEGO_PATH, report, type ImageDataLike, type OnProgress } from '@core';
 import { wrapText } from './text-wrap';
 
 /** Public project page; printed so the data can be restored without the store. */
@@ -308,6 +308,11 @@ export function wrapForFont(
 export interface BuildPaperInput {
   /** One payload per image (header || shard). */
   imagePayloads: Uint8Array[];
+  /**
+   * Progress: `render` counts the pages, plus one final step for serializing the
+   * document, which on a long set is a real share of the time.
+   */
+  onProgress?: OnProgress | undefined;
   /** Encode a payload to pixels (codec.encode bound to the paper profile). */
   encodeQr: (payload: Uint8Array) => ImageDataLike;
   /** Encode pixels to embeddable PNG bytes (canvas in browser, fast-png in CLI). */
@@ -402,6 +407,7 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
 
   const total = input.imagePayloads.length;
   for (let i = 0; i < total; i++) {
+    await report(input.onProgress, { phase: 'render', done: i, total: total + 1 });
     const img = input.encodeQr(input.imagePayloads[i]!);
     const png = await pdf.embedPng(await input.pngEncode(img));
 
@@ -433,5 +439,8 @@ export async function buildPaperPdf(input: BuildPaperInput): Promise<Uint8Array>
     }
   }
 
-  return pdf.save();
+  await report(input.onProgress, { phase: 'render', done: total, total: total + 1 });
+  const bytes = await pdf.save();
+  await report(input.onProgress, { phase: 'render', done: total + 1, total: total + 1 });
+  return bytes;
 }

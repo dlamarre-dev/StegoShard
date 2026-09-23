@@ -128,6 +128,31 @@ describe('the stream contract', () => {
     for (const e of events) expect(e.event).toBe('progress');
   });
 
+  /**
+   * Each event also carries the weighted fraction of the whole save and the
+   * stage it belongs to. Additive: `phase`, `done` and `total` are unchanged,
+   * so a consumer of `stegoshard.cli/1` that never heard of them keeps working.
+   */
+  it(
+    'reports one fraction of the whole save that never goes back and ends full',
+    SLOW,
+    async () => {
+      const io = fakeIo({ STEGOSHARD_PASSWORD: PW });
+      await expect(run(['save', secret(), '--out', tmp(), '--json'], io)).resolves.toBe(0);
+      const events = eventsOf(io) as { phase: string; fraction?: number; stage?: string }[];
+      expect(events.length).toBeGreaterThan(0);
+      let last = 0;
+      for (const e of events) {
+        expect(typeof e.phase).toBe('string');
+        expect(typeof e.stage).toBe('string');
+        expect(e.fraction!).toBeGreaterThanOrEqual(last);
+        last = e.fraction!;
+      }
+      expect(last).toBe(1);
+      expect(events.map((e) => e.stage)).toContain('rendering');
+    },
+  );
+
   it('round-trips save then restore, both as documents', SLOW, async () => {
     const vault = tmp();
     const saveIo = fakeIo({ STEGOSHARD_PASSWORD: PW });

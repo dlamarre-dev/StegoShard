@@ -136,6 +136,10 @@ export const pt: CliCatalog = {
   phaseVerify: 'A verificar',
   phaseUnlock: 'A desbloquear',
   phaseRender: 'A gerar',
+  phaseDerive: 'A derivar a chave',
+  phasePrepare: 'A preparar as fotos',
+  phaseEmbed: 'A ocultar nas fotos',
+  phaseDeliver: 'A gravar os ficheiros',
 
   purposeVault: 'o cofre: contém o seu ficheiro',
   purposeArchive: 'todas as imagens reunidas num .zip',

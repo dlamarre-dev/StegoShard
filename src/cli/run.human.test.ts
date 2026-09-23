@@ -14,7 +14,8 @@
  * than merely unlikely.
  */
 
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { encode as encodePng } from 'fast-png';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -25,6 +26,20 @@ import { StegoShardApiError } from '../api/errors';
 import { WrongPasswordError } from '@core';
 
 const SLOW = { timeout: 90_000 };
+
+/** A noisy PNG, textured enough to carry a gallery fragment after re-encoding. */
+function noisyPng(side: number, seed: number): Uint8Array {
+  const data = new Uint8Array(side * side * 4);
+  let s = seed >>> 0;
+  for (let i = 0; i < side * side; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    data[i * 4] = s >>> 24;
+    data[i * 4 + 1] = (s >>> 16) & 0xff;
+    data[i * 4 + 2] = (s >>> 8) & 0xff;
+    data[i * 4 + 3] = 255;
+  }
+  return encodePng({ width: side, height: side, data, channels: 4, depth: 8 });
+}
 const PW = 'a long unrelated passphrase for these tests';
 const tmp = () => mkdtempSync(join(tmpdir(), 'ss-run-'));
 
@@ -120,10 +135,36 @@ describe('the stdout / stderr split', () => {
     await expect(run(['save', secret(), '--out', tmp()], io)).resolves.toBe(0);
     expect(io.stdout).toMatch(/^Saved /m);
     expect(io.stdout).toMatch(/Files created:/);
-    // The image path emits no progress at all: `exportVault` takes no
-    // `onProgress`, because it is capped at 1 MiB and effectively instant. Only
-    // the binary path reports phases, which the next test covers.
-    expect(io.stderr).toBe('');
+    // Progress goes to stderr, never stdout: one line per stage when piped, in
+    // the order the save runs them. The image path used to report nothing; it
+    // now reports its stages like every other path, weighted by time.
+    expect(io.stdout).not.toMatch(/Encrypting|Verifying|Rendering/);
+    const stages = io.stderr.split(/\r?\n/).filter((l) => l.endsWith('…'));
+    expect(stages).toEqual(['Deriving the key…', 'Encrypting…', 'Verifying…', 'Rendering…']);
+  });
+
+  /**
+   * A gallery save used to print nothing between the password and the result,
+   * through a re-encode of every cover and four Argon2 derivations. It now names
+   * each stage on stderr as it starts, the first one at once.
+   */
+  it('reports gallery stages on stderr, the first one at once', { timeout: 180_000 }, async () => {
+    const dir = tmp();
+    const covers = join(dir, 'covers');
+    mkdirSync(covers);
+    for (let i = 0; i < 9; i++) {
+      writeFileSync(join(covers, `c${i}.png`), noisyPng(768, i + 1));
+    }
+    const io = fakeIo({ env: { STEGOSHARD_PASSWORD: PW } });
+    await expect(
+      run(['gallery-save', secret(), covers, '--out', join(dir, 'album')], io),
+    ).resolves.toBe(0);
+    expect(io.stdout).toMatch(/Files created:/);
+    const stages = io.stderr.split(/\r?\n/).filter((l) => l.endsWith('…'));
+    expect(stages[0]).toBe('Preparing photos…');
+    expect(stages).toContain('Hiding in photos…');
+    expect(stages[stages.length - 1]).toBe('Verifying…');
+    expect(io.stdout).not.toMatch(/Preparing photos|Hiding in photos/);
   });
 
   it('reports binary phases on stderr, never on stdout', SLOW, async () => {

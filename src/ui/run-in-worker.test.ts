@@ -71,7 +71,9 @@ describe('run-in-worker transport', () => {
       'pw',
       undefined,
       undefined,
-      (p) => seen.push(`${p.phase}:${p.done}/${p.total}`),
+      (p) => {
+        seen.push(`${p.phase}:${p.done}/${p.total}`);
+      },
     );
     const w = FakeWorker.last!;
     const sent = w.posted[w.posted.length - 1]!;

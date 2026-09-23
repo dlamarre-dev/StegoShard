@@ -26,7 +26,14 @@
  */
 
 import { resolve } from 'node:path';
-import { stegoErrorCode, stegoErrorDetails, toHex, type OnProgress } from '@core';
+import {
+  DEFAULT_CALIBRATION,
+  ProgressTracker,
+  stegoErrorCode,
+  stegoErrorDetails,
+  toHex,
+  type OnProgress,
+} from '@core';
 import { CliError, type CliFailure } from './errors';
 import { StegoShardApiError } from '../api/errors';
 import type { CliIo } from './io';
@@ -265,17 +272,31 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
       event({ event: 'note', text });
     },
 
-    progress(quiet) {
+    progress(quiet, stages) {
       if (quiet) return { done: () => {} };
-      let lastPhase = '';
+      // With a plan, each event also carries `fraction` (0..1, of the whole
+      // operation, weighted by time and never decreasing) and `stage` (the stage's
+      // label). Additive: the fields `stegoshard.cli/1` always had are unchanged.
+      const tracker =
+        stages && stages.length > 0
+          ? new ProgressTracker(stages, DEFAULT_CALIBRATION, () => Date.now())
+          : undefined;
+      let lastKey = '';
       let lastAt = 0;
       const onProgress: OnProgress = (p) => {
+        const view = tracker?.onEvent(p);
+        const key = view ? `${p.phase}:${view.label}` : p.phase;
         const now = Date.now();
-        if (p.phase === lastPhase && now - lastAt < PROGRESS_INTERVAL_MS) return;
-        lastPhase = p.phase;
+        if (key === lastKey && now - lastAt < PROGRESS_INTERVAL_MS) return;
+        lastKey = key;
         lastAt = now;
         // The raw phase name, not a localized label: this is the machine channel.
-        event({ event: 'progress', phase: p.phase, done: p.done, total: p.total });
+        const base = { event: 'progress', phase: p.phase, done: p.done, total: p.total };
+        event(
+          view
+            ? { ...base, fraction: Math.round(view.fraction * 1000) / 1000, stage: view.label }
+            : base,
+        );
       };
       return { onProgress, done: () => {} };
     },

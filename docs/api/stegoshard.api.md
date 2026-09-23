@@ -442,6 +442,7 @@ export function galleryDecode(images: GalleryCover[], password: string, options?
 // @public (undocumented)
 export interface GalleryDecodeOptions {
     keyBlock?: Uint8Array | undefined;
+    onProgress?: OnProgress | undefined;
     // (undocumented)
     params?: Argon2Params;
     secret?: Uint8Array | undefined;
@@ -455,6 +456,7 @@ export interface GalleryEncodeOptions {
     bundle?: boolean | undefined;
     keyMode?: KeyMode;
     mode?: 'plain' | 'nonpossession';
+    onProgress?: OnProgress | undefined;
     params?: Argon2Params;
     // (undocumented)
     threshold?: {
@@ -684,8 +686,8 @@ export interface NormalizeResult {
     };
 }
 
-// @public (undocumented)
-export type OnProgress = (p: Progress) => void;
+// @public
+export type OnProgress = (p: Progress) => void | Promise<void>;
 
 // @public
 export function parseKeyBlock(bytes: Uint8Array): KeyBlock;
@@ -702,7 +704,7 @@ export const PROFILE_PAPER = 2;
 // @public
 export interface Progress {
     done: number;
-    phase: 'compress' | 'encrypt' | 'decrypt' | 'verify' | 'unlock' | 'render';
+    phase: 'compress' | 'encrypt' | 'decrypt' | 'verify' | 'unlock' | 'render' | 'derive' | 'prepare' | 'reencode' | 'embed' | 'extract' | 'deliver';
     total: number;
 }
 
@@ -864,7 +866,7 @@ export function verifyBinaryExport(container: Uint8Array, dek: CryptoKey, filena
 export function verifyDisguisedExport(container: Uint8Array, dek: Uint8Array, regionIndex: number, filename: string, content: Uint8Array, onProgress?: OnProgress): Promise<void>;
 
 // @public
-export function verifyGalleryExport(images: GalleryImage[], password: string, keyBlock: Uint8Array | undefined, filename: string, content: Uint8Array, secret?: Uint8Array | undefined): Promise<void>;
+export function verifyGalleryExport(images: GalleryImage[], password: string, keyBlock: Uint8Array | undefined, filename: string, content: Uint8Array, secret?: Uint8Array | undefined, onProgress?: OnProgress): Promise<void>;
 
 // @public
 export function verifyImageExport(imagePayloads: Uint8Array[], dek: CryptoKey, filename: string, content: Uint8Array): Promise<void>;

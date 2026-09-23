@@ -76,6 +76,7 @@ import { buildNonPossessionVaultBlob } from './access';
 import { BucketTooLargeError, GALLERY_LADDER } from './buckets';
 import { type CoverSetReport, inspectCoverSet, normalizeCoverBytes } from './normalize';
 import { scrubGps } from './exif-scrub';
+import { type OnProgress, opaqueStage, report } from './progress';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -183,6 +184,11 @@ export interface GalleryEncodeOptions {
   threshold?: { k: number; n: number } | undefined;
   /** CONTENT is a .zip of several files (SPEC §4 FLAGS bit1). */
   bundle?: boolean | undefined;
+  /**
+   * Progress: `prepare` per cover as the set is screened, a `derive` around each
+   * of the two password derivations, and `embed` per cover. See `progress-plan.ts`.
+   */
+  onProgress?: OnProgress | undefined;
 }
 /**
  * What cover normalization did to this set (SPEC §9.7).
@@ -235,6 +241,8 @@ export interface GalleryDecodeOptions {
   keyBlock?: Uint8Array | undefined;
   /** Recovered Shamir secret S for a Mode B (non-possession) gallery (§10.6). */
   secret?: Uint8Array | undefined;
+  /** Progress: a `derive`, `extract` per image, then a `derive` per set tried. */
+  onProgress?: OnProgress | undefined;
 }
 
 /**
@@ -548,10 +556,14 @@ export class GalleryCoversRejectedError extends Error {
  * mean a user removing a photo, waiting through a save, and being told about the
  * next one.
  */
-function screenCovers(covers: readonly GalleryCover[]): void {
+async function screenCovers(
+  covers: readonly GalleryCover[],
+  onProgress?: OnProgress,
+): Promise<void> {
   const needed = GALLERY_SLOT_BITS * GALLERY_EMBED_MARGIN;
   const rejected: string[] = [];
-  for (const cover of covers) {
+  for (const [i, cover] of covers.entries()) {
+    await report(onProgress, { phase: 'prepare', done: i, total: covers.length });
     // The strict decode, not `jpegStegoCapacityBits`: that one reads "cannot
     // decode" as zero carriers, which would name a progressive JPEG (reachable
     // under `preserveContainer`) as too smooth. Its `JpegUnsupportedError`
@@ -563,6 +575,7 @@ function screenCovers(covers: readonly GalleryCover[]): void {
     if (carriers < needed) rejected.push(cover.name);
   }
   if (rejected.length > 0) throw new GalleryCoversRejectedError(rejected, needed);
+  await report(onProgress, { phase: 'prepare', done: covers.length, total: covers.length });
 }
 
 /**
@@ -608,7 +621,7 @@ export async function galleryEncode(
   // Before the Argon2, and before the shard arithmetic below: a photo too smooth
   // to take a slot sparsely is not a cover, and the whole set has to pass, or the
   // ones that did would be identifiable as the ones that did (SPEC §9.8).
-  screenCovers(clean);
+  await screenCovers(clean, options.onProgress);
 
   // One self-contained, password-encrypted MULTI-REGION blob (§10.4): the mandatory
   // 4-slot / 2-region geometry, always embedded in the fragments. embedded mode is
@@ -626,29 +639,34 @@ export async function galleryEncode(
       // shares. embedded uses shares only.
       if (!options.threshold) throw new Error('gallery: mode nonpossession requires a threshold');
       const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
-      const built = await buildNonPossessionVaultBlob(
-        filename,
-        content,
-        password,
-        options.threshold.k,
-        options.threshold.n,
-        GALLERY_LADDER,
-        params,
-        keyFactor,
+      const { k: tk, n: tn } = options.threshold;
+      const built = await opaqueStage(options.onProgress, 'derive', () =>
+        buildNonPossessionVaultBlob(
+          filename,
+          content,
+          password,
+          tk,
+          tn,
+          GALLERY_LADDER,
+          params,
+          keyFactor,
+        ),
       );
       blob = built.blob;
       shares = built.shares;
       if (keyFactor) keyBlock = keyFactor;
     } else {
       const keyFactor = keyMode === 'embedded' ? null : randomBytes(KEY_FACTOR_LEN);
-      ({ blob } = await buildPlainVaultBlobMulti(
-        filename,
-        content,
-        password,
-        GALLERY_LADDER,
-        params,
-        keyFactor,
-        options.bundle,
+      ({ blob } = await opaqueStage(options.onProgress, 'derive', () =>
+        buildPlainVaultBlobMulti(
+          filename,
+          content,
+          password,
+          GALLERY_LADDER,
+          params,
+          keyFactor,
+          options.bundle,
+        ),
       ));
       if (keyFactor) keyBlock = keyFactor;
     }
@@ -676,7 +694,9 @@ export async function galleryEncode(
   const { shards, shardLen } = encodeShards(blob, k, m);
   const setId = randomBytes(SET_ID_LEN);
   const hash = await sha256Short(blob);
-  const { posKey, aeadKey } = await galleryKeys(password, params);
+  const { posKey, aeadKey } = await opaqueStage(options.onProgress, 'derive', () =>
+    galleryKeys(password, params),
+  );
 
   // Which covers carry which shard is a CSPRNG permutation, never the input
   // order. The images come back in input order and are written in it, so if the
@@ -712,8 +732,10 @@ export async function galleryEncode(
     } else {
       slot = randomBytes(GALLERY_SLOT_BYTES);
     }
+    await report(options.onProgress, { phase: 'embed', done: i, total: covers.length });
     images.push(await embedSlot(clean[i]!, slot, posKey));
   }
+  await report(options.onProgress, { phase: 'embed', done: covers.length, total: covers.length });
   posKey.fill(0);
   return { images, k, m, decoys, setId, keyBlock, shares, normalization };
 }
@@ -769,10 +791,12 @@ export async function galleryDecode(
   options: GalleryDecodeOptions = {},
 ): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const params = options.params ?? DEFAULT_ARGON2;
-  const { posKey, aeadKey } = await galleryKeys(password, params);
+  const on = options.onProgress;
+  const { posKey, aeadKey } = await opaqueStage(on, 'derive', () => galleryKeys(password, params));
 
   const frags: { header: Header; shard: Uint8Array }[] = [];
-  for (const img of images) {
+  for (const [i, img] of images.entries()) {
+    await report(on, { phase: 'extract', done: i, total: images.length });
     const slot = await extractSlot(img, posKey);
     if (!slot) continue;
     let frag: Uint8Array;
@@ -793,6 +817,7 @@ export async function galleryDecode(
     }
   }
   posKey.fill(0);
+  await report(on, { phase: 'extract', done: images.length, total: images.length });
   if (frags.length === 0) throw new GalleryRestoreError();
 
   // Group by set id; try the largest groups first so a mixed folder (or a second
@@ -806,7 +831,9 @@ export async function galleryDecode(
   }
   for (const members of [...groups.values()].sort((a, b) => b.length - a.length)) {
     try {
-      return await reconstructGroup(members, password, options.keyBlock, params, options.secret);
+      return await opaqueStage(on, 'derive', () =>
+        reconstructGroup(members, password, options.keyBlock, params, options.secret),
+      );
     } catch {
       // this set is incomplete or failed integrity, so try the next
     }
@@ -827,10 +854,15 @@ export async function verifyGalleryExport(
   filename: string,
   content: Uint8Array,
   secret?: Uint8Array | undefined,
+  onProgress?: OnProgress,
 ): Promise<void> {
   let got: { filename: string; content: Uint8Array };
   try {
-    got = await galleryDecode(images as GalleryCover[], password, { keyBlock, secret });
+    got = await galleryDecode(images as GalleryCover[], password, {
+      keyBlock,
+      secret,
+      onProgress,
+    });
   } catch {
     throw new VerificationError();
   }

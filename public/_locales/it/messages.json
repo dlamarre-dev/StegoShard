@@ -980,6 +980,26 @@
   "statusRendering": {
     "message": "Rendering…"
   },
+  "statusCheckingPassword": {
+    "message": "Verifica della password…",
+    "description": "Progress stage label: checking the password of the key photo."
+  },
+  "statusDeriving": {
+    "message": "Protezione della chiave della password…",
+    "description": "Progress stage label: deriving the key from the password (the slow step)."
+  },
+  "statusPreparingPhotos": {
+    "message": "Preparazione delle tue foto…",
+    "description": "Progress stage label: preparing the cover photos of a gallery."
+  },
+  "statusHidingKey": {
+    "message": "Occultamento della chiave nella tua foto…",
+    "description": "Progress stage label: hiding the key inside the chosen photo."
+  },
+  "statusDelivering": {
+    "message": "Avvio dei download…",
+    "description": "Progress stage label: handing the files to the browser as downloads."
+  },
   "accessModeHeading": {
     "message": "Modalità di accesso",
     "description": "Heading for the §10 access-mode selector (deniable paths)."

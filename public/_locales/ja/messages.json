@@ -980,6 +980,26 @@
   "statusRendering": {
     "message": "生成中…"
   },
+  "statusCheckingPassword": {
+    "message": "パスワードを確認中…",
+    "description": "Progress stage label: checking the password of the key photo."
+  },
+  "statusDeriving": {
+    "message": "パスワードから鍵を生成中…",
+    "description": "Progress stage label: deriving the key from the password (the slow step)."
+  },
+  "statusPreparingPhotos": {
+    "message": "写真を準備中…",
+    "description": "Progress stage label: preparing the cover photos of a gallery."
+  },
+  "statusHidingKey": {
+    "message": "写真に鍵を隠しています…",
+    "description": "Progress stage label: hiding the key inside the chosen photo."
+  },
+  "statusDelivering": {
+    "message": "ダウンロードを開始中…",
+    "description": "Progress stage label: handing the files to the browser as downloads."
+  },
   "accessModeHeading": {
     "message": "アクセスモード",
     "description": "Heading for the §10 access-mode selector (deniable paths)."

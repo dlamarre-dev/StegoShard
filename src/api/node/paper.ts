@@ -24,6 +24,7 @@ import {
   buildPaperPdf,
 } from '../../ui/paper-build';
 import { wrapText } from '../../ui/text-wrap';
+import type { OnProgress } from '../../core';
 
 /** Replace characters Helvetica (WinAnsi) cannot encode. */
 function sanitizeWinAnsi(text: string): string {
@@ -155,6 +156,8 @@ async function canEmbed(bytes: Uint8Array): Promise<boolean> {
 }
 
 export interface CliPaperOptions {
+  /** Progress, forwarded to `buildPaperPdf`: one `render` step per page. */
+  onProgress?: OnProgress | undefined;
   title?: string | undefined;
   date?: string | undefined;
   locale?: string | undefined;
@@ -206,6 +209,7 @@ export async function buildCliPaperPdf(
 
   const pdf = await buildPaperPdf({
     imagePayloads,
+    onProgress: options.onProgress,
     encodeQr,
     pngEncode,
     createTextEngine: async (doc) => {

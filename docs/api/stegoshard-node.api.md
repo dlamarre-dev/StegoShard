@@ -81,8 +81,10 @@ export interface GalleryRestoreResult {
     seen: number;
 }
 
+// Warning: (ae-forgotten-export) The symbol "OnProgress" needs to be exported by the entry point node.d.ts
+//
 // @public
-export function gallerySave(opts: GallerySaveOptions): Promise<GallerySaveResult>;
+export function gallerySave(opts: GallerySaveOptions, onProgress?: OnProgress): Promise<GallerySaveResult>;
 
 // @public (undocumented)
 export interface GallerySaveOptions {
@@ -196,8 +198,6 @@ export interface NormalizeOptions {
     report?: boolean | undefined;
 }
 
-// Warning: (ae-forgotten-export) The symbol "OnProgress" needs to be exported by the entry point node.d.ts
-//
 // @public (undocumented)
 export function restore(opts: RestoreOptions, onProgress?: OnProgress): Promise<RestoreResult>;
 
