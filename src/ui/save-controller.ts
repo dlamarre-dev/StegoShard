@@ -18,8 +18,11 @@ import {
   type VaultKey,
   CODEC_COLOR_GRID,
   CODEC_QR_GRID,
+  GALLERY_LADDER,
+  GalleryFileTooLargeError,
   WrongPasswordError,
   clearUserEntropy,
+  envelopeFitsLadder,
   galleryCoversForEnvelopeLen,
   installUserEntropy,
   parseKeyBlock,
@@ -290,7 +293,15 @@ async function performSave(req: SaveRequest, msg: Msg): Promise<SaveOutcome> {
     // short set lives in `galleryEncode`, which only runs once the key has been
     // derived, so a user who brought seven photos waited out the expensive part
     // to be told they needed nine. One gzip answers it up front.
-    const needed = galleryCoversForEnvelopeLen(await envelopeLenFor(file)).needed;
+    //
+    // The ladder is checked first because the count reaches `pickBucket`, which
+    // throws a bare `BucketTooLargeError` past the top rung. `galleryEncode`
+    // translates that into the error the UI localizes; this check has to as well.
+    const envelopeLen = await envelopeLenFor(file);
+    if (!envelopeFitsLadder(envelopeLen, GALLERY_LADDER)) {
+      throw new GalleryFileTooLargeError(file.size, GALLERY_LADDER[GALLERY_LADDER.length - 1]!);
+    }
+    const needed = galleryCoversForEnvelopeLen(envelopeLen).needed;
     if (covers.length < needed) throw new Error(msg('wizGalleryNeed', String(needed)));
     const res = await saveGalleryToDisk(file, covers, req.galleryPassword, {
       bundle,

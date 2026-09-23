@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { hasUserEntropy, type VaultKey } from '@core';
+import { GalleryFileTooLargeError, hasUserEntropy, type VaultKey } from '@core';
 
 // Mock the disk layer (it calls browser download APIs we don't have in node);
 // we only care that runSave routes to the right function with the right args.
@@ -144,6 +144,29 @@ describe('runSave routing', () => {
     await expect(
       runSave({ dest: 'gallery', files: [file], covers: short, galleryPassword: 'pw' }, msg),
     ).rejects.toThrow('wizGalleryNeed:9');
+    expect(saveGalleryToDisk).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The count reaches `pickBucket`, which throws a bare `BucketTooLargeError`
+   * past the top rung. `galleryEncode` has always translated that into the error
+   * the UI localizes; the early count has to as well, or an oversized secret
+   * shows a raw English bucket message.
+   */
+  it('refuses a secret past the gallery ladder with the localizable error', async () => {
+    // Incompressible, so the envelope cannot gzip under the 64 KiB top rung.
+    const big = new Uint8Array(80 * 1024);
+    for (let i = 0; i < big.length; i += 65536) crypto.getRandomValues(big.subarray(i, i + 65536));
+    const err = await runSave(
+      {
+        dest: 'gallery',
+        files: [new File([big], 'big.bin')],
+        covers: galleryCovers(),
+        galleryPassword: 'pw',
+      },
+      msg,
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GalleryFileTooLargeError);
     expect(saveGalleryToDisk).not.toHaveBeenCalled();
   });
 
