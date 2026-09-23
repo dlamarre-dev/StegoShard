@@ -184,7 +184,7 @@
     "message": "請先解鎖您的保險庫。"
   },
   "errMissingKey": {
-    "message": "此圖像組合需要其獨立的 .key 檔案才能還原。"
+    "message": "此保險庫需要其獨立的金鑰才能還原：.key 檔案，或藏有金鑰的照片。"
   },
   "errFileTooLarge": {
     "message": "檔案過大（$SIZE$ KB）。此保險庫用於小型機密（上限 $LIMIT$ KB）。",

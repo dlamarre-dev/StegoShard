@@ -184,7 +184,7 @@
     "message": "Entsperre zuerst deinen Tresor."
   },
   "errMissingKey": {
-    "message": "Dieser Bildersatz benötigt seine separate .key-Datei zur Wiederherstellung."
+    "message": "Dieser Tresor braucht zur Wiederherstellung seinen separaten Schlüssel: die .key-Datei oder das Foto mit dem Schlüssel."
   },
   "errFileTooLarge": {
     "message": "Datei zu groß ($SIZE$ KB). Dieser Tresor ist für kleine Geheimnisse (max. $LIMIT$ KB).",

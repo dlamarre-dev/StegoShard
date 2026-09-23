@@ -343,6 +343,47 @@ describe('CLI round-trips', () => {
     },
   );
 
+  /**
+   * The key photo passed in with everything else, without `--key`.
+   *
+   * Delivered photos are all named `IMG_nnnn`, so nothing about the key photo's
+   * name marks it out, and giving it together with the vault is the natural
+   * thing to do. QA found the restore then failing with "needs its separate key":
+   * the photo was never looked at as a key. Every stego destination is covered,
+   * including the .db, whose missing factor reads as a wrong password.
+   */
+  describe('with the key photo among the inputs rather than behind --key', () => {
+    const cases: [string, { binary?: 'branded' | 'disguised' }][] = [
+      ['branded .ssbn', { binary: 'branded' }],
+      ['disguised .db', { binary: 'disguised' }],
+      ['image set', {}],
+    ];
+    it.each(cases)('%s restores', SLOW, async (_name, extra) => {
+      const dir = tmp();
+      const content = pattern(1500, 43);
+      const input = writeSecret(dir, content);
+      const cover = writeCover(dir);
+      const { files, manifest } = await runSave({
+        inputs: [input],
+        outDir: join(dir, 'out'),
+        password: PW,
+        paper: false,
+        zip: false,
+        keyMode: 'stego',
+        cover,
+        ...extra,
+      });
+      const keyImage = stegoKeyPath(manifest);
+      const { outPath } = await runRestore({
+        inputs: files, // the vault (or its images) and the key photo, all together
+        outDir: join(dir, 'restored'),
+        password: PW,
+      });
+      expect(files).toContain(keyImage);
+      expect([...readFileSync(outPath)]).toEqual([...content]);
+    });
+  });
+
   it('warns when a secret over 256 KiB is saved as images', SLOW, async () => {
     const dir = tmp();
     // Over the warn threshold by raw size, but highly compressible so it still

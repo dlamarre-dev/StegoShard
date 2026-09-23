@@ -82,7 +82,8 @@ export const pt: CliCatalog = {
   errWrongPassword: 'palavra-passe incorreta',
   errNoGallery:
     'não foi encontrada nenhuma galeria restaurável (palavra-passe incorreta, ou estas fotos não são uma galeria)',
-  errNeedsKey: 'este conjunto de imagens exige uma chave separada (use --key <ficheiro|imagem>)',
+  errNeedsKey:
+    'este cofre exige a sua chave separada (use --key <ficheiro|imagem>, ou passe a foto da chave com o cofre)',
   errDuressTooSimilar:
     'a palavra-passe de coação é demasiado parecida com a verdadeira ({reason}); ' +
     'escolha uma palavra-passe de coação sem relação',

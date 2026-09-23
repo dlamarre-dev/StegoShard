@@ -77,7 +77,7 @@ export const zhTW: CliCatalog = {
 
   errWrongPassword: '密碼錯誤',
   errNoGallery: '找不到可還原的相簿（密碼錯誤，或這些照片不是相簿）',
-  errNeedsKey: '這組圖片需要獨立的金鑰（請使用 --key <檔案|圖片>）',
+  errNeedsKey: '此保險庫需要其獨立的金鑰（請使用 --key <檔案|圖片>，或將金鑰照片與保險庫一併提供）',
   errDuressTooSimilar: '脅迫密碼與真正的密碼太相似（{reason}）；請另選一個毫無關聯的脅迫密碼',
   errOverwrite: '不覆寫既有檔案：{path}（要覆寫請加 --force）',
   errStegoNeedsCover: 'stego 模式需要一張 --cover 圖片',

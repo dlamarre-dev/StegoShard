@@ -184,7 +184,7 @@
     "message": "Desbloquea primero tu caja fuerte."
   },
   "errMissingKey": {
-    "message": "Este conjunto de imágenes necesita su archivo .key aparte para restaurar."
+    "message": "Esta caja fuerte necesita su clave aparte para restaurarse: el archivo .key o la foto que contiene la clave."
   },
   "errFileTooLarge": {
     "message": "Archivo demasiado grande ($SIZE$ KB). Esta caja fuerte es para secretos pequeños (máx. $LIMIT$ KB).",

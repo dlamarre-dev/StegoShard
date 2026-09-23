@@ -80,7 +80,8 @@ export const it: CliCatalog = {
   errWrongPassword: 'password errata',
   errNoGallery:
     'nessuna galleria ripristinabile trovata (password errata, o queste foto non sono una galleria)',
-  errNeedsKey: 'questo set di immagini richiede una chiave separata (usa --key <file|immagine>)',
+  errNeedsKey:
+    'questo caveau richiede la sua chiave separata (usa --key <file|immagine>, o passa la foto della chiave con il caveau)',
   errDuressTooSimilar:
     'la password di coercizione è troppo simile a quella reale ({reason}); ' +
     'scegli una password di coercizione senza relazione',

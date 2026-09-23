@@ -221,7 +221,7 @@
     "message": "먼저 금고를 잠금 해제하세요."
   },
   "errMissingKey": {
-    "message": "이 이미지 세트를 복원하려면 별도의 .key 파일이 필요합니다."
+    "message": "이 금고를 복원하려면 별도의 키가 필요합니다: .key 파일 또는 키를 담은 사진."
   },
   "errFileTooLarge": {
     "message": "파일이 너무 큽니다($SIZE$ KB). 이 금고는 작은 비밀을 위한 것입니다(최대 $LIMIT$ KB).",
