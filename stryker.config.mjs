@@ -217,6 +217,25 @@ export default {
   // this timeout covers the rest.
   timeoutMS: 60_000,
 
+  /**
+   * The initial test run's budget, which was never chosen: Stryker's default is
+   * 5 minutes, and every shard's dry run had been taking about 4 on the nightly
+   * runner for weeks. Stryker rounds its own report down, so "4 minutes" could be
+   * 4:59. The margin was a property of the runner, not of the suite, which is the
+   * same failure `testTimeout` in `vitest.mutation.config.ts` records.
+   *
+   * It ran out on 23 September: the `codes` shard timed out on 9e914bf, a commit
+   * that had passed the night before, and a timed-out dry run is not a lower score
+   * but no score at all ("Something went wrong in the initial test run"). The
+   * selection had also just grown from 778 tests to 1228 with the gallery re-encode
+   * work, which measures 2m49 locally without Stryker's per-test coverage, so every
+   * shard would have followed the next night.
+   *
+   * 20 minutes is headroom, not a target: the dry run is the full selection once,
+   * so a real hang still fails well inside the job's 120-minute limit.
+   */
+  dryRunTimeoutMinutes: 20,
+
   // Four workers on a four-vCPU GitHub runner, while vitest parallelises inside
   // each of them. That is very likely oversubscribed, and it is a plausible part
   // of why the per-mutant cost is 7.0 seconds. Plausible, not established: the
