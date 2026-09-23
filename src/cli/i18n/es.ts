@@ -80,7 +80,8 @@ export const es: CliCatalog = {
   errWrongPassword: 'contraseña incorrecta',
   errNoGallery:
     'no se encontró ninguna galería restaurable (contraseña incorrecta, o estas fotos no son una galería)',
-  errNeedsKey: 'este conjunto de imágenes necesita una clave aparte (usa --key <archivo|imagen>)',
+  errNeedsKey:
+    'esta caja fuerte necesita su clave aparte (usa --key <archivo|imagen>, o pasa la foto de la clave con la caja)',
   errDuressTooSimilar:
     'la contraseña de coacción se parece demasiado a la real ({reason}); ' +
     'elige una contraseña de coacción sin relación',

@@ -85,7 +85,8 @@ export const fr: CliCatalog = {
   errWrongPassword: 'mot de passe incorrect',
   errNoGallery:
     'aucune galerie restaurable trouvée (mot de passe incorrect, ou ces photos ne sont pas une galerie)',
-  errNeedsKey: 'ce jeu d’images exige une clé séparée (utilisez --key <fichier|image>)',
+  errNeedsKey:
+    'ce coffre exige sa clé séparée (utilisez --key <fichier|image>, ou passez la photo de la clé avec le coffre)',
   errDuressTooSimilar:
     'le mot de passe de contrainte est trop proche du vrai ({reason}) ; ' +
     'choisissez un mot de passe de contrainte sans rapport',

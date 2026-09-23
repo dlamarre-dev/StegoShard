@@ -288,7 +288,7 @@
     "description": "Popup: shown when saving while locked."
   },
   "errMissingKey": {
-    "message": "This image set needs its separate .key file to restore.",
+    "message": "This vault needs its separate key to restore: the .key file, or the photo holding the key.",
     "description": "Shown when a keyfile-mode set is restored without the .key."
   },
   "errFileTooLarge": {

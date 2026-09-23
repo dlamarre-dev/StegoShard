@@ -268,7 +268,7 @@
     "description": "Popup: shown when saving while locked."
   },
   "errMissingKey": {
-    "message": "Ce jeu d'images nécessite son fichier .key séparé pour être restauré.",
+    "message": "Ce coffre a besoin de sa clé séparée pour être restauré : le fichier .key, ou la photo contenant la clé.",
     "description": "Shown when a keyfile-mode set is restored without the .key."
   },
   "errFileTooLarge": {

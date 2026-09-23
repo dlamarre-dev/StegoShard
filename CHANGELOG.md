@@ -410,6 +410,18 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **A key photo picked together with its vault was never read as a key.** Restoring a
+  `.ssbn` saved with a stego key photo, with the vault and the photo picked in the same
+  file field, failed with "This image set needs its separate .key file". Only the key
+  field was ever searched for a key. Since delivered photos are now all named `IMG_nnnn`,
+  nothing marks the key photo out, and handing over every file of a save at once is the
+  natural thing to do. The browser and the CLI now look for the key among the other
+  files: anything beside a `.ssbn` or `.db` is tried as its key photo before decrypting
+  (a `.db` missing its factor reads as a wrong password, not a missing key), and for an
+  image set, the images that do not decode as vault images are tried when the key turns
+  out to be missing. The message itself no longer says `.key` only: it names the key
+  photo too.
+
 - **Delivered photos no longer carry their cover's name, and their order no longer points
   at the carriers.** A gallery photo kept the name of the photo it was made from, and so did
   every stego key photo. That name is the device's: `PXL_20260921_143012.jpg` says a Pixel

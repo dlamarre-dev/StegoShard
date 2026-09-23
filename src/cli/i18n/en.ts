@@ -92,7 +92,8 @@ export const en = {
   // --- errors: the run itself ---------------------------------------------
   errWrongPassword: 'wrong password',
   errNoGallery: 'no restorable gallery found (wrong password or these are not gallery photos)',
-  errNeedsKey: 'this image set needs a separate key (use --key <file|image>)',
+  errNeedsKey:
+    'this vault needs its separate key (use --key <file|image>, or pass the key photo with the vault)',
   errDuressTooSimilar:
     'the duress password is too similar to the real one ({reason}); ' +
     'choose an unrelated duress password',

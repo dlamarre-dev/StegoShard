@@ -37,6 +37,7 @@ import {
   verifyGalleryExport,
   wrapBinary,
   verifyImageExport,
+  MissingKeyError,
   photoNames,
   type KeyMode,
   type OnProgress,
@@ -861,6 +862,24 @@ function concatChunks(parts: Uint8Array[], total: number): Uint8Array {
  * block; the latter is de-embedded with the restore password. `extraPayloads`
  * lets callers add already-decoded payloads (e.g. live camera captures).
  */
+/**
+ * The key hidden in one of `files`, or undefined when none holds one.
+ *
+ * For a stego key photo picked alongside the vault instead of in the key field.
+ * Since delivered photos are all named `IMG_nnnn`, nothing about the name marks
+ * the key photo out, so putting it in with everything else is the natural thing
+ * to do. A photo carries either a 92-byte key block or a 32-byte key factor; the
+ * two self-distinguish, so both are tried. Each attempt costs one derivation.
+ */
+async function keyFromPhotos(files: File[], password: string): Promise<Uint8Array | undefined> {
+  for (const file of files) {
+    const key =
+      (await extractKeyImage(file, password)) ?? (await extractKeyFactorImage(file, password));
+    if (key) return key;
+  }
+  return undefined;
+}
+
 export async function restoreFileFromDisk(
   files: File[],
   password: string,
@@ -916,6 +935,15 @@ export async function restoreFileFromDisk(
     for (const file of files) {
       const bytes = await boundedBlobBytes(file, MAX_BROWSER_CONTAINER_BYTES);
       if (unwrapBinary(bytes)) {
+        // Anything handed in beside the container, with no key given in the key
+        // field, can only be its key photo: tried before decrypting, because a
+        // .db whose key factor is missing answers "wrong password" (it cannot
+        // tell the two apart, by design), not "missing key".
+        if (!keyBlock)
+          keyBlock = await keyFromPhotos(
+            files.filter((f) => f !== file),
+            password,
+          );
         const { filename, content, bundled } = await decryptBinaryInWorker(
           bytes,
           password,
@@ -947,14 +975,31 @@ export async function restoreFileFromDisk(
     }
   }
 
+  const unreadable: Uint8Array[] = [];
   for (const bytes of images) {
     const payload = await decodeImageBytes(bytes);
     // A single unreadable image is fine; erasure coding tolerates losses.
     if (payload) payloads.push(payload);
+    else unreadable.push(bytes);
   }
   if (payloads.length === 0) throw new Error('restore: no readable images found');
 
-  const { filename, content, bundled } = await importVault(payloads, password, { keyBlock });
+  let restored: Awaited<ReturnType<typeof importVault>>;
+  try {
+    restored = await importVault(payloads, password, { keyBlock });
+  } catch (err) {
+    // A stego key photo picked with the set rather than in the key field is one
+    // of the images that did not decode as a vault image. Only those are tried:
+    // each attempt costs a key derivation.
+    if (!(err instanceof MissingKeyError) || keyBlock || unreadable.length === 0) throw err;
+    const found = await keyFromPhotos(
+      unreadable.map((b) => new File([b as BlobPart], 'key')),
+      password,
+    );
+    if (!found) throw err;
+    restored = await importVault(payloads, password, { keyBlock: found });
+  }
+  const { filename, content, bundled } = restored;
   await deliverRestored(filename, content, bundled);
   return { filename };
 }

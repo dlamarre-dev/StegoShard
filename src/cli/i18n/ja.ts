@@ -86,7 +86,8 @@ export const ja: CliCatalog = {
   errWrongPassword: 'パスワードが違います',
   errNoGallery:
     '復元できるギャラリーが見つかりません（パスワードが違う、またはこれらはギャラリーの写真ではありません）',
-  errNeedsKey: 'この画像セットには別の鍵が必要です（--key <ファイル|画像> を使ってください）',
+  errNeedsKey:
+    'この保管庫には別の鍵が必要です（--key <ファイル|画像> を使うか、鍵の写真を保管庫と一緒に渡してください）',
   errDuressTooSimilar:
     '強要用パスワードが本物と似すぎています（{reason}）。' +
     '無関係な強要用パスワードを選んでください',

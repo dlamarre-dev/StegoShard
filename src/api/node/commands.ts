@@ -97,6 +97,7 @@ import {
 } from '../../core';
 import {
   asJpegName,
+  decodeImageToPayload,
   embedKeyImage,
   embedKeyFactorImage,
   extractKeyImage,
@@ -1108,13 +1109,50 @@ export async function runGallerySave(
   return withKeyClaim((hold, landed) => runGallerySaveImpl(opts, onProgress, hold, landed));
 }
 
+/**
+ * The key hidden in one of `paths`, or undefined when none holds one.
+ *
+ * For a stego key photo given with the vault instead of with `--key`. Delivered
+ * photos are all named `IMG_nnnn`, so nothing about the name marks the key photo
+ * out. Only image files are tried; each attempt costs one key derivation.
+ */
+async function keyFromPhotos(
+  paths: readonly string[],
+  password: string,
+): Promise<Uint8Array | undefined> {
+  for (const p of paths) {
+    let bytes: Uint8Array;
+    try {
+      if (!statSync(p).isFile()) continue;
+      bytes = read(p);
+    } catch {
+      continue;
+    }
+    if (!isJpegBytes(bytes) && !(bytes[0] === 0x89 && bytes[1] === 0x50)) continue;
+    const name = basename(p);
+    const key =
+      (await extractKeyImage(bytes, name, password)) ??
+      (await extractKeyFactorImage(bytes, name, password));
+    if (key) return key;
+  }
+  return undefined;
+}
+
 export async function runRestore(
   opts: RestoreOptions,
   onProgress?: OnProgress,
 ): Promise<RestoreResult> {
   const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
   if (binaryVaultPath) {
-    const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
+    // With no --key, anything else on the command line beside the container can
+    // only be its key photo: tried before decrypting, because a .db whose key
+    // factor is missing answers "wrong password" (by design), not "missing key".
+    const keyBlock = opts.keyPath
+      ? await resolveKeyBlock(opts.keyPath, opts.password)
+      : await keyFromPhotos(
+          opts.inputs.filter((p) => p !== binaryVaultPath),
+          opts.password,
+        );
     // Threshold shares (Mode B) recover the secret that gates the .db slot.
     const secret = await recoverSecret(opts.sharePaths);
     const { filename, content, bundled, identity } = await importVaultBinary(
@@ -1135,11 +1173,22 @@ export async function runRestore(
     throw new StegoShardApiError('NO_READABLE_IMAGES', 'no readable vault images among the inputs');
   }
 
-  const { filename, content, bundled, identity } = await importVault(
-    gathered.payloads,
-    opts.password,
-    { keyBlock },
-  );
+  let restored: Awaited<ReturnType<typeof importVault>>;
+  try {
+    restored = await importVault(gathered.payloads, opts.password, { keyBlock });
+  } catch (err) {
+    // A stego key photo given with the set instead of with --key is one of the
+    // images that did not decode as a vault image. Only those are tried: each
+    // attempt costs a key derivation.
+    if (!(err instanceof MissingKeyError) || keyBlock) throw err;
+    const unreadable = gatherImageFiles(opts.inputs).filter(
+      (p) => decodeImageToPayload(read(p), basename(p)) === null,
+    );
+    const found = await keyFromPhotos(unreadable, opts.password);
+    if (!found) throw err;
+    restored = await importVault(gathered.payloads, opts.password, { keyBlock: found });
+  }
+  const { filename, content, bundled, identity } = restored;
   const written = writeRestored(opts, filename, content, bundled);
   const outPath = written[0]!;
   return {

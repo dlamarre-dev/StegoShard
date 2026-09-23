@@ -184,7 +184,7 @@
     "message": "Desbloqueie seu cofre primeiro."
   },
   "errMissingKey": {
-    "message": "Este conjunto de imagens precisa do seu arquivo .key separado para restaurar."
+    "message": "Este cofre precisa da sua chave separada para ser restaurado: o arquivo .key ou a foto que guarda a chave."
   },
   "errFileTooLarge": {
     "message": "Arquivo grande demais ($SIZE$ KB). Este cofre é para pequenos segredos (máx. $LIMIT$ KB).",

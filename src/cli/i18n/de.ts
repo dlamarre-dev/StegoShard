@@ -85,7 +85,8 @@ export const de: CliCatalog = {
   errWrongPassword: 'falsches Passwort',
   errNoGallery:
     'keine wiederherstellbare Galerie gefunden (falsches Passwort, oder das sind keine Galeriefotos)',
-  errNeedsKey: 'dieser Bildsatz braucht einen separaten Schlüssel (--key <Datei|Bild>)',
+  errNeedsKey:
+    'dieser Tresor braucht seinen separaten Schlüssel (--key <Datei|Bild>, oder das Schlüsselfoto mit dem Tresor angeben)',
   errDuressTooSimilar:
     'das Zwangspasswort ist dem echten zu ähnlich ({reason}); ' +
     'wählen Sie ein unabhängiges Zwangspasswort',

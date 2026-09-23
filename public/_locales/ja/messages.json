@@ -184,7 +184,7 @@
     "message": "まず金庫のロックを解除してください。"
   },
   "errMissingKey": {
-    "message": "この画像セットの復元には、別の .key ファイルが必要です。"
+    "message": "この保管庫の復元には別の鍵が必要です：.key ファイル、または鍵を隠した写真。"
   },
   "errFileTooLarge": {
     "message": "ファイルが大きすぎます（$SIZE$ KB）。この金庫は小さな秘密向けです（最大 $LIMIT$ KB）。",

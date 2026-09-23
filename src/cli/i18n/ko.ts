@@ -84,7 +84,8 @@ export const ko: CliCatalog = {
   errWrongPassword: '비밀번호가 틀렸습니다',
   errNoGallery:
     '복원할 수 있는 갤러리를 찾지 못했습니다(비밀번호가 틀렸거나 갤러리 사진이 아닙니다)',
-  errNeedsKey: '이 이미지 세트에는 별도의 키가 필요합니다(--key <파일|이미지> 를 쓰세요)',
+  errNeedsKey:
+    '이 금고에는 별도의 키가 필요합니다(--key <파일|이미지> 를 쓰거나, 키 사진을 금고와 함께 넘기세요)',
   errDuressTooSimilar:
     '강요용 비밀번호가 진짜 비밀번호와 너무 비슷합니다({reason}). ' +
     '서로 관련 없는 강요용 비밀번호를 고르세요',

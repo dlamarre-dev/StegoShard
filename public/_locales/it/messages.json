@@ -184,7 +184,7 @@
     "message": "Sblocca prima la cassaforte."
   },
   "errMissingKey": {
-    "message": "Questo set di immagini richiede il suo file .key separato per il ripristino."
+    "message": "Questo caveau richiede la sua chiave separata per il ripristino: il file .key o la foto che contiene la chiave."
   },
   "errFileTooLarge": {
     "message": "File troppo grande ($SIZE$ KB). Questa cassaforte è per piccoli segreti (max $LIMIT$ KB).",
