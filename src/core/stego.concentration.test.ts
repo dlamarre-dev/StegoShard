@@ -116,8 +116,9 @@ async function embedAtMargin(name: string): Promise<{ cover: Uint8Array; stego: 
 }
 
 // Two of the five, one textured and one dim, which is the axis that moves the
-// numbers. The full corpus is measured in the bench SPEC §9.8 cites; running all
-// five here would buy a third decimal place for four times the CI time.
+// numbers. SPEC §9.8.2 reports the spread over the whole corpus (1.05x to 1.45x
+// of binomial); running all five here would buy a third decimal place for four
+// times the CI time, and the property under test is not a property of the corpus.
 describe.each(['mountain.jpg', 'lake.jpg'])('modification density in %s', (name) => {
   it('spreads at the rate the margin promises, everywhere in the photo', async () => {
     const { cover, stego } = await embedAtMargin(name);
