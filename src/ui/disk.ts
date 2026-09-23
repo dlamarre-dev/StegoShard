@@ -22,6 +22,7 @@ import {
   galleryDecode,
   galleryEncode,
   GALLERY_KEYFILE_NAME,
+  type GalleryCover,
   importVault,
   MAX_FILE_BYTES,
   MAX_FILE_BYTES_BINARY_UI,
@@ -49,6 +50,7 @@ import {
 import { Unzip, UnzipInflate, zipSync } from 'fflate';
 import { unpackBundle } from './bundle';
 import {
+  asJpegName,
   decodeImageBytes,
   downloadBlob,
   embedKeyImage,
@@ -321,7 +323,15 @@ async function buildDisguisedMode(
       ];
     }
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
-    const k = await embedKeyFactorImage(options.stego.cover, keyFactor, options.stego.password);
+    const k = await embedKeyFactorImage(
+      options.stego.cover,
+      keyFactor,
+      options.stego.password,
+      // A .db is not a set of photos: this key image sits in the user's own
+      // library, where SPEC 5.4's rule holds and transcoding it would make it
+      // the one file that does not match its neighbours.
+      'as-is',
+    );
     const dl: Download = {
       name: stegoKeyName(options.stego.cover.name, k.ext, options.id),
       blob: octet(k.bytes, k.mime),
@@ -472,6 +482,7 @@ export async function saveFileToBinary(
         options.stego.cover,
         keyFactor,
         options.stego.password,
+        'as-is',
       );
       const dl: Download = {
         name: stegoKeyName(options.stego.cover.name, stegoKey.ext, disguisedId),
@@ -565,7 +576,14 @@ export interface GallerySaveResult {
    * never told it. Same shape as `GallerySaveResult.provenance` on the Node
    * side, so the two surfaces say the same thing.
    */
-  provenance: { covers: number; segments: number; bytes: number; uniform: boolean };
+  provenance: {
+    covers: number;
+    segments: number;
+    bytes: number;
+    /** Always 0 here: the browser has no preserve-container mode to reach. */
+    gpsScrubbed: number;
+    uniform: boolean;
+  };
 }
 
 /**
@@ -592,7 +610,12 @@ export async function saveGalleryToDisk(
   const keyMode = options.keyMode ?? 'embedded';
   const mode = options.mode ?? 'plain';
   const content = new Uint8Array(await secret.arrayBuffer());
-  const galleryCovers = await Promise.all(covers.map(fileToGalleryCover));
+  // One at a time, not `Promise.all`: the default path decodes each cover to
+  // full-resolution RGBA before re-encoding it, and a 12-megapixel photo is 48 MB
+  // of pixels. Nine of those live at once is a quarter of a gigabyte for no
+  // reason — the re-encoded JPEG is what is kept, and it is small.
+  const galleryCovers: GalleryCover[] = [];
+  for (const file of covers) galleryCovers.push(await fileToGalleryCover(file));
   const res = await galleryEncode(secret.name, content, password, galleryCovers, {
     keyMode,
     bundle: options.bundle,
@@ -617,9 +640,17 @@ export async function saveGalleryToDisk(
     if (!options.stego) throw new Error('stego mode requires a cover image and password');
     // Gallery is a multi-region path: the external artifact is the 32-byte key
     // factor (§10.3), hidden in its own SSKF envelope, not a 92-byte key block.
-    const k = await embedKeyFactorImage(options.stego.cover, res.keyBlock, options.stego.password);
+    // 'profile': this key photo is delivered *with* the gallery, so it takes the
+    // gallery's container rule. Its name follows its bytes, or a PNG cover would
+    // arrive as a `.png` full of JPEG.
+    const k = await embedKeyFactorImage(
+      options.stego.cover,
+      res.keyBlock,
+      options.stego.password,
+      'profile',
+    );
     downloads.push({
-      name: stegoKeyName(options.stego.cover.name, k.ext, setHex),
+      name: asJpegName(stegoKeyName(options.stego.cover.name, k.ext, setHex)),
       blob: octet(k.bytes, k.mime),
       purpose: 'stegoCover',
     });
@@ -673,7 +704,11 @@ export async function saveGalleryToDisk(
     decoys: res.decoys,
     setId: setHex,
     manifest: manifestOf(downloads),
-    provenance: { ...res.normalization.removed, uniform: res.normalization.uniform },
+    provenance: {
+      ...res.normalization.removed,
+      gpsScrubbed: res.normalization.gpsScrubbed,
+      uniform: res.normalization.uniform,
+    },
   };
 }
 
@@ -685,7 +720,13 @@ export async function restoreGalleryFromDisk(
   secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
   assertBrowserInputs([...files, ...(keyFile ? [keyFile] : [])]);
-  const covers = await Promise.all(files.map(fileToGalleryCover));
+  // `preserveContainer` on the way *in*: these photos carry a payload in their
+  // coefficients, and re-encoding one would destroy exactly what restore is here
+  // to read. The flag means the same thing it means on the save path — hand me
+  // the file as it is — and this is the path where it is not optional.
+  const covers: GalleryCover[] = [];
+  for (const file of files)
+    covers.push(await fileToGalleryCover(file, { preserveContainer: true }));
   // Optional external key (keyfile/stego galleries): a .key, a binary key
   // container, or a stego cover de-embedded with the restore password.
   let keyBlock: Uint8Array | undefined;

@@ -36,6 +36,7 @@ import jpeg from 'jpeg-js';
 beforeEach(resetStegoCoverGuard);
 
 import {
+  profileMismatch,
   DEFAULT_ARGON2,
   KEY_BLOCK_LEN,
   KEY_FACTOR_LEN,
@@ -264,16 +265,35 @@ describe('a stego cover keeps its format', () => {
   });
 });
 
-describe('gallery covers keep their format too', () => {
-  it('carries a JPEG cover verbatim, and decodes anything else to RGBA', () => {
+describe('gallery covers converge on one profile', () => {
+  /**
+   * The default, and the reason the feature exists: a set gathered from three
+   * devices is three kinds of file until every cover goes through one encoder.
+   * A PNG converges too, name included — a set that is JPEG except for the PNGs
+   * sorts on exactly that.
+   */
+  it('re-encodes every cover into the profile, whatever it arrived as', () => {
+    const fromJpeg = fileToGalleryCover(baselineJpeg(32), 'holiday.jpg');
+    expect(fromJpeg.kind).toBe('jpeg');
+    expect(fromJpeg.kind === 'jpeg' && profileMismatch(fromJpeg.jpeg)).toBeNull();
+
+    const fromPng = fileToGalleryCover(noisyPng(32), 'holiday.png');
+    expect(fromPng.kind).toBe('jpeg');
+    expect(fromPng.name).toBe('holiday.jpg');
+    expect(fromPng.kind === 'jpeg' && profileMismatch(fromPng.jpeg)).toBeNull();
+  });
+
+  /**
+   * The opt-in mode, and what restore uses on the way in: the bytes as they are.
+   * Re-encoding a delivered photo would destroy the payload in its coefficients,
+   * which is why this flag is not optional on that path.
+   */
+  it('carries a cover verbatim when the container is to be preserved', () => {
     const jpg = baselineJpeg(32);
-    const cover = fileToGalleryCover(jpg, 'holiday.jpg');
-    expect(cover.kind).toBe('jpeg');
-    // Verbatim: the DCT coefficients are the carrier, so a decode/re-encode here
-    // would quietly cost capacity before the embedding even starts.
+    const cover = fileToGalleryCover(jpg, 'holiday.jpg', { preserveContainer: true });
     expect(cover.kind === 'jpeg' && cover.jpeg).toBe(jpg);
 
-    const other = fileToGalleryCover(noisyPng(16), 'holiday.png');
+    const other = fileToGalleryCover(noisyPng(16), 'holiday.png', { preserveContainer: true });
     expect(other.kind).toBe('rgba');
     expect(other.kind === 'rgba' && other.width).toBe(16);
   });

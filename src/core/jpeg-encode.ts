@@ -32,6 +32,7 @@
  */
 
 import { BitWriter, buildHuff, encodeBlock } from './jpeg-coeff';
+import { type JpegLayout, lumaQuantSum, parseJpegSegments } from './jpeg-segments';
 import type { ImageDataLike } from './codec/types';
 import {
   HUFF_AC_CHROMA_COUNTS,
@@ -142,6 +143,98 @@ export function encodeJpegProfile(img: ImageDataLike): Uint8Array {
   bw.align();
 
   return assemble(width, height, Uint8Array.from(bw.bytes()));
+}
+
+/** Coarseness of the profile itself: what every source is compared against. */
+export const PROFILE_QUANT_SUM = QUANT_LUMA.reduce((a, b) => a + b, 0);
+
+/**
+ * Re-encode one cover into the profile, refusing the sources it would betray.
+ *
+ * `source` is the file the pixels came from, and it is read for one number: how
+ * coarsely it was quantized. Re-quantizing **finer** than the source leaves empty
+ * bins in the coefficient histogram, the comb a first-order detector looks for,
+ * and it is the failure mode of a photo that has already been through a
+ * messaging app — those recompress at a coarseness this profile sits under.
+ * Measured on the repository's own camera photographs: four quantize at 437 and
+ * one at 864, against this profile's 1109, so all five are safe;
+ * quality 90 would sum to 736 and comb the fifth.
+ *
+ * Refused rather than warned about, and refused from the source alone, before any
+ * work: the photo is named so the user knows which one to drop. A cover that
+ * would arrive with a detectable artifact is not a cover, which is the same rule
+ * the complexity filter applies to texture.
+ *
+ * `source` may be pixels that never were a JPEG (a PNG cover): with no table to
+ * compare against there is no comb to create, and the re-encode goes ahead.
+ */
+export function reencodeCover(
+  pixels: ImageDataLike,
+  source?: Uint8Array,
+  label?: string,
+): Uint8Array {
+  const coarseness = source ? lumaQuantSum(source) : null;
+  if (coarseness !== null && coarseness > PROFILE_QUANT_SUM) {
+    throw new JpegEncodeError(
+      `${label ? `${label}: ` : ''}the source was quantized more coarsely than this profile ` +
+        `(${coarseness} against ${PROFILE_QUANT_SUM}), so re-encoding it would leave a ` +
+        'double-quantization comb in the histogram. It has probably been through a ' +
+        'messaging app or another re-encode; use the original if you still have it.',
+    );
+  }
+  return encodeJpegProfile(pixels);
+}
+
+/**
+ * Why these bytes are not a file this profile produced, or null when they are.
+ *
+ * The re-encode itself happens where the pixels are, which is the image adapter
+ * on each surface, so this is the check rather than the enforcement: it is what
+ * the tests hold the four surfaces to, and what a library consumer assembling
+ * `GalleryCover` objects by hand can call to see whether their set has the
+ * uniformity the feature is for.
+ *
+ * `galleryEncode` deliberately does **not** call it. A raster cover is a
+ * legitimate input to the core (SPEC §9 has always taken one), and the
+ * container-preserving mode exists precisely to hand it covers that are not in
+ * the profile, so a refusal here would be the core overriding a decision the
+ * caller is entitled to make. The uniformity rule is stated normatively in
+ * SPEC §9.8 and kept by the adapters, which is where the pixels and the mode
+ * both are.
+ *
+ * Structural, and cheap: the quantization table, the segment sequence, the
+ * sampling factors and the absence of a trailer are all readable without
+ * touching the entropy-coded scan.
+ */
+export function profileMismatch(bytes: Uint8Array): string | null {
+  let layout: JpegLayout;
+  try {
+    layout = parseJpegSegments(bytes);
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  if (layout.trailerStart < bytes.length) {
+    return `${bytes.length - layout.trailerStart} bytes follow EOI`;
+  }
+  const markers = layout.segments.map((s) => s.marker);
+  const wanted = [0xe0, 0xdb, 0xc0, 0xc4, 0xda];
+  if (markers.length !== wanted.length || markers.some((m, i) => m !== wanted[i])) {
+    const seen = markers.map((m) => `0x${m.toString(16)}`).join(' ');
+    return `segments are ${seen}, not the profile's APP0 DQT SOF0 DHT SOS`;
+  }
+  const quant = lumaQuantSum(bytes);
+  if (quant !== PROFILE_QUANT_SUM) {
+    return `luma quantization sums to ${quant}, not the profile's ${PROFILE_QUANT_SUM}`;
+  }
+  // SOF0 payload: precision, height, width, component count, then (id, HV, tq).
+  const sof = layout.segments[2]!;
+  const at = sof.payloadStart;
+  if (bytes[at + 5] !== 3) return `${bytes[at + 5]} components, not 3`;
+  const sampling = [bytes[at + 7], bytes[at + 10], bytes[at + 13]];
+  if (sampling[0] !== 0x22 || sampling[1] !== 0x11 || sampling[2] !== 0x11) {
+    return `sampling factors ${sampling.map((s) => s?.toString(16)).join('/')}, not 4:2:0`;
+  }
+  return null;
 }
 
 /**

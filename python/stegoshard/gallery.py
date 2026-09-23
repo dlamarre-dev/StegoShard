@@ -30,10 +30,13 @@ IV_LEN = 12
 GCM_TAG_LEN = 16
 GALLERY_FRAG_LEN = HEADER_LEN + GALLERY_SLOT_DATA
 GALLERY_SLOT_BYTES = IV_LEN + GALLERY_FRAG_LEN + GCM_TAG_LEN
-# Eligible carriers must exceed the slot by this factor (matches the TS encoder);
-# below it an image can't be a carrier, so extraction skips it (never drains the
-# keystream).
-GALLERY_CAPACITY_MARGIN = 4
+# Eligible carriers must exceed the slot by this factor; below it an image can't
+# be a carrier, so extraction skips it (never drains the keystream).
+#
+# This is a decoder, so it mirrors the TS reader's margin (GALLERY_READ_MARGIN),
+# not the writer's. The writer asks for 16 now, for sparseness; a reader that
+# demanded 16 would refuse to open galleries written when the bar was 4.
+GALLERY_READ_MARGIN = 4
 
 
 class GalleryRestoreError(Exception):
@@ -65,7 +68,7 @@ def _gallery_keys(
 def _extract_slot(image_bytes: bytes, pos_key: bytes) -> bytes | None:
     """Read a fixed-size slot from one photo (JPEG DCT or PNG spatial LSB)."""
     if image_bytes[:2] == b"\xff\xd8":  # JPEG
-        return extract_bytes_jpeg(image_bytes, pos_key, GALLERY_SLOT_BYTES, GALLERY_CAPACITY_MARGIN)
+        return extract_bytes_jpeg(image_bytes, pos_key, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN)
     from PIL import Image
 
     with Image.open(io.BytesIO(image_bytes)) as img:
@@ -73,7 +76,7 @@ def _extract_slot(image_bytes: bytes, pos_key: bytes) -> bytes | None:
         width, height = rgba.size
         data = rgba.tobytes()
     return extract_bytes_rgba(
-        data, width, height, pos_key, GALLERY_SLOT_BYTES, GALLERY_CAPACITY_MARGIN
+        data, width, height, pos_key, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN
     )
 
 

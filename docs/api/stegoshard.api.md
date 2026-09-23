@@ -423,6 +423,16 @@ export class GalleryCoverCapacityError extends Error {
 }
 
 // @public
+export class GalleryCoversRejectedError extends Error {
+    constructor(names: readonly string[], neededBits: number);
+    readonly coverNames: string;
+    static fromNames(coverNames: string, neededBits: number): GalleryCoversRejectedError;
+    readonly names: readonly string[];
+    // (undocumented)
+    readonly neededBits: number;
+}
+
+// @public
 export function galleryDecode(images: GalleryCover[], password: string, options?: GalleryDecodeOptions): Promise<{
     filename: string;
     content: Uint8Array;
@@ -767,7 +777,7 @@ export interface StegoEmbedOptions {
 }
 
 // @public
-export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_ENCODE' | 'JPEG_STRUCTURE' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'PROVENANCE_NORMALIZE' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'STEGO_COVER_REUSE' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
+export type StegoErrorCode = 'BUCKET_TOO_LARGE' | 'CREDENTIALS_NOT_INDEPENDENT' | 'EXIF_SCRUB' | 'FILE_TOO_LARGE' | 'GALLERY_COVER_CAPACITY' | 'GALLERY_COVERS_REJECTED' | 'GALLERY_FILE_TOO_LARGE' | 'GALLERY_RESTORE_FAILED' | 'GALLERY_TOO_FEW_IMAGES' | 'GALLERY_TOO_MANY_IMAGES' | 'JPEG_ENCODE' | 'JPEG_STRUCTURE' | 'JPEG_UNSUPPORTED' | 'MISSING_KEY' | 'PROVENANCE_NORMALIZE' | 'SEGMENTED_FORMAT' | 'SHARE_CHECKSUM' | 'SHARE_SET' | 'STEGO_CAPACITY' | 'STEGO_COVER_FORMAT' | 'STEGO_COVER_REUSE' | 'TOO_MANY_FILES' | 'TOO_MANY_IMAGES' | 'VERIFICATION_FAILED' | 'WRONG_PASSWORD';
 
 // @public
 export function stegoErrorCode(err: unknown): StegoErrorCode | null;

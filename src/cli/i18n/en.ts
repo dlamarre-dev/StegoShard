@@ -47,6 +47,10 @@ export const en = {
   hintAllowCoverReuse: 'Pass --allow-cover-reuse to override this if you mean it.',
   helpAllowCoverReuse:
     'Allow a cover photo to carry a second secret under the same password (weakens both; see docs/CLI.md)',
+  errPreserveContainerWrongCommand:
+    '--preserve-container has no effect on {command} (only gallery-save re-encodes cover photos)',
+  helpPreserveContainer:
+    'Keep each photo in its own container instead of re-encoding the set into one profile. Scrubs GPS. Keeps an Ultra HDR gain map, and everything else the device wrote (gallery-save)',
   errExportNumberInvalid:
     '--export-number must be a whole number from 1 to 4294967295 (got "{value}")',
   errExportNumberWrongCommand:
@@ -123,6 +127,12 @@ export const en = {
   warnCoversNotUniform:
     'Warning: these photos do not share one metadata profile, so they can still be ' +
     'told apart by it. Run stegoshard normalize --report on the set to see what differs.',
+  warnPreserveContainer:
+    'Warning: --preserve-container kept each photo in its own container, so this set ' +
+    'was not re-encoded into one profile. GPS was removed; camera model, timestamps, ' +
+    'maker notes and the device encoder’s own quantization tables were not. Photos ' +
+    'from different devices stay tellable apart by them, and a photo the device made ' +
+    'stays tellable from one it did not.',
   labelPassword: 'password',
   promptPassword: 'Password: ',
   promptDuressPassword: 'Duress password: ',

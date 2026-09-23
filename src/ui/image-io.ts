@@ -24,6 +24,7 @@ import {
   isHeif,
   isJpeg,
   recoveryLines,
+  reencodeCover,
   type GalleryCover,
   type GalleryImage,
   type ImageDataLike,
@@ -243,18 +244,41 @@ export async function extractKeyImage(file: Blob, password: string): Promise<Uin
 }
 
 /**
- * Hide the 32-byte external key factor (§10.3) in a cover photo, keeping the
- * cover's format, the stego-delivery counterpart of a raw `.key` file on the
- * multi-region paths (gallery, disguised `.db`). Same format rules as
- * embedKeyImage.
+ * Hide the 32-byte external key factor (§10.3) in a cover photo, the
+ * stego-delivery counterpart of a raw `.key` file on the multi-region paths
+ * (gallery, disguised `.db`).
+ *
+ * `container` says what to do with the cover first, and the two answers belong
+ * to two different deliveries. `'as-is'` keeps the cover's own format, which is
+ * §5.4: a key photo delivered beside a `.db` sits in a library of device files,
+ * and transcoding it would make it the one that does not match. `'profile'`
+ * re-encodes it into the gallery profile, because a key photo delivered *with* a
+ * gallery has to match that set instead, and a lone PNG among twelve profile
+ * JPEGs is the most interesting file in the folder (SPEC §9.8).
  */
 export async function embedKeyFactorImage(
   cover: Blob,
   factor: Uint8Array,
   password: string,
+  container: 'as-is' | 'profile',
   opts?: StegoEmbedOptions,
 ): Promise<StegoKeyImage> {
   const bytes = await boundedBlobBytes(cover, MAX_BROWSER_MEDIA_BYTES);
+  if (container === 'profile') {
+    // Re-encode first, then embed: the payload lives in the coefficients, so a
+    // re-encode after the embed would destroy it. Same order the covers take.
+    const img = await fileToImageData(cover); // full resolution (no cap)
+    try {
+      // Named where a name exists, so a comb refusal says which photo to swap.
+      const label = cover instanceof File ? cover.name : undefined;
+      const profiled = reencodeCover(img, isJpeg(bytes) ? bytes : undefined, label);
+      const out = await embedKeyFactorStegoJpeg(profiled, factor, password, undefined, opts);
+      return { bytes: out, mime: 'image/jpeg', ext: 'jpg' };
+    } catch (err) {
+      if (err instanceof JpegUnsupportedError) throw new StegoCoverFormatError();
+      throw err;
+    }
+  }
   if (isJpeg(bytes)) {
     try {
       const out = await embedKeyFactorStegoJpeg(bytes, factor, password, undefined, opts);
@@ -294,20 +318,48 @@ export async function extractKeyFactorImage(
 // --- Gallery Mode cover I/O (SPEC §9) ----------------------------------------
 
 /**
- * Turn a picked file into a gallery cover. A baseline JPEG is kept as raw bytes
- * (its DCT coefficients are the carrier and must not be re-encoded); anything
- * else is decoded to full-resolution RGBA (a cover is never downscaled; gallery
- * embedding is position-sensitive).
+ * Turn image file bytes into a gallery cover.
+ *
+ * By default every cover, whatever it arrived as, is decoded to pixels and
+ * re-encoded into the one profile (SPEC §9.8): that is what makes a set of
+ * photos from three devices one kind of file instead of three. A PNG becomes a
+ * JPEG, and its name follows, because a set that is JPEG except for the PNGs
+ * sorts on exactly that.
+ *
+ * `preserveContainer` keeps the old behaviour — a baseline JPEG carried as-is,
+ * anything else decoded to RGBA — for the caller who knows what it costs: the
+ * source's quantization tables, its ICC profile, its makernote and its XMP
+ * dialect all survive, and a mixed-device set stays mixed. It is a flag, never
+ * the default.
  */
-export async function fileToGalleryCover(file: File): Promise<GalleryCover> {
+export async function fileToGalleryCover(
+  file: File,
+  opts: { preserveContainer?: boolean | undefined } = {},
+): Promise<GalleryCover> {
   const bytes = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
-  if (isJpeg(bytes)) return { kind: 'jpeg', name: file.name, jpeg: bytes };
   // HEIC/HEIF/AVIF named before the decode attempt, mirroring the Node adapter:
   // StegoShard never ingests one (SPEC §5.4), and a browser that happens to
   // decode HEIC would otherwise silently transcode a carrier. See `isHeif`.
   if (isHeif(bytes)) throw new StegoCoverFormatError();
+  if (opts.preserveContainer) {
+    if (isJpeg(bytes)) return { kind: 'jpeg', name: file.name, jpeg: bytes };
+    const raster = await fileToImageData(file);
+    return {
+      kind: 'rgba',
+      name: file.name,
+      rgba: raster.data,
+      width: raster.width,
+      height: raster.height,
+    };
+  }
   const img = await fileToImageData(file);
-  return { kind: 'rgba', name: file.name, rgba: img.data, width: img.width, height: img.height };
+  const encoded = reencodeCover(img, isJpeg(bytes) ? bytes : undefined, file.name);
+  return { kind: 'jpeg', name: asJpegName(file.name), jpeg: encoded };
+}
+
+/** A re-encoded cover is a JPEG whatever it arrived as, so its name says so. */
+export function asJpegName(name: string): string {
+  return /\.jpe?g$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, '')}.jpg`;
 }
 
 /** Serialize a produced gallery image to a download blob, keeping its format. */

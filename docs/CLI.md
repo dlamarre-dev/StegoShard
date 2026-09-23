@@ -83,6 +83,27 @@ npm run cli -- estimate note.txt --gallery
 npm run cli -- gallery-save note.txt ./photos --out ./album
 npm run cli -- gallery-restore ./album --out ./restored
 
+# Every cover is re-encoded into one pinned encoder profile before anything is
+# hidden in it (SPEC §9.8), carriers and decoys alike, and the stego key photo
+# with them. That is what makes photos from three devices one kind of file
+# instead of three: no EXIF, no XMP, no ICC, no maker note, one set of
+# quantization tables. A PNG comes out a .jpg, because a set that is JPEG except
+# for two .png files sorts on exactly that.
+#
+# Two things follow. Photos are refused if they are too smooth to take a
+# fragment sparsely, by name, so you can drop them and re-run. And a photo that
+# has already been through a messaging service is refused too: it was
+# recompressed more coarsely than the profile, and re-encoding it would leave a
+# double-quantization comb a detector can read.
+#
+# --preserve-container turns the re-encoding off for the whole delivery: each
+# photo keeps its own container, so an Ultra HDR gain map survives and the
+# coefficients stay exactly as the camera wrote them. What it costs is the
+# uniformity above, and it is not a small cost: camera model, timestamps, maker
+# notes and the device's own quantization tables all stay, so a set gathered
+# from several devices stays as sortable as it was. GPS is removed either way.
+npm run cli -- gallery-save note.txt ./photos --preserve-container --out ./album
+
 # Cover normalization (SPEC §9.7): strip the C2PA provenance manifest cameras
 # embed. Saving already does this to the covers it is handed, carriers AND
 # decoys, because a set where only the carriers lost their manifests sorts just

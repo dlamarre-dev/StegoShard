@@ -9,6 +9,75 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **Gallery covers are re-encoded into one pinned encoder profile** (SPEC §9.8, new).
+  Removing the C2PA manifest was the right first step and a small one. It left the GPS,
+  the maker notes, the vendor ICC profile and, most of all, the device's own quantization
+  tables: a JPEG with no EXIF but Google's tables reads as a camera file someone scrubbed,
+  which is a louder signal than the EXIF was. Chasing that device by device does not
+  terminate, because every vendor's tables, ICC profile and sampling choice is another
+  axis and new ones ship with new phones.
+
+  So the default stopped preserving and started **converging**. Every cover is decoded to
+  pixels and re-encoded by one encoder written for this purpose (`src/core/jpeg-encode.ts`,
+  `src/core/jpeg-profile.ts`): Annex K tables at quality 85 as literal values, 4:2:0, the
+  four standard Huffman tables, baseline, no restart interval, a JFIF APP0 and nothing
+  else. No EXIF, no XMP, no ICC, no MPF, nothing after EOI. The delivered photos are not
+  similar files, they are the same kind of file, which is the only version of this property
+  that survives an analyst sorting a folder.
+
+  The encoder is in the repository rather than a dependency because no library reachable
+  from all four build targets can be pinned: `jpeg-js` hardcodes 4:4:4 and is bundled only
+  in two of the four, and `canvas.convertToBlob` varies by browser, OS and GPU on every
+  axis that matters here. Every arithmetic step is integer, including a written-out
+  fixed-point cosine table, so two engines cannot produce two different files from one
+  photo. The profile is locked by tests **on the produced bytes** (DQT, DHT, markers,
+  segment order), never on a `quality: 85` argument, which is a number two libraries
+  disagree about.
+
+  **It applies to the whole set, and that is the point.** Carriers, decoys, and the
+  `--key-mode stego` key photo, which used to be delivered in its own container and would
+  have been the single file in the folder not matching its neighbours. A PNG cover comes
+  out a `.jpg`, name included.
+
+  **Two refusals come with it.** A photo already recompressed by a messaging service is
+  coarser than the profile, and re-encoding it would imprint a double-quantization comb in
+  its histogram: a detector signal introduced by the tool. It is refused by name. And a
+  photo too smooth to carry a fragment sparsely is refused by name too, over the whole set
+  rather than the carriers, because "passes the filter" must not be a test that finds the
+  carriers.
+
+  **The sparseness bar was measured, not chosen.** `GALLERY_EMBED_MARGIN` went from 4 to 16,
+  which puts the modification rate at 3.1%. The derivation is in SPEC §9.8.1: on the five
+  camera photographs in `tests/steganalysis/covers-jpeg/`, the total-variation distance
+  between a cover's coefficient histogram and its carrier's crosses the photo's own noise
+  floor at about 6%, so the old margin was sitting at 12.5%, above the crossing. The margin
+  was the defect, not the re-encoding that exposed it. A first-order chi-square attack does
+  not move at any rate up to 20% on that corpus, so no number here was derived from it, and
+  the specification says so. Readers still accept the old margin: a reader that demanded
+  the new one would refuse galleries this project itself produced.
+
+  Concentration was measured too, and is documented as a **negative result** (§9.8.2): the
+  per-tile modification rate equals the global rate everywhere, within 1.05x to 1.45x of
+  binomial noise, because carrier positions are drawn uniformly. A per-tile threshold would
+  reject nothing, so none was added. What was added is a test that fails if the draw ever
+  stops being uniform, which is the condition the conclusion depends on.
+
+- **`--preserve-container`, and a GPS scrub that comes with it** (SPEC §9.8.3). The opt-in
+  mode for a caller who needs the Ultra HDR gain map or the device's own coefficients: each
+  photo keeps its container, and the set keeps its heterogeneity, which the CLI says out
+  loud on every such run rather than in a footnote. CLI and library only; the web app and
+  the extension do not offer it.
+
+  What it does not keep is the coordinate. `src/core/exif-scrub.ts` removes the EXIF GPS
+  IFD from every cover in the set, and removes the **values** as well as the pointer:
+  dropping the pointer alone makes the coordinates invisible to a conforming reader and
+  leaves them perfectly legible to anyone reading the bytes, which is concealment rather
+  than removal. Nothing moves while it works, because every TIFF value longer than four
+  bytes is addressed by an absolute offset and several vendors write their own offsets into
+  an opaque maker note: the file keeps its length, the freed entry is left as unreferenced
+  padding, and a whole class of offset bugs is impossible rather than rare. An EXIF block it
+  cannot walk is a refusal, not a pass.
+
 - **Cover normalization: the C2PA provenance manifest is removed before embedding**
   (SPEC §9.7, new). Recent phones and cameras embed a signed manifest carrying a hash of
   the image content. Embedding changes that content, so a carrier fails validation — and

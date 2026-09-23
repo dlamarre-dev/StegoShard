@@ -147,7 +147,7 @@ describe('gallery output', () => {
       decoys: 2,
       setId: 'deadbeef',
       keyMode: 'embedded',
-      provenance: { covers: 0, segments: 0, bytes: 0, uniform: true },
+      provenance: { covers: 0, segments: 0, bytes: 0, gpsScrubbed: 0, uniform: true },
     });
     expect(io.stdout).toMatch(/3/);
     expect(io.stderr).toBe('');
@@ -162,7 +162,7 @@ describe('gallery output', () => {
       m: 2,
       decoys: 2,
       setId: 'deadbeef',
-      provenance: { covers: 0, segments: 0, bytes: 0, uniform: true },
+      provenance: { covers: 0, segments: 0, bytes: 0, gpsScrubbed: 0, uniform: true },
     };
     humanPresenter(embedded).gallerySave({ ...base, keyMode: 'embedded' });
     const stego = fakeIo();

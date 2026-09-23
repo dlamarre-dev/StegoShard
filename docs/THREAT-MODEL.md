@@ -141,6 +141,38 @@ the originals it leaves behind are exactly the comparison the removed manifests
 used to provide. What to do with them is your decision, and it is the decision this
 section is about.
 
+### Re-encoding does not change that, and is not meant to
+
+Gallery Mode now re-encodes every cover into one pinned encoder profile before
+embedding (SPEC §9.8). It is worth being exact about what that buys, because it
+looks like it should help here and it does not.
+
+The profile is **published** and the encoder is **deterministic**: given the same
+original, anyone can run it and get the same bytes. So an adversary holding your
+original re-encodes it themselves and compares coefficient by coefficient, exactly
+as before. Re-encoding defends against nobody who has the original. What it
+removes is **triage**: the device fingerprints, the metadata and the container
+quirks that let someone sort a folder of photos into groups without having any
+original at all. Those are different attacks, and only the second one is in scope.
+
+Two smaller notes in the same spirit.
+
+A photo that has already been through a messaging service has been recompressed
+more coarsely than the profile, and re-encoding it would leave a
+double-quantization comb in its histogram: a detector signal introduced by the
+tool. Such a photo is refused by name rather than used. That is the right outcome
+and it doubles as a hint, because a photo that went through a messaging service is
+a photo whose original is on someone else's device, which is the burned cover the
+section above is about.
+
+The cover-reuse guard (`src/core/stego-guard.ts`) is indexed on the cover's
+coefficient fingerprint. The same photo used once with `--preserve-container` and
+once without produces two different fingerprints, so the guard will not call that
+reuse. It is not reuse: the two runs derive independent keys and share no pad, the
+same way SPEC §5.4 already treats one photograph's JPEG and a PNG decode of it as
+two distinct covers. It is written down here because it looks like a gap and is
+not one.
+
 ## Access structures: duress & non-possession
 
 The Gallery and decoy-database (`.db`) carriers can hold **two independent payloads behind

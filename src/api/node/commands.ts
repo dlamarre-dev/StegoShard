@@ -70,6 +70,7 @@ import {
   isHeif,
   isJpeg as isJpegBytes,
   normalizeJpegCover,
+  reencodeCover,
   type CoverKind,
   type CoverProfile,
   type CoverSetEntry,
@@ -84,11 +85,13 @@ import {
   type CoverClaim,
 } from '../../core';
 import {
+  asJpegName,
   embedKeyImage,
   embedKeyFactorImage,
   extractKeyImage,
   extractKeyFactorImage,
   fileToGalleryCover,
+  fileToImageData,
   galleryImageToFile,
   imageDataToPng,
 } from './image-io';
@@ -431,6 +434,23 @@ async function externalKey(
   keyfileName: string,
   password: string,
   cover: string | undefined,
+  /**
+   * What to do with the stego cover's container before hiding anything in it.
+   *
+   * `'as-is'` is §5.4: the cover keeps the tables, the metadata and the format
+   * the device wrote, because a key photo on an overt path sits in a library of
+   * device files and transcoding it would make it the one that does not match.
+   *
+   * `'profile'` is Gallery Mode. There the key photo is delivered **with** the
+   * set, so "matches its neighbours" means the profile every other photo in that
+   * set was re-encoded into (§9.8). Left as-is it would be the single file in the
+   * delivery carrying a device's own quantization tables, which is to say the
+   * carriers would be uniform and the key would not.
+   *
+   * Required rather than defaulted: this is a security property of a delivery,
+   * and a new call site should have to say which one it is.
+   */
+  coverContainer: 'as-is' | 'profile',
   // Single-region paths (branded .ssbn, disk, paper) hide a 92-byte key block;
   // multi-region paths (gallery, disguised .db) hide the 32-byte key factor.
   variant: 'block' | 'factor' = 'block',
@@ -448,11 +468,27 @@ async function externalKey(
     // `onClaim` forwards straight to the holder, so the claim is registered before
     // anything else in this function can throw.
     const embedOpts: StegoEmbedOptions = { ...opts, onClaim: hold };
+    const raw = read(cover);
+    // Into the profile first, where the delivery asks for it, so the embed writes
+    // into the coefficients that will actually be delivered. A re-encode after
+    // the embed would destroy the payload; this is the only order that works,
+    // and it is the same order §9.8 requires of the covers: normalize, then hide.
+    const source =
+      coverContainer === 'profile'
+        ? reencodeCover(
+            fileToImageData(raw, basename(cover)),
+            isJpegBytes(raw) ? raw : undefined,
+            basename(cover),
+          )
+        : raw;
+    // The name follows the bytes: a PNG key cover re-encoded into the profile is
+    // a JPEG, and a set of JPEGs with one `.png` in it sorts on exactly that.
+    const name = coverContainer === 'profile' ? asJpegName(basename(cover)) : basename(cover);
     const key =
       variant === 'factor'
-        ? await embedKeyFactorImage(read(cover), basename(cover), keyBlock, password, embedOpts)
-        : await embedKeyImage(read(cover), basename(cover), keyBlock, password, embedOpts);
-    return { name: basename(cover), bytes: key.bytes, mimicPath: cover, onLanded: landed };
+        ? await embedKeyFactorImage(source, name, keyBlock, password, embedOpts)
+        : await embedKeyImage(source, name, keyBlock, password, embedOpts);
+    return { name, bytes: key.bytes, mimicPath: cover, onLanded: landed };
   }
   if (keyMode !== 'embedded') {
     return { name: keyfileName, bytes: keyBlock };
@@ -531,6 +567,7 @@ async function runSaveDisguisedImpl(
       binaryKeyName('disguised'),
       opts.password,
       opts.cover,
+      'as-is',
       'factor',
       reuseOpt(opts),
       hold,
@@ -629,6 +666,7 @@ async function runSaveDisguisedImpl(
       binaryKeyName('disguised'),
       opts.password,
       opts.cover,
+      'as-is',
       'factor',
       reuseOpt(opts),
       hold,
@@ -714,6 +752,7 @@ async function runSaveImpl(
         binaryKeyName(variant),
         opts.password,
         opts.cover,
+        'as-is',
         'block',
         reuseOpt(opts),
         hold,
@@ -749,6 +788,7 @@ async function runSaveImpl(
     `stegoshard-${setHex}.key`,
     opts.password,
     opts.cover,
+    'as-is',
     'block',
     reuseOpt(opts),
     hold,
@@ -978,6 +1018,22 @@ export async function runRestore(
 // --- Gallery Mode (SPEC §9) --------------------------------------------------
 
 export interface GallerySaveOptions {
+  /**
+   * Keep each cover in the container it arrived in, instead of re-encoding the
+   * whole set into one profile (SPEC §9.8).
+   *
+   * The mode for a caller who knows what it costs: the source device's
+   * quantization tables, its ICC profile, its makernote and its XMP dialect all
+   * survive, so a set gathered from several devices stays as sortable as it was.
+   * What it buys is the coefficients left exactly as the camera wrote them, and
+   * an Ultra HDR gain map that still resolves.
+   *
+   * The one thing it does not keep is the GPS block, which is removed from every
+   * cover either way. A coordinate is not a container quirk that makes a set
+   * sortable; it is the location the photo was taken, and there is no reading of
+   * "preserve the container" under which a caller wanted that published.
+   */
+  preserveContainer?: boolean | undefined;
   secretFile: string;
   /** Cover photo paths and/or directories to draw covers from. */
   covers: string[];
@@ -1019,8 +1075,18 @@ export interface GallerySaveResult {
    * (SPEC §9.7). `uniform` false means the photos that were just written can
    * still be sorted by their metadata, which is the condition normalizing only
    * the carriers would have produced.
+   *
+   * `gpsScrubbed` counts the covers a coordinate came out of. It is zero on the
+   * default path, where the re-encode leaves no metadata for one to sit in, and
+   * non-zero only under `preserveContainer` (SPEC §9.8).
    */
-  provenance: { covers: number; segments: number; bytes: number; uniform: boolean };
+  provenance: {
+    covers: number;
+    segments: number;
+    bytes: number;
+    gpsScrubbed: number;
+    uniform: boolean;
+  };
 }
 
 async function runGallerySaveImpl(
@@ -1034,7 +1100,9 @@ async function runGallerySaveImpl(
   if (coverPaths.length === 0) {
     throw new StegoShardApiError('NO_COVERS_FOUND', 'no usable cover photos found');
   }
-  const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
+  const covers = coverPaths.map((p) =>
+    fileToGalleryCover(read(p), basename(p), { preserveContainer: opts.preserveContainer }),
+  );
 
   const mode = opts.mode ?? 'plain';
   const secretName = basename(opts.secretFile);
@@ -1085,6 +1153,10 @@ async function runGallerySaveImpl(
     GALLERY_KEYFILE_NAME,
     opts.password,
     opts.keyCover,
+    // The key photo is delivered beside the gallery, so it takes the gallery's
+    // container rule, not §5.4's. `--preserve-container` turns it off for the
+    // whole delivery, key photo included: one flag, one set, one answer.
+    opts.preserveContainer ? 'as-is' : 'profile',
     'factor',
     reuseOpt(opts),
     hold,
@@ -1114,7 +1186,11 @@ async function runGallerySaveImpl(
     decoys: res.decoys,
     setId: setHex,
     keyMode,
-    provenance: { ...res.normalization.removed, uniform: res.normalization.uniform },
+    provenance: {
+      ...res.normalization.removed,
+      gpsScrubbed: res.normalization.gpsScrubbed,
+      uniform: res.normalization.uniform,
+    },
   };
 }
 
@@ -1131,7 +1207,11 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   if (coverPaths.length === 0) {
     throw new StegoShardApiError('NO_GALLERY_IMAGES', 'no images to scan for a gallery');
   }
-  const covers = coverPaths.map((p) => fileToGalleryCover(read(p), basename(p)));
+  // `preserveContainer` on the way *in*: these photos carry a payload in their
+  // coefficients, and re-encoding one would destroy what restore is here to read.
+  const covers = coverPaths.map((p) =>
+    fileToGalleryCover(read(p), basename(p), { preserveContainer: true }),
+  );
 
   // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
   const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;

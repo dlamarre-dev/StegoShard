@@ -726,7 +726,9 @@ function positionStreamLen(payloadBits: number): number {
  * against up to N+1024 available, about 45% headroom; measured clear at 16, 32, 64 and
  * 128 square, with 1.25 on the boundary and 1 draining at every size. Anything denser is
  * now refused by the guard below with a StegoCapacityError before selection starts.
- * Production passes GALLERY_CAPACITY_MARGIN = 4. See stego.errors.test.ts.
+ * Production passes GALLERY_EMBED_MARGIN = 16, far above that floor, because what it
+ * buys there is detectability headroom rather than keystream headroom. See
+ * stego.errors.test.ts.
  */
 export async function embedBytesStegoRgba(
   rgba: Uint8Array | Uint8ClampedArray,

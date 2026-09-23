@@ -36,6 +36,10 @@ export const fr: CliCatalog = {
   hintAllowCoverReuse: 'Utilisez --allow-cover-reuse pour passer outre si c’est voulu.',
   helpAllowCoverReuse:
     'Autoriser une photo de couverture à porter un second secret sous le même mot de passe (affaiblit les deux ; voir docs/CLI.md)',
+  errPreserveContainerWrongCommand:
+    "--preserve-container n'a aucun effet sur {command} (seul gallery-save ré-encode les photos de couverture)",
+  helpPreserveContainer:
+    "Conserver chaque photo dans son propre conteneur au lieu de ré-encoder l'ensemble vers un profil unique. Efface le GPS. Conserve une gain map Ultra HDR, et tout le reste de ce que l'appareil a écrit (gallery-save)",
   errExportNumberInvalid:
     '--export-number doit être un entier de 1 à 4294967295 (reçu « {value} »)',
   errExportNumberWrongCommand:
@@ -118,6 +122,13 @@ export const fr: CliCatalog = {
     'Attention : ces photos ne partagent pas un même profil de métadonnées ; elles ' +
     'restent donc distinguables par là. Lancez stegoshard normalize --report sur ' +
     "l'ensemble pour voir ce qui diffère.",
+  warnPreserveContainer:
+    'Attention : --preserve-container a gardé chaque photo dans son propre conteneur ; ' +
+    "cet ensemble n'a donc pas été ré-encodé vers un profil unique. Le GPS a été retiré ; " +
+    "le modèle d'appareil, les horodatages, les makernotes et les tables de quantification " +
+    "propres à l'encodeur de l'appareil ne l'ont pas été. Des photos venues d'appareils " +
+    'différents restent distinguables par là, et une photo faite par cet appareil reste ' +
+    "distinguable d'une photo qui ne l'est pas.",
   labelPassword: 'mot de passe',
   promptPassword: 'Mot de passe : ',
   promptDuressPassword: 'Mot de passe de contrainte : ',

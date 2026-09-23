@@ -17,8 +17,9 @@
 import { describe, expect, it } from 'vitest';
 import jpeg from 'jpeg-js';
 import { decode as decodeCoeff } from './jpeg-coeff';
-import { parseJpegSegments } from './jpeg-segments';
-import { JpegEncodeError, encodeJpegProfile } from './jpeg-encode';
+
+import { JpegEncodeError, encodeJpegProfile, reencodeCover } from './jpeg-encode';
+import { lumaQuantSum, parseJpegSegments } from './jpeg-segments';
 import {
   HUFF_AC_CHROMA_COUNTS,
   HUFF_AC_CHROMA_VALUES,
@@ -208,5 +209,46 @@ describe('the encoder', () => {
     expect(() => encodeJpegProfile({ ...img, width: 20000, height: 20000 })).toThrow(/ceiling/);
     // A buffer shorter than the dimensions claim would otherwise read undefined.
     expect(() => encodeJpegProfile({ ...img, width: 64, height: 64 })).toThrow(/RGBA buffer/);
+  });
+});
+
+describe('the source a re-encode refuses', () => {
+  const pixels = noise(64, 48);
+
+  /** A JPEG quantized at a chosen quality, to stand in for a source file. */
+  const encodedAt = (quality: number): Uint8Array =>
+    new Uint8Array(
+      jpeg.encode(
+        { data: pixels.data as unknown as Uint8Array, width: pixels.width, height: pixels.height },
+        quality,
+      ).data,
+    );
+
+  it('reads how coarsely a file was quantized, or says it cannot', () => {
+    // Our own profile, and a coarser encode of the same pixels.
+    expect(lumaQuantSum(encodeJpegProfile(pixels))).toBe(1109);
+    expect(lumaQuantSum(encodedAt(80))).toBe(1477);
+    // Nothing to read: not a JPEG at all, and a JPEG whose markers do not parse.
+    expect(lumaQuantSum(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBeNull();
+    expect(lumaQuantSum(new Uint8Array([0xff, 0xd8, 0xff]))).toBeNull();
+  });
+
+  /**
+   * The comb: re-quantizing finer than the source empties histogram bins, which
+   * is what a photo already through a messaging app would do here. Refused from
+   * the source alone, before any pixels are touched, and the photo is named.
+   */
+  it('refuses a source quantized more coarsely than the profile', () => {
+    expect(() => reencodeCover(pixels, encodedAt(80), 'IMG_2043.jpg')).toThrow(JpegEncodeError);
+    expect(() => reencodeCover(pixels, encodedAt(80), 'IMG_2043.jpg')).toThrow(
+      /IMG_2043\.jpg: .*1477 against 1109/,
+    );
+  });
+
+  it('accepts a source at the profile’s own coarseness, and one with no table', () => {
+    // Equal, not finer: re-encoding our own output is the idempotent case.
+    expect(reencodeCover(pixels, encodeJpegProfile(pixels)).length).toBeGreaterThan(0);
+    // A PNG cover has no quantization table, so there is no comb to create.
+    expect(reencodeCover(pixels).length).toBeGreaterThan(0);
   });
 });

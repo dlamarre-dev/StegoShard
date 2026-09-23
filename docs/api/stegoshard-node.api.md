@@ -52,7 +52,9 @@ export function extractKeyImage(bytes: Uint8Array, filename: string, password: s
 // Warning: (ae-forgotten-export) The symbol "GalleryCover" needs to be exported by the entry point node.d.ts
 //
 // @public
-export function fileToGalleryCover(bytes: Uint8Array, name: string): GalleryCover;
+export function fileToGalleryCover(bytes: Uint8Array, name: string, opts?: {
+    preserveContainer?: boolean | undefined;
+}): GalleryCover;
 
 // @public
 export function fileToImageData(bytes: Uint8Array, filename: string): ImageDataLike;
@@ -95,6 +97,7 @@ export interface GallerySaveOptions {
     outDir: string;
     // (undocumented)
     password: string;
+    preserveContainer?: boolean | undefined;
     // (undocumented)
     secretFile: string;
     // (undocumented)
@@ -121,6 +124,7 @@ export interface GallerySaveResult {
         covers: number;
         segments: number;
         bytes: number;
+        gpsScrubbed: number;
         uniform: boolean;
     };
     // (undocumented)

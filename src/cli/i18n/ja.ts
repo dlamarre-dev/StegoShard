@@ -39,6 +39,10 @@ export const ja: CliCatalog = {
   hintAllowCoverReuse: '意図的な場合は --allow-cover-reuse を指定すると上書きできます。',
   helpAllowCoverReuse:
     'カバー写真が同じパスワードで二つ目の秘密を運ぶことを許可します（両方が弱くなります。docs/CLI.md を参照）',
+  errPreserveContainerWrongCommand:
+    '--preserve-container は {command} では効果がありません（カバー写真を再エンコードするのは gallery-save だけです）',
+  helpPreserveContainer:
+    '一式を一つのプロファイルに再エンコードせず、各写真をそのままのコンテナで保持します。GPS は消去します。Ultra HDR のゲインマップと、端末が書いたそれ以外のものは残ります（gallery-save）',
   errExportNumberInvalid:
     '--export-number は 1 から 4294967295 までの整数でなければなりません（指定値: 「{value}」）',
   errExportNumberWrongCommand:
@@ -117,6 +121,11 @@ export const ja: CliCatalog = {
   warnCoversNotUniform:
     '警告: これらの写真はメタデータのプロファイルが揃っておらず、そこから見分けられます。' +
     'この一式に stegoshard normalize --report を実行して、どこが違うか確認してください。',
+  warnPreserveContainer:
+    '警告: --preserve-container により各写真はそのままのコンテナで保持され、この一式は' +
+    '一つのプロファイルに再エンコードされていません。GPS は削除しましたが、カメラの機種、' +
+    '日時、メーカーノート、端末エンコーダ固有の量子化テーブルは残っています。別々の端末で' +
+    '撮った写真はそこから見分けられ、その端末で撮った写真とそうでない写真も見分けられます。',
   labelPassword: 'パスワード',
   promptPassword: 'パスワード: ',
   promptDuressPassword: '強要用パスワード: ',

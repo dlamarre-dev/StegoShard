@@ -35,6 +35,10 @@ export const pt: CliCatalog = {
   hintAllowCoverReuse: 'Use --allow-cover-reuse para ignorar isto se for intencional.',
   helpAllowCoverReuse:
     'Permitir que uma foto de capa leve um segundo segredo com a mesma senha (enfraquece ambos; veja docs/CLI.md)',
+  errPreserveContainerWrongCommand:
+    '--preserve-container não tem efeito em {command} (só gallery-save recodifica fotos de capa)',
+  helpPreserveContainer:
+    'Manter cada foto no seu próprio contentor em vez de recodificar o conjunto para um perfil único. Apaga o GPS. Mantém uma gain map Ultra HDR e tudo o resto que o dispositivo escreveu (gallery-save)',
   errExportNumberInvalid:
     '--export-number deve ser um número inteiro de 1 a 4294967295 (recebido «{value}»)',
   errExportNumberWrongCommand:
@@ -113,6 +117,13 @@ export const pt: CliCatalog = {
     'Aviso: estas fotos não partilham um mesmo perfil de metadados, pelo que continuam ' +
     'distinguíveis por aí. Execute stegoshard normalize --report sobre o conjunto para ' +
     'ver o que difere.',
+  warnPreserveContainer:
+    'Aviso: --preserve-container manteve cada foto no seu próprio contentor, por isso ' +
+    'este conjunto não foi recodificado para um perfil único. O GPS foi retirado; o ' +
+    'modelo da câmara, as datas, as maker notes e as tabelas de quantização do próprio ' +
+    'codificador do dispositivo não. Fotos de dispositivos diferentes continuam ' +
+    'distinguíveis por aí, e uma foto feita pelo dispositivo continua distinguível de ' +
+    'uma que não o seja.',
   labelPassword: 'palavra-passe',
   promptPassword: 'Palavra-passe: ',
   promptDuressPassword: 'Palavra-passe de coação: ',

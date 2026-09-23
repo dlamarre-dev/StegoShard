@@ -7,11 +7,19 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { decode as decodePng, encode as encodePng } from 'fast-png';
+import { encode as encodePng } from 'fast-png';
+import { decode as decodeCoeff, hasGps, inspectJpegCover, profileMismatch } from '../../core';
+import { baseJpeg, exifSegmentWithGps, spliceBeforeSos } from '../../core/jpeg-fixtures';
 import { runGalleryRestore, runGallerySave } from './commands';
 
 // Production Argon2 (64 MiB) runs on save and restore; give CI room.
-const SLOW = { timeout: 60_000 };
+//
+// 180s rather than 60s because a gallery save now re-encodes every cover with
+// the repository's own JPEG encoder, which is pure integer JavaScript by design
+// (SPEC §9.8: two engines must not produce two files). Twelve covers at 768
+// square, encoded on the way in and again by the post-save verify, are seconds
+// of real work, and the v8 coverage instrumentation roughly triples it.
+const SLOW = { timeout: 180_000 };
 const PW = 'correct horse battery staple';
 
 function tmp(): string {
@@ -19,9 +27,17 @@ function tmp(): string {
 }
 
 /** A PNG cover with ample RGB LSB capacity for one gallery slot. */
+/**
+ * A cover big enough to clear the capacity margin **after** normalization.
+ *
+ * 256x256 was sized for the old pipeline, where a JPEG cover was carried
+ * verbatim. Every cover is re-encoded into the profile now, which costs
+ * carriers, and the margin is measured against what survives that. 768x768 of
+ * noise yields about 400k carriers where the slot needs 270k.
+ */
 function writePngCover(dir: string, name: string, seed: number): void {
-  const w = 256;
-  const h = 256;
+  const w = 768;
+  const h = 768;
   const data = new Uint8Array(w * h * 4);
   let s = seed >>> 0;
   for (let p = 0; p < w * h; p++) {
@@ -33,6 +49,63 @@ function writePngCover(dir: string, name: string, seed: number): void {
   }
   writeFileSync(join(dir, name), encodePng({ width: w, height: h, data, channels: 4, depth: 8 }));
 }
+
+/**
+ * A JPEG cover as a camera would hand one over: textured enough to clear the
+ * embed margin, and carrying a GPS coordinate.
+ *
+ * 768 square because the margin is measured on what survives a re-encode, and
+ * because this one is *not* re-encoded it has to clear the bar as it stands.
+ */
+function writeJpegCover(dir: string, name: string, seed: number): void {
+  const photo = spliceBeforeSos(baseJpeg(768, 768, 85, seed), exifSegmentWithGps());
+  writeFileSync(join(dir, name), photo);
+}
+
+/**
+ * `--preserve-container`, which is the whole of the opt-in mode: the photo keeps
+ * the container the device wrote, and loses its coordinate.
+ *
+ * Both halves are asserted, because each without the other is a different
+ * feature. Keeping the container without scrubbing would publish where the photo
+ * was taken; scrubbing while re-encoding is just the default path.
+ */
+describe('CLI gallery save with --preserve-container', () => {
+  it('keeps each container, and takes the GPS out of every one', SLOW, async () => {
+    const coverDir = tmp();
+    const COVERS = 12;
+    for (let i = 0; i < COVERS; i++) writeJpegCover(coverDir, `photo-${i}.jpg`, i + 1);
+
+    const secretDir = tmp();
+    const secretPath = join(secretDir, 'note.txt');
+    const secret = Buffer.from('the container is the camera’s own');
+    writeFileSync(secretPath, secret);
+
+    const albumDir = tmp();
+    const save = await runGallerySave({
+      secretFile: secretPath,
+      covers: [coverDir],
+      outDir: albumDir,
+      password: PW,
+      preserveContainer: true,
+    });
+    expect(save.files.length).toBe(COVERS);
+    expect(save.provenance.gpsScrubbed, 'every cover carried a coordinate').toBe(COVERS);
+
+    for (const file of save.files) {
+      const bytes = new Uint8Array(readFileSync(file));
+      // Not the profile: these are the device's own tables, which is the point.
+      expect(profileMismatch(bytes), `${file} should NOT be in the profile`).not.toBeNull();
+      expect(hasGps(bytes), `${file} still has GPS`).toBe(false);
+      // The rest of the EXIF is still there. The flag preserves the container;
+      // the scrub is surgical, not a metadata wipe wearing a different name.
+      expect(inspectJpegCover(bytes).exif?.make).toBe('Google');
+    }
+
+    const res = await runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW });
+    expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+  });
+});
 
 describe('CLI gallery round-trip', () => {
   it('saves a secret across a folder of photos and restores it blindly', SLOW, async () => {
@@ -60,11 +133,17 @@ describe('CLI gallery round-trip', () => {
 
     // Gallery photos must carry no StegoShard branding; the whole point is that
     // they pass as ordinary pictures. Every output keeps its cover's exact
-    // dimensions, so no band was added.
+    // dimensions, so no band was added — and every one is now a JPEG in the one
+    // profile, whatever it arrived as, which is what makes the set one kind of
+    // file instead of several (SPEC §9.7). The PNGs went in, JPEGs come out, and
+    // their names say so.
     for (const file of save.files) {
-      const out = decodePng(new Uint8Array(readFileSync(file)));
-      expect(out.width, `${file} width`).toBe(256);
-      expect(out.height, `${file} height`).toBe(256);
+      expect(file, 'a re-encoded cover is a JPEG').toMatch(/\.jpg$/);
+      const bytes = new Uint8Array(readFileSync(file));
+      expect(profileMismatch(bytes), `${file} profile`).toBeNull();
+      const out = decodeCoeff(bytes);
+      expect(out.width, `${file} width`).toBe(768);
+      expect(out.height, `${file} height`).toBe(768);
     }
 
     const restoreDir = tmp();
@@ -135,9 +214,14 @@ describe('CLI gallery round-trip', () => {
         keyCover: keyCoverPath,
       });
       expect(save.keyMode).toBe('stego');
-      // The produced stego key image keeps the cover's own filename (blends in).
-      const stegoKeyPath = save.files.find((f) => f.endsWith('keycover.png'));
+      // The produced stego key image keeps the cover's own stem, which is what
+      // makes it blend in, and follows the set's format, which is what keeps it
+      // from being the one file in the delivery that does not match. A PNG key
+      // photo among twelve profile JPEGs would be the single most interesting
+      // file in the folder, and it is the one holding the key (SPEC §9.8).
+      const stegoKeyPath = save.files.find((f) => f.endsWith('keycover.jpg'));
       expect(stegoKeyPath).toBeTruthy();
+      expect(profileMismatch(new Uint8Array(readFileSync(stegoKeyPath!)))).toBeNull();
 
       // Without the key cover, restore fails (the factor is not embedded in fragments).
       await expect(
@@ -177,7 +261,9 @@ describe('CLI gallery round-trip', () => {
       (f) => f.endsWith('.txt') && basename(f).startsWith('recovery-'),
     );
     expect(shares.length).toBe(3);
-    const photos = save.files.filter((f) => f.endsWith('.png'));
+    // The covers went in as PNGs and come out as profile JPEGs: one encoder for
+    // the whole set is the point, and the extension follows the file.
+    const photos = save.files.filter((f) => f.endsWith('.jpg'));
 
     // Password + photos alone cannot restore (no threshold material).
     await expect(
@@ -219,7 +305,9 @@ describe('CLI gallery round-trip', () => {
     const shares = save.files.filter(
       (f) => f.endsWith('.txt') && basename(f).startsWith('recovery-'),
     );
-    const photos = save.files.filter((f) => f.endsWith('.png'));
+    // The covers went in as PNGs and come out as profile JPEGs: one encoder for
+    // the whole set is the point, and the extension follows the file.
+    const photos = save.files.filter((f) => f.endsWith('.jpg'));
     expect(keyPath).toBeTruthy();
     expect(shares.length).toBe(3);
 

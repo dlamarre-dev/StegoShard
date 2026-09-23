@@ -363,6 +363,96 @@ export function exifSegment(
   return appSegment(0xe1, concat(bytesOf('Exif\0\0'), tiff));
 }
 
+/**
+ * The GPS rationals this fixture writes: 45° 30′ 15″, degrees over 1.
+ *
+ * Exported so a test can search the produced bytes for them. That is the
+ * assertion that matters about a scrub: not that a reader no longer finds the
+ * block, but that the numbers are not in the file any more.
+ */
+export const GPS_FIXTURE_RATIONALS = [45, 1, 30, 1, 15, 1];
+
+/**
+ * An EXIF APP1 carrying Make, Model and a **GPS IFD** with a real coordinate.
+ *
+ * Shaped the way a phone writes one: IFD0 holds a GPS pointer tag, the GPS IFD
+ * sits elsewhere in the block, its two refs are inlined in their entries (two
+ * ASCII bytes each) and its two coordinates are three RATIONALs apiece, which at
+ * 24 bytes are far too big to inline and therefore live out in the value area.
+ * Both halves matter: the entry, and the out-of-line value it addresses.
+ */
+export function exifSegmentWithGps(
+  littleEndian = false,
+  make = 'Google',
+  model = 'Pixel 10',
+): Uint8Array {
+  const le = littleEndian;
+  const strings = [make, model].map((s) => bytesOf(`${s}\0`));
+  const HEADER = 8;
+  const IFD0_AT = HEADER;
+  const IFD0_LEN = 2 + 3 * 12 + 4; // Make, Model, GPSInfo, then the next-IFD offset
+  const GPS_AT = IFD0_AT + IFD0_LEN;
+  const GPS_LEN = 2 + 4 * 12 + 4; // LatRef, Lat, LonRef, Lon
+  const VALUES_AT = GPS_AT + GPS_LEN;
+  const coord = 3 * 8; // three RATIONALs
+
+  const size = VALUES_AT + strings[0]!.length + strings[1]!.length + 2 * coord;
+  const tiff = new Uint8Array(size);
+  const put16 = (o: number, v: number) => {
+    tiff[o] = le ? v & 0xff : (v >> 8) & 0xff;
+    tiff[o + 1] = le ? (v >> 8) & 0xff : v & 0xff;
+  };
+  const put32 = (o: number, v: number) => {
+    const b = [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+    tiff.set(le ? b.reverse() : b, o);
+  };
+
+  tiff.set(bytesOf(le ? 'II' : 'MM'), 0);
+  put16(2, 42);
+  put32(4, IFD0_AT);
+
+  put16(IFD0_AT, 3);
+  const entry0 = (i: number): number => IFD0_AT + 2 + i * 12;
+  let valueAt = VALUES_AT;
+  [0x010f, 0x0110].forEach((tag, i) => {
+    put16(entry0(i), tag);
+    put16(entry0(i) + 2, 2); // ASCII
+    put32(entry0(i) + 4, strings[i]!.length);
+    put32(entry0(i) + 8, valueAt);
+    tiff.set(strings[i]!, valueAt);
+    valueAt += strings[i]!.length;
+  });
+  put16(entry0(2), 0x8825); // GPSInfo IFD pointer
+  put16(entry0(2) + 2, 4); // LONG
+  put32(entry0(2) + 4, 1);
+  put32(entry0(2) + 8, GPS_AT);
+  put32(IFD0_AT + 2 + 3 * 12, 0); // no IFD1
+
+  put16(GPS_AT, 4);
+  const entryG = (i: number): number => GPS_AT + 2 + i * 12;
+  const ref = (i: number, tag: number, text: string): void => {
+    put16(entryG(i), tag);
+    put16(entryG(i) + 2, 2); // ASCII
+    put32(entryG(i) + 4, 2);
+    tiff.set(bytesOf(`${text}\0`), entryG(i) + 8); // two bytes: inlined
+  };
+  const rationals = (i: number, tag: number): void => {
+    put16(entryG(i), tag);
+    put16(entryG(i) + 2, 5); // RATIONAL
+    put32(entryG(i) + 4, 3);
+    put32(entryG(i) + 8, valueAt);
+    for (let k = 0; k < 6; k++) put32(valueAt + k * 4, GPS_FIXTURE_RATIONALS[k]!);
+    valueAt += coord;
+  };
+  ref(0, 0x0001, 'N');
+  rationals(1, 0x0002);
+  ref(2, 0x0003, 'W');
+  rationals(3, 0x0004);
+  put32(GPS_AT + 2 + 4 * 12, 0); // no IFD after the GPS one
+
+  return appSegment(0xe1, concat(bytesOf('Exif\0\0'), tiff));
+}
+
 /** Append bytes after EOI, as a gain map or a motion-photo video would sit. */
 export function withTrailer(bytes: Uint8Array, trailer: Uint8Array): Uint8Array {
   return concat(bytes, trailer);
