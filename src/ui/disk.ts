@@ -723,6 +723,7 @@ export async function saveGalleryToDisk(
     content,
     thresholdSecret,
     on,
+    options.bundle ?? false,
   );
   if (keyMode === 'stego' && options.stego) {
     const cover = downloads[downloads.length - 1]!;

@@ -645,6 +645,25 @@ describe('gallery non-possession (Mode B, §10.6)', () => {
     const S = await shamirRecover([shares![0]!, shares![2]!]);
     const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST, secret: S });
     expect(dec.decode(out.content)).toBe('gated gallery secret');
+    expect(out.bundled).toBe(false);
+  });
+
+  // Found in review: the plain branch forwarded `bundle` and this one did not,
+  // so a multi-file save restored as one opaque .zip.
+  it('keeps the bundle flag, as the plain branch does', async () => {
+    const secret = enc.encode('a bundle standing in for several files');
+    const { covers } = await coversFor('stegoshard-bundle.zip', secret, (n, s) =>
+      rgbaCover(`${n}.png`, s),
+    );
+    const { images, shares } = await galleryEncode('stegoshard-bundle.zip', secret, 'pw', covers, {
+      params: FAST,
+      mode: 'nonpossession',
+      threshold: { k: 2, n: 3 },
+      bundle: true,
+    });
+    const S = await shamirRecover(shares!);
+    const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST, secret: S });
+    expect(out.bundled).toBe(true);
   });
 });
 

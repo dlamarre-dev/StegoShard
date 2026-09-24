@@ -9,7 +9,7 @@
  * each gets a test that fails if the decision is quietly reversed.
  */
 
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
@@ -178,6 +178,52 @@ describe('path confinement reaches every path argument', () => {
     );
   });
 
+  /**
+   * Found in review: only the argument was checked, and `save` then walked the
+   * directory itself, following a link planted inside it. `junction` is what
+   * Windows allows without elevation; elsewhere the type is ignored.
+   */
+  describe('a symlink nested inside an input directory', () => {
+    it('is refused when it points out of the root', async () => {
+      const root = tmp();
+      const docs = join(root, 'docs');
+      mkdirSync(docs);
+      secretIn(docs, 'a.txt');
+      const elsewhere = tmp();
+      secretIn(elsewhere, 'id_rsa');
+      symlinkSync(elsewhere, join(docs, 'keys'), 'junction');
+      for (const tool of ['stegoshard_save', 'stegoshard_restore']) {
+        await expectPolicy(
+          callTool(envPolicy(root), tool, {
+            inputs: [docs],
+            out_dir: join(root, 'v'),
+            password_source: { env: 'STEGOSHARD_PASSWORD' },
+          }),
+          'PATH_OUTSIDE_ROOT',
+        );
+      }
+    });
+
+    it('is followed when it stays inside the root', SLOW, async () => {
+      const root = tmp();
+      const docs = join(root, 'docs');
+      const shelf = join(root, 'shelf');
+      mkdirSync(docs);
+      mkdirSync(shelf);
+      secretIn(docs, 'a.txt');
+      secretIn(shelf, 'b.txt');
+      symlinkSync(shelf, join(docs, 'shelf'), 'junction');
+      // A cycle back to the top must end rather than recurse.
+      symlinkSync(docs, join(shelf, 'back'), 'junction');
+      const saved = await callTool(envPolicy(root), 'stegoshard_save', {
+        inputs: [docs],
+        out_dir: join(root, 'v'),
+        password_source: { env: 'STEGOSHARD_PASSWORD' },
+      });
+      expect(saved.result.imageCount).toBeGreaterThan(0);
+    });
+  });
+
   it('refuses every call when no root was configured', async () => {
     const root = tmp();
     const input = secretIn(root);
@@ -200,6 +246,31 @@ describe('credential rules', () => {
       }),
       'ENV_NOT_ALLOWED',
     );
+  });
+
+  // `allow_weak_password` was advertised and never read, so no floor applied.
+  describe('the password floor on save', () => {
+    const saveWith = (password: string, extra: Record<string, unknown> = {}) => {
+      const root = tmp();
+      const policy = makePolicy([root], { allowInlinePassword: true, env: {} });
+      return callTool(policy, 'stegoshard_save', {
+        inputs: [secretIn(root)],
+        out_dir: join(root, 'v'),
+        password,
+        ...extra,
+      });
+    };
+
+    it('refuses a password below 12 characters, flag or not', async () => {
+      await expectPolicy(saveWith('abc'), 'PASSWORD_TOO_SHORT');
+      await expectPolicy(saveWith('abc', { allow_weak_password: true }), 'PASSWORD_TOO_SHORT');
+    });
+
+    it('refuses a weak one above the floor unless the call accepts the risk', SLOW, async () => {
+      await expectPolicy(saveWith('aaaaaaaaaaaaa'), 'PASSWORD_WEAK');
+      const saved = await saveWith('aaaaaaaaaaaaa', { allow_weak_password: true });
+      expect(saved.result.imageCount).toBeGreaterThan(0);
+    });
   });
 
   it('refuses an inline password by default', async () => {

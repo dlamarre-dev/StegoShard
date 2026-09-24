@@ -44,10 +44,12 @@ import {
   PolicyError,
   readPassword,
   resolveInRoot,
+  resolveTreeInRoot,
   type PasswordSource,
   type Policy,
 } from './policy';
 import { RPC, RpcError } from './rpc';
+import { MIN_PASSWORD_LENGTH, isStrongNewPassword, meetsPasswordFloor } from '../ui/password';
 
 export interface ToolDefinition {
   name: string;
@@ -302,6 +304,31 @@ function refuseAccessModes(args: Record<string, unknown>): void {
   }
 }
 
+/**
+ * The creation floor, as the command line applies it (`requireStrongOrAcknowledged`).
+ *
+ * `allow_weak_password` was in the schema from the start and never read, so a
+ * three-character password went through here while the CLI refused it. The floor
+ * is checked first and no flag lifts it; above it, a password short of the
+ * advisory tier needs the flag, because there is no one to confirm with.
+ */
+function requireNewPassword(password: string, allowWeak: boolean): void {
+  if (isStrongNewPassword(password)) return;
+  if (!meetsPasswordFloor(password)) {
+    throw new PolicyError(
+      'PASSWORD_TOO_SHORT',
+      `a new vault needs a password of at least ${MIN_PASSWORD_LENGTH} characters, not ${password.length}`,
+      { min: MIN_PASSWORD_LENGTH, length: password.length },
+    );
+  }
+  if (!allowWeak) {
+    throw new PolicyError(
+      'PASSWORD_WEAK',
+      'the password is weak for a new vault; pass allow_weak_password: true to accept that risk',
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -320,6 +347,9 @@ export async function callTool(
 
   const inline = args.password === undefined ? undefined : String(args.password);
   const inRoot = (key: string, value: string) => resolveInRoot(policy, key, value);
+  // `inputs` may name directories, whose contents are checked one by one: see
+  // `resolveTreeInRoot` for the symlink that checking only the argument let through.
+  const inTree = (key: string, value: string) => resolveTreeInRoot(policy, key, value);
 
   switch (name) {
     case 'stegoshard_estimate': {
@@ -333,9 +363,10 @@ export async function callTool(
     }
 
     case 'stegoshard_save': {
-      const inputs = reqStringArray(args, 'inputs', 64).map((p) => inRoot('inputs', p));
+      const inputs = reqStringArray(args, 'inputs', 64).flatMap((p) => inTree('inputs', p));
       const outDir = inRoot('out_dir', reqString(args, 'out_dir'));
       const password = readPassword(policy, passwordSourceOf(args), inline);
+      requireNewPassword(password, optBool(args, 'allow_weak_password'));
       const cover = optString(args, 'cover');
       const binary = optBool(args, 'binary');
       const disguise = optBool(args, 'disguise');
@@ -359,7 +390,7 @@ export async function callTool(
     }
 
     case 'stegoshard_restore': {
-      const inputs = reqStringArray(args, 'inputs', 256).map((p) => inRoot('inputs', p));
+      const inputs = reqStringArray(args, 'inputs', 256).flatMap((p) => inTree('inputs', p));
       const outDir = inRoot('out_dir', reqString(args, 'out_dir'));
       const password = readPassword(policy, passwordSourceOf(args), inline);
       const keyFile = optString(args, 'key_file');

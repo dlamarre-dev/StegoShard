@@ -866,7 +866,7 @@ export function verifyBinaryExport(container: Uint8Array, dek: CryptoKey, filena
 export function verifyDisguisedExport(container: Uint8Array, dek: Uint8Array, regionIndex: number, filename: string, content: Uint8Array, onProgress?: OnProgress): Promise<void>;
 
 // @public
-export function verifyGalleryExport(images: GalleryImage[], password: string, keyBlock: Uint8Array | undefined, filename: string, content: Uint8Array, secret?: Uint8Array | undefined, onProgress?: OnProgress): Promise<void>;
+export function verifyGalleryExport(images: GalleryImage[], password: string, keyBlock: Uint8Array | undefined, filename: string, content: Uint8Array, secret?: Uint8Array | undefined, onProgress?: OnProgress, bundled?: boolean): Promise<void>;
 
 // @public
 export function verifyImageExport(imagePayloads: Uint8Array[], dek: CryptoKey, filename: string, content: Uint8Array): Promise<void>;

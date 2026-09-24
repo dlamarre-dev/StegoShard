@@ -32,6 +32,11 @@ const failFsync: { error: Error | null } = { error: null };
  * the short write is forced here rather than waited for.
  */
 const shortWrite: { limit: number | null } = { limit: null };
+/**
+ * A rename the OS refuses: an antivirus or an indexer holding the target open
+ * on Windows answers `EBUSY` or `EPERM`, and nothing in the process can prevent it.
+ */
+const failRename: { error: Error | null } = { error: null };
 vi.mock('node:fs', async (importOriginal) => {
   const real = await importOriginal<typeof import('node:fs')>();
   return {
@@ -39,6 +44,10 @@ vi.mock('node:fs', async (importOriginal) => {
     fsyncSync: (fd: number) => {
       if (failFsync.error) throw failFsync.error;
       return real.fsyncSync(fd);
+    },
+    renameSync: (from: string, to: string) => {
+      if (failRename.error) throw failRename.error;
+      return real.renameSync(from, to);
     },
     writeSync: (fd: number, data: Uint8Array, offset?: number, length?: number) => {
       const off = offset ?? 0;
@@ -60,11 +69,13 @@ function scratch(): string {
 
 beforeEach(() => {
   failFsync.error = null;
+  failRename.error = null;
   shortWrite.limit = null;
 });
 
 afterEach(() => {
   failFsync.error = null;
+  failRename.error = null;
   shortWrite.limit = null;
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
@@ -127,6 +138,20 @@ describe('a write that fails partway leaves the previous file intact', () => {
       readdirSync(out).filter((f) => f.endsWith('.tmp')),
       'a temporary survived a failed write',
     ).toEqual([]);
+  });
+
+  // Found in review: on Windows the target was deleted before the rename, so a
+  // refused rename under --force lost the old vault and then the new one.
+  it('keeps the old target when the rename itself is refused', async () => {
+    const out = scratch();
+    const target = (await saveInto(out)).files[0]!;
+    const before = readFileSync(target);
+
+    failRename.error = new Error('EBUSY: resource busy or locked, rename');
+    await expect(saveInto(out, true)).rejects.toThrow(/EBUSY/);
+
+    expect(Buffer.compare(Buffer.from(readFileSync(target)), Buffer.from(before))).toBe(0);
+    expect(readdirSync(out).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 
   it('leaves no file at all when the very first write fails', async () => {

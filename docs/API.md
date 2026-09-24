@@ -382,6 +382,11 @@ of the comparison resolve symlinks as far as the filesystem goes and keep the
 remainder verbatim, so `--root /vault/new` means `/vault/new` whether or not it
 has been created, and does not quietly become `/vault`.
 
+A directory named in `inputs` is expanded by the server, not by the command it
+calls, and every file under it goes through the same comparison. A symlink inside
+the root that points out of it is refused with `PATH_OUTSIDE_ROOT`, however deep
+it sits; one that stays inside a root is followed.
+
 **With no `--root`, the server starts and `tools/list` works, but every
 `tools/call` returns `ROOT_NOT_CONFIGURED`.** Forgetting to configure it gets you
 the safe outcome and a message that explains the fix.
@@ -411,6 +416,13 @@ exist and someone chose to reference them.
 
 **Gallery Mode**, in 0.9. It rewrites a folder of real photographs in place and is
 the flow most likely to be driven badly by an agent.
+
+**A way around the password floor.** `stegoshard_save` applies the same rule
+as the command line: below 12 characters is `PASSWORD_TOO_SHORT` whatever the
+request says, and a password above that but short of the advisory tier is
+`PASSWORD_WEAK` unless the call sets `allow_weak_password: true`. There is no
+confirmation prompt to fall back on, so the flag is the acknowledgement. Restore
+takes any password, as everywhere else: an old vault must still open.
 
 **`force`.** A name collision returns `OUTPUT_EXISTS` and the agent picks another
 directory; overwriting is not a call to make on an agent's judgement.
