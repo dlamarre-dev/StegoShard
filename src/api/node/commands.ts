@@ -87,6 +87,7 @@ import {
   type GalleryCover,
   type OnProgress,
   type Stage,
+  planRestore,
   GalleryRestoreError,
   withStegoSeedCache,
   estimateImageCount,
@@ -1024,6 +1025,26 @@ function isBinaryContainerFile(path: string): boolean {
   }
 }
 
+/** A key photo, as opposed to a .key file or a key container. */
+const isImagePath = (p: string): boolean => /\.(png|jpe?g|webp)$/i.test(p);
+
+/**
+ * `resolveKeyBlock`, reported as a stage when it has to derive: extracting a key
+ * from a photo costs one Argon2 run, reading a .key or a container costs none.
+ */
+function resolveKeyStage(
+  keyPath: string,
+  password: string,
+  onProgress: OnProgress | undefined,
+): Promise<Uint8Array | undefined> {
+  // One derivation for both formats a key photo may hold: the stego seed is the same.
+  return isImagePath(keyPath)
+    ? opaqueStage(onProgress, 'derive', () =>
+        withStegoSeedCache(() => resolveKeyBlock(keyPath, password)),
+      )
+    : resolveKeyBlock(keyPath, password);
+}
+
 /** Resolve an external key block from a .key file, a stego image, or a binary
  * key container (branded/disguised). */
 async function resolveKeyBlock(keyPath: string, password: string): Promise<Uint8Array | undefined> {
@@ -1098,6 +1119,38 @@ export function gallerySavePlan(opts: GallerySaveOptions): Stage[] {
   });
 }
 
+/**
+ * The stages `runRestore` (or, with `gallery`, `runGalleryRestore`) will go
+ * through, for a weighted progress display (see `planRestore`). Read from names
+ * and sizes on disk, before the restore starts.
+ */
+export function restorePlan(opts: RestoreOptions, gallery = false): Stage[] {
+  const binary = opts.inputs.find(isBinaryContainerFile);
+  const kind = gallery
+    ? 'gallery'
+    : binary
+      ? /\.db$/i.test(binary)
+        ? 'sqlite'
+        : 'binary'
+      : opts.inputs.some((p) => /\.pdf$/i.test(p))
+        ? 'pdf'
+        : 'images';
+  let imageCount = opts.inputs.length;
+  try {
+    imageCount = gatherImageFiles(opts.inputs).length || imageCount;
+  } catch {
+    // The restore reports an unreadable input itself.
+  }
+  return planRestore({
+    surface: 'cli',
+    kind,
+    inputBytes: bytesOnDisk(opts.inputs),
+    imageCount,
+    keyPhoto: opts.keyPath !== undefined && isImagePath(opts.keyPath),
+    searchesKeyPhoto: binary !== undefined && !opts.keyPath && opts.inputs.length > 1,
+  });
+}
+
 /** Save a vault. See {@link SaveOptions}. */
 export async function runSave(opts: SaveOptions, onProgress?: OnProgress): Promise<SaveResult> {
   return withKeyClaim((hold, landed) => runSaveImpl(opts, onProgress, hold, landed));
@@ -1165,12 +1218,12 @@ export async function runRestore(
     // With no --key, anything else on the command line beside the container can
     // only be its key photo: tried before decrypting, because a .db whose key
     // factor is missing answers "wrong password" (by design), not "missing key".
+    const others = opts.inputs.filter((p) => p !== binaryVaultPath);
     const keyBlock = opts.keyPath
-      ? await resolveKeyBlock(opts.keyPath, opts.password)
-      : await keyFromPhotos(
-          opts.inputs.filter((p) => p !== binaryVaultPath),
-          opts.password,
-        );
+      ? await resolveKeyStage(opts.keyPath, opts.password, onProgress)
+      : others.length > 0
+        ? await opaqueStage(onProgress, 'derive', () => keyFromPhotos(others, opts.password))
+        : undefined;
     // Threshold shares (Mode B) recover the secret that gates the .db slot.
     const secret = await recoverSecret(opts.sharePaths);
     const { filename, content, bundled, identity } = await importVaultBinary(
@@ -1183,9 +1236,12 @@ export async function runRestore(
     return { outPath: written[0]!, files: written, filename, seen: 1, decoded: 1, identity };
   }
 
-  const gathered = await gatherInputs(opts.inputs);
-  let keyBlock = gathered.keyBlock;
-  if (opts.keyPath) keyBlock = await resolveKeyBlock(opts.keyPath, opts.password);
+  // The key first, then the images: the order the progress plan reports them in.
+  const explicitKey = opts.keyPath
+    ? await resolveKeyStage(opts.keyPath, opts.password, onProgress)
+    : undefined;
+  const gathered = await gatherInputs(opts.inputs, onProgress);
+  const keyBlock = explicitKey ?? gathered.keyBlock;
 
   if (gathered.payloads.length === 0) {
     throw new StegoShardApiError('NO_READABLE_IMAGES', 'no readable vault images among the inputs');
@@ -1193,7 +1249,9 @@ export async function runRestore(
 
   let restored: Awaited<ReturnType<typeof importVault>>;
   try {
-    restored = await importVault(gathered.payloads, opts.password, { keyBlock });
+    restored = await opaqueStage(onProgress, 'derive', () =>
+      importVault(gathered.payloads, opts.password, { keyBlock }),
+    );
   } catch (err) {
     // A stego key photo given with the set instead of with --key is one of the
     // images that did not decode as a vault image. Only those are tried: each
@@ -1438,7 +1496,10 @@ export interface GalleryRestoreResult {
   seen: number;
 }
 
-export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
+export async function runGalleryRestore(
+  opts: RestoreOptions,
+  onProgress?: OnProgress,
+): Promise<GalleryRestoreResult> {
   // Photos loose, in folders, or in a .zip (the whole delivery zipped up, key
   // photo and all, is the natural thing to hand over). A .key found among them,
   // loose or zipped, is the key.
@@ -1466,12 +1527,14 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
 
   // A keyfile/stego gallery delivers its key separately: --key (a .key or the key
   // photo), or a .key that came in with the photos.
-  const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : foundKey;
+  const keyBlock = opts.keyPath
+    ? await resolveKeyStage(opts.keyPath, opts.password, onProgress)
+    : foundKey;
   // A non-possession gallery is gated on threshold shares (--share).
   const secret = await recoverSecret(opts.sharePaths);
   let restored: Awaited<ReturnType<typeof galleryDecode>>;
   try {
-    restored = await galleryDecode(covers, opts.password, { keyBlock, secret });
+    restored = await galleryDecode(covers, opts.password, { keyBlock, secret, onProgress });
   } catch (err) {
     // A stego gallery's key photo given among the photos instead of with --key:
     // the missing factor reads as a failed restore, so the photos are searched
@@ -1479,7 +1542,11 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
     if (!(err instanceof GalleryRestoreError) || keyBlock) throw err;
     const found = await keyInPhotos(photos, opts.password);
     if (!found) throw err;
-    restored = await galleryDecode(covers, opts.password, { keyBlock: found, secret });
+    restored = await galleryDecode(covers, opts.password, {
+      keyBlock: found,
+      secret,
+      onProgress,
+    });
   }
   const { filename, content } = restored;
   const outName = basename(filename) || 'restored.bin';

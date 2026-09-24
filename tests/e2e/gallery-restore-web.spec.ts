@@ -85,7 +85,36 @@ test('a gallery restores from one .zip holding its photos and its key photo', as
     buffer: Buffer.from(zip),
   });
   await page.locator('#restore-pw').fill(PW);
+
+  // The restore bar: up at once, and only ever moving forward. A gallery restore
+  // runs two key derivations and reads every photo, and used to show nothing.
+  await page.evaluate(() => {
+    const w = window as unknown as { __rp: { clickAt: number; shownAt: number; values: number[] } };
+    w.__rp = { clickAt: -1, shownAt: -1, values: [] };
+    const bar = document.getElementById('restore-progress')!;
+    document
+      .getElementById('restore-btn')!
+      .addEventListener('click', () => (w.__rp.clickAt = performance.now()), { capture: true });
+    new MutationObserver(() => {
+      if (!bar.hidden && w.__rp.shownAt < 0) w.__rp.shownAt = performance.now();
+      const v = bar.getAttribute('aria-valuenow');
+      if (v !== null) w.__rp.values.push(Number(v));
+    }).observe(bar, { attributes: true, attributeFilter: ['hidden', 'aria-valuenow'] });
+  });
   await page.locator('#restore-btn').click();
   await expect(page.locator('#restore-result')).toBeVisible({ timeout: 300_000 });
   await expect(page.locator('#restore-status')).not.toHaveClass(/error/);
+
+  const rp = await page.evaluate(
+    () =>
+      (window as unknown as { __rp: { clickAt: number; shownAt: number; values: number[] } }).__rp,
+  );
+  expect(rp.shownAt, 'the restore bar never appeared').toBeGreaterThan(0);
+  expect(rp.shownAt - rp.clickAt, 'the restore bar appeared late').toBeLessThan(100);
+  for (let i = 1; i < rp.values.length; i++) {
+    expect(rp.values[i]!, `went back: ${rp.values.join(',')}`).toBeGreaterThanOrEqual(
+      rp.values[i - 1]!,
+    );
+  }
+  expect(Math.max(...rp.values)).toBeGreaterThan(50);
 });

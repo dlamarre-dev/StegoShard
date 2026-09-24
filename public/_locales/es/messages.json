@@ -975,6 +975,10 @@
   "statusDecrypting": {
     "message": "Descifrando…"
   },
+  "statusReading": {
+    "message": "Leyendo las imágenes…",
+    "description": "Progress stage label: reading the photos or images being restored."
+  },
   "statusVerifying": {
     "message": "Verificando…"
   },

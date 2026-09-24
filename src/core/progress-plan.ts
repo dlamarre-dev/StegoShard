@@ -81,7 +81,10 @@ export type StageLabel =
   | 'encrypting'
   | 'rendering'
   | 'verifying'
-  | 'delivering';
+  | 'delivering'
+  | 'unlocking'
+  | 'reading'
+  | 'decrypting';
 
 /** One step of an operation, in the order the code runs it. */
 export interface Stage {
@@ -256,6 +259,64 @@ export function planSave(i: SavePlanInput): Stage[] {
       return out;
     }
   }
+}
+
+/** Everything a plan needs to know about a restore, read before it starts. */
+export interface RestorePlanInput {
+  surface: 'extension' | 'web' | 'cli';
+  /**
+   * What is being restored: a gallery's photos, an image set (loose or zipped
+   * images), a printed PDF, a branded `.ssbn` or a disguised `.db`.
+   */
+  kind: 'gallery' | 'images' | 'pdf' | 'binary' | 'sqlite';
+  /** Total size of the inputs, in bytes. */
+  inputBytes: number;
+  /** How many photos or images, when known (loose files; a zip counts as one). */
+  imageCount?: number | undefined;
+  /** A key photo is given explicitly: extracting it is one derivation. */
+  keyPhoto?: boolean | undefined;
+  /** Files beside a container, with no key given, are searched for its key photo. */
+  searchesKeyPhoto?: boolean | undefined;
+  argon2?: Argon2Params | undefined;
+}
+
+/**
+ * The stages of one restore, in the order the code runs them. Same contract as
+ * `planSave`: every entry has to match what the restore really emits.
+ *
+ * A key that turns out to be missing sends a gallery or an image set back
+ * through a search and a second decode. That path is not in the plan; on it
+ * the bar holds near its last stage until the restore completes.
+ */
+export function planRestore(i: RestorePlanInput): Stage[] {
+  const kdf = i.argon2 ?? DEFAULT_KDF;
+  const kdfUnits = (kdf.memoryKiB / 1024) * kdf.iterations;
+  const argon = (phase: Progress['phase'] = 'derive'): Stage =>
+    stage(phase, 'unlocking', 'argon2', kdfUnits);
+  const mb = i.inputBytes / MB;
+  const count = Math.max(1, i.imageCount ?? 1);
+  const out: Stage[] = [];
+
+  if (i.keyPhoto || i.searchesKeyPhoto) out.push(argon());
+  switch (i.kind) {
+    case 'gallery':
+      out.push(argon()); // the winnowing key
+      out.push(stage('extract', 'reading', 'extractPerMB', mb, 5 * count));
+      out.push(argon()); // the vault's slot key
+      break;
+    case 'images':
+    case 'pdf':
+      out.push(stage('extract', 'reading', 'extractPerMB', mb, 40 * count));
+      out.push(argon()); // the key block
+      break;
+    case 'binary':
+    case 'sqlite':
+      out.push(argon('unlock'));
+      out.push(stage('decrypt', 'decrypting', 'cryptoPerMB', mb, 20));
+      break;
+  }
+  if (i.surface !== 'cli') out.push(stage('deliver', 'delivering', 'deliverPerFile', 1));
+  return out;
 }
 
 /** Estimated duration of one stage on a device, in milliseconds. */

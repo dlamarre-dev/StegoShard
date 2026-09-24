@@ -143,6 +143,7 @@ export const ja: CliCatalog = {
   phasePrepare: '写真を準備中',
   phaseEmbed: '写真に隠しています',
   phaseDeliver: 'ファイルを書き込み中',
+  phaseRead: '画像を読み取り中',
 
   purposeVault: '保管庫: ファイル本体が入っています',
   purposeArchive: 'すべての画像を 1 つの .zip にまとめたもの',

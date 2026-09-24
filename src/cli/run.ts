@@ -26,6 +26,7 @@ import {
   runRestore,
   runSave,
   savePlan,
+  restorePlan,
   type CodecChoice,
   type SaveOptions,
 } from '../api/node/commands';
@@ -523,21 +524,19 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
   if (command === 'restore') {
     if (positionals.length === 0) fail(t('errRestoreMissing'));
     const password = await resolvePassword(io, present, values);
-    const progress = present.progress(Boolean(values.quiet));
+    const restoreOpts = {
+      inputs: positionals,
+      outDir,
+      password,
+      keyPath: values.key as string | undefined,
+      sharePaths: values.share as string[] | undefined,
+      force,
+      maxBytes: MAX_FILE_BYTES_BINARY_CLI, // see the save path above
+    };
+    const progress = present.progress(Boolean(values.quiet), restorePlan(restoreOpts));
     let res: Awaited<ReturnType<typeof runRestore>>;
     try {
-      res = await runRestore(
-        {
-          inputs: positionals,
-          outDir,
-          password,
-          keyPath: values.key as string | undefined,
-          sharePaths: values.share as string[] | undefined,
-          force,
-          maxBytes: MAX_FILE_BYTES_BINARY_CLI, // see the save path above
-        },
-        progress.onProgress,
-      );
+      res = await runRestore(restoreOpts, progress.onProgress);
     } finally {
       progress.done();
     }
@@ -635,14 +634,21 @@ async function runCommand(argv: string[], io: CliIo, present: Presenter): Promis
   if (command === 'gallery-restore') {
     if (positionals.length === 0) fail(t('errGalleryRestoreMissing'));
     const password = await resolvePassword(io, present, values);
-    const res = await runGalleryRestore({
+    const galleryRestoreOpts = {
       inputs: positionals,
       outDir,
       password,
       keyPath: values.key as string | undefined,
       sharePaths: values.share as string[] | undefined,
       force,
-    });
+    };
+    const progress = present.progress(Boolean(values.quiet), restorePlan(galleryRestoreOpts, true));
+    let res: Awaited<ReturnType<typeof runGalleryRestore>>;
+    try {
+      res = await runGalleryRestore(galleryRestoreOpts, progress.onProgress);
+    } finally {
+      progress.done();
+    }
     present.galleryRestore(res);
     return 0;
   }

@@ -127,6 +127,7 @@ export const zhTW: CliCatalog = {
   phasePrepare: '準備相片中',
   phaseEmbed: '藏入相片中',
   phaseDeliver: '寫入檔案中',
+  phaseRead: '讀取圖像中',
 
   purposeVault: '保險庫：存放您的檔案',
   purposeArchive: '所有圖片打包成一個 .zip',

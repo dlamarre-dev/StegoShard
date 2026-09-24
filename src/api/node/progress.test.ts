@@ -23,10 +23,14 @@ import {
 } from '../../core';
 import {
   gallerySavePlan,
+  restorePlan,
+  runGalleryRestore,
   runGallerySave,
+  runRestore,
   runSave,
   savePlan,
   type GallerySaveOptions,
+  type RestoreOptions,
   type SaveOptions,
 } from './commands';
 
@@ -118,6 +122,81 @@ describe('CLI save paths match their progress plans', () => {
       events.push(p);
     });
     const { skipped, finished } = replay(gallerySavePlan(opts), events);
+    expect(finished).toBe(true);
+    expect(skipped).toBe(0);
+  });
+});
+
+/** The stego key photo a save wrote, found by purpose. */
+const keyPhotoOf = (manifest: readonly { name: string; purpose: string }[]): string =>
+  manifest.find((m) => m.purpose === 'stegoCover')!.name;
+
+describe('CLI restore paths match their progress plans', () => {
+  const cases: [string, Partial<SaveOptions>, 'explicit' | 'among' | 'none'][] = [
+    ['image set', {}, 'none'],
+    ['image set, key photo given with --key', { keyMode: 'stego' }, 'explicit'],
+    ['paper', { paper: true }, 'none'],
+    ['branded .ssbn', { binary: 'branded' }, 'none'],
+    ['branded .ssbn, key photo among the inputs', { binary: 'branded', keyMode: 'stego' }, 'among'],
+    ['disguised .db', { binary: 'disguised' }, 'none'],
+  ];
+  it.each(cases)('%s', SLOW, async (_name, extra, key) => {
+    const dir = tmp();
+    const cover = join(dir, 'cover.png');
+    noisyPng(cover, 256, 5);
+    const save = await runSave({
+      inputs: [secretIn(dir)],
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      keyMode: 'embedded',
+      ...(extra.keyMode === 'stego' ? { cover } : {}),
+      ...extra,
+    });
+    const keyPhoto = key === 'none' ? undefined : keyPhotoOf(save.manifest);
+    const opts: RestoreOptions = {
+      inputs: key === 'explicit' ? save.files.filter((f) => f !== keyPhoto) : save.files,
+      outDir: join(dir, 'restored'),
+      password: PW,
+      ...(key === 'explicit' ? { keyPath: keyPhoto } : {}),
+    };
+    const events: Progress[] = [];
+    await runRestore(opts, (p) => {
+      events.push(p);
+    });
+    const { skipped, finished } = replay(restorePlan(opts), events);
+    expect(finished).toBe(true);
+    expect(skipped).toBe(0);
+  });
+
+  it.each([false, true])('gallery (key photo given with --key: %s)', SLOW, async (stego) => {
+    const dir = tmp();
+    const covers = join(dir, 'covers');
+    mkdirSync(covers);
+    for (let i = 0; i < 12; i++) noisyPng(join(covers, `c${i}.png`), 768, i + 21);
+    const keyCover = join(dir, 'key.png');
+    noisyPng(keyCover, 768, 77);
+    const save = await runGallerySave({
+      secretFile: secretIn(dir),
+      covers: [covers],
+      outDir: join(dir, 'album'),
+      password: PW,
+      keyMode: stego ? 'stego' : 'embedded',
+      ...(stego ? { keyCover } : {}),
+    });
+    const keyPhoto = stego ? keyPhotoOf(save.manifest) : undefined;
+    const opts: RestoreOptions = {
+      inputs: save.files.filter((f) => f !== keyPhoto),
+      outDir: join(dir, 'restored'),
+      password: PW,
+      ...(keyPhoto ? { keyPath: keyPhoto } : {}),
+    };
+    const events: Progress[] = [];
+    await runGalleryRestore(opts, (p) => {
+      events.push(p);
+    });
+    const { skipped, finished } = replay(restorePlan(opts, true), events);
     expect(finished).toBe(true);
     expect(skipped).toBe(0);
   });

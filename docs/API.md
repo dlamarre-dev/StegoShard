@@ -58,7 +58,7 @@ await restore({ inputs: ['./vault'], outDir: './restored', password: … });
 ### What is in it, and what is not
 
 The published surface is **curated**, not the internal barrel. `src/core/index.ts`
-re-exports 326 runtime values; the library exports 127 across both entries. What a
+re-exports 327 runtime values; the library exports 127 across both entries. What a
 consumer needs to save and restore a vault is there. What is deliberately not:
 
 - the Galois field and the erasure coding (`gfMul`, `rsEncode`, `buildCauchyMatrix`,
@@ -247,11 +247,13 @@ Events are throttled to at most one per 100 ms within a phase, and every phase
 change is reported, so a 1 GiB save does not emit tens of thousands of lines.
 `--quiet` suppresses progress but not warnings or errors.
 
-On `save` and `gallery-save`, every event also carries `fraction` and `stage`.
+On `save`, `gallery-save`, `restore` and `gallery-restore`, every event also carries
+`fraction` and `stage`.
 `fraction` is how far through the **whole** save it is, from 0 to 1, weighted by
 how long each stage takes and never decreasing; `stage` names the step
 (`deriving`, `compressing`, `preparingPhotos`, `hiding`, `hidingKey`,
-`encrypting`, `rendering`, `verifying`, `delivering`). Both were added without a
+`encrypting`, `rendering`, `verifying`, `delivering`, and on a restore
+`unlocking`, `reading`, `decrypting`). Both were added without a
 schema change: the fields `stegoshard.cli/1` always had mean what they meant.
 
 Every save path reports progress: the image, paper and gallery paths used to be

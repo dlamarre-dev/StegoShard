@@ -208,6 +208,9 @@ const STAGE_KEYS = {
   rendering: 'phaseRender',
   verifying: 'phaseVerify',
   delivering: 'phaseDeliver',
+  unlocking: 'phaseUnlock',
+  reading: 'phaseRead',
+  decrypting: 'phaseDecrypt',
 } as const satisfies Record<StageLabel, CliKey>;
 
 /**

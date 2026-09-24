@@ -57,6 +57,9 @@ const STAGE_KEY: Record<StageLabel, string> = {
   rendering: 'statusRendering',
   verifying: 'statusVerifying',
   delivering: 'statusDelivering',
+  unlocking: 'statusUnlocking',
+  reading: 'statusReading',
+  decrypting: 'statusDecrypting',
 };
 
 export interface ProgressUI {

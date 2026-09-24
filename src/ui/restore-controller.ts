@@ -5,7 +5,7 @@
  * lives in one place. Returns a localized result note via the caller's `msg`.
  */
 
-import { type OnProgress, decodeShareText, shamirRecover } from '@core';
+import { type OnProgress, type Stage, decodeShareText, planRestore, shamirRecover } from '@core';
 import { restoreFileFromDisk, restoreGalleryFromDisk } from './disk';
 import type { Msg } from './save-controller';
 
@@ -24,8 +24,40 @@ export interface RestoreRequest {
   shareFiles?: File[] | undefined;
   /** Standard mode only: already-decoded payloads (e.g. live camera captures). */
   extraPayloads?: Uint8Array[];
-  /** Progress callback for the binary path (the slow, large-file container). */
+  /**
+   * Progress, for every kind of restore. Pair it with `planForRestore` and
+   * `ProgressUI.begin` for one bar weighted across the whole restore.
+   */
   onProgress?: OnProgress;
+}
+
+/**
+ * The stages a restore will go through, for `ProgressUI.begin` (see
+ * `planRestore`). Worked out from the names and sizes of the picked files alone,
+ * so the bar can appear the instant the user clicks, before anything is read.
+ */
+export function planForRestore(req: RestoreRequest, surface: 'extension' | 'web'): Stage[] {
+  const names = req.files.map((f) => f.name);
+  const kind =
+    req.mode === 'gallery'
+      ? 'gallery'
+      : names.some((n) => /\.ssbn$/i.test(n))
+        ? 'binary'
+        : names.some((n) => /\.db$/i.test(n))
+          ? 'sqlite'
+          : names.some((n) => /\.pdf$/i.test(n))
+            ? 'pdf'
+            : 'images';
+  const container = kind === 'binary' || kind === 'sqlite';
+  return planRestore({
+    surface,
+    kind,
+    inputBytes: req.files.reduce((n, f) => n + f.size, 0),
+    imageCount: req.files.length + (req.extraPayloads?.length ?? 0),
+    // A key given as a photo is one derivation; a .key or a key container is none.
+    keyPhoto: req.keyFile !== undefined && /\.(png|jpe?g|webp)$/i.test(req.keyFile.name),
+    searchesKeyPhoto: container && !req.keyFile && req.files.length > 1,
+  });
 }
 
 // A dash-grouped Crockford-base32 token, so instruction prose in the share file
@@ -53,7 +85,7 @@ export async function runRestore(
   const secret = await recoverSecretFromShares(req.shareFiles);
   const { filename } =
     req.mode === 'gallery'
-      ? await restoreGalleryFromDisk(req.files, req.password, req.keyFile, secret)
+      ? await restoreGalleryFromDisk(req.files, req.password, req.keyFile, secret, req.onProgress)
       : await restoreFileFromDisk(
           req.files,
           req.password,

@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { unzipSync } from 'fflate';
-import { MAX_IMAGES } from '../../core';
+import { MAX_IMAGES, type OnProgress, report } from '../../core';
 import { extractPdfImages } from '../../ui/pdf-restore';
 import { decodeImageToPayload, decodePixelsToPayload } from './image-io';
 
@@ -24,6 +24,7 @@ const MAX_ZIP_ENTRIES = MAX_IMAGES + 4;
 const MAX_ENTRY_BYTES = 25 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 300 * 1024 * 1024;
 
+/** What `gatherInputs` found: decoded payloads, a key block if one came with them, and counts. */
 export interface GatheredInputs {
   payloads: Uint8Array[];
   keyBlock?: Uint8Array;
@@ -110,8 +111,14 @@ export function gatherImageFiles(paths: string[]): string[] {
   return files.filter((p) => IMAGE_RE.test(basename(p)));
 }
 
-/** Expand input paths into decoded payloads plus an optional key block. */
-export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
+/**
+ * Expand input paths into decoded payloads plus an optional key block.
+ * `onProgress` gets one `extract` step per input file read.
+ */
+export async function gatherInputs(
+  paths: string[],
+  onProgress?: OnProgress,
+): Promise<GatheredInputs> {
   const files: string[] = [];
   for (const path of paths) {
     if (statSync(path).isDirectory()) files.push(...walk(path));
@@ -123,7 +130,8 @@ export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
   let seen = 0;
   let decoded = 0;
 
-  for (const path of files) {
+  for (const [i, path] of files.entries()) {
+    await report(onProgress, { phase: 'extract', done: i, total: files.length });
     const name = basename(path);
     if (isKey(name)) {
       keyBlock = read(path);
@@ -152,6 +160,9 @@ export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
       }
     }
     // silently ignore anything else (a stray README, the input file itself)
+  }
+  if (files.length > 0) {
+    await report(onProgress, { phase: 'extract', done: files.length, total: files.length });
   }
 
   return keyBlock ? { payloads, keyBlock, seen, decoded } : { payloads, seen, decoded };

@@ -150,9 +150,12 @@ async function deliverRestored(
   filename: string,
   content: Uint8Array,
   bundled: boolean,
+  onProgress?: OnProgress,
 ): Promise<void> {
   if (!bundled) {
+    await report(onProgress, { phase: 'deliver', done: 0, total: 1 });
     downloadBlob(new Blob([content as BufferSource]), filename);
+    await report(onProgress, { phase: 'deliver', done: 1, total: 1 });
     return;
   }
   // No containing folder: a single-file restore drops straight into Downloads,
@@ -162,6 +165,7 @@ async function deliverRestored(
       name: f.name,
       blob: new Blob([f.bytes as BufferSource]),
     })),
+    onProgress,
   );
 }
 
@@ -759,6 +763,7 @@ export async function restoreGalleryFromDisk(
   password: string,
   keyFile?: File,
   secret?: Uint8Array | undefined,
+  onProgress?: OnProgress,
 ): Promise<{ filename: string }> {
   // A .zip of a whole set is a container, not a photo: it gets the container
   // ceiling, and only loose files are held to the per-photo one. The same split
@@ -814,12 +819,14 @@ export async function restoreGalleryFromDisk(
       ? unwrapped.payload
       : isKey(keyFile.name)
         ? bytes
-        : ((await extractKeyFactorImage(keyFile, password)) ?? undefined);
+        : ((await opaqueStage(onProgress, 'derive', () =>
+            extractKeyFactorImage(keyFile, password),
+          )) ?? undefined);
   }
   // Mode B (non-possession): `secret` is recovered from a threshold share quorum.
   let restored: Awaited<ReturnType<typeof galleryDecode>>;
   try {
-    restored = await galleryDecode(covers, password, { keyBlock, secret });
+    restored = await galleryDecode(covers, password, { keyBlock, secret, onProgress });
   } catch (err) {
     // A stego gallery whose key photo was put in with the other photos (loose or
     // zipped) rather than in the key field: its missing key factor reads as a
@@ -835,10 +842,10 @@ export async function restoreGalleryFromDisk(
       return undefined;
     });
     if (!found) throw err;
-    restored = await galleryDecode(covers, password, { keyBlock: found, secret });
+    restored = await galleryDecode(covers, password, { keyBlock: found, secret, onProgress });
   }
   const { filename, content, bundled } = restored;
-  await deliverRestored(filename, content, bundled);
+  await deliverRestored(filename, content, bundled, onProgress);
   return { filename };
 }
 
@@ -994,9 +1001,15 @@ export async function restoreFileFromDisk(
           // paper / branded .ssbn) or the 32-byte key factor (multi-region .db).
           // The two envelopes self-distinguish by magic, so try block then factor;
           // only the one actually embedded returns non-null.
-          ((await extractKeyImage(keyFile, password)) ??
-          (await extractKeyFactorImage(keyFile, password)) ??
-          undefined);
+          // One derivation for both attempts: the stego seed is the same.
+          await opaqueStage(onProgress, 'derive', () =>
+            withStegoSeedCache(
+              async () =>
+                (await extractKeyImage(keyFile, password)) ??
+                (await extractKeyFactorImage(keyFile, password)) ??
+                undefined,
+            ),
+          );
   }
 
   // A single binary vault container short-circuits the image pipeline. (Camera
@@ -1009,11 +1022,10 @@ export async function restoreFileFromDisk(
         // field, can only be its key photo: tried before decrypting, because a
         // .db whose key factor is missing answers "wrong password" (it cannot
         // tell the two apart, by design), not "missing key".
-        if (!keyBlock)
-          keyBlock = await keyFromPhotos(
-            files.filter((f) => f !== file),
-            password,
-          );
+        const others = files.filter((f) => f !== file);
+        if (!keyBlock && others.length > 0) {
+          keyBlock = await opaqueStage(onProgress, 'derive', () => keyFromPhotos(others, password));
+        }
         const { filename, content, bundled } = await decryptBinaryInWorker(
           bytes,
           password,
@@ -1021,7 +1033,7 @@ export async function restoreFileFromDisk(
           secret,
           onProgress,
         );
-        await deliverRestored(filename, content, bundled);
+        await deliverRestored(filename, content, bundled, onProgress);
         return { filename };
       }
     }
@@ -1037,26 +1049,31 @@ export async function restoreFileFromDisk(
     } else if (isPdf(file.name)) {
       // Lazy: keeps pdf-lib out of the initial bundle (only paper users pay).
       const { extractPdfPayloads } = await import('./pdf-restore');
-      payloads.push(
-        ...(await extractPdfPayloads(await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES))),
-      );
+      const pdf = await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES);
+      payloads.push(...(await opaqueStage(onProgress, 'extract', () => extractPdfPayloads(pdf))));
     } else {
       images.push(await boundedBlobBytes(file, MAX_BROWSER_MEDIA_BYTES));
     }
   }
 
   const unreadable: Uint8Array[] = [];
-  for (const bytes of images) {
+  for (const [i, bytes] of images.entries()) {
+    await report(onProgress, { phase: 'extract', done: i, total: images.length });
     const payload = await decodeImageBytes(bytes);
     // A single unreadable image is fine; erasure coding tolerates losses.
     if (payload) payloads.push(payload);
     else unreadable.push(bytes);
   }
+  if (images.length > 0) {
+    await report(onProgress, { phase: 'extract', done: images.length, total: images.length });
+  }
   if (payloads.length === 0) throw new Error('restore: no readable images found');
 
   let restored: Awaited<ReturnType<typeof importVault>>;
   try {
-    restored = await importVault(payloads, password, { keyBlock });
+    restored = await opaqueStage(onProgress, 'derive', () =>
+      importVault(payloads, password, { keyBlock }),
+    );
   } catch (err) {
     // A stego key photo picked with the set rather than in the key field is one
     // of the images that did not decode as a vault image. Only those are tried:
@@ -1070,6 +1087,6 @@ export async function restoreFileFromDisk(
     restored = await importVault(payloads, password, { keyBlock: found });
   }
   const { filename, content, bundled } = restored;
-  await deliverRestored(filename, content, bundled);
+  await deliverRestored(filename, content, bundled, onProgress);
   return { filename };
 }
