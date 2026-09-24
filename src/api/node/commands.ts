@@ -1448,9 +1448,21 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
   }
   // `preserveContainer` on the way *in*: these photos carry a payload in their
   // coefficients, and re-encoding one would destroy what restore is here to read.
-  const covers = photos.map((p) =>
-    fileToGalleryCover(p.bytes, p.name, { preserveContainer: true }),
-  );
+  //
+  // A file that does not decode is left out rather than failing the restore, the
+  // way a vault restore passes over an unreadable image: winnowing needs only the
+  // carriers, and a zip can carry things that merely look like photos. If nothing
+  // decodes, the first reason is the one reported (a HEIC, say).
+  const covers: GalleryCover[] = [];
+  let firstFailure: unknown;
+  for (const p of photos) {
+    try {
+      covers.push(fileToGalleryCover(p.bytes, p.name, { preserveContainer: true }));
+    } catch (err) {
+      firstFailure ??= err;
+    }
+  }
+  if (covers.length === 0 && firstFailure !== undefined) throw firstFailure;
 
   // A keyfile/stego gallery delivers its key separately: --key (a .key or the key
   // photo), or a .key that came in with the photos.

@@ -38,6 +38,15 @@ export interface PhotoInput {
   bytes: Uint8Array;
 }
 
+/**
+ * An entry macOS adds when it zips a folder: `__MACOSX/…` and `._name` files
+ * hold Finder metadata, not the file they are named after. `._IMG_0001.jpg`
+ * matches the photo pattern and is a few hundred bytes of something else.
+ */
+function isArchiveMetadata(path: string): boolean {
+  return /(^|\/)__MACOSX\//.test(path) || /(^|\/)\._[^/]*$/.test(path);
+}
+
 /** Extract image/.key entries from a zip within the size/count budgets. */
 function extractZip(zipBytes: Uint8Array): { images: PhotoInput[]; keyBlock?: Uint8Array } {
   let count = 0;
@@ -45,6 +54,7 @@ function extractZip(zipBytes: Uint8Array): { images: PhotoInput[]; keyBlock?: Ui
   const entries = unzipSync(zipBytes, {
     filter: (f) => {
       if (!(IMAGE_RE.test(f.name) || isKey(f.name))) return false;
+      if (isArchiveMetadata(f.name)) return false; // macOS resource forks, named like photos
       if (f.originalSize > MAX_ENTRY_BYTES) throw new Error('restore: a .zip entry is too large');
       count += 1;
       total += f.originalSize;

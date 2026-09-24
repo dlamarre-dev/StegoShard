@@ -760,7 +760,15 @@ export async function restoreGalleryFromDisk(
   keyFile?: File,
   secret?: Uint8Array | undefined,
 ): Promise<{ filename: string }> {
-  assertBrowserInputs([...files, ...(keyFile ? [keyFile] : [])]);
+  // A .zip of a whole set is a container, not a photo: it gets the container
+  // ceiling, and only loose files are held to the per-photo one. The same split
+  // `restoreFileFromDisk` makes; a dozen phone photos zip to well over 25 MiB.
+  assertBrowserInputs([...files, ...(keyFile ? [keyFile] : [])], {
+    perFile: MAX_BROWSER_CONTAINER_BYTES,
+    total: MAX_BROWSER_TOTAL_INPUT_BYTES,
+  });
+  for (const file of files) if (!isZip(file.name)) assertBlobSize(file, MAX_BROWSER_MEDIA_BYTES);
+  if (keyFile) assertBlobSize(keyFile, MAX_BROWSER_MEDIA_BYTES);
   // The photos may come loose, in a .zip, or both; a .key may ride in the zip or
   // among the loose files. Everything that is not a key is treated as a photo.
   const photos: File[] = [];
@@ -782,9 +790,21 @@ export async function restoreGalleryFromDisk(
   // coefficients, and re-encoding one would destroy exactly what restore is here
   // to read. The flag means the same thing it means on the save path — hand me
   // the file as it is — and this is the path where it is not optional.
+  //
+  // A file that does not decode is left out rather than failing the restore, the
+  // way a vault restore passes over an unreadable image: winnowing needs only
+  // the carriers, and a zip can carry things that merely look like photos. If
+  // nothing decodes, the first reason is the one reported (a HEIC, say).
   const covers: GalleryCover[] = [];
-  for (const file of photos)
-    covers.push(await fileToGalleryCover(file, { preserveContainer: true }));
+  let firstFailure: unknown;
+  for (const file of photos) {
+    try {
+      covers.push(await fileToGalleryCover(file, { preserveContainer: true }));
+    } catch (err) {
+      firstFailure ??= err;
+    }
+  }
+  if (covers.length === 0 && firstFailure !== undefined) throw firstFailure;
   // Optional external key (keyfile/stego galleries): a .key, a binary key
   // container, or a stego cover de-embedded with the restore password.
   if (keyFile) {
@@ -844,6 +864,15 @@ const MAX_TOTAL_BYTES = MAX_BROWSER_TOTAL_INPUT_BYTES;
  * unbounded. Runs synchronously: fflate's `Unzip` + `UnzipInflate` deliver all
  * data during the single `push` below.
  */
+/**
+ * An entry macOS adds when it zips a folder: `__MACOSX/…` and `._name` files
+ * hold Finder metadata, not the file they are named after. `._IMG_0001.jpg`
+ * matches the photo pattern and is a few hundred bytes of something else.
+ */
+function isArchiveMetadata(path: string): boolean {
+  return /(^|\/)__MACOSX\//.test(path) || /(^|\/)\._[^/]*$/.test(path);
+}
+
 export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
   const images: Uint8Array[] = [];
   let keyBlock: Uint8Array | undefined;
@@ -855,6 +884,7 @@ export function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlo
   unzip.onfile = (file) => {
     const name = file.name;
     if (!(IMAGE_RE.test(name) || isKey(name))) return; // never decompressed
+    if (isArchiveMetadata(name)) return; // macOS resource forks: named like photos, are not
     count += 1;
     if (count > MAX_ZIP_ENTRIES) throw new Error('restore: too many entries in the .zip');
 

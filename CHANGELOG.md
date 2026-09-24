@@ -422,7 +422,10 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   (`withStegoSeedCache`, which zeroes it when the search ends). The key-field hint, which
   spoke only of a `.key` file, now matches what restore actually does in both modes.
   `stegoshard gallery-restore` takes a `.zip` too, and finds the key inside it the same
-  way; `stegoshard restore` now also looks for a key photo inside a `.zip`.
+  way; `stegoshard restore` now also looks for a key photo inside a `.zip`. A zipped set
+  is held to the container ceiling rather than the 25 MiB per-photo one, which a dozen
+  phone photos exceed; the `__MACOSX/._name` entries macOS adds when it zips a folder are
+  skipped; and a file that does not decode is left out rather than failing the restore.
 
 - **A key photo picked together with its vault was never read as a key.** Restoring a
   `.ssbn` saved with a stego key photo, with the vault and the photo picked in the same

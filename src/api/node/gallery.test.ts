@@ -176,12 +176,17 @@ describe('CLI gallery key photo under --preserve-container', () => {
  * a keyfile one.
  */
 describe('CLI gallery restore from a .zip', () => {
+  // Zipped the way macOS Finder does it: every file gets a `__MACOSX/._name`
+  // sibling of Finder metadata, named like a photo and not one.
   const zipAll = (files: string[]): string => {
     const zipPath = join(tmp(), 'album.zip');
-    writeFileSync(
-      zipPath,
-      zipSync(Object.fromEntries(files.map((f) => [basename(f), readFileSync(f)]))),
-    );
+    const junk = new Uint8Array([0, 5, 22, 7, 0, 2, 0, 0, 77, 97, 99]);
+    const entries: Record<string, Uint8Array> = {};
+    for (const f of files) {
+      entries[`album/${basename(f)}`] = new Uint8Array(readFileSync(f));
+      entries[`__MACOSX/album/._${basename(f)}`] = junk;
+    }
+    writeFileSync(zipPath, zipSync(entries));
     return zipPath;
   };
 
@@ -208,8 +213,11 @@ describe('CLI gallery restore from a .zip', () => {
         keyMode,
         keyCover,
       });
+      // Plus a loose file named like a photo that is not one: left out, not fatal.
+      const broken = join(tmp(), 'IMG_9999.jpg');
+      writeFileSync(broken, Buffer.from('not a photo at all'));
       const res = await runGalleryRestore({
-        inputs: [zipAll(save.files)],
+        inputs: [zipAll(save.files), broken],
         outDir: tmp(),
         password: PW,
       });
