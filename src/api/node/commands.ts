@@ -109,7 +109,7 @@ import {
   galleryImageToFile,
   imageDataToPng,
 } from './image-io';
-import { gatherImageFiles, gatherInputs, walk } from './inputs';
+import { type PhotoInput, gatherImageFiles, gatherInputs, gatherPhotos, walk } from './inputs';
 import { BUNDLE_NAME, packBundle, unpackBundle } from '../../ui/bundle';
 import { StegoShardApiError } from '../errors';
 import { createVaultKey } from '../keys';
@@ -1123,23 +1123,31 @@ async function keyFromPhotos(
   paths: readonly string[],
   password: string,
 ): Promise<Uint8Array | undefined> {
-  return withStegoSeedCache(() => firstKeyIn(paths, password));
+  const photos: PhotoInput[] = [];
+  for (const p of paths) {
+    try {
+      if (statSync(p).isFile()) photos.push({ name: basename(p), bytes: read(p) });
+    } catch {
+      // Unreadable here means the restore itself reports it.
+    }
+  }
+  return keyInPhotos(photos, password);
+}
+
+/** `keyFromPhotos`, over photos already read (from disk or out of a .zip). */
+async function keyInPhotos(
+  photos: readonly PhotoInput[],
+  password: string,
+): Promise<Uint8Array | undefined> {
+  return withStegoSeedCache(() => firstKeyIn(photos, password));
 }
 
 async function firstKeyIn(
-  paths: readonly string[],
+  photos: readonly PhotoInput[],
   password: string,
 ): Promise<Uint8Array | undefined> {
-  for (const p of paths) {
-    let bytes: Uint8Array;
-    try {
-      if (!statSync(p).isFile()) continue;
-      bytes = read(p);
-    } catch {
-      continue;
-    }
+  for (const { name, bytes } of photos) {
     if (!isJpegBytes(bytes) && !(bytes[0] === 0x89 && bytes[1] === 0x50)) continue;
-    const name = basename(p);
     const key =
       (await extractKeyImage(bytes, name, password)) ??
       (await extractKeyFactorImage(bytes, name, password));
@@ -1191,10 +1199,11 @@ export async function runRestore(
     // images that did not decode as a vault image. Only those are tried: each
     // attempt costs a key derivation.
     if (!(err instanceof MissingKeyError) || keyBlock) throw err;
-    const unreadable = gatherImageFiles(opts.inputs).filter(
-      (p) => decodeImageToPayload(read(p), basename(p)) === null,
+    // Zipped images included: a whole delivery zipped up holds the key photo too.
+    const unreadable = gatherPhotos(opts.inputs).photos.filter(
+      (p) => decodeImageToPayload(p.bytes, p.name) === null,
     );
-    const found = await keyFromPhotos(unreadable, opts.password);
+    const found = await keyInPhotos(unreadable, opts.password);
     if (!found) throw err;
     restored = await importVault(gathered.payloads, opts.password, { keyBlock: found });
   }
@@ -1430,18 +1439,22 @@ export interface GalleryRestoreResult {
 }
 
 export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult> {
-  const coverPaths = gatherImageFiles(opts.inputs);
-  if (coverPaths.length === 0) {
+  // Photos loose, in folders, or in a .zip (the whole delivery zipped up, key
+  // photo and all, is the natural thing to hand over). A .key found among them,
+  // loose or zipped, is the key.
+  const { photos, keyBlock: foundKey } = gatherPhotos(opts.inputs);
+  if (photos.length === 0) {
     throw new StegoShardApiError('NO_GALLERY_IMAGES', 'no images to scan for a gallery');
   }
   // `preserveContainer` on the way *in*: these photos carry a payload in their
   // coefficients, and re-encoding one would destroy what restore is here to read.
-  const covers = coverPaths.map((p) =>
-    fileToGalleryCover(read(p), basename(p), { preserveContainer: true }),
+  const covers = photos.map((p) =>
+    fileToGalleryCover(p.bytes, p.name, { preserveContainer: true }),
   );
 
-  // A keyfile/stego gallery delivers its key separately (--key: a .key or cover photo).
-  const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : undefined;
+  // A keyfile/stego gallery delivers its key separately: --key (a .key or the key
+  // photo), or a .key that came in with the photos.
+  const keyBlock = opts.keyPath ? await resolveKeyBlock(opts.keyPath, opts.password) : foundKey;
   // A non-possession gallery is gated on threshold shares (--share).
   const secret = await recoverSecret(opts.sharePaths);
   let restored: Awaited<ReturnType<typeof galleryDecode>>;
@@ -1452,7 +1465,7 @@ export async function runGalleryRestore(opts: RestoreOptions): Promise<GalleryRe
     // the missing factor reads as a failed restore, so the photos are searched
     // for it, for one key derivation in all. Only on this failure path.
     if (!(err instanceof GalleryRestoreError) || keyBlock) throw err;
-    const found = await keyFromPhotos(coverPaths, opts.password);
+    const found = await keyInPhotos(photos, opts.password);
     if (!found) throw err;
     restored = await galleryDecode(covers, opts.password, { keyBlock: found, secret });
   }

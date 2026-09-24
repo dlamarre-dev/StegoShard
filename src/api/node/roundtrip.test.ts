@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { resetStegoCoverGuard } from '@core';
 import { encode as encodePng } from 'fast-png';
 import jpeg from 'jpeg-js';
+import { zipSync } from 'fflate';
 import { runEstimate, runRestore, runSave, codecIdForSave } from './commands';
 import { CODEC_COLOR_GRID, CODEC_QR_GRID, clearUserEntropy, installUserEntropy } from '@core';
 
@@ -352,6 +353,32 @@ describe('CLI round-trips', () => {
    * the photo was never looked at as a key. Every stego destination is covered,
    * including the .db, whose missing factor reads as a wrong password.
    */
+  it('image set restores with its key photo inside a .zip of everything', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(1500, 47);
+    const input = writeSecret(dir, content);
+    const { files } = await runSave({
+      inputs: [input],
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      keyMode: 'stego',
+      cover: writeCover(dir),
+    });
+    const zipPath = join(dir, 'everything.zip');
+    writeFileSync(
+      zipPath,
+      zipSync(Object.fromEntries(files.map((f) => [basename(f), readFileSync(f)]))),
+    );
+    const { outPath } = await runRestore({
+      inputs: [zipPath],
+      outDir: join(dir, 'restored'),
+      password: PW,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
   describe('with the key photo among the inputs rather than behind --key', () => {
     const cases: [string, { binary?: 'branded' | 'disguised' }][] = [
       ['branded .ssbn', { binary: 'branded' }],
