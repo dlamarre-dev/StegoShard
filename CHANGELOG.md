@@ -410,6 +410,21 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **MCP: a symlink inside an input directory could reach outside `--root`.** Only the
+  path argument was checked; `stegoshard_save` then walked the directory and followed a
+  link planted in it, so `/vault/docs/keys -> ~/.ssh` carried `id_rsa` into the vault.
+  The server now expands input directories itself and checks every file. A link that
+  stays inside a root is still followed.
+- **MCP: `stegoshard_save` applied no password floor.** `allow_weak_password` was
+  advertised and never read. The CLI's rule now applies: `PASSWORD_TOO_SHORT` below 12
+  characters, and `PASSWORD_WEAK` for a weak password unless `allow_weak_password` is set.
+- **Windows: a `--force` save whose rename was refused lost both vaults.** The old file
+  was deleted before the rename, and the cleanup then deleted the new one. The rename
+  already replaces the target, so the old file now stays until the new one is in place.
+- **Gallery non-possession saves of several files restored as one `.zip`.** The bundle
+  flag was dropped on that path. It is now kept, and the post-save check compares it
+  (`verifyGalleryExport` takes an optional `bundled`).
+
 - **Restores had no progress bar, except for `.ssbn` and `.db`.** The weighted bar added
   for saves did not cover restores: a gallery restore, which runs two key derivations and
   reads every photo, showed nothing at all, and an image set or a printed PDF showed
