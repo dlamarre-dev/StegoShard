@@ -410,6 +410,20 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **A forged JPEG could exhaust memory.** The coefficient decoder had no size limit and
+  fed padding bits without end past the scan, so a 138-byte file whose tables decode
+  padding as empty blocks, claiming 65535x65535, allocated until the process died. It
+  now refuses a frame past 100 megapixels (the encoder's own ceiling) or past the block
+  count such a photo has, and a scan that needs more than four bytes of padding. The
+  Python reader applies the same limits.
+- **A forged `.db` threw instead of being refused.** Lengths and offsets read from the
+  file (a record header length, a payload length, the root's cell pointers) were used
+  unchecked, giving a `RangeError` or an allocation failure where the reader returns
+  `null` for anything that is not its own database. Each is now checked first, in the
+  Python reader too.
+- **A symlink loop in an input folder crashed the command.** Directory expansion
+  followed a link back to an ancestor until the stack ran out. Each real directory is
+  now entered once.
 - **MCP: a symlink inside an input directory could reach outside `--root`.** Only the
   path argument was checked; `stegoshard_save` then walked the directory and followed a
   link planted in it, so `/vault/docs/keys -> ~/.ssh` carried `id_rsa` into the vault.

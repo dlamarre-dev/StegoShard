@@ -219,3 +219,62 @@ describe('jpeg decoder: truncation', () => {
     expect(() => decode(makeJpeg(64, 64, 88, 11))).not.toThrow();
   });
 });
+
+/**
+ * A forged file whose tables make the all-ones code mean "DC 0" (DC) and "EOB"
+ * (AC), with no entropy data at all: every block then decodes from padding.
+ * Each component is `[h, v]`; the scan names all of them.
+ */
+function forgedJpeg(
+  width: number,
+  height: number,
+  comps: [number, number][] = [[1, 1]],
+): Uint8Array {
+  const seg = (marker: number, body: number[]) => [
+    0xff,
+    marker,
+    (body.length + 2) >> 8,
+    (body.length + 2) & 0xff,
+    ...body,
+  ];
+  // Two 1-bit codes: '0' and '1', both mapped to symbol 0.
+  const table = (tc: number) => [(tc << 4) | 0, 2, ...new Array(15).fill(0), 0, 0];
+  const sof = [8, height >> 8, height & 0xff, width >> 8, width & 0xff, comps.length];
+  comps.forEach(([h, v], i) => sof.push(i + 1, (h << 4) | v, 0));
+  const sos = [comps.length];
+  comps.forEach((_, i) => sos.push(i + 1, 0x00));
+  sos.push(0, 63, 0);
+  return new Uint8Array([
+    0xff,
+    0xd8,
+    ...seg(0xc0, sof),
+    ...seg(0xc4, [...table(0), ...table(1)]),
+    ...seg(0xda, sos),
+    0xff,
+    0xd9,
+  ]);
+}
+
+// Found in review: with no bound on either, a 138-byte file claiming 65535x65535
+// allocated blocks decoded from padding until the process ran out of memory.
+describe('jpeg decoder: forged sizes', () => {
+  it('refuses a scan that would be decoded from padding alone', () => {
+    // 64 blocks at two synthetic bits each: sixteen bytes of padding.
+    expect(() => decode(forgedJpeg(64, 64))).toThrow(/runs past its data/);
+  });
+
+  it('refuses a frame past the pixel ceiling before allocating it', () => {
+    expect(() => decode(forgedJpeg(65535, 65535))).toThrow(/pixel ceiling/);
+  });
+
+  it('refuses sampling factors that multiply the block count past any photo', () => {
+    // 81 megapixels passes the pixel check; 64 blocks per 32x32 MCU does not.
+    const four: [number, number][] = [
+      [4, 4],
+      [4, 4],
+      [4, 4],
+      [4, 4],
+    ];
+    expect(() => decode(forgedJpeg(9000, 9000, four))).toThrow(/8x8 blocks/);
+  });
+});
