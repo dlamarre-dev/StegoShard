@@ -191,10 +191,11 @@ function writeOut(target: WriteTarget, name: string, bytes: Uint8Array): string 
     fsyncSync(fd);
     closeSync(fd);
     fd = undefined;
-    // Windows refuses rename onto an existing path, so clear it first. This is
-    // the one window where the target is gone and the new file is not yet in
-    // place; it exists only under --force, where the user asked for a replace.
-    if (process.platform === 'win32' && existsSync(path)) unlinkSync(path);
+    // Onto an existing target too, on Windows as well: Node and Deno both rename
+    // with MOVEFILE_REPLACE_EXISTING there. Deleting the target first, as this
+    // once did, meant a rename refused by an antivirus or an indexer holding the
+    // file (EBUSY, EPERM) under --force lost the old vault, and the cleanup below
+    // then removed the new one as well.
     renameSync(tmp, path);
     // Make the new directory entry durable too. Best-effort: some platforms
     // (Windows) refuse to open a directory for fsync, and a file that is on disk

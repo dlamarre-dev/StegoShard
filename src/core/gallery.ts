@@ -650,6 +650,7 @@ export async function galleryEncode(
           GALLERY_LADDER,
           params,
           keyFactor,
+          options.bundle,
         ),
       );
       blob = built.blob;
@@ -855,8 +856,9 @@ export async function verifyGalleryExport(
   content: Uint8Array,
   secret?: Uint8Array | undefined,
   onProgress?: OnProgress,
+  bundled = false,
 ): Promise<void> {
-  let got: { filename: string; content: Uint8Array };
+  let got: { filename: string; content: Uint8Array; bundled: boolean };
   try {
     got = await galleryDecode(images as GalleryCover[], password, {
       keyBlock,
@@ -866,7 +868,10 @@ export async function verifyGalleryExport(
   } catch {
     throw new VerificationError();
   }
-  if (got.filename !== filename || got.content.length !== content.length)
+  // `bundled` too: the non-possession branch once dropped the flag, and the set
+  // restored as one opaque .zip while this check, looking at the bytes alone,
+  // passed it.
+  if (got.filename !== filename || got.bundled !== bundled || got.content.length !== content.length)
     throw new VerificationError();
   for (let i = 0; i < content.length; i++) {
     if (got.content[i] !== content[i]) throw new VerificationError();

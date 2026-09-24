@@ -26,7 +26,7 @@
  *       dist-cli/stegoshard.js mcp --root /vault
  */
 
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 
 /** Why a request was refused. Machine-stable, like every other code. */
@@ -42,7 +42,11 @@ export type PolicyErrorCode =
   /** No usable password source in the request. */
   | 'PASSWORD_REQUIRED'
   /** A SPEC §10 access mode, which this surface does not carry. */
-  | 'MODE_NOT_AVAILABLE';
+  | 'MODE_NOT_AVAILABLE'
+  /** A new vault's password is below the hard floor, which no flag lifts. */
+  | 'PASSWORD_TOO_SHORT'
+  /** Above the floor but weak, and `allow_weak_password` was not set. */
+  | 'PASSWORD_WEAK';
 
 export class PolicyError extends Error {
   constructor(
@@ -160,6 +164,42 @@ export function resolveInRoot(policy: Policy, argName: string, value: string): s
     });
   }
   return resolved;
+}
+
+/**
+ * Resolve one path argument that may name a directory, and return every file
+ * under it, each one checked against the roots.
+ *
+ * {@link resolveInRoot} alone was not enough for `inputs`, and review found the
+ * hole: it checks the path it is handed, and `save`/`restore` then expand a
+ * directory themselves, following whatever symlinks it holds. A link planted at
+ * `/vault/docs/keys -> ~/.ssh` passed the check on `/vault/docs` and carried
+ * `id_rsa` into the vault. So the expansion happens here instead, every entry is
+ * compared the same way the argument was, and the orchestration layer receives
+ * plain files it has no reason to walk again.
+ *
+ * A symlink that stays inside a root is still followed: refusing links outright
+ * would break a library organized with them, and the comparison is what matters.
+ * Each real directory is visited once, so a link cycle ends instead of recursing
+ * until the stack gives out.
+ */
+export function resolveTreeInRoot(policy: Policy, argName: string, value: string): string[] {
+  const top = resolveInRoot(policy, argName, value);
+  if (!existsSync(top) || !statSync(top).isDirectory()) return [top];
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const visit = (dir: string): void => {
+    const real = realpathSync(dir);
+    if (seen.has(real)) return;
+    seen.add(real);
+    for (const name of readdirSync(dir)) {
+      const entry = resolveInRoot(policy, argName, join(dir, name));
+      if (statSync(entry).isDirectory()) visit(entry);
+      else files.push(entry);
+    }
+  };
+  visit(top);
+  return files;
 }
 
 /** Where a tool call says its password lives. Never the password itself. */
