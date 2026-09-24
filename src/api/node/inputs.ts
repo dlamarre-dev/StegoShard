@@ -32,8 +32,14 @@ export interface GatheredInputs {
   decoded: number;
 }
 
+/** A photo read from disk or out of a .zip, with the name it had there. */
+export interface PhotoInput {
+  name: string;
+  bytes: Uint8Array;
+}
+
 /** Extract image/.key entries from a zip within the size/count budgets. */
-function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Uint8Array } {
+function extractZip(zipBytes: Uint8Array): { images: PhotoInput[]; keyBlock?: Uint8Array } {
   let count = 0;
   let total = 0;
   const entries = unzipSync(zipBytes, {
@@ -47,11 +53,11 @@ function extractZip(zipBytes: Uint8Array): { images: Uint8Array[]; keyBlock?: Ui
       return true;
     },
   });
-  const images: Uint8Array[] = [];
+  const images: PhotoInput[] = [];
   let keyBlock: Uint8Array | undefined;
   for (const [name, bytes] of Object.entries(entries)) {
     if (isKey(name)) keyBlock = bytes;
-    else if (IMAGE_RE.test(name)) images.push(bytes);
+    else if (IMAGE_RE.test(name)) images.push({ name: basename(name), bytes });
   }
   return keyBlock ? { images, keyBlock } : { images };
 }
@@ -116,7 +122,7 @@ export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
       if (kb) keyBlock = kb;
       for (const img of images) {
         seen++;
-        const p = decodeImageToPayload(img, 'zipped.png');
+        const p = decodeImageToPayload(img.bytes, img.name);
         if (p) {
           payloads.push(p);
           decoded++;
@@ -139,4 +145,40 @@ export async function gatherInputs(paths: string[]): Promise<GatheredInputs> {
   }
 
   return keyBlock ? { payloads, keyBlock, seen, decoded } : { payloads, seen, decoded };
+}
+
+/**
+ * Every photo among `paths`, loose, in a directory or inside a `.zip`, plus a
+ * `.key` if one rides along (loose or zipped).
+ *
+ * For the paths that want photos rather than decoded vault images: a gallery
+ * restore, and the search for a stego key photo handed in with everything else.
+ * Delivered photos are all named `IMG_nnnn`, so zipping a whole delivery, key
+ * photo included, is the natural thing to do, and a zip has to be opened for
+ * either of those to see what is in it.
+ */
+export function gatherPhotos(paths: readonly string[]): {
+  photos: PhotoInput[];
+  keyBlock?: Uint8Array;
+} {
+  const files: string[] = [];
+  for (const path of paths) {
+    if (statSync(path).isDirectory()) files.push(...walk(path));
+    else files.push(path);
+  }
+  const photos: PhotoInput[] = [];
+  let keyBlock: Uint8Array | undefined;
+  for (const path of files) {
+    const name = basename(path);
+    if (isKey(name)) {
+      keyBlock = read(path);
+    } else if (isZip(name)) {
+      const extracted = extractZip(read(path));
+      photos.push(...extracted.images);
+      if (extracted.keyBlock) keyBlock = extracted.keyBlock;
+    } else if (IMAGE_RE.test(name)) {
+      photos.push({ name, bytes: read(path) });
+    }
+  }
+  return keyBlock ? { photos, keyBlock } : { photos };
 }

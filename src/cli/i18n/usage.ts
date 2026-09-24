@@ -60,7 +60,7 @@ const COMMANDS = [
   'stegoshard restore <images|folder|zip|pdf ...> [options]',
   'stegoshard estimate <file> [--paper] [--codec color|qr] | --gallery',
   'stegoshard gallery-save <file> <cover-photos|folder ...> [options]',
-  'stegoshard gallery-restore <photos|folder ...> [options]',
+  'stegoshard gallery-restore <photos|folder|zip ...> [options]',
   // --out and --report are alternatives, not a flag and an option: --report writes
   // nothing, so the two together are refused rather than resolved.
   'stegoshard normalize <photos|folder ...> (--out <dir> | --report)',

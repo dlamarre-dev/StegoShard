@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
+import { zipSync } from 'fflate';
 import {
   StegoCoverFormatError,
   decode as decodeCoeff,
@@ -166,6 +167,57 @@ describe('CLI gallery key photo under --preserve-container', () => {
   });
 });
 
+/**
+ * The whole delivery zipped up and handed to gallery-restore as one file.
+ *
+ * Delivered photos are all named IMG_nnnn, so zipping everything a save wrote,
+ * key included, is the natural way to keep it together. The zip is opened, and
+ * the key is found inside it: the key photo of a stego gallery, or the .key of
+ * a keyfile one.
+ */
+describe('CLI gallery restore from a .zip', () => {
+  const zipAll = (files: string[]): string => {
+    const zipPath = join(tmp(), 'album.zip');
+    writeFileSync(
+      zipPath,
+      zipSync(Object.fromEntries(files.map((f) => [basename(f), readFileSync(f)]))),
+    );
+    return zipPath;
+  };
+
+  it.each(['stego', 'keyfile'] as const)(
+    'restores a %s gallery from one .zip holding its photos and its key',
+    SLOW,
+    async (keyMode) => {
+      const coverDir = tmp();
+      for (let i = 0; i < 12; i++) writePngCover(coverDir, `c${i}.png`, i + 400);
+      const secretDir = tmp();
+      const secretPath = join(secretDir, 'note.txt');
+      const secret = Buffer.from(`zipped ${keyMode} gallery`);
+      writeFileSync(secretPath, secret);
+      let keyCover: string | undefined;
+      if (keyMode === 'stego') {
+        writePngCover(secretDir, 'key.png', 499);
+        keyCover = join(secretDir, 'key.png');
+      }
+      const save = await runGallerySave({
+        secretFile: secretPath,
+        covers: [coverDir],
+        outDir: tmp(),
+        password: PW,
+        keyMode,
+        keyCover,
+      });
+      const res = await runGalleryRestore({
+        inputs: [zipAll(save.files)],
+        outDir: tmp(),
+        password: PW,
+      });
+      expect(new Uint8Array(readFileSync(res.outPath))).toEqual(new Uint8Array(secret));
+    },
+  );
+});
+
 describe('CLI gallery round-trip', () => {
   it('saves a secret across a folder of photos and restores it blindly', SLOW, async () => {
     // The §10 geometry doubles the blob, so a tiny secret spans ~5 data shards;
@@ -233,13 +285,16 @@ describe('CLI gallery round-trip', () => {
     expect(keyPath).toBeTruthy();
 
     // Without the key, restore fails.
+    const photos = save.files.filter((f) => !f.endsWith('.key'));
     await expect(
-      runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW }),
+      runGalleryRestore({ inputs: photos, outDir: tmp(), password: PW }),
     ).rejects.toThrow();
 
-    // With the key, it restores. (Pass the photos, not the folder, so the walker
-    // doesn't feed the .key in as a "photo".)
-    const photos = save.files.filter((f) => !f.endsWith('.key'));
+    // With the .key left in the album folder, it is found and used.
+    const fromFolder = await runGalleryRestore({ inputs: [albumDir], outDir: tmp(), password: PW });
+    expect(new Uint8Array(readFileSync(fromFolder.outPath))).toEqual(new Uint8Array(secret));
+
+    // And with the key given explicitly.
     const res = await runGalleryRestore({
       inputs: photos,
       outDir: tmp(),

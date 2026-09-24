@@ -421,6 +421,8 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
   key derivation for the whole set, since the stego seed depends on the password alone
   (`withStegoSeedCache`, which zeroes it when the search ends). The key-field hint, which
   spoke only of a `.key` file, now matches what restore actually does in both modes.
+  `stegoshard gallery-restore` takes a `.zip` too, and finds the key inside it the same
+  way; `stegoshard restore` now also looks for a key photo inside a `.zip`.
 
 - **A key photo picked together with its vault was never read as a key.** Restoring a
   `.ssbn` saved with a stego key photo, with the vault and the photo picked in the same

@@ -89,6 +89,11 @@ npm run cli -- gallery-restore ./album --out ./restored
 # Which photos carry the secret is drawn at random too, so neither the names nor
 # the order the files are written in say which ones matter. A --key-mode stego
 # key photo draws its name from the same set; the summary says which one it is.
+#
+# gallery-restore takes the photos loose, in folders, or in a .zip, and finds the
+# key among them: a .key (loose or zipped), or the key photo itself, so the whole
+# album, zipped or not, restores without --key.
+npm run cli -- gallery-restore album.zip --out ./restored
 
 # Every cover is re-encoded into one pinned encoder profile before anything is
 # hidden in it (SPEC §9.8), carriers and decoys alike, and the stego key photo
