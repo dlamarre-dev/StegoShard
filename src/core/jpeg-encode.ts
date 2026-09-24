@@ -81,7 +81,11 @@ const DCT_ROUND = 1 << (DCT_BITS - 1);
 /** 4:2:0: one chroma sample per 2x2 luma, so an MCU is 16x16 pixels. */
 const MCU = 16;
 
-/** Ceiling on pixels, so a hostile size cannot ask for an unbounded allocation. */
+/**
+ * Ceiling on pixels, so a hostile size cannot ask for an unbounded allocation.
+ * The decoder in `jpeg-coeff.ts` refuses past the same value; keep them equal,
+ * or a photo written here could not be read back.
+ */
 const MAX_PIXELS = 100_000_000;
 
 /**

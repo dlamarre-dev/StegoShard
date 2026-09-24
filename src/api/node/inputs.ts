@@ -7,7 +7,7 @@
  * image passed via the key slot is treated as a stego carrier by the caller.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { unzipSync } from 'fflate';
 import { MAX_IMAGES, type OnProgress, report } from '../../core';
@@ -90,12 +90,22 @@ function read(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));
 }
 
-/** Recursively collect file paths from a directory. */
-export function walk(dir: string): string[] {
+/**
+ * Recursively collect file paths from a directory.
+ *
+ * Symlinks are followed, as they always were, but each real directory is
+ * entered once: a link back to an ancestor used to recurse until the stack gave
+ * out, so one careless `ln -s .. up` in a photo folder crashed every command
+ * pointed at it.
+ */
+export function walk(dir: string, seen: Set<string> = new Set()): string[] {
+  const real = realpathSync(dir);
+  if (seen.has(real)) return [];
+  seen.add(real);
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...walk(p));
+    if (statSync(p).isDirectory()) out.push(...walk(p, seen));
     else out.push(p);
   }
   return out;

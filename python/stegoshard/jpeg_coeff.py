@@ -17,6 +17,13 @@ def _u16(b: bytes, o: int) -> int:
     return (b[o] << 8) | b[o + 1]
 
 
+# Mirrors jpeg-coeff.ts: the pixel and block ceilings a frame header may claim,
+# and how many synthetic 1-bit bytes a scan may consume before it is refused.
+MAX_JPEG_PIXELS = 100_000_000
+MAX_JPEG_BLOCKS = 3 * -(-MAX_JPEG_PIXELS // 64)
+MAX_PAD_BYTES = 4
+
+
 class _BitReader:
     """MSB-first bit reader over the entropy scan, with byte-unstuffing."""
 
@@ -25,11 +32,18 @@ class _BitReader:
         self.pos = pos
         self.byte = 0
         self.bits = 0
+        self.padded = 0
+
+    def _pad(self) -> None:
+        self.padded += 1
+        if self.padded > MAX_PAD_BYTES:
+            raise JpegUnsupported("scan runs past its data")
+        self.byte = 0xFF
+        self.bits = 8
 
     def _fill(self) -> None:
         if self.pos >= len(self.data):
-            self.byte = 0xFF  # feed 1-bits past the end (JPEG pad convention)
-            self.bits = 8
+            self._pad()  # feed 1-bits past the end (JPEG pad convention)
             return
         b = self.data[self.pos]
         self.pos += 1
@@ -38,7 +52,8 @@ class _BitReader:
             if nxt == 0x00:
                 self.pos += 1  # stuffed FF00 → literal 0xFF
             else:
-                b = 0xFF  # marker: feed 1-bits so an in-flight read completes
+                self._pad()  # marker: feed 1-bits so an in-flight read completes
+                return
         self.byte = b
         self.bits = 8
 
@@ -56,6 +71,7 @@ class _BitReader:
 
     def align_restart(self) -> None:
         self.bits = 0
+        self.padded = 0
         while self.pos < len(self.data) and self.data[self.pos] != 0xFF:
             self.pos += 1
         if self.pos + 1 < len(self.data):
@@ -183,6 +199,10 @@ def _decode_scan(data, scan_start, frame, dc_tables, ac_tables, restart_interval
     max_v = max(c["v"] for c in comps)
     mcus_x = (frame["width"] + 8 * max_h - 1) // (8 * max_h)
     mcus_y = (frame["height"] + 8 * max_v - 1) // (8 * max_v)
+    if frame["width"] * frame["height"] > MAX_JPEG_PIXELS:
+        raise JpegUnsupported("frame is past the pixel ceiling")
+    if mcus_x * mcus_y * sum(c["h"] * c["v"] for c in comps) > MAX_JPEG_BLOCKS:
+        raise JpegUnsupported("the frame asks for more 8x8 blocks than any photo has")
     br = _BitReader(data, scan_start)
     pred = [0] * len(comps)
     mcu = 0

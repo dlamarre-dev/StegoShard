@@ -218,6 +218,8 @@ def pack_sqlite(blob: bytes) -> bytes:
 
 def _decode_row(payload: bytes) -> tuple[bytes, bytes] | None:
     header_len, hl_size = _read_varint(payload, 0)
+    if header_len < hl_size or header_len > len(payload):
+        return None
     p = hl_size
     serials = []
     while p < header_len:
@@ -240,7 +242,18 @@ def _decode_row(payload: bytes) -> tuple[bytes, bytes] | None:
 
 
 def unpack_sqlite(data: bytes) -> bytes | None:
-    """Extract the vault blob from a disguised SQLite database, or None."""
+    """Extract the vault blob from a disguised SQLite database, or None.
+
+    A foreign or hostile file is None, never an exception: every offset below
+    comes from the file, so a read past a page is treated as "not ours".
+    """
+    try:
+        return _unpack_sqlite(data)
+    except (IndexError, struct.error):
+        return None
+
+
+def _unpack_sqlite(data: bytes) -> bytes | None:
     if len(data) < PAGE_SIZE or data[: len(SQLITE_MAGIC)] != SQLITE_MAGIC:
         return None
     (page_size,) = struct.unpack_from(">H", data, 16)
@@ -259,6 +272,8 @@ def unpack_sqlite(data: bytes) -> bytes | None:
         p += n1
         _, n2 = _read_varint(page, p)  # rowid
         p += n2
+        if P > page_count * PAGE_SIZE:
+            return None
         local = _split_payload(P)
         out = bytearray(page[p : p + local])
         filled = local

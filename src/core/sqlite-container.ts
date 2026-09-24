@@ -293,9 +293,17 @@ export function packSqlite(blob: Uint8Array): Uint8Array {
 
 // --- reader -------------------------------------------------------------------
 
-/** Row (k, v) decoded from a table-leaf record. */
+/**
+ * Row (k, v) decoded from a table-leaf record.
+ *
+ * Every length below comes from the file, and every one is checked against the
+ * bytes actually present before it is used, so a foreign or hostile database is
+ * `null` as the contract says. Unchecked, a header length of 2^34 had this loop
+ * push serial types for seconds until the array itself threw.
+ */
 function decodeRow(payload: Uint8Array): { key: Uint8Array; value: Uint8Array } | null {
   const [headerLen, hlSize] = readVarint(payload, 0);
+  if (headerLen < hlSize || headerLen > payload.length) return null;
   let p = hlSize;
   const serials: number[] = [];
   while (p < headerLen) {
@@ -360,8 +368,12 @@ export function unpackSqlite(bytes: Uint8Array): Uint8Array | null {
     p += n1;
     const [, n2] = readVarint(page, p); // rowid (ignored)
     p += n2;
+    // A payload longer than the whole file cannot be reassembled from it, and
+    // allocating it first is the one step that would not fail cleanly.
+    if (P > pageCount * PAGE_SIZE) return null;
     const local = splitPayload(P);
     if (p + local > page.length) return null;
+    if (P > local && p + local + 4 > page.length) return null;
     const out = new Uint8Array(P);
     out.set(page.subarray(p, p + local), 0);
     let filled = local;
@@ -386,9 +398,11 @@ export function unpackSqlite(bytes: Uint8Array): Uint8Array | null {
   if (cache[0] === 0x05) {
     // Interior table page: [left-child 4B][varint rowid] cells + right-most pointer.
     const nCells = (cache[3]! << 8) | cache[4]!;
+    if (12 + nCells * 2 > PAGE_SIZE) return null;
     const rootDv = new DataView(cache.buffer, cache.byteOffset, cache.byteLength);
     for (let i = 0; i < nCells; i++) {
       const cellOff = (cache[12 + i * 2]! << 8) | cache[12 + i * 2 + 1]!;
+      if (cellOff + 4 > PAGE_SIZE) return null;
       childPages.push(rootDv.getUint32(cellOff, false));
     }
     childPages.push(rootDv.getUint32(8, false)); // right-most child
@@ -404,8 +418,10 @@ export function unpackSqlite(bytes: Uint8Array): Uint8Array | null {
     const leaf = pageAt(cp);
     if (leaf[0] !== 0x0d) continue;
     const nCells = (leaf[3]! << 8) | leaf[4]!;
+    if (8 + nCells * 2 > PAGE_SIZE) continue;
     for (let i = 0; i < nCells; i++) {
       const cellOff = (leaf[8 + i * 2]! << 8) | leaf[8 + i * 2 + 1]!;
+      if (cellOff >= PAGE_SIZE) continue;
       const payload = reassemble(leaf, cellOff);
       if (!payload) continue;
       const row = decodeRow(payload);

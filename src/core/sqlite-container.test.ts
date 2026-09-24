@@ -189,3 +189,56 @@ describe('sqlite container reader: every rejection path', () => {
     expect(unpackSqlite(db)).toBeNull();
   });
 });
+
+/**
+ * Lengths and offsets the file claims, set past what it holds. Found in review:
+ * each of these threw (`RangeError`, or ran out of memory) where the contract is
+ * `null` for anything that is not our database.
+ */
+describe('sqlite container reader: forged lengths never throw', () => {
+  const INTERIOR = PAGE_SIZE; // page 2, the `cache` root
+  const u16 = (db: Uint8Array, o: number) => (db[o]! << 8) | db[o + 1]!;
+  const u32 = (db: Uint8Array, o: number) =>
+    new DataView(db.buffer, db.byteOffset).getUint32(o, false);
+
+  /** Byte offset of the first leaf's first cell, found through the root. */
+  function firstCell(db: Uint8Array): number {
+    const firstChild = u32(db, INTERIOR + u16(db, INTERIOR + 12));
+    const leaf = (firstChild - 1) * PAGE_SIZE;
+    return leaf + u16(db, leaf + 8);
+  }
+  const valid = () => packSqlite(Uint8Array.from({ length: 4000 }, (_, i) => i & 0xff));
+
+  it('a record header longer than its record', () => {
+    const db = valid();
+    const cell = firstCell(db);
+    // Skip the payload-length and rowid varints (one or two bytes each here).
+    let p = cell;
+    while (db[p]! & 0x80) p++;
+    p++;
+    while (db[p]! & 0x80) p++;
+    p++;
+    db.set([0xc0, 0x80, 0x80, 0x80, 0x00], p); // header length 2^34
+    // The forged row is skipped like any row that is not ours; what matters is
+    // that reading it neither throws nor spends seconds building its header.
+    expect(() => unpackSqlite(db)).not.toThrow();
+  });
+
+  it('a payload length larger than the file', () => {
+    const db = valid();
+    db.set([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f], firstCell(db));
+    expect(() => unpackSqlite(db)).not.toThrow();
+  });
+
+  it('a root cell pointer past the end of its page', () => {
+    const db = valid();
+    db.set([0xff, 0xfe], INTERIOR + 12);
+    expect(unpackSqlite(db)).toBeNull();
+  });
+
+  it('a root cell count past what the page can index', () => {
+    const db = valid();
+    db.set([0xff, 0xff], INTERIOR + 3);
+    expect(unpackSqlite(db)).toBeNull();
+  });
+});

@@ -62,6 +62,29 @@ export interface JpegModel {
 
 const u16 = (b: Uint8Array, o: number): number => (b[o]! << 8) | b[o + 1]!;
 
+/**
+ * Ceiling on pixels. It must equal `MAX_PIXELS` in `jpeg-encode.ts`, so this
+ * decoder accepts every photo the gallery can produce and nothing the size field
+ * alone could ask for. Not exported: everything here reaches the core barrel.
+ */
+const MAX_JPEG_PIXELS = 100_000_000;
+
+/**
+ * Ceiling on 8x8 blocks, which is what the decoder actually allocates (about
+ * 400 bytes each). Three full-resolution components at the pixel ceiling: a
+ * 4:4:4 photo of that size fits, and a frame whose sampling factors multiply
+ * the block count past it does not.
+ */
+const MAX_JPEG_BLOCKS = 3 * Math.ceil(MAX_JPEG_PIXELS / 64);
+
+/**
+ * How many synthetic 1-bit bytes the reader will hand out before refusing the
+ * scan. A well-formed scan needs none, since the decoder reads bit by bit with
+ * no lookahead and the encoder's own padding is real data; two was measured to
+ * change no outcome over 712 truncation points, and four leaves margin.
+ */
+const MAX_PAD_BYTES = 4;
+
 /** True if the bytes start with the JPEG SOI marker. */
 export function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
@@ -98,6 +121,8 @@ class BitReader {
   logical = 0;
   /** Set when a marker (non-stuffed FF xx) is hit; the scan segment has ended. */
   marker = 0;
+  /** Synthetic bytes handed out since the last restart; see MAX_PAD_BYTES. */
+  private padded = 0;
   constructor(
     private data: Uint8Array,
     private pos: number,
@@ -111,21 +136,16 @@ class BitReader {
    * convention: an encoder fills the final byte with 1s and a decoder reads them
    * to finish the last symbol.
    *
-   * Feeding them unbounded looks like a hole, and a bound was written and then
-   * removed once it was measured. Over 712 truncation points across three files,
-   * bounding the padding to two bytes changed the outcome in **zero** cases: the
-   * Huffman decoder already refuses a short scan, because synthetic 1-bits do not
-   * resolve to valid codes. The only truncations that decode are the last two or
-   * three bytes, which is the padding the convention actually describes.
-   *
-   * Left as it was, with the measurement recorded, rather than carrying a guard
-   * that never fires. See the truncation tests in jpeg-coeff.test.ts.
+   * They are bounded by MAX_PAD_BYTES. An earlier version fed them without limit,
+   * on the measurement that synthetic 1-bits never resolve to valid codes in a
+   * real file's tables. Review found the file that is not real: a DHT that makes
+   * the all-ones code mean "DC 0" and "EOB" turns endless padding into endless
+   * valid blocks, and a 138-byte JPEG claiming 65535x65535 then allocated until
+   * the process died.
    */
   private fill(): void {
     if (this.pos >= this.end) {
-      this.byte = 0;
-      this.bits = 8; // feed 1s past the end (JPEG pad convention)
-      this.byte = 0xff;
+      this.pad(); // feed 1s past the end (JPEG pad convention)
       return;
     }
     let b = this.data[this.pos++]!;
@@ -136,10 +156,19 @@ class BitReader {
       } else {
         this.marker = next;
         // Don't consume the marker; feed 1-bits so any in-flight read completes.
-        b = 0xff;
+        this.pad();
+        return;
       }
     }
     this.byte = b;
+    this.bits = 8;
+  }
+
+  private pad(): void {
+    if (++this.padded > MAX_PAD_BYTES) {
+      throw new JpegUnsupportedError('scan runs past its data');
+    }
+    this.byte = 0xff;
     this.bits = 8;
   }
 
@@ -161,6 +190,7 @@ class BitReader {
     // We're byte-aligned by construction after a full MCU when restart hits.
     this.bits = 0;
     this.marker = 0;
+    this.padded = 0;
     // Skip any fill bytes up to the FF Dn.
     while (this.pos < this.end && this.data[this.pos] !== 0xff) this.pos++;
     if (this.pos + 1 < this.end) this.pos += 2; // skip FF Dn
@@ -297,6 +327,17 @@ function decodeScan(
   const { width, height, comps, maxH, maxV } = frame;
   const mcusPerLine = Math.ceil(width / (8 * maxH));
   const mcusPerColumn = Math.ceil(height / (8 * maxV));
+  // Before anything is allocated: the frame header alone sets how many blocks
+  // the loop below will create, and it is the file's to claim.
+  if (width * height > MAX_JPEG_PIXELS) {
+    throw new JpegUnsupportedError(
+      `${width}x${height} is past the ${MAX_JPEG_PIXELS}-pixel ceiling`,
+    );
+  }
+  const blocksPerMcu = comps.reduce((sum, c) => sum + c.h * c.v, 0);
+  if (mcusPerLine * mcusPerColumn * blocksPerMcu > MAX_JPEG_BLOCKS) {
+    throw new JpegUnsupportedError('the frame asks for more 8x8 blocks than any photo has');
+  }
   const br = new BitReader(bytes, scanStart, bytes.length);
   const pred = new Array(comps.length).fill(0);
 
