@@ -12,6 +12,7 @@ import {
   type Stage,
   estimateMs,
   parseCalibration,
+  planRestore,
   planSave,
   updateCalibration,
 } from './progress-plan';
@@ -212,6 +213,33 @@ describe('planSave', () => {
       mintsKey: true,
     });
     expect(web[0]!.label).toBe('deriving');
+  });
+});
+
+describe('planRestore', () => {
+  const phases = (i: Parameters<typeof planRestore>[0]): string[] =>
+    planRestore(i).map((s) => `${s.phase}:${s.label}`);
+
+  it('lists a gallery restore in the order the code runs it', () => {
+    expect(
+      phases({ surface: 'web', kind: 'gallery', inputBytes: 5e6, imageCount: 9, keyPhoto: true }),
+    ).toEqual([
+      'derive:unlocking',
+      'derive:unlocking',
+      'extract:reading',
+      'derive:unlocking',
+      'deliver:delivering',
+    ]);
+  });
+
+  it('reads an image set before deriving its key, and a container unlocks then decrypts', () => {
+    expect(phases({ surface: 'cli', kind: 'images', inputBytes: 1e5, imageCount: 4 })).toEqual([
+      'extract:reading',
+      'derive:unlocking',
+    ]);
+    expect(
+      phases({ surface: 'extension', kind: 'binary', inputBytes: 1e5, searchesKeyPhoto: true }),
+    ).toEqual(['derive:unlocking', 'unlock:unlocking', 'decrypt:decrypting', 'deliver:delivering']);
   });
 });
 

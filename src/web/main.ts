@@ -47,7 +47,12 @@ import {
   type SaveRequest,
   type StegoInput,
 } from '../ui/save-controller';
-import { runRestore, type RestoreMode } from '../ui/restore-controller';
+import {
+  planForRestore,
+  runRestore,
+  type RestoreMode,
+  type RestoreRequest,
+} from '../ui/restore-controller';
 import {
   MIN_PASSWORD_LENGTH,
   extraEntropyBits as extraEntropyBitsOf,
@@ -732,19 +737,21 @@ restoreBtn.addEventListener('click', async () => {
   show(restoreResult, false);
   const prog = makeProgressUI(restoreProgress, restoreProgressBar, restoreStatus, msg);
   setStatus(restoreStatus, msg('statusRestoring'));
+  let ok = false;
   try {
-    const { note } = await runRestore(
-      {
-        mode: selectedRestoreMode(),
-        files,
-        password: restorePw.value,
-        keyFile: restoreKey.files?.[0],
-        shareFiles: restoreShares.files ? Array.from(restoreShares.files) : undefined,
-        extraPayloads: capturedPayloads(),
-        onProgress: prog.onProgress,
-      },
-      msg,
-    );
+    const req: RestoreRequest = {
+      mode: selectedRestoreMode(),
+      files,
+      password: restorePw.value,
+      keyFile: restoreKey.files?.[0],
+      shareFiles: restoreShares.files ? Array.from(restoreShares.files) : undefined,
+      extraPayloads: capturedPayloads(),
+      onProgress: prog.onProgress,
+    };
+    // The bar goes up before any key derivation, as it does for a save.
+    await prog.begin(planForRestore(req, 'web'));
+    const { note } = await runRestore(req, msg);
+    ok = true;
     setStatus(restoreStatus, '');
     restoreResultNote.textContent = note;
     show(restoreResult, true);
@@ -754,7 +761,7 @@ restoreBtn.addEventListener('click', async () => {
   } catch (err) {
     setStatus(restoreStatus, friendlyError(err), true);
   } finally {
-    prog.done();
+    prog.done(ok);
     restoreBtn.disabled = false;
   }
 });

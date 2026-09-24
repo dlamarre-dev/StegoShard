@@ -1067,6 +1067,10 @@
     "message": "Decrypting…",
     "description": "Progress phase label: decrypting."
   },
+  "statusReading": {
+    "message": "Reading the images…",
+    "description": "Progress stage label: reading the photos or images being restored."
+  },
   "statusVerifying": {
     "message": "Verifying…",
     "description": "Progress phase label: verifying the saved vault round-trips."

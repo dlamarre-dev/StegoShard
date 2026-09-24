@@ -26,7 +26,12 @@ import {
   type SaveRequest,
   writesOneFile,
 } from './save-controller';
-import { runRestore, type RestoreMode } from './restore-controller';
+import {
+  planForRestore,
+  runRestore,
+  type RestoreMode,
+  type RestoreRequest,
+} from './restore-controller';
 import { resolveSaveInput } from './bundle';
 import { type IconName, iconSvg } from './icons';
 import type { Msg } from './save-controller';
@@ -970,18 +975,18 @@ export function createWizard(root: HTMLElement, env: WizardEnv): Wizard {
         prog.done(true);
         showDone(note, manifest);
       } else {
-        const { note } = await runRestore(
-          {
-            mode: state.restoreMode,
-            files: state.restoreFiles,
-            password: state.restorePassword,
-            keyFile: state.keyFile ?? undefined,
-            extraPayloads: env.camera?.capturedPayloads() ?? [],
-            onProgress: prog.onProgress,
-          },
-          msg,
-        );
-        prog.done();
+        const req: RestoreRequest = {
+          mode: state.restoreMode,
+          files: state.restoreFiles,
+          password: state.restorePassword,
+          keyFile: state.keyFile ?? undefined,
+          extraPayloads: env.camera?.capturedPayloads() ?? [],
+          onProgress: prog.onProgress,
+        };
+        // The bar goes up before any key derivation, as it does for a save.
+        await prog.begin(planForRestore(req, env.surface));
+        const { note } = await runRestore(req, msg);
+        prog.done(true);
         env.camera?.clearCaptured();
         showDone(note);
       }

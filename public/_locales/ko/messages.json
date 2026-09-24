@@ -869,6 +869,10 @@
   "statusDecrypting": {
     "message": "복호화하는 중…"
   },
+  "statusReading": {
+    "message": "이미지를 읽는 중…",
+    "description": "Progress stage label: reading the photos or images being restored."
+  },
   "statusVerifying": {
     "message": "검증하는 중…"
   },

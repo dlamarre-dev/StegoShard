@@ -145,6 +145,7 @@ export const de: CliCatalog = {
   phasePrepare: 'Fotos vorbereiten',
   phaseEmbed: 'In Fotos verstecken',
   phaseDeliver: 'Dateien schreiben',
+  phaseRead: 'Bilder lesen',
 
   purposeVault: 'der Tresor: enthält Ihre Datei',
   purposeArchive: 'alle Bilder in einer .zip gebündelt',

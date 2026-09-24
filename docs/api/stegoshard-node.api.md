@@ -67,8 +67,10 @@ export function galleryImageToFile(img: GalleryImage): {
     bytes: Uint8Array;
 };
 
+// Warning: (ae-forgotten-export) The symbol "OnProgress" needs to be exported by the entry point node.d.ts
+//
 // @public (undocumented)
-export function galleryRestore(opts: RestoreOptions): Promise<GalleryRestoreResult>;
+export function galleryRestore(opts: RestoreOptions, onProgress?: OnProgress): Promise<GalleryRestoreResult>;
 
 // @public (undocumented)
 export interface GalleryRestoreResult {
@@ -81,8 +83,6 @@ export interface GalleryRestoreResult {
     seen: number;
 }
 
-// Warning: (ae-forgotten-export) The symbol "OnProgress" needs to be exported by the entry point node.d.ts
-//
 // @public
 export function gallerySave(opts: GallerySaveOptions, onProgress?: OnProgress): Promise<GallerySaveResult>;
 
@@ -145,7 +145,7 @@ export interface GatheredInputs {
 }
 
 // @public
-export function gatherInputs(paths: string[]): Promise<GatheredInputs>;
+export function gatherInputs(paths: string[], onProgress?: OnProgress): Promise<GatheredInputs>;
 
 // @public
 export function imageDataToPng(img: ImageDataLike): Uint8Array;

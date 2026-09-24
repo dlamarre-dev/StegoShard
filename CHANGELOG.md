@@ -410,6 +410,15 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **Restores had no progress bar, except for `.ssbn` and `.db`.** The weighted bar added
+  for saves did not cover restores: a gallery restore, which runs two key derivations and
+  reads every photo, showed nothing at all, and an image set or a printed PDF showed
+  nothing either. Every restore now gets the same bar, in the web app, the extension and
+  the guided wizard: up within a frame of the click, weighted by time, never going back
+  (`planRestore` in `src/core/progress-plan.ts`). The CLI's `restore` and
+  `gallery-restore` print the same weighted percentage, and a key photo given with
+  `--key` now costs one key derivation rather than two.
+
 - **Gallery restore asked for the wrong things, and could not open a `.zip`.** The
   restore card showed the gallery _save_ explanation, asked for "image files, a .zip, or a
   printed PDF", offered the camera scanner, and then failed on a `.zip`. In gallery mode it

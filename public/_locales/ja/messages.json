@@ -975,6 +975,10 @@
   "statusDecrypting": {
     "message": "復号中…"
   },
+  "statusReading": {
+    "message": "画像を読み取り中…",
+    "description": "Progress stage label: reading the photos or images being restored."
+  },
   "statusVerifying": {
     "message": "検証中…"
   },

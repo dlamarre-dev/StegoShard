@@ -151,6 +151,7 @@ export const en = {
   phasePrepare: 'Preparing photos',
   phaseEmbed: 'Hiding in photos',
   phaseDeliver: 'Writing files',
+  phaseRead: 'Reading images',
 
   // --- what each written file is for --------------------------------------
   purposeVault: 'the vault: holds your file',
