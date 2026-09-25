@@ -69,6 +69,7 @@
     "test:erasure": "pytest tests/erasure",
     "test:provenance": "pytest tests/provenance",
     "test:steganalysis": "pytest tests/steganalysis -m \"not nightly\"",
+    "bench:stego": "tsx scripts/stego-bench.ts",
     "test:steganalysis:nightly": "pytest tests/steganalysis -m nightly",
     "fixtures": "tsx scripts/gen-fixtures.ts",
     "golden": "tsx scripts/gen-golden.ts",

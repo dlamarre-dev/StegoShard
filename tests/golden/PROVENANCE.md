@@ -17,15 +17,17 @@ constant moving in the same commit fails CI.
 - `keyfile/` — QR-grid images with a separate .key file (SPEC §5.2)
 - `stego/` — key block hidden in a PNG cover by spatial LSB (SPEC §5.3)
 - `stego-jpeg/` — key block hidden in a JPEG cover by DCT coefficient (SPEC §5.4)
+- `gallery-slot-jpeg/` — one gallery carrier photo and its fragment, embedding scheme S0 (SPEC §9.3)
 - `binary-branded/` — branded .ssbn container (SPEC §8)
 - `binary-disguised/` — disguised SQLite .db container (SPEC §8)
 
-Gallery Mode is not here. Its smallest fixture is 2.4 MB against about 1 MB for
-everything above together. Its slot format is partially pinned by the
-`multiRegionSegmentedBlob` vectors in `tests/vectors/crypto-vectors.json`;
-the photo carriers themselves are not pinned at all. That is the one output path
-this corpus leaves uncovered, and it is stated here rather than left to be
-discovered.
+A whole gallery is not here: its smallest fixture is 2.4 MB against about 1 MB
+for everything above together. One carrier photo and the fragment it opens to
+are (`gallery-slot-jpeg/`), which pins the photo carrier layer: the carrier
+set, the position draw, the bit order, the slot layout and the AAD. The blob the
+fragments assemble into is pinned by the `multiRegionSegmentedBlob` vectors in
+`tests/vectors/crypto-vectors.json`. The Reed-Solomon split across photos is
+the part neither pins end to end.
 
 ## Format version constants at generation
 
@@ -36,7 +38,7 @@ discovered.
 
 ## Contents
 
-41 files, 1102 KiB.
+44 files, 1415 KiB.
 
 ```
 81f3b862e8a812f4f9aa4ba89e8991ddc505878637ecc60d9a20f24939344bed  binary-branded/expected.bin
@@ -59,6 +61,9 @@ d88d0c26d405ede077095f81777781ddc0af5156d68c5cde05f5e6ed78d62bdc  embedded/page-
 e174397e1f44ccacefa13309661c1636ad76fd3f16f5d0d90e22e5b70ae934ac  embedded/page-02.png
 1ab01bb0e510c1443e634468c1d6e766d608d17418576ade2fbdc5eb5469d843  embedded/page-03.png
 4eb8bf98b717719bee3de288bc166c7f539ae1da253d478d953871014bc97d51  embedded/page-04.png
+0ebb5b413f13b093038d530d1875bac033f29ff783db5e429cbd8007d82f50cb  gallery-slot-jpeg/carrier.jpg
+89c66a624ebd9c6c66cff3796a79549caf338504874738438dac8fe54ca0583a  gallery-slot-jpeg/fragment.bin
+2d40e4867917d2831d667e7fdae1f17ede35ba12b54fc21a0ee7d838408f5f67  gallery-slot-jpeg/manifest.json
 81f3b862e8a812f4f9aa4ba89e8991ddc505878637ecc60d9a20f24939344bed  keyfile/expected.bin
 fe44bead6b0a8d6f15df8807889fbd3d0c32def6de1cd0f84a83d83a2b5d04df  keyfile/manifest.json
 00dd69307ba24587aed0e34d1d3782561b43f66149460427f8633075c01c6560  keyfile/page-01.png

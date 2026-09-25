@@ -30,6 +30,7 @@ import {
   estimateGalleryCovers,
   galleryEncode,
   randomBytes,
+  readGallerySlot,
   serializeKeyBlock,
   buildDuressDbContainer,
   buildNonPossessionDbContainer,
@@ -209,6 +210,47 @@ async function generateGallery(
   console.log(
     `fixture ${name}: gallery ${res.images.length} photo(s) (k=${res.k} m=${res.m} decoys=${res.decoys})`,
   );
+}
+
+/**
+ * One gallery carrier photo and the fragment it opens to: the S0 embedding
+ * scheme (SPEC §9.3) pinned on a single image.
+ *
+ * A whole gallery needs at least five carriers of about 300 KB each, which is why
+ * `gallery-jpeg` stays out of the golden corpus. One photo is enough to hold the
+ * carrier layer still (the carrier set, the position draw, the bit order, the
+ * slot layout and the AAD), and that layer is what a new embedding scheme puts
+ * at risk: a reader that learns S1 must keep opening this file.
+ */
+async function generateGallerySlot(name: string): Promise<void> {
+  const dir = join(outRoot, name);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+
+  const secret = pseudoRandom(300, 0x5107);
+  const { needed } = await estimateGalleryCovers(FILENAME, secret, 'embedded');
+  const covers: GalleryCover[] = Array.from({ length: needed }, (_, i) => ({
+    kind: 'jpeg',
+    name: `cover-${i}.jpg`,
+    jpeg: makeJpegCover(GALLERY_COVER_SIDE, GALLERY_COVER_SIDE, 0x700 + i),
+  }));
+  const res = await galleryEncode(FILENAME, secret, PASSWORD, covers, { keyMode: 'embedded' });
+  // Which photos are carriers is deliberately not reported, so find one the way
+  // a reader would. The first image whose slot opens is kept.
+  for (const img of res.images) {
+    if (img.kind !== 'jpeg') continue;
+    const fragment = await readGallerySlot(img, PASSWORD);
+    if (!fragment) continue;
+    writeFileSync(join(dir, 'carrier.jpg'), img.jpeg);
+    writeFileSync(join(dir, 'fragment.bin'), fragment);
+    writeFileSync(
+      join(dir, 'manifest.json'),
+      JSON.stringify({ password: PASSWORD, scheme: 'S0' }, null, 2),
+    );
+    console.log(`fixture ${name}: one carrier, fragment of ${fragment.length} bytes`);
+    return;
+  }
+  throw new Error(`${name}: no carrier opened, so there is nothing to pin`);
 }
 
 async function generate(
@@ -550,6 +592,7 @@ await generateGallery('gallery-png', false);
 await generateGallery('gallery-jpeg', true);
 await generateGallery('gallery-keyfile', false, 'keyfile');
 await generateGallery('gallery-stego', false, 'stego');
+await generateGallerySlot('gallery-slot-jpeg');
 await generateBinary('binary-disguised-stego', 'stego', 'disguised', content);
 await generateDisguisedNpStego('binary-disguised-np-stego', content);
 await generateBundle('bundle-images', false);
