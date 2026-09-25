@@ -1038,10 +1038,16 @@ after the edit. The trailer is copied verbatim, so an image inside it keeps its
 position **within** the trailer, which is what makes the arithmetic local:
 
 ```
+when the old file has a trailer (trailerStart_old < length_old),
 for each MP Entry whose Individual Image Data Offset is non-zero:
     P_old      = endianAt_old + offset_old
     offset_new = trailerStart_new + (P_old - trailerStart_old) - endianAt_new
 ```
+
+With no trailer, every data offset **MUST** be left exactly as it was: as §9.7
+says, such an index locates no second image, so there is nothing for a shift to
+invalidate, and an MPO whose trailer was stripped keeps entries that no rewrite
+could make true.
 
 The formula is the identity when field and trailer moved together, which is the
 case that needed no rewriting to begin with.
@@ -1059,10 +1065,12 @@ into a different wrong number is not a repair; the offsets are what locate the
 trailer, and they are still corrected.
 
 An implementation **MUST** fail rather than rewrite when the index cannot be
-parsed, when it carries no entries, when the first entry's data offset is not
-`0`, when any later entry's is `0`, when a non-zero data offset does not resolve
-into the old trailer (`P_old < trailerStart_old` or `P_old >= length_old`), or
-when a rewritten offset would not fit its unsigned 32-bit field. Byte order is
+parsed, when it carries no entries, or when the first entry's data offset is not
+`0`. When the old file has a trailer it **MUST** also fail when any later entry's
+data offset is `0`, when a non-zero data offset does not resolve into the old
+trailer (`P_old < trailerStart_old` or `P_old >= length_old`), or when a
+rewritten offset would not fit its unsigned 32-bit field. Without a trailer those
+three conditions do not apply, because no offset is rewritten. Byte order is
 the index's own, read from the MP endian field, never the host's.
 
 Every one of those conditions is a property of the file as it arrives, so §9.7's

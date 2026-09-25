@@ -410,6 +410,20 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **The web app did not start in a browser that blocks site data.** The codec
+  preference was read from `localStorage` unguarded while the page loaded, and blocked
+  storage throws, so the script stopped before anything was shown. The codec choice
+  now falls back to the default and a failed write is ignored, like the language choice.
+- **A failed estimate could erase a newer one.** When an earlier file selection failed
+  after a later one had succeeded, the web app cleared the later selection's size and
+  counts. A superseded failure is now ignored.
+- **A photo whose MPF index outlived its trailer was refused.** An MPO or Ultra HDR file
+  whose gain map had been stripped still lists it, and the entry offsets pointing past
+  the end made the cover unsupported. With nothing after EOI there is nothing those
+  offsets could locate, as SPEC §9.7 says, so the photo is accepted, its offsets are
+  left as they were and only the primary image's size is updated. SPEC §9.7.1 now says
+  the same.
+
 - **A threshold share at index 0 was accepted.** SPEC §10.6.1 allows 1 to 255. Index 0
   is where the secret is evaluated, and the share checksum is unkeyed, so a forged share
   there set the recovered secret by itself. It is now refused, in the Python reader too.
