@@ -114,7 +114,11 @@ function warningJson(w: CliWarning) {
  *
  * `OnProgress` fires per chunk on encrypt and decrypt, so a large binary save
  * would otherwise emit tens of thousands of stderr lines. Every phase change is
- * reported, plus at most one update per interval within a phase.
+ * reported, plus at most one update per interval within a phase, plus the event
+ * that completes a phase. That last one is what carries `done === total` and,
+ * with a plan, `fraction: 1`; dropping it because it landed within the interval
+ * of the previous update left the stream ending at 0.969 whenever the last
+ * images rendered quickly, which is a matter of timing, not of the save.
  */
 const PROGRESS_INTERVAL_MS = 100;
 
@@ -287,7 +291,8 @@ export function jsonPresenter(io: CliIo, command: string | null): Presenter {
         const view = tracker?.onEvent(p);
         const key = view ? `${p.phase}:${view.label}` : p.phase;
         const now = Date.now();
-        if (key === lastKey && now - lastAt < PROGRESS_INTERVAL_MS) return;
+        const completes = p.total > 0 && p.done >= p.total;
+        if (!completes && key === lastKey && now - lastAt < PROGRESS_INTERVAL_MS) return;
         lastKey = key;
         lastAt = now;
         // The raw phase name, not a localized label: this is the machine channel.

@@ -255,6 +255,19 @@ describe('progress events', () => {
     expect(events.map((e) => e.phase)).toContain('verify');
   });
 
+  // Synchronous, so every event lands inside one throttle interval: the
+  // completing one must still get through. It used to be dropped, and the
+  // end-to-end check in run.json.test.ts failed or passed on render timing.
+  it('never drop the event that completes a phase', () => {
+    const io = fakeIo();
+    const { onProgress } = jsonPresenter(io, 'save').progress(false, [
+      { phase: 'render', label: 'rendering', cost: 'renderPerImage', units: 3, baseMs: 0 },
+    ]);
+    for (let i = 0; i <= 3; i++) onProgress!({ phase: 'render', done: i, total: 3 });
+    const last = eventsOf(io).at(-1)!;
+    expect(last).toMatchObject({ phase: 'render', done: 3, total: 3, fraction: 1 });
+  });
+
   it('emit nothing when quiet', () => {
     const io = fakeIo();
     const { onProgress } = jsonPresenter(io, 'save').progress(true);
