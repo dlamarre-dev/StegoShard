@@ -410,6 +410,14 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **`--json` progress no longer stops short of the end.** The throttle that keeps a
+  large save to a few stderr lines also dropped the event that completes a phase when
+  it arrived within 100 ms of the previous update, so a save whose last images rendered
+  quickly ended its stream at `render 2/3`, `fraction: 0.969`. A completing event now
+  always gets through. Found by the nightly mutation run, whose slower instrumented
+  dry run failed `run.json.test.ts` on it; `json.test.ts` now checks it without
+  depending on timing.
+
 - **The web app did not start in a browser that blocks site data.** The codec
   preference was read from `localStorage` unguarded while the page loaded, and blocked
   storage throws, so the script stopped before anything was shown. The codec choice
