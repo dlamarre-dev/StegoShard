@@ -378,6 +378,26 @@ detectors are also _learned_, so a low score may mean undetectable or merely out
 the training distribution. This is not a general claim of resistance to JPEG
 steganalysis.
 
+**A targeted measurement of the gallery carrier.** `scripts/stego-bench.ts` runs
+the real pipeline over nine phone originals (4000×2256, not in git), embeds 27
+gallery slots at the real size and margin, and scores cover and carrier with
+first-order and calibration attacks (`tests/steganalysis/bench/s0-baseline.md`).
+
+| attack                                        | AUC, unpaired | carrier above its cover |
+| --------------------------------------------- | ------------- | ----------------------- |
+| Westfeld-Pfitzmann chi-square, global         | 0.50          | 0 of 27                 |
+| F5 calibrated β (Fridrich et al. 2002)        | 0.54          | 22 of 27                |
+| histogram shape against the calibrated image  | 0.57          | 27 of 27                |
+| calibrated pair estimator for LSB replacement | **0.68**      | **27 of 27**            |
+
+The last row is the attack aimed at what the carrier is: the replacement of a
+fraction r of the `|v| ≥ 2` LSBs scales every pair difference `h(2i) - h(2i+1)` by
+`1 - r`, and the calibrated image estimates the cover's. Its paired shift (0.019)
+matches the fraction actually embedded (0.014 to 0.037), and it is a third of the
+spread between photos, which is why one photo is weak evidence and a gallery,
+pooled, is not. Every change is ±1 and none touches DC or `|v| < 2`; the magnitude
+counts move by -2.4 σ at 2 and +3.4 σ at 3 per photo.
+
 **How often this actually runs, and why it matters.** The workflow is scheduled nightly
 but skips the sweep when nothing feeding the measurement has changed: the steganalysis
 tests, the sample generator, the lockfile, the workflow itself, and the runner image

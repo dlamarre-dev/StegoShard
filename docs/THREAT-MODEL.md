@@ -93,10 +93,22 @@ With the original, they need nothing else.
 
 ### With the original, the comparison is trivial
 
-The ±1 scheme is statistically undetectable taken on its own. No first-order
-attack sees it: global and windowed Westfeld-Pfitzmann chi-square, F5 signatures,
-histogram shape. That has been measured, not assumed (`tests/steganalysis`,
-[CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.4).
+The gallery carrier writes each payload bit into the least significant bit of a
+coefficient's magnitude, on a sparse, password-chosen subset of the AC
+coefficients with `|v| ≥ 2`. Each change is ±1 in magnitude, but its direction is
+set by the bit, not chosen: this is LSB **replacement** (the JSteg family), not ±1
+matching, and it leaves the one structure LSB replacement always leaves, pairs of
+magnitudes `{2i, 2i+1}` drifting toward equal counts.
+
+The global Westfeld-Pfitzmann chi-square does not see it, and neither does F5's
+calibrated estimator. A calibrated estimator aimed at that pair structure does: on
+27 cover/carrier pairs from nine phone photos it scores the carrier above its own
+cover in 27 of 27 pairs, and separates carriers from covers it was not paired with
+at an AUC of 0.68 (`tests/steganalysis/bench/s0-baseline.md`, made by
+`scripts/stego-bench.ts`). That is weak evidence on one photo, and it grows with
+every photo a warden can pool, which a gallery hands over by construction. Treat
+the carrier as detectable by targeted steganalysis, as
+[CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.4 already does.
 
 Put the original beside the carrier and none of that matters. A diff shows on the
 order of 8,500 coefficients changed by exactly ±1, with 0 and ±1 never touched.

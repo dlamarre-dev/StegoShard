@@ -46,12 +46,12 @@ const OUT = join(ROOT, 'tests', 'golden');
 /**
  * One artifact per output path, chosen for coverage rather than completeness.
  *
- * Gallery Mode is deliberately absent. Its smallest fixture is 2.4 MB against
+ * A whole gallery is deliberately absent. Its smallest fixture is 2.4 MB against
  * about 1 MB for everything below put together, and committing it would grow the
- * repository by more than the corpus is worth. Its slot format is partially
- * pinned by the multiRegionSegmentedBlob vectors in crypto-vectors.json. Partial
- * is the honest word: the photo carriers themselves are not pinned, and that is
- * the one output path this corpus does not cover.
+ * repository by more than the corpus is worth. What is pinned instead is one
+ * carrier photo and the fragment it opens to (`gallery-slot-jpeg`), which holds
+ * the photo carrier layer still; the blob those fragments assemble into is pinned
+ * by the multiRegionSegmentedBlob vectors in crypto-vectors.json.
  */
 const SETS = [
   ['embedded', 'QR-grid images, key block embedded (SPEC §2.1, §5.1)'],
@@ -59,6 +59,10 @@ const SETS = [
   ['keyfile', 'QR-grid images with a separate .key file (SPEC §5.2)'],
   ['stego', 'key block hidden in a PNG cover by spatial LSB (SPEC §5.3)'],
   ['stego-jpeg', 'key block hidden in a JPEG cover by DCT coefficient (SPEC §5.4)'],
+  [
+    'gallery-slot-jpeg',
+    'one gallery carrier photo and its fragment, embedding scheme S0 (SPEC §9.3)',
+  ],
   ['binary-branded', 'branded .ssbn container (SPEC §8)'],
   ['binary-disguised', 'disguised SQLite .db container (SPEC §8)'],
 ] as const;
@@ -127,12 +131,13 @@ constant moving in the same commit fails CI.
 
 ${SETS.map(([n, why]) => `- \`${n}/\` — ${why}`).join('\n')}
 
-Gallery Mode is not here. Its smallest fixture is 2.4 MB against about 1 MB for
-everything above together. Its slot format is partially pinned by the
-\`multiRegionSegmentedBlob\` vectors in \`tests/vectors/crypto-vectors.json\`;
-the photo carriers themselves are not pinned at all. That is the one output path
-this corpus leaves uncovered, and it is stated here rather than left to be
-discovered.
+A whole gallery is not here: its smallest fixture is 2.4 MB against about 1 MB
+for everything above together. One carrier photo and the fragment it opens to
+are (\`gallery-slot-jpeg/\`), which pins the photo carrier layer: the carrier
+set, the position draw, the bit order, the slot layout and the AAD. The blob the
+fragments assemble into is pinned by the \`multiRegionSegmentedBlob\` vectors in
+\`tests/vectors/crypto-vectors.json\`. The Reed-Solomon split across photos is
+the part neither pins end to end.
 
 ## Format version constants at generation
 

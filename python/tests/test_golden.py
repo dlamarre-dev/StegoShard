@@ -55,6 +55,9 @@ if not GOLDEN.exists():
 
 IMAGE_SETS = ["embedded", "color-grid", "keyfile", "stego", "stego-jpeg"]
 BINARY_SETS = ["binary-branded", "binary-disguised"]
+# One carrier photo and its fragment, read by its own test below rather than by
+# the image or binary decode paths.
+GALLERY_SETS = ["gallery-slot-jpeg"]
 
 
 def _manifest(name: str) -> dict:
@@ -139,7 +142,7 @@ def test_corpus_covers_every_pinned_path() -> None:
     instead.
     """
     present = {p.name for p in GOLDEN.iterdir() if p.is_dir()}
-    assert present == set(IMAGE_SETS) | set(BINARY_SETS), (
+    assert present == set(IMAGE_SETS) | set(BINARY_SETS) | set(GALLERY_SETS), (
         f"golden corpus contents changed: {sorted(present)}. Adding a path is fine; "
         "update this list and PROVENANCE.md. Losing one is not."
     )
@@ -182,3 +185,23 @@ def test_provenance_records_the_version_constants() -> None:
     text = (GOLDEN / "PROVENANCE.md").read_text()
     for constant in ("FORMAT_VERSION", "KEY_BLOCK_VERSION", "BINARY_VERSION", "CODEC_GALLERY"):
         assert constant in text, f"PROVENANCE.md does not record {constant}"
+
+
+def test_gallery_carrier_scheme_s0_opens_to_its_fragment():
+    """One S0 gallery carrier and the fragment it opens to (SPEC §9.3).
+
+    Mirrors the gallery case in src/api/node/golden-stego.test.ts: a reader that
+    learns a new embedding scheme must keep reading this one.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from stegoshard.aad import gallery_frag_aad
+    from stegoshard.gallery import IV_LEN, _extract_slot, _gallery_keys
+
+    d = GOLDEN / GALLERY_SETS[0]
+    manifest = json.loads((d / "manifest.json").read_text())
+    # The frozen gallery cost (SPEC §9.1): not stored, so the reader assumes it.
+    pos_key, aead_key = _gallery_keys(manifest["password"], 4, 256 * 1024, 1)
+    slot = _extract_slot((d / "carrier.jpg").read_bytes(), pos_key)
+    assert slot is not None, "the S0 carrier no longer yields a slot"
+    fragment = AESGCM(aead_key).decrypt(slot[:IV_LEN], slot[IV_LEN:], gallery_frag_aad())
+    assert fragment == (d / "fragment.bin").read_bytes()

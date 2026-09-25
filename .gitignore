@@ -73,3 +73,7 @@ reports/
 # NOT ignored. It records which skill and revision were installed, the way
 # package-lock.json does, and that should be a reviewable diff.
 .claude/
+
+# Stego bench working files: normalized covers and stego pairs made from a
+# personal corpus (scripts/stego-bench.ts). Only the reports are committed.
+.bench/

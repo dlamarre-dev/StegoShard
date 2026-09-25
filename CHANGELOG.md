@@ -9,6 +9,21 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **A stego bench, and the reference every future embedding scheme is measured
+  against.** `npm run bench:stego -- --corpus <dir>` runs photos through the real gallery
+  pipeline, embeds gallery slots at the real size and margin, and reports what changed
+  (changes per photo, transitions between magnitudes, rate, count shifts against their
+  own shot noise, time, memory) and what first-order and calibration attacks make of it,
+  as an unpaired AUC and a paired sign test. The corpus stays out of git; only the report
+  is committed. The first one, `tests/steganalysis/bench/s0-baseline.md`, covers 27
+  pairs from nine phone photos: about 8,400 changes per photo, every one ±1 on a `|v| ≥ 2`
+  coefficient, and a calibrated pair estimator that separates carriers from covers at an
+  AUC of 0.68. The threat model and the crypto review now say so.
+- **The gallery carrier layer is in the golden corpus.** One carrier photo and the
+  fragment it opens to (`tests/golden/gallery-slot-jpeg/`), read by the TypeScript and
+  the Python decoders, so a reader that learns a new embedding scheme cannot silently
+  stop reading the current one. `readGallerySlot` opens a single photo's slot.
+
 - **One progress bar for the whole save, on every destination, up within a frame of
   the click.** Only the `.ssbn` and `.db` paths used to report anything. A gallery save
   showed a static line of text through four Argon2 derivations (six with a key photo) and

@@ -871,9 +871,11 @@ already uniform) and the length is `SLOT_BYTES·8` bits, not the fixed key-block
 length. Unlike §5.3/§5.4 the keystream is **not** bound to a per-cover fingerprint:
 positions may repeat across same-size covers, but this leaks nothing here because
 each slot is an independent AES-GCM message (fresh random nonce, §9.2) with no
-whitening, so there is no two-time-pad to exploit. A cover must have
-`≥ SLOT_BYTES·8·4` eligible carriers (a ×4 margin keeps embedding sparse) or it is
-rejected.
+whitening, so there is no two-time-pad to exploit. A writer **MUST** refuse a
+cover with fewer than `SLOT_BYTES·8·16` eligible carriers (the ×16 margin of
+§9.8.1, which keeps embedding sparse). A reader skips a cover with fewer than
+`SLOT_BYTES·8·4`: the margin writers used before §9.8.1 raised it, so that no
+gallery already delivered becomes unreadable.
 
 ### 9.4 Encode
 

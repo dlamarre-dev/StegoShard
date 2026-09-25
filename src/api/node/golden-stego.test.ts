@@ -29,7 +29,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { KEY_BLOCK_LEN, isSerializedKeyBlock } from '../../core/index';
+import { KEY_BLOCK_LEN, isSerializedKeyBlock, readGallerySlot } from '../../core/index';
 import { extractKeyImage } from './image-io';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..', 'tests', 'golden');
@@ -61,5 +61,33 @@ describe('golden stego covers', () => {
     // returned a key block for anything, which is the failure it guards.
     const bytes = new Uint8Array(readFileSync(join(ROOT, 'stego', 'key.png')));
     expect(await extractKeyImage(bytes, 'key.png', 'not the password')).toBeNull();
+  });
+});
+
+/**
+ * The gallery carrier layer, embedding scheme S0 (SPEC §9.3): one carrier photo
+ * written by an earlier version, and the fragment it must keep opening to.
+ *
+ * Pinned before any new embedding scheme exists, because that is the change it
+ * guards against: a reader that learns a second scheme and stops reading the
+ * first loses every gallery already delivered, and a round-trip test of the new
+ * writer cannot see it.
+ */
+describe('golden gallery carrier (scheme S0)', () => {
+  const dir = join(ROOT, 'gallery-slot-jpeg');
+  const cover = {
+    kind: 'jpeg' as const,
+    name: 'carrier.jpg',
+    jpeg: new Uint8Array(readFileSync(join(dir, 'carrier.jpg'))),
+  };
+
+  it('opens to the pinned fragment', async () => {
+    const fragment = await readGallerySlot(cover, manifest('gallery-slot-jpeg').password);
+    expect(fragment, 'the S0 carrier no longer opens').not.toBeNull();
+    expect(Buffer.from(fragment!).equals(readFileSync(join(dir, 'fragment.bin')))).toBe(true);
+  });
+
+  it('opens to nothing under a wrong password', async () => {
+    expect(await readGallerySlot(cover, 'not the password')).toBeNull();
   });
 });

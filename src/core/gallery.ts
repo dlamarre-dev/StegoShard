@@ -416,6 +416,52 @@ async function extractSlot(cover: GalleryCover, posKey: Uint8Array): Promise<Uin
 }
 
 /**
+ * Read one photo's slot and open it, or null for a decoy, a destroyed carrier, a
+ * foreign image or a wrong password, which a failed tag cannot tell apart.
+ */
+async function openSlot(
+  img: GalleryCover,
+  posKey: Uint8Array,
+  aeadKey: CryptoKey,
+): Promise<Uint8Array | null> {
+  const slot = await extractSlot(img, posKey);
+  if (!slot) return null;
+  try {
+    return await decryptBytes(
+      aeadKey,
+      slot.subarray(0, IV_LEN),
+      slot.subarray(IV_LEN),
+      galleryFragAad(),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The authenticated fragment one photo carries (`header || shard`), or null.
+ *
+ * The single-photo half of `galleryDecode`, without the grouping and the
+ * reconstruction. It exists so the carrier layer can be pinned on its own: a
+ * whole gallery needs at least five carriers of about 300 KB each, while one
+ * photo and the fragment it opens to hold the carrier set, the position draw,
+ * the bit order, the slot layout and the AAD still. It is also the unit a reader
+ * that knows more than one embedding scheme tries each scheme against.
+ */
+export async function readGallerySlot(
+  cover: GalleryCover,
+  password: string,
+  params: Argon2Params = DEFAULT_ARGON2,
+): Promise<Uint8Array | null> {
+  const { posKey, aeadKey } = await galleryKeys(password, params);
+  try {
+    return await openSlot(cover, posKey, aeadKey);
+  } finally {
+    posKey.fill(0);
+  }
+}
+
+/**
  * Strip provenance from every cover in the set, and report on what is left
  * (SPEC §9.7).
  *
@@ -798,19 +844,8 @@ export async function galleryDecode(
   const frags: { header: Header; shard: Uint8Array }[] = [];
   for (const [i, img] of images.entries()) {
     await report(on, { phase: 'extract', done: i, total: images.length });
-    const slot = await extractSlot(img, posKey);
-    if (!slot) continue;
-    let frag: Uint8Array;
-    try {
-      frag = await decryptBytes(
-        aeadKey,
-        slot.subarray(0, IV_LEN),
-        slot.subarray(IV_LEN),
-        galleryFragAad(),
-      );
-    } catch {
-      continue; // failed tag → decoy, destroyed carrier, or foreign image
-    }
+    const frag = await openSlot(img, posKey, aeadKey);
+    if (!frag) continue;
     try {
       frags.push(decodeImagePayload(frag));
     } catch {
