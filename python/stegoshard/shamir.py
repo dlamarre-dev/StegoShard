@@ -42,12 +42,17 @@ BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _SHARE_TOKEN = re.compile(r"[0-9A-Za-z]{5}(?:-[0-9A-Za-z]{1,5})+")
 
 
+#: Crockford's decode aliases, mirroring shamir.ts: letters that read as digits.
+_ALIASES = {"O": "0", "I": "1", "L": "1"}
+
+
 def base32_decode(text: str) -> bytes:
     """Decode Crockford base32, ignoring dashes, spaces and line breaks."""
     bits = 0
     value = 0
     out = bytearray()
     for char in text.upper():
+        char = _ALIASES.get(char, char)
         idx = BASE32_ALPHABET.find(char)
         if idx < 0:
             continue  # separator, or a stray character the alphabet excludes
@@ -101,6 +106,8 @@ def parse_share(share: bytes) -> tuple[int, bytes]:
         raise ValueError("share: bad length")
     if share[0] != SHARE_VERSION:
         raise ValueError(f"share: unsupported version {share[0]}")
+    if share[1] == 0:
+        raise ValueError("share: index 0 out of range")  # SPEC 10.6.1: 1..255
     body = share[:_SHARE_BODY_LEN]
     if share[_SHARE_BODY_LEN:] != _checksum(body):
         raise ShareChecksumError("share checksum mismatch (likely a transcription error)")

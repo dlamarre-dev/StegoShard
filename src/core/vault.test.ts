@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { type Argon2Params, WrongPasswordError, createKeyBlock, serializeKeyBlock } from './crypto';
-import { CODEC_COLOR_GRID, CODEC_QR_GRID, PROFILE_DISK, PROFILE_PAPER } from './header';
+import {
+  CODEC_COLOR_GRID,
+  CODEC_QR_GRID,
+  PROFILE_DISK,
+  PROFILE_PAPER,
+  decodeImagePayload,
+  encodeImagePayload,
+} from './header';
 import {
   FileTooLargeError,
   MAX_FILE_BYTES,
@@ -137,6 +144,20 @@ describe('import robustness', () => {
     const { imagePayloads } = await exportVault('a.bin', content, key);
     const foreign = new Uint8Array(60); // bad magic → not an StegoShard payload
     const out = await importVault([foreign, ...imagePayloads], 'pw');
+    expect([...out.content]).toEqual([...content]);
+  });
+
+  // Found in review: only the set id was voted on, and k, m, the length and the
+  // hash came from whichever member was listed first.
+  it('outvotes a damaged first header that still decodes', async () => {
+    const key = await makeKey('pw');
+    const content = pseudoRandom(3000, 44);
+    const { imagePayloads } = await exportVault('a.bin', content, key);
+    const { header, shard } = decodeImagePayload(imagePayloads[0]!);
+    const hash = header.hash.slice();
+    hash[0] = hash[0]! ^ 0xff;
+    const damaged = encodeImagePayload({ ...header, hash }, shard);
+    const out = await importVault([damaged, ...imagePayloads.slice(1)], 'pw');
     expect([...out.content]).toEqual([...content]);
   });
 

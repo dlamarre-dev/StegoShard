@@ -68,6 +68,7 @@ import {
   decodeShareText,
   shamirRecover,
   randomBytes,
+  KEY_BLOCK_LEN,
   KEY_FACTOR_LEN,
   inspectCoverSet,
   inspectJpegCover,
@@ -1202,33 +1203,82 @@ async function firstKeyIn(
 ): Promise<Uint8Array | undefined> {
   for (const { name, bytes } of photos) {
     if (!isJpegBytes(bytes) && !(bytes[0] === 0x89 && bytes[1] === 0x50)) continue;
-    const key =
-      (await extractKeyImage(bytes, name, password)) ??
-      (await extractKeyFactorImage(bytes, name, password));
-    if (key) return key;
+    // One photo that does not decode (a truncated PNG throws rather than
+    // answering null) is not the key and must not end the search: it used to
+    // stop here with an internal error before the real key photo was tried.
+    try {
+      const key =
+        (await extractKeyImage(bytes, name, password)) ??
+        (await extractKeyFactorImage(bytes, name, password));
+      if (key) return key;
+    } catch {
+      // not a readable image, so not the key
+    }
   }
   return undefined;
+}
+
+/** `decodeImageToPayload`, with an image that does not decode reading as not a vault image. */
+function payloadOrNull(photo: PhotoInput): Uint8Array | null {
+  try {
+    return decodeImageToPayload(photo.bytes, photo.name);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The binary containers among the inputs, each read once and sorted into the
+ * vault and its key.
+ *
+ * Both carry the same wrapping, so the payload decides: a key container holds a
+ * key block or a key factor, and nothing else is that short. Taking the first
+ * container found picked `stegoshard-key.ssbn` over `stegoshard-vault.ssbn`,
+ * which sorts after it.
+ */
+function binaryContainers(paths: readonly string[]): {
+  vault?: { path: string; bytes: Uint8Array };
+  key?: { path: string; payload: Uint8Array };
+} {
+  const out: ReturnType<typeof binaryContainers> = {};
+  for (const path of paths.filter(isBinaryContainerFile)) {
+    const bytes = read(path);
+    let payload: Uint8Array | undefined;
+    try {
+      payload = unwrapBinary(bytes)?.payload;
+    } catch {
+      // an unsupported version: left to the vault path, which reports it
+    }
+    const isKey = payload?.length === KEY_BLOCK_LEN || payload?.length === KEY_FACTOR_LEN;
+    if (isKey && !out.key) out.key = { path, payload: payload! };
+    else if (!isKey && !out.vault) out.vault = { path, bytes };
+  }
+  return out;
 }
 
 export async function runRestore(
   opts: RestoreOptions,
   onProgress?: OnProgress,
 ): Promise<RestoreResult> {
-  const binaryVaultPath = opts.inputs.find(isBinaryContainerFile);
-  if (binaryVaultPath) {
-    // With no --key, anything else on the command line beside the container can
-    // only be its key photo: tried before decrypting, because a .db whose key
-    // factor is missing answers "wrong password" (by design), not "missing key".
-    const others = opts.inputs.filter((p) => p !== binaryVaultPath);
+  const containers = binaryContainers(opts.inputs);
+  if (containers.vault) {
+    // With no --key, a key container beside the vault is its key. Otherwise
+    // anything else on the command line can only be its key photo: tried before
+    // decrypting, because a .db whose key factor is missing answers "wrong
+    // password" (by design), not "missing key".
+    const vault = containers.vault;
+    const others = opts.inputs.filter((p) => p !== vault.path && p !== containers.key?.path);
     const keyBlock = opts.keyPath
       ? await resolveKeyStage(opts.keyPath, opts.password, onProgress)
-      : others.length > 0
-        ? await opaqueStage(onProgress, 'derive', () => keyFromPhotos(others, opts.password))
-        : undefined;
+      : containers.key
+        ? containers.key.payload
+        : others.length > 0
+          ? await opaqueStage(onProgress, 'derive', () => keyFromPhotos(others, opts.password))
+          : undefined;
     // Threshold shares (Mode B) recover the secret that gates the .db slot.
     const secret = await recoverSecret(opts.sharePaths);
     const { filename, content, bundled, identity } = await importVaultBinary(
-      read(binaryVaultPath),
+      vault.bytes,
       opts.password,
       { keyBlock, secret: secret ?? null, maxBytes: opts.maxBytes ?? DEFAULT_MAX_BINARY_BYTES },
       onProgress,
@@ -1242,7 +1292,7 @@ export async function runRestore(
     ? await resolveKeyStage(opts.keyPath, opts.password, onProgress)
     : undefined;
   const gathered = await gatherInputs(opts.inputs, onProgress);
-  const keyBlock = explicitKey ?? gathered.keyBlock;
+  const keyBlock = explicitKey ?? gathered.keyBlock ?? containers.key?.payload;
 
   if (gathered.payloads.length === 0) {
     throw new StegoShardApiError('NO_READABLE_IMAGES', 'no readable vault images among the inputs');
@@ -1259,9 +1309,7 @@ export async function runRestore(
     // attempt costs a key derivation.
     if (!(err instanceof MissingKeyError) || keyBlock) throw err;
     // Zipped images included: a whole delivery zipped up holds the key photo too.
-    const unreadable = gatherPhotos(opts.inputs).photos.filter(
-      (p) => decodeImageToPayload(p.bytes, p.name) === null,
-    );
+    const unreadable = gatherPhotos(opts.inputs).photos.filter((p) => payloadOrNull(p) === null);
     const found = await keyInPhotos(unreadable, opts.password);
     if (!found) throw err;
     restored = await importVault(gathered.payloads, opts.password, { keyBlock: found });

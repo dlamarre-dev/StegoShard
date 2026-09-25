@@ -155,10 +155,12 @@ const DQT = 0xdb;
  * — so an encoder profile may only ever be *coarser* than the file it is given.
  * The sum is enough for that comparison and says nothing else about the image.
  *
- * Table id 0 by convention: baseline JPEG assigns it to the luma component, and
- * every profile in this codebase writes it first. A file that assigns another id
- * to luma reads as "no luma table" here, and the caller refuses rather than
- * comparing against a table that may not be the one in use.
+ * The table is the one the frame header assigns to its first component, which
+ * is luma in every JFIF and EXIF file. It used to be id 0 by convention, which
+ * holds for every profile in this codebase and not for every file: one whose luma
+ * uses table 1 had its chroma table compared instead, refusing a safe photo or
+ * accepting one too coarse. No frame header, or no table under the id it names,
+ * reads as null, and the caller refuses rather than guess.
  */
 export function lumaQuantSum(bytes: Uint8Array): number | null {
   let layout: JpegLayout;
@@ -167,6 +169,12 @@ export function lumaQuantSum(bytes: Uint8Array): number | null {
   } catch {
     return null;
   }
+  const sof = layout.segments.find((seg) => isSof(seg.marker));
+  // Precision, height, width and the component count come first (6 bytes), then
+  // the first component's id, sampling byte and quantization table id.
+  if (!sof || sof.payloadStart + 9 > sof.end) return null;
+  const lumaTable = bytes[sof.payloadStart + 8]!;
+  const sums = new Map<number, number>();
   for (const seg of layout.segments) {
     if (seg.marker !== DQT) continue;
     let p = seg.payloadStart;
@@ -176,17 +184,21 @@ export function lumaQuantSum(bytes: Uint8Array): number | null {
       p += 1;
       const width = precision === 0 ? 1 : 2;
       if (p + 64 * width > seg.end) return null;
-      if (id === 0) {
-        let sum = 0;
-        for (let i = 0; i < 64; i++) {
-          sum += width === 1 ? bytes[p + i]! : u16(bytes, p + i * 2);
-        }
-        return sum;
+      let sum = 0;
+      for (let i = 0; i < 64; i++) {
+        sum += width === 1 ? bytes[p + i]! : u16(bytes, p + i * 2);
       }
+      // A later definition replaces an earlier one, as it does for a decoder.
+      sums.set(id, sum);
       p += 64 * width;
     }
   }
-  return null;
+  return sums.get(lumaTable) ?? null;
+}
+
+/** SOF0..SOF15, less DHT (C4), JPG (C8) and DAC (CC), which share the range. */
+function isSof(marker: number): boolean {
+  return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
 }
 
 /** The payload bytes of a segment, i.e. everything after its length field. */

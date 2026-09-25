@@ -315,7 +315,14 @@ function scrubTiff(out: Uint8Array, from: number, to: number): boolean {
     const { at: ifd, gps } = queue.shift()!;
     // A malformed file can point an IFD at itself, or at one already walked;
     // visiting each offset once bounds the walk without trusting the file.
-    if (ifd <= 0 || ifd + 2 > tiff.length || seen.has(ifd)) continue;
+    if (ifd <= 0 || ifd + 2 > tiff.length) {
+      // Fail closed on a GPS pointer (SPEC §9.8.3): skipping it would remove the
+      // pointer, report the location as scrubbed, and leave the coordinates in
+      // the file wherever the encoder actually put them.
+      if (gps) throw new ExifScrubError('the GPS IFD pointer lands outside the EXIF block');
+      continue;
+    }
+    if (seen.has(ifd)) continue;
     seen.add(ifd);
     const count = u16(ifd);
     // 2 count bytes, `count` 12-byte entries, then a 4-byte next-IFD offset.

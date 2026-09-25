@@ -33,6 +33,21 @@ function randomContent(len: number): Uint8Array {
   return randomBytes(len);
 }
 
+// Found in review: these callbacks were called directly rather than through
+// `report()`, so a progress display that failed failed the save with it.
+describe('a failing progress callback', () => {
+  it('neither fails a segmented save nor its restore', async () => {
+    const key = await makeKey('pw');
+    const content = randomContent(12345);
+    const boom = () => {
+      throw new Error('progress display broke');
+    };
+    const blob = await buildSegmentedBlob('x', content, key, 'embedded', boom, CHUNK);
+    const out = await decodeSegmentedBlob(blob, 'pw', { maxContentBytes: MAX }, boom);
+    expect([...out.content]).toEqual([...content]);
+  });
+});
+
 describe('segmented blob round-trip', () => {
   // With filename 'x' (1 byte) and incompressible content, the envelope length is
   // 4 + len, so these lengths cover: empty, 1 byte, a partial last chunk, an exact

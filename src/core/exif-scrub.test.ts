@@ -171,6 +171,21 @@ describe('EXIF it cannot walk', () => {
     expect(() => scrubGps(broken((t) => t.set([0xff, 0xff], 8)))).toThrow(ExifScrubError);
   });
 
+  // Found in review: this was skipped, the pointer removed, and the photo
+  // reported as scrubbed with its coordinates still in the file.
+  it('refuses a GPS pointer that lands outside the block', () => {
+    const photo = broken((t) => {
+      const be = t[0] === 0x4d;
+      const u16 = (o: number) => (be ? (t[o]! << 8) | t[o + 1]! : t[o]! | (t[o + 1]! << 8));
+      const count = u16(8);
+      for (let i = 0; i < count; i++) {
+        const e = 8 + 2 + i * 12;
+        if (u16(e) === 0x8825) t.set([0xff, 0xff, 0xff, 0xf0], e + 8);
+      }
+    });
+    expect(() => scrubGps(photo)).toThrow(ExifScrubError);
+  });
+
   it('refuses a tag whose value runs past the end of the block', () => {
     // The Make entry's value offset, pushed past the end.
     expect(() => scrubGps(broken((t) => t.set([0xff, 0xff, 0xff, 0xf0], 8 + 2 + 8)))).toThrow(
