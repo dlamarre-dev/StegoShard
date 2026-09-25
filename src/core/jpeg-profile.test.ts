@@ -243,6 +243,20 @@ describe('the source a re-encode refuses', () => {
     expect(lumaQuantSum(new Uint8Array([0xff, 0xd8, 0xff]))).toBeNull();
   });
 
+  // Found in review: table 0 was read whatever the frame header assigned to luma.
+  it('reads the table the frame header assigns to luma, not table 0', () => {
+    const bytes = encodeJpegProfile(pixels).slice();
+    const sof = parseJpegSegments(bytes).segments.find((s) => s.marker === 0xc0)!;
+    const lumaTq = sof.payloadStart + 8; // first component's quantization table id
+    expect(bytes[lumaTq]).toBe(0);
+    bytes[lumaTq] = 1; // point luma at the chroma table
+    const chroma = lumaQuantSum(bytes);
+    expect(chroma).not.toBeNull();
+    expect(chroma).not.toBe(1109);
+    bytes[lumaTq] = 5; // a table this file never defines
+    expect(lumaQuantSum(bytes)).toBeNull();
+  });
+
   /**
    * The comb: re-quantizing finer than the source empties histogram bins, which
    * is what a photo already through a messaging app would do here. Refused from

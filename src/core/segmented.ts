@@ -64,7 +64,7 @@ import {
 import { DB_LADDER, pickBucket } from './buckets';
 import { REGION_LEN_FIELD, padRegionPlaintext, parseRegionPlaintext } from './regions';
 import { buildPayload, parsePayload, type VaultIdentity } from './payload';
-import type { OnProgress } from './progress';
+import { type OnProgress, report } from './progress';
 import type { KeyMode } from './types';
 import type { LiveRegion, VaultKey } from './vault';
 import { MissingKeyError } from './vault';
@@ -190,7 +190,7 @@ export async function buildSegmentedBlob(
   identity?: VaultIdentity | undefined,
 ): Promise<Uint8Array> {
   const envelope = await buildPayload(filename, content, { bundle, identity });
-  onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
+  await report(onProgress, { phase: 'compress', done: envelope.length, total: envelope.length });
 
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
   const noncePrefix = randomBytes(NONCE_PREFIX_LEN);
@@ -213,7 +213,7 @@ export async function buildSegmentedBlob(
     const segment = envelope.subarray(start, end);
     const nonce = buildNonce(noncePrefix, i, i === n - 1);
     parts.push(await aeadSeal(cek, nonce, segment, header));
-    onProgress?.({ phase: 'encrypt', done: end, total: L });
+    await report(onProgress, { phase: 'encrypt', done: end, total: L });
   }
   return concatBytes(...parts);
 }
@@ -257,7 +257,7 @@ async function decryptChunks(
     }
     out.set(pt, outOff);
     outOff += pt.length;
-    onProgress?.({ phase: 'decrypt', done: outOff, total: plaintextLen });
+    await report(onProgress, { phase: 'decrypt', done: outOff, total: plaintextLen });
   }
   return out;
 }
@@ -294,9 +294,9 @@ export async function decodeSegmentedBlob(
   const kbBytes = parsed.keyBlock.length > 0 ? parsed.keyBlock : opts.keyBlock;
   if (!kbBytes || kbBytes.length === 0) throw new MissingKeyError();
   // Argon2id is the multi-second cost on restore; flag it as an indeterminate phase.
-  onProgress?.({ phase: 'unlock', done: 0, total: 0 });
+  await report(onProgress, { phase: 'unlock', done: 0, total: 0 });
   const dek = await unlockKeyBlock(parseKeyBlock(kbBytes), password);
-  onProgress?.({ phase: 'unlock', done: 1, total: 1 });
+  await report(onProgress, { phase: 'unlock', done: 1, total: 1 });
   const cek = await deriveContentKey(dek, parsed.contentSalt);
   const envelope = await decryptChunks(blob, parsed, cek, opts.maxContentBytes, onProgress);
   return parsePayload(envelope, opts.maxContentBytes);
@@ -381,7 +381,7 @@ async function buildRegionStream(
   region: LiveRegion,
   bucket: number,
   chunkSize: number,
-  onChunk?: (done: number) => void,
+  onChunk?: (done: number) => Promise<void>,
 ): Promise<Uint8Array> {
   const contentSalt = randomBytes(CONTENT_SALT_LEN);
   const noncePrefix = randomBytes(NONCE_PREFIX_LEN);
@@ -395,7 +395,7 @@ async function buildRegionStream(
     const end = Math.min(start + chunkSize, bucket);
     const nonce = buildNonce(noncePrefix, i, i === n - 1);
     parts.push(await aeadSeal(cek, nonce, plaintext.subarray(start, end), aad));
-    onChunk?.(end);
+    await onChunk?.(end);
   }
   return concatBytes(...parts);
 }
@@ -428,7 +428,7 @@ export async function buildMultiRegionSegmentedBlob(
   let base = 0;
   for (const r of live) {
     streams[r.regionIndex] = await buildRegionStream(head, r, bucket, chunkSize, (done) =>
-      onProgress?.({ phase: 'encrypt', done: base + done, total: totalLive }),
+      report(onProgress, { phase: 'encrypt', done: base + done, total: totalLive }),
     );
     base += bucket;
   }
@@ -457,7 +457,7 @@ export async function buildPlainSegmentedBlobMulti(
   const dek = randomBytes(DEK_LEN);
   const regionIndex = randomBytes(1)[0]! & 1;
   const envelope = await buildPayload(filename, content, { bundle });
-  onProgress?.({ phase: 'compress', done: envelope.length, total: envelope.length });
+  await report(onProgress, { phase: 'compress', done: envelope.length, total: envelope.length });
   const blob = await buildMultiRegionSegmentedBlob(
     vaultSalt,
     [{ kek, dek, regionIndex }],
@@ -553,7 +553,7 @@ async function decryptRegionStream(
     }
     out.set(pt, outOff);
     outOff += pt.length;
-    onProgress?.({ phase: 'decrypt', done: outOff, total: bucketLen });
+    await report(onProgress, { phase: 'decrypt', done: outOff, total: bucketLen });
   }
   return parseRegionPlaintext(out, maxContentBytes);
 }
@@ -576,7 +576,7 @@ export async function decodeMultiRegionSegmentedBlob(
   onProgress?: OnProgress,
 ): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const parsed = parseMultiHead(blob, opts.maxContentBytes);
-  onProgress?.({ phase: 'unlock', done: 0, total: 0 });
+  await report(onProgress, { phase: 'unlock', done: 0, total: 0 });
   let candidates: CryptoKey[];
   try {
     candidates = await slotKekCandidates(
@@ -594,7 +594,7 @@ export async function decodeMultiRegionSegmentedBlob(
     candidates,
     slotAadFor('segmented-multiregion', parsed.vaultSalt),
   );
-  onProgress?.({ phase: 'unlock', done: 1, total: 1 });
+  await report(onProgress, { phase: 'unlock', done: 1, total: 1 });
   const stream = parsed.regionArea.subarray(regionIndex * parsed.S, (regionIndex + 1) * parsed.S);
   const envelope = await decryptRegionStream(
     parsed.head,

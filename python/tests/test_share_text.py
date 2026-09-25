@@ -80,3 +80,22 @@ def test_rejects_a_truncated_token() -> None:
     truncated = _grouped(share)[:20]
     with pytest.raises(ValueError, match="expected 38 bytes"):
         decode_share_text(truncated)
+
+
+def test_crockford_aliases_read_as_digits() -> None:
+    """O reads as 0 and I or L as 1, mirroring shamir.test.ts."""
+    share = serialize_share(1, bytes(32))  # a zero value: its text is mostly 0s
+    text = _grouped(share)
+    assert "0" in text
+    assert decode_share_text(text.replace("0", "O").replace("1", "l")) == share
+
+
+def test_share_index_zero_is_refused() -> None:
+    import hashlib
+
+    from stegoshard.shamir import parse_share
+
+    body = bytes([1, 0]) + b"B" * 32
+    forged = body + hashlib.sha256(body).digest()[:4]
+    with pytest.raises(ValueError, match="index 0"):
+        parse_share(forged)

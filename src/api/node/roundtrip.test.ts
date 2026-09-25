@@ -411,6 +411,58 @@ describe('CLI round-trips', () => {
     });
   });
 
+  // Found in review: the first container found was taken for the vault, and
+  // `stegoshard-key.ssbn` sorts before `stegoshard-vault.ssbn`; a key container
+  // given without --key was not looked at either.
+  it('binary branded keyfile: key .ssbn listed before the vault, no --key', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(2000, 53);
+    const { files } = await runSave({
+      inputs: [writeSecret(dir, content)],
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      binary: 'branded',
+      keyMode: 'keyfile',
+    });
+    const vault = files.find((f) => f.endsWith('stegoshard-vault.ssbn'))!;
+    const key = files.find((f) => f.endsWith('stegoshard-key.ssbn'))!;
+    const { outPath } = await runRestore({
+      inputs: [key, vault],
+      outDir: join(dir, 'r'),
+      password: PW,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
+  // Found in review: a PNG that does not decode threw out of the key search,
+  // before the real key photo was tried.
+  it('finds the key photo past a truncated PNG among the inputs', SLOW, async () => {
+    const dir = tmp();
+    const content = pattern(1500, 59);
+    const cover = writeCover(dir);
+    const { files } = await runSave({
+      inputs: [writeSecret(dir, content)],
+      outDir: join(dir, 'out'),
+      password: PW,
+      paper: false,
+      zip: false,
+      binary: 'branded',
+      keyMode: 'stego',
+      cover,
+    });
+    const png = readFileSync(cover);
+    const broken = join(dir, 'IMG_0001.png');
+    writeFileSync(broken, png.subarray(0, Math.floor(png.length / 2)));
+    const { outPath } = await runRestore({
+      inputs: [broken, ...files],
+      outDir: join(dir, 'r'),
+      password: PW,
+    });
+    expect([...readFileSync(outPath)]).toEqual([...content]);
+  });
+
   it('warns when a secret over 256 KiB is saved as images', SLOW, async () => {
     const dir = tmp();
     // Over the warn threshold by raw size, but highly compressible so it still

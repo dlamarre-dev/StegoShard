@@ -33,6 +33,7 @@ from .format import (
     IV_LEN,
     MAX_CONTENT_BYTES,
     MAX_CONTENT_BYTES_BINARY,
+    Header,
     decode_blob,
     parse_envelope,
     parse_key_block,
@@ -90,11 +91,16 @@ def decode_vault(
         raise ValueError("import: no valid StegoShard images found")
 
     # Use the majority set so a stray/first-listed foreign image can't derail it.
-    counts: dict[bytes, int] = {}
+    # Vote on every field the reconstruction reads, as vault.ts does, so one
+    # damaged but decodable header listed first cannot set k, m, length or hash.
+    def shape(h: Header) -> tuple[bytes, int, int, int, bytes]:
+        return (h.set_id, h.k, h.m, h.blob_len, h.hash)
+
+    counts: dict[tuple[bytes, int, int, int, bytes], int] = {}
     for header, _shard in decoded:
-        counts[header.set_id] = counts.get(header.set_id, 0) + 1
-    best_set = max(counts, key=lambda s: counts[s])
-    members = [(h, s) for (h, s) in decoded if h.set_id == best_set]
+        counts[shape(header)] = counts.get(shape(header), 0) + 1
+    best = max(counts, key=lambda s: counts[s])
+    members = [(h, s) for (h, s) in decoded if shape(h) == best]
     first = members[0][0]
     k, m, blob_len = first.k, first.m, first.blob_len
 

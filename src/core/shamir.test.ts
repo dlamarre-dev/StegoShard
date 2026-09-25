@@ -67,6 +67,26 @@ describe('Shamir secret sharing (SPEC §10.6.1)', () => {
     await expect(shamirRecover([shares[0]!, shares[1]!])).resolves.toHaveLength(SECRET_LEN);
   });
 
+  // Found in review: the checksum is unkeyed, so a share at x=0 is easy to forge,
+  // and Lagrange at 0 then returns its value whatever the genuine shares say.
+  it('refuses a share at index 0, which SPEC §10.6.1 excludes', async () => {
+    const body = Uint8Array.of(1, 0, ...new Uint8Array(SECRET_LEN).fill(0x42));
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', body));
+    const forged = Uint8Array.of(...body, ...digest.subarray(0, 4));
+    await expect(parseShare(forged)).rejects.toThrow(/index 0/);
+    const [genuine] = await shamirSplit(secret(), 2, 3);
+    await expect(shamirRecover([forged, genuine!])).rejects.toThrow(/index 0/);
+  });
+
+  it('reads O as 0 and I or L as 1 in a typed share, as Crockford base32 does', async () => {
+    const shares = await shamirSplit(secret(), 2, 3);
+    for (const share of shares) {
+      const text = encodeShareText(share);
+      const misread = text.replace(/0/g, 'O').replace(/1/g, (_, i: number) => (i % 2 ? 'l' : 'I'));
+      expect(decodeShareText(misread)).toEqual(share);
+    }
+  });
+
   it('checksum detects a transcription error but is not vault-bound', async () => {
     const shares = await shamirSplit(secret(), 2, 3);
     const good = shares[0]!;

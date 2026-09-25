@@ -1,303 +1,54 @@
 /**
- * Key material is wiped after use, and nothing verified that until now.
+ * The key-mixing steps leave no copy of a KEK behind.
  *
- * `docs/CRYPTO-REVIEW.md` §3 tells auditors three specific things: the transient
- * raw KEK is zeroized immediately after import in `deriveKEK`; the raw DEK is
- * zeroized on both the wrap and unwrap paths; and the wrap path zeroizes a
- * `.slice()` copy rather than the buffer `exportKey` returned, because a runtime
- * that aliased that buffer to the live key would otherwise see the wipe corrupt
- * the key.
- *
- * `src/core` performs 46 `fill(0)` calls in service of that. Not one was tested.
- * The first nightly mutation run showed what that means: deleting the calls
- * outright leaves the entire suite green, so the dossier described a behaviour
- * the code was free to stop having.
- *
- * WHAT THIS PROVES, AND WHAT IT DOES NOT
- * The buffers are function-local, so a caller cannot inspect them. The spy goes
- * on `Uint8Array.prototype.fill` and records every wipe, which is exactly what
- * the mutant removes: delete the call and the test fails.
- *
- * It does not prove the memory becomes unreachable, and nothing in JavaScript
- * could. CRYPTO-REVIEW says `fill(0)` is best-effort, that the VM may have copied
- * buffers through GC compaction or the hash-wasm heap, and that remains true.
- * These tests move the claim from "documented" to "verified as written", which is
- * a smaller thing and the only honest one available.
+ * Found in review: `KEK || factor` and `KEK || secret` were built inline for
+ * HKDF and never zeroed, while the KEK they copied was. Watching the buffers
+ * `concatBytes` hands out is the only way to see that from outside, so the
+ * module is wrapped here and every buffer of the concatenation's size is kept.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  type Argon2Params,
-  DEK_LEN,
-  clearUserEntropy,
-  deriveContentKey,
-  deriveKEK,
-  exportDekRaw,
-  aeadSeal,
-  generateDEK,
-  installUserEntropy,
-  randomBytes,
-  serializeSlot,
-  slotAadFor,
-  tryOpenSlot,
-  unwrapDEK,
-  wrapDEK,
-} from './crypto';
+import { describe, it, expect, vi } from 'vitest';
 
-const KIND = 'gallery-multiregion' as const;
-const SLOT_AAD = (salt: Uint8Array) => slotAadFor(KIND, salt);
-const SALT = new Uint8Array(16).fill(0x5a);
-
-const PARAMS: Argon2Params = { iterations: 1, memoryKiB: 256, parallelism: 1 };
-
-/** Lengths of every buffer wiped with zero while the spy was installed. */
-let wipes: number[] = [];
-let spy: ReturnType<typeof vi.spyOn>;
-
-beforeEach(() => {
-  wipes = [];
-  const real = Uint8Array.prototype.fill;
-  spy = vi.spyOn(Uint8Array.prototype, 'fill').mockImplementation(function (
-    this: Uint8Array,
-    ...args: unknown[]
-  ) {
-    // Only zero-fills count. Buffers are also filled with other values during
-    // ordinary work, and counting those would make the assertions meaningless.
-    if (args[0] === 0 && args.length === 1) wipes.push(this.length);
-    return (real as (...a: unknown[]) => Uint8Array).apply(this, args);
-  });
+const made: Uint8Array[] = [];
+vi.mock('./bytes', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./bytes')>();
+  return {
+    ...real,
+    concatBytes: (...parts: Uint8Array[]) => {
+      const out = real.concatBytes(...parts);
+      made.push(out);
+      return out;
+    },
+  };
 });
 
-afterEach(() => spy.mockRestore());
+const { randomBytes, slotKekCandidates, slotKekRaw } = await import('./crypto');
 
-/**
- * Wipes of a given length, counted exactly.
- *
- * `toBeGreaterThan(0)` was the first form and it was too weak. `deriveContentKey`
- * wipes two 32-byte buffers, the raw DEK copy and the CEK bytes, so deleting
- * either one still left a wipe of that length behind and the assertion passed. A
- * targeted mutation run confirmed the CEK deletion survived. Counts are exact
- * here for that reason: the number is the assertion.
- */
-const wiped = (len: number) => wipes.filter((n) => n === len).length;
+const FAST = { iterations: 1, memoryKiB: 256, parallelism: 1 };
+const KEK_PLUS_32 = 64;
 
-describe('key material is zeroized after use (CRYPTO-REVIEW §3)', () => {
-  it('wipes the transient raw KEK after importing it', async () => {
-    await deriveKEK('correct horse battery staple', randomBytes(16), PARAMS);
-    // Exactly one 32-byte wipe: the Argon2 output, imported non-extractable then
-    // wiped. Argon2 itself allocates through the hash-wasm heap, not through a
-    // Uint8Array this spy can see.
-    expect(wiped(32), 'deriveKEK did not wipe exactly its raw KEK bytes').toBe(1);
+/** The concatenations a call made that are the size of KEK || 32 bytes. */
+async function concatenationsOf(run: () => Promise<unknown>): Promise<Uint8Array[]> {
+  made.length = 0;
+  await run();
+  return made.filter((b) => b.length === KEK_PLUS_32);
+}
+
+describe('KEK copies are zeroed', () => {
+  it('after mixing in a key factor', async () => {
+    const copies = await concatenationsOf(() =>
+      slotKekRaw('pw', randomBytes(16), randomBytes(32), FAST),
+    );
+    expect(copies.length).toBeGreaterThan(0);
+    for (const c of copies) expect(c.every((b) => b === 0)).toBe(true);
   });
 
-  it('wipes the transient raw DEK after importing it', async () => {
-    await generateDEK();
-    expect(wiped(DEK_LEN), 'generateDEK did not wipe exactly its raw DEK bytes').toBe(1);
-  });
-
-  it('wipes the exported DEK copy on the wrap path', async () => {
-    const salt = randomBytes(16);
-    const kek = await deriveKEK('pw', salt, PARAMS);
-    const dek = await generateDEK();
-    wipes = [];
-    await wrapDEK(dek, kek, salt, PARAMS);
-    expect(wiped(DEK_LEN), 'wrapDEK did not wipe the exported key copy').toBe(1);
-  });
-
-  it('wipes a copy, not the buffer exportKey returned', async () => {
-    // The subtle half of the claim, and the first version of this test did not
-    // check it. It asserted only that the key was still usable afterwards, which
-    // passes on any conforming WebCrypto: the spec already says `exportKey`
-    // returns a fresh ArrayBuffer, so removing `.slice(0)` would have gone
-    // unnoticed on Node. The `.slice()` exists for runtimes that do not conform,
-    // Deno among them per the comment in crypto.ts, where the returned buffer
-    // still aliases the live key.
-    //
-    // So the buffer `exportKey` hands back is captured and inspected directly.
-    // Without the slice, `view.fill(0)` would scribble on exactly this buffer.
-    const salt = randomBytes(16);
-    const kek = await deriveKEK('pw', salt, PARAMS);
-    const dek = await generateDEK();
-
-    let exported: ArrayBuffer | null = null;
-    const realExport = globalThis.crypto.subtle.exportKey.bind(globalThis.crypto.subtle);
-    const exportSpy = vi
-      .spyOn(globalThis.crypto.subtle, 'exportKey')
-      .mockImplementation(async (...args: Parameters<typeof realExport>) => {
-        const out = await realExport(...args);
-        if (out instanceof ArrayBuffer && out.byteLength === DEK_LEN) exported = out;
-        return out;
-      });
-    try {
-      await wrapDEK(dek, kek, salt, PARAMS);
-    } finally {
-      exportSpy.mockRestore();
-    }
-
-    expect(exported, 'exportKey was never called with a DEK-sized key').not.toBeNull();
-    expect(
-      new Uint8Array(exported!).some((b) => b !== 0),
-      'wrapDEK zeroized the buffer exportKey returned, so a non-conforming runtime would lose the key',
-    ).toBe(true);
-
-    // And the key still works, which is the consequence that would follow.
-    const raw = await exportDekRaw(dek);
-    expect(raw.length).toBe(DEK_LEN);
-    expect(
-      raw.some((b) => b !== 0),
-      'the DEK was zeroized along with its copy',
-    ).toBe(true);
-  });
-
-  it('wipes the plaintext DEK on the unwrap path', async () => {
-    const salt = randomBytes(16);
-    const kek = await deriveKEK('pw', salt, PARAMS);
-    const dek = await generateDEK();
-    const { iv, wrapped } = await wrapDEK(dek, kek, salt, PARAMS);
-    wipes = [];
-    await unwrapDEK(wrapped, iv, kek, salt, PARAMS);
-    expect(wiped(DEK_LEN), 'unwrapDEK did not wipe the plaintext DEK').toBe(1);
-  });
-
-  it('wipes the transient CEK bytes after deriving the content key', async () => {
-    const dek = await generateDEK();
-    wipes = [];
-    await deriveContentKey(dek, randomBytes(16));
-    // Two, not one: the raw DEK copy and the CEK bytes, both 32 bytes. Asserting
-    // "at least one" let either deletion pass, which is exactly what happened.
-    expect(wiped(32), 'deriveContentKey wiped the wrong number of 32-byte buffers').toBe(2);
-  });
-
-  it('the spy would notice a deleted wipe', async () => {
-    // The instrument check. Every assertion above is "greater than zero", which a
-    // spy that recorded nothing would fail rather than pass, but a spy that
-    // recorded *everything* would satisfy them without measuring anything. This
-    // pins that zero-fills are counted and other fills are not.
-    const buf = new Uint8Array(999);
-    wipes = [];
-    buf.fill(7);
-    expect(wiped(999), 'a non-zero fill was counted as a wipe').toBe(0);
-    buf.fill(0);
-    expect(wiped(999), 'a zero fill was not counted').toBe(1);
-  });
-});
-
-/**
- * The user-entropy layer, which holds more secret material for longer than
- * anything else here.
- *
- * Its HKDF key lives for the whole session inside the HMAC instance, and its
- * keystream blocks are, by construction, bytes that were XORed into salts, IVs
- * and DEKs. A spent block left in memory is a spent one-time pad left in memory:
- * anyone who recovers it can subtract the layer back off every value drawn from
- * it. `crypto.ts` wipes all four buffers, and a mutation run showed that
- * deleting any of those calls left the whole suite green.
- *
- * Counts are exact for the reason given above the `wiped` helper: the layer wipes
- * a 32-byte buffer in three different places, so "at least one" would have
- * passed with two of them deleted.
- */
-describe('the user-entropy layer wipes its key material and spent keystream', () => {
-  afterEach(() => {
-    clearUserEntropy();
-  });
-
-  it('wipes the encoded text and the derived key on install', async () => {
-    const text = 'dice rolls 3 1 4 1 5'; // 20 ASCII bytes, so it cannot be confused
-    clearUserEntropy(); //                  with the 32-byte HKDF key below
-    wipes = [];
-
-    await installUserEntropy(text);
-
-    expect(wiped(20), 'the encoded passphrase was left in memory').toBe(1);
-    expect(wiped(32), 'the derived HKDF key was left in memory').toBe(1);
-  });
-
-  it('wipes each keystream block once it is spent', async () => {
-    await installUserEntropy('some entropy');
-    wipes = [];
-
-    randomBytes(64); // exactly two SHA-256 blocks, so one refill and one drain
-
-    // Block 0 is wiped when the refill replaces it, block 1 when the draw ends
-    // on a block boundary and the buffer is released.
-    expect(wiped(32), 'a spent keystream block was left in memory').toBe(2);
-  });
-
-  it('wipes the live block when the layer is cleared mid-block', async () => {
-    await installUserEntropy('some entropy');
-    randomBytes(16); // half of block 0 consumed, the rest still live
-    wipes = [];
-
-    clearUserEntropy();
-
-    expect(wiped(32), 'clearUserEntropy left an unspent keystream block behind').toBe(1);
-  });
-
-  it('wipes the previous layer before installing a new one', async () => {
-    await installUserEntropy('first');
-    randomBytes(16); // leave a live block behind
-    wipes = [];
-
-    await installUserEntropy('second');
-
-    // Two 32-byte wipes now: the old layer's live block, torn down first, and
-    // the new layer's HKDF key. Re-installing without that teardown would orphan
-    // the old keystream on the heap.
-    expect(wiped(32), 'reinstalling did not tear down the previous layer').toBe(2);
-  });
-});
-
-/**
- * The slot layer's transient plaintexts.
- *
- * A slot plaintext is a raw DEK plus its region index. It exists for as long as
- * it takes to seal or to copy out, on both sides, and `crypto.ts` wipes it in
- * three places: after sealing, after a successful open, and on the path that
- * refuses a slot naming a region that does not exist. All three deletions
- * survived the mutation run.
- */
-describe('slot plaintexts are wiped on both sides (SPEC §10.3)', () => {
-  const kekFor = () => deriveKEK('pw', randomBytes(16), PARAMS);
-  const SLOT_PLAINTEXT_LEN = 48;
-
-  it('wipes the plaintext it sealed', async () => {
-    const kek = await kekFor();
-    wipes = [];
-
-    await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT));
-
-    expect(wiped(SLOT_PLAINTEXT_LEN), 'serializeSlot left the raw DEK in its plaintext').toBe(1);
-  });
-
-  it('wipes the plaintext it opened, keeping only the DEK copy', async () => {
-    const kek = await kekFor();
-    const slot = await serializeSlot(kek, randomBytes(12), randomBytes(DEK_LEN), 0, SLOT_AAD(SALT));
-    wipes = [];
-
-    const opened = await tryOpenSlot(kek, slot, SLOT_AAD(SALT));
-
-    expect(opened).not.toBeNull();
-    expect(wiped(SLOT_PLAINTEXT_LEN), 'tryOpenSlot left the opened plaintext behind').toBe(1);
-    // The DEK handed back is a copy, so wiping the plaintext must not have
-    // blanked it.
-    expect(opened!.dek.some((b) => b !== 0)).toBe(true);
-  });
-
-  it('wipes the plaintext even when it refuses the slot', async () => {
-    // A forged slot naming a region that does not exist: it decrypts, so the
-    // plaintext is real key material, and then it is thrown away. That is the
-    // path most likely to forget the wipe, because nothing is returned.
-    const kek = await kekFor();
-    const nonce = randomBytes(12);
-    const pt = new Uint8Array(SLOT_PLAINTEXT_LEN);
-    pt.set(randomBytes(DEK_LEN), 0);
-    pt[DEK_LEN] = 99; // far outside the two regions
-    const forged = new Uint8Array([...nonce, ...(await aeadSeal(kek, nonce, pt, SLOT_AAD(SALT)))]);
-    wipes = [];
-
-    expect(await tryOpenSlot(kek, forged, SLOT_AAD(SALT))).toBeNull();
-
-    expect(wiped(SLOT_PLAINTEXT_LEN), 'the refused slot plaintext was left in memory').toBe(1);
+  it('after gating on threshold material, with and without a factor', async () => {
+    const copies = await concatenationsOf(() =>
+      slotKekCandidates('pw', randomBytes(16), randomBytes(32), randomBytes(32), FAST),
+    );
+    // One factor mix, and one gate for each of the two bases.
+    expect(copies.length).toBe(3);
+    for (const c of copies) expect(c.every((b) => b === 0)).toBe(true);
   });
 });

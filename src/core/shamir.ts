@@ -77,8 +77,18 @@ function base32Encode(bytes: Uint8Array): string {
   return out;
 }
 
+/**
+ * Crockford's decode aliases: the letters the alphabet leaves out because they
+ * read as digits. Dropping them, as this once did, shifted every later bit, so a
+ * share typed with `O` for `0` failed its checksum with no hint why.
+ */
+const ALIASES: Record<string, string> = { O: '0', I: '1', L: '1' };
+
 function base32Decode(text: string): Uint8Array {
-  const clean = text.toUpperCase().replace(/[^0-9A-Z]/g, '');
+  const clean = text
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .replace(/[OIL]/g, (c) => ALIASES[c]!);
   let bits = 0;
   let value = 0;
   const out: number[] = [];
@@ -167,6 +177,10 @@ export async function serializeShare(index: number, value: Uint8Array): Promise<
 export async function parseShare(share: Uint8Array): Promise<{ index: number; value: Uint8Array }> {
   if (share.length !== SHARE_LEN) throw new RangeError('share: bad length');
   if (share[0] !== SHARE_VERSION) throw new Error(`share: unsupported version ${share[0]}`);
+  // SPEC §10.6.1: 1..255. Index 0 is where Lagrange evaluates, so a share there
+  // *is* a secret, and with an unkeyed checksum anyone can forge one that
+  // overrides every genuine share it is combined with.
+  if (share[1] === 0) throw new RangeError('share: index 0 out of range');
   const body = share.subarray(0, SHARE_BODY_LEN);
   if (!bytesEqual(share.subarray(SHARE_BODY_LEN), await shareChecksum(body))) {
     throw new ShareChecksumError();
@@ -211,7 +225,7 @@ export async function shamirRecover(shares: Uint8Array[]): Promise<Uint8Array> {
   // Distinct, non-zero indices are required: a repeated index (the same share
   // loaded twice) makes a Lagrange denominator term (x_i XOR x_m) zero → a raw
   // GF(256) division-by-zero. Fail with a clear, catchable error instead. (x=0 is
-  // the secret itself and never a valid share index; parseShare already bounds ≥1.)
+  // the secret itself and never a valid share index; parseShare refuses it.)
   if (new Set(xs).size !== xs.length) {
     throw new ShareSetError('duplicate shares: each share must have a distinct index');
   }

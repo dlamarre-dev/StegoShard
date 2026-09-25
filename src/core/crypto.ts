@@ -726,9 +726,32 @@ export async function slotKekRaw(
 ): Promise<Uint8Array> {
   const kekBytes = await deriveKekBytes(password, vaultSalt, params);
   if (!keyFactor) return kekBytes;
-  const mixed = await hkdf(concatBytes(kekBytes, keyFactor), KEYFILE_KEK_INFO, DEK_LEN, vaultSalt);
-  kekBytes.fill(0);
-  return mixed;
+  try {
+    return await hkdfOverKey(kekBytes, keyFactor, KEYFILE_KEK_INFO, vaultSalt);
+  } finally {
+    kekBytes.fill(0);
+  }
+}
+
+/**
+ * HKDF over `kek || extra`, zeroing the concatenation afterwards.
+ *
+ * The concatenation is a second copy of the KEK, and every caller used to build
+ * it inline and drop it: the originals were zeroized and this copy of the same
+ * bytes was left for the garbage collector.
+ */
+async function hkdfOverKey(
+  kek: Uint8Array,
+  extra: Uint8Array,
+  info: Uint8Array,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  const ikm = concatBytes(kek, extra);
+  try {
+    return await hkdf(ikm, info, DEK_LEN, salt);
+  } finally {
+    ikm.fill(0);
+  }
 }
 
 export async function deriveSlotKek(
@@ -754,10 +777,12 @@ export async function gateKek(
   secret: Uint8Array,
   vaultSalt: Uint8Array,
 ): Promise<CryptoKey> {
-  const gated = await hkdf(concatBytes(baseKek, secret), SLOT_KEK_INFO, DEK_LEN, vaultSalt);
-  const key = await importAesGcmKey(gated);
-  gated.fill(0);
-  return key;
+  const gated = await hkdfOverKey(baseKek, secret, SLOT_KEK_INFO, vaultSalt);
+  try {
+    return await importAesGcmKey(gated);
+  } finally {
+    gated.fill(0);
+  }
 }
 
 /**
@@ -787,16 +812,17 @@ export async function slotKekCandidates(
   // no-factor live slot exists there), so it is harmless; credential independence
   // (§10.9) guarantees the real and decoy KEKs never both match.
   const bases: Uint8Array[] = [kekBytes];
-  if (keyFactor) {
-    bases.push(await hkdf(concatBytes(kekBytes, keyFactor), KEYFILE_KEK_INFO, DEK_LEN, vaultSalt));
+  try {
+    if (keyFactor) bases.push(await hkdfOverKey(kekBytes, keyFactor, KEYFILE_KEK_INFO, vaultSalt));
+    const candidates: CryptoKey[] = [];
+    for (const base of bases) {
+      candidates.push(await importAesGcmKey(base));
+      if (secret) candidates.push(await gateKek(base, secret, vaultSalt));
+    }
+    return candidates;
+  } finally {
+    for (const base of bases) base.fill(0);
   }
-  const candidates: CryptoKey[] = [];
-  for (const base of bases) {
-    candidates.push(await importAesGcmKey(base));
-    if (secret) candidates.push(await gateKek(base, secret, vaultSalt));
-  }
-  for (const base of bases) base.fill(0);
-  return candidates;
 }
 
 /**
@@ -935,11 +961,17 @@ export async function openSlotArray(
       const opened = await tryOpenSlot(kek, slot, aad); // never throws; no early exit
       if (opened) {
         matches++;
+        // Only the first DEK can be returned; any other is wiped as it arrives,
+        // and the first too when a second match fails the open closed below.
         if (!found) found = opened;
+        else opened.dek.fill(0);
       }
     }
   }
-  if (matches !== 1 || !found) throw new WrongPasswordError();
+  if (matches !== 1 || !found) {
+    found?.dek.fill(0);
+    throw new WrongPasswordError();
+  }
   return found;
 }
 

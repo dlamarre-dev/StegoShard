@@ -710,20 +710,26 @@ async function reassembleBlob(payloads: Uint8Array[]): Promise<Uint8Array> {
   }
   if (decoded.length === 0) throw new Error('import: no valid StegoShard images found');
 
+  // Vote on everything the reconstruction reads from a header, not only the set
+  // id. Voting on the id alone and then taking k, m, the length and the hash from
+  // whichever member came first let one damaged but decodable header, listed
+  // first, make an intact set unrecoverable. Image headers carry no checksum of
+  // their own, so agreement among them is the only evidence there is.
+  const shapeOf = (h: Header) => `${toHex(h.setId)}:${h.k}:${h.m}:${h.blobLen}:${toHex(h.hash)}`;
   const counts = new Map<string, number>();
   for (const { header } of decoded) {
-    const key = toHex(header.setId);
+    const key = shapeOf(header);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  let bestSet = '';
+  let bestShape = '';
   let bestCount = -1;
   for (const [key, n] of counts) {
     if (n > bestCount) {
       bestCount = n;
-      bestSet = key;
+      bestShape = key;
     }
   }
-  const members = decoded.filter(({ header }) => toHex(header.setId) === bestSet);
+  const members = decoded.filter(({ header }) => shapeOf(header) === bestShape);
   const first = members[0]!.header;
   const { k, m, blobLen } = first;
 

@@ -410,6 +410,32 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Fixed
 
+- **A threshold share at index 0 was accepted.** SPEC §10.6.1 allows 1 to 255. Index 0
+  is where the secret is evaluated, and the share checksum is unkeyed, so a forged share
+  there set the recovered secret by itself. It is now refused, in the Python reader too.
+- **A share typed with `O` for `0`, or `I` or `L` for `1`, failed its checksum.** Those
+  letters were dropped, shifting every later bit. They now read as the digits they look
+  like, as Crockford base32 intends.
+- **One damaged image header could make an intact image set unrecoverable.** Only the
+  set id was voted on; the shard counts, length and hash came from whichever image was
+  listed first. The whole header is now voted on, in the Python reader too.
+- **Restore gave up on a key search at the first PNG that did not decode**, with an
+  internal error, before trying the real key photo. Such a file is now skipped.
+- **A key `.ssbn` given with its vault was taken for the vault.** `stegoshard-key.ssbn`
+  sorts first. The vault and its key container are now told apart by what they hold, and
+  a key container given without `--key` is used as the key.
+- **A progress display that threw failed a `.ssbn` or `.db` save or restore.** Those
+  paths now report progress the way every other one does, where a failing display is
+  ignored.
+- **A GPS pointer outside the EXIF block was reported as removed**, with the coordinates
+  left wherever they were. The scrub now refuses the photo, as SPEC §9.8.3 requires.
+- **The re-encode coarseness check read quantization table 0**, whatever table the photo
+  assigns to luma, so a photo whose luma uses another table could be refused though safe,
+  or accepted though too coarse. The table is now the one the frame header names.
+- **Copies of a key-encryption key were left in memory.** The `KEK || factor` and
+  `KEK || secret` buffers built for HKDF, and a DEK opened from a second matching slot,
+  are now zeroed.
+
 - **A forged JPEG could exhaust memory.** The coefficient decoder had no size limit and
   fed padding bits without end past the scan, so a 138-byte file whose tables decode
   padding as empty blocks, claiming 65535x65535, allocated until the process died. It
