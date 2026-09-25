@@ -71,6 +71,7 @@ import {
   clearCaptured,
   wireCamera,
 } from './camera';
+import { storeCodec, storedCodec } from './codec-store';
 
 if (window.top !== window.self) {
   document.body.textContent = 'StegoShard refuses to run while embedded in another page.';
@@ -273,12 +274,6 @@ let estimates: Estimates | null = null;
 // key mode re-renders the counts instantly.
 let envelope: { file: File; len: number } | null = null;
 
-/** The web app has no prefs module, so the codec sticks in localStorage. */
-const CODEC_KEY = 'stegoshard.codec';
-function storedCodec(): CodecChoice {
-  return localStorage.getItem(CODEC_KEY) === 'qr' ? 'qr' : 'color';
-}
-
 const destRadios = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[name="dest"]'));
 
@@ -320,6 +315,9 @@ async function refreshEstimates(): Promise<void> {
     ({ file } = await resolveSaveInput(picked));
     len = await envelopeLenForEstimate(file);
   } catch {
+    // A newer pick owns the display: an older one failing late must not wipe
+    // the numbers that pick already put there.
+    if (serial !== pickSerial) return;
     // Couldn't read the selection. Drop what we knew rather than leaving the
     // previous file's size and counts on screen beside the new file's name.
     envelope = null;
@@ -495,7 +493,7 @@ for (const r of document.querySelectorAll('input[name="keymode"]')) {
 }
 for (const r of document.querySelectorAll('input[name="codec"]')) {
   r.addEventListener('change', () => {
-    localStorage.setItem(CODEC_KEY, selectedCodec());
+    storeCodec(selectedCodec());
     recomputeEstimates();
   });
 }

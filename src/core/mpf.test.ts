@@ -258,6 +258,25 @@ describe('retargetMpfIndex', () => {
     expect(parseMpfIndex(grown)!.entries[0]!.size).toBe(grown.length);
   });
 
+  /**
+   * SPEC §9.7 over the letter of §9.7.1, decided in review: an index whose
+   * trailer was stripped still lists its other images, and with nothing after
+   * EOI those entries locate nothing a shift could break. It used to be refused.
+   */
+  it('keeps an index whose trailer was stripped, following only the primary size', () => {
+    const { bytes, trailerStart } = ultraHdr();
+    const stripped = bytes.slice(0, trailerStart);
+    const link = mpfTrailerLink(stripped);
+    expect(link.kind).toBe('index');
+    const offsetBefore = parseMpfIndex(stripped)!.entries[1]!.offset;
+
+    const grown = growScan(stripped, 3);
+    expect(retargetMpfIndex(grown, link as never)).toEqual({ ok: true, rewritten: 1 });
+    const after = parseMpfIndex(grown)!;
+    expect(after.entries[0]!.size).toBe(grown.length);
+    expect(after.entries[1]!.offset).toBe(offsetBefore);
+  });
+
   it('refuses when the index cannot be read back out of the edited file', () => {
     const { link } = ultraHdr();
     const notAJpeg = retargetMpfIndex(new Uint8Array([0xff, 0xd8, 0xff]), link);

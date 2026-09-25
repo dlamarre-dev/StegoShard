@@ -249,6 +249,11 @@ function entryTrouble(
   if (primary.offset !== 0) {
     return `MPF entry 1 is the primary image and must carry a data offset of 0, not ${primary.offset}`;
   }
+  // With nothing after EOI there is no image for a later entry to locate, and no
+  // shift that could invalidate its offset (SPEC §9.7): an MPO whose trailer was
+  // stripped still carries its entries, and refusing it over them rejected a
+  // photo for nothing. Only the primary size is maintained then.
+  if (!hasTrailer(file)) return null;
   for (const [i, entry] of entries.entries()) {
     if (i === 0) continue;
     const at = entry.offset === 0 ? 0 : file.endianAt + entry.offset;
@@ -324,6 +329,8 @@ export function retargetMpfIndex(
       }
       continue;
     }
+    // No trailer, nothing located: the offset is left exactly as it was.
+    if (!hasTrailer(before)) continue;
     const was = before.endianAt + entry.offset;
     const now = layout.trailerStart + (was - before.trailerStart) - index.endianAt;
     if (now < 0 || now > 0xffffffff) {
@@ -337,6 +344,9 @@ export function retargetMpfIndex(
   for (const { at, value } of puts) putU32(out, at, value, index.littleEndian);
   return { ok: true, rewritten: puts.length };
 }
+
+const hasTrailer = (file: { trailerStart: number; length: number }): boolean =>
+  file.trailerStart < file.length;
 
 const message = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
