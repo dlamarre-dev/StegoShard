@@ -22,6 +22,7 @@
 
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import strykerConfig from '../stryker.config.mjs';
 
 // Set by the workflow from the shard plan. Without it the missing-shard warning
 // cannot be computed, and saying nothing would read as "none missing".
@@ -125,4 +126,19 @@ const summary = render(paths);
 console.log(summary);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+}
+
+// The break threshold, applied per file now that a file spans several shards.
+// Each shard runs with it switched off (see `thresholds` in stryker.config.mjs),
+// so this is the only place a score drop turns the nightly red. The config is
+// imported without STRYKER_NO_BREAK set, so it reads the value a local run uses.
+const breakAt = strykerConfig.thresholds.break;
+const below = rowsFrom(paths).rows.filter((r) => breakAt != null && r.pct < breakAt);
+if (below.length > 0) {
+  console.error(
+    below
+      .map((r) => `${r.file}: ${r.pct.toFixed(2)}% is below the break threshold of ${breakAt}.`)
+      .join('\n'),
+  );
+  process.exit(1);
 }

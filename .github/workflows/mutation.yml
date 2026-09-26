@@ -272,6 +272,10 @@ jobs:
         run: npm ci
 
       - name: Run Stryker (${{ steps.mode.outputs.label }})
+        # A shard is a line range, possibly a few dozen mutants, so the break
+        # threshold is applied per file by the summary job instead.
+        env:
+          STRYKER_NO_BREAK: '1'
         run: |
           # The report name stays whatever stryker.config.mjs sets. Stryker has no
           # CLI flag for a nested reporter option, and it does not need one here:
