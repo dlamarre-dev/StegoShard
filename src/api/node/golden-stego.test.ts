@@ -65,29 +65,35 @@ describe('golden stego covers', () => {
 });
 
 /**
- * The gallery carrier layer, embedding scheme S0 (SPEC §9.3): one carrier photo
- * written by an earlier version, and the fragment it must keep opening to.
+ * The gallery carrier layer, one committed carrier per embedding scheme (SPEC
+ * §9.3, §9.3.1), and the fragment each must keep opening to.
  *
- * Pinned before any new embedding scheme exists, because that is the change it
- * guards against: a reader that learns a second scheme and stops reading the
- * first loses every gallery already delivered, and a round-trip test of the new
- * writer cannot see it.
+ * Each opens under its own scheme and not under the other: a reader that
+ * learned S1 and stopped reading S0 would lose every gallery already delivered,
+ * and one that read an S1 carrier as S0 would mean the schemes were not apart.
+ * The S0 carrier was written before S1 existed and is kept as written.
  */
-describe('golden gallery carrier (scheme S0)', () => {
-  const dir = join(ROOT, 'gallery-slot-jpeg');
+describe.each([
+  ['gallery-slot-jpeg', 'S0', 'S1'],
+  ['gallery-slot-jpeg-s1', 'S1', 'S0'],
+] as const)('golden gallery carrier %s', (set, scheme, other) => {
+  const dir = join(ROOT, set);
   const cover = {
     kind: 'jpeg' as const,
     name: 'carrier.jpg',
     jpeg: new Uint8Array(readFileSync(join(dir, 'carrier.jpg'))),
   };
+  const password = () => manifest(set).password;
 
-  it('opens to the pinned fragment', async () => {
-    const fragment = await readGallerySlot(cover, manifest('gallery-slot-jpeg').password);
-    expect(fragment, 'the S0 carrier no longer opens').not.toBeNull();
+  it(`opens to the pinned fragment under ${scheme}, the way a reader finds it`, async () => {
+    const fragment = await readGallerySlot(cover, password());
+    expect(fragment, `the ${scheme} carrier no longer opens`).not.toBeNull();
     expect(Buffer.from(fragment!).equals(readFileSync(join(dir, 'fragment.bin')))).toBe(true);
+    expect(await readGallerySlot(cover, password(), undefined, scheme)).not.toBeNull();
   });
 
-  it('opens to nothing under a wrong password', async () => {
+  it(`does not open under ${other}, nor under a wrong password`, async () => {
+    expect(await readGallerySlot(cover, password(), undefined, other)).toBeNull();
     expect(await readGallerySlot(cover, 'not the password')).toBeNull();
   });
 });

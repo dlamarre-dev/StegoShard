@@ -381,14 +381,22 @@ steganalysis.
 **A targeted measurement of the gallery carrier.** `scripts/stego-bench.ts` runs
 the real pipeline over nine phone originals (4000×2256, not in git), embeds 27
 gallery slots at the real size and margin, and scores cover and carrier with
-first-order and calibration attacks (`tests/steganalysis/bench/s0-baseline.md`).
+first-order and calibration attacks, once per embedding scheme
+(`tests/steganalysis/bench/s0-baseline.md` for S0, `s1-stc.md` for S1, SPEC §9.3.1).
+The same seed gives both the same payloads and keys, so the two compare pair by pair.
 
-| attack                                        | AUC, unpaired | carrier above its cover |
-| --------------------------------------------- | ------------- | ----------------------- |
-| Westfeld-Pfitzmann chi-square, global         | 0.50          | 0 of 27                 |
-| F5 calibrated β (Fridrich et al. 2002)        | 0.54          | 22 of 27                |
-| histogram shape against the calibrated image  | 0.57          | 27 of 27                |
-| calibrated pair estimator for LSB replacement | **0.68**      | **27 of 27**            |
+| attack                                        | S0: AUC | S0: above cover | S1: AUC  | S1: above cover |
+| --------------------------------------------- | ------- | --------------- | -------- | --------------- |
+| Westfeld-Pfitzmann chi-square, global         | 0.50    | 0 of 27         | 0.50     | 0 of 27         |
+| F5 calibrated β (Fridrich et al. 2002)        | 0.54    | 22 of 27        | 0.51     | 16 of 27        |
+| histogram shape against the calibrated image  | 0.57    | 27 of 27        | 0.56     | 27 of 27        |
+| calibrated pair estimator for LSB replacement | 0.68    | 27 of 27        | **0.56** | **25 of 27**    |
+
+S1 flips 2 385 coefficients per photo against S0's 8 422, and the pair estimator's
+paired shift falls from 0.019 to 0.002, a tenth of the spread between photos.
+It still ranks 25 carriers of 27 above their own cover: the direction of each
+change is still set by the parity, which is the structure it measures, and
+removing that is the next step, not this one.
 
 The last row is the attack aimed at what the carrier is: the replacement of a
 fraction r of the `|v| ≥ 2` LSBs scales every pair difference `h(2i) - h(2i+1)` by
@@ -737,10 +745,12 @@ survives only lossless storage. Both carriers resist the **cheap heuristics** a
 camera-roll triage uses (wrong format, wrong size, visual diff, first-order
 histogram), but neither is indistinguishable to **dedicated statistical
 steganalysis** (within-category chi-square, calibration, ML detectors), which JPEG
-coefficient-LSB (JSteg-style) is in fact known to be detectable by. State-of-the-art
-undetectable schemes (J-UNIWARD + Syndrome-Trellis Codes) are out of scope: no
-deterministic cross-implementation build exists, they are float-heavy and
-unauditable, and the gain is marginal at our 736-bit (very low) embedding rate.
+coefficient-LSB (JSteg-style) is in fact known to be detectable by. The gallery
+carrier now uses Syndrome-Trellis Codes (SPEC §9.3.1), in integer arithmetic with a
+generated submatrix and frozen cross-implementation vectors, which answers the
+determinism objection this paragraph used to raise; adaptive costs are planned on
+top of it, UERD rather than J-UNIWARD, for the float-free reason given here. The
+736-bit key photo still writes one bit per carrier.
 An adversary holding the _original_ cover can diff it against the carrier.
 Deniability is a hiding property layered on top of the password-wrapped key
 block: defense-in-depth, not the vault's confidentiality boundary (that remains

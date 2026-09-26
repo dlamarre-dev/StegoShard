@@ -29,6 +29,7 @@ _LABEL_VAULT_BLOB = b"stegoshard/v2/aad/vault-blob"
 _LABEL_SLOT_ARRAY = b"stegoshard/v2/aad/slot-array"
 _LABEL_VAULT_REGION = b"stegoshard/v2/aad/vault-region"
 _LABEL_GALLERY_FRAG = b"stegoshard/v2/aad/gallery-frag"
+_LABEL_GALLERY_FRAG_S1 = b"stegoshard/v2/aad/gallery-frag/s1"
 
 #: Which container a slot array belongs to. Never stored: the decoder knows it
 #: from the path it entered by, so binding it costs no bytes and stops a slot
@@ -110,14 +111,14 @@ def region_block_aad(
     )
 
 
-def gallery_frag_aad() -> bytes:
+def gallery_frag_aad(scheme: str = "S0") -> bytes:
     """Gallery per-photo fragment (SPEC §9.2): a constant, and nothing else can be.
 
     Blind winnowing trial-opens every photo with no prior knowledge, so set id
     and shard index are only recoverable *after* the tag verifies; and they are
     already authenticated inside the sealed plaintext.
     """
-    return _LABEL_GALLERY_FRAG
+    return _LABEL_GALLERY_FRAG_S1 if scheme == "S1" else _LABEL_GALLERY_FRAG
 
 
 def segmented_region_aad(

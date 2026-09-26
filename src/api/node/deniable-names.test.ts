@@ -18,7 +18,10 @@ import { describe, it, expect } from 'vitest';
 import { encode as encodePng } from 'fast-png';
 import { runGallerySave, runSave } from './commands';
 
-const SLOW = { timeout: 90_000 };
+// Whole gallery saves at production Argon2, each photo run through the S1
+// trellis (SPEC §9.3.1); under coverage instrumentation in a parallel suite the
+// threshold-share case measured 93 s against the 90 s this used to allow.
+const SLOW = { timeout: 180_000 };
 const PW = 'a long unrelated passphrase for the deniability tests';
 const tmp = () => mkdtempSync(join(tmpdir(), 'ss-deniable-'));
 

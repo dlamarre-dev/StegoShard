@@ -23,6 +23,7 @@ The format carries several independent version tags:
 | `SEG_VERSION`       | `src/core/segmented.ts`        | Segmented `.ssbn` / `.db` container (§8.1)                                     |
 | `BINARY_VERSION`    | `src/core/binary-container.ts` | Branded binary container framing (§8)                                          |
 | `CODEC_GALLERY`     | `src/core/header.ts`           | Gallery Mode codec id (§9)                                                     |
+| `STEGO_SCHEME`      | `src/core/gallery.ts`          | Gallery embedding scheme a writer uses; **unstored**, see below (§9.3, §9.3.1) |
 | `DEFAULT_ARGON2`    | `src/core/crypto.ts`           | Argon2id cost; **unstored and therefore format-defining** on §5.3, §9.1, §10.2 |
 
 `FORMAT_VERSION`, `KEY_BLOCK_VERSION` and `SEG_VERSION` are `2`; `BINARY_VERSION`
@@ -52,6 +53,29 @@ vectors and fixtures were regenerated accordingly. Note that this is **not** wha
 moved `FORMAT_VERSION` to `2` — that was the AAD binding and the identity block (SPEC
 §4.1, §11.1), which do change how a decoder parses. The geometry above still announces
 itself nowhere, under version 2 as under version 1.
+
+### Gallery embedding schemes, and the one old decode branch kept (SPEC §9.3, §9.3.1)
+
+How a gallery slot is spread over a photo's coefficients is an **embedding
+scheme**, and nothing in a photo names it: the gallery carries no header, no magic
+and no length, by design. Two exist.
+
+| Scheme | Written for                      | Read for | Identified by                                          |
+| ------ | -------------------------------- | -------- | ------------------------------------------------------ |
+| S0     | raster covers                    | all      | `posKey`, AAD `stegoshard/v2/aad/gallery-frag`         |
+| S1     | JPEG covers (`STEGO_SCHEME = 1`) | JPEG     | `stcKey` (`…/gallery/pos/s1`), AAD `…/gallery-frag/s1` |
+
+A reader tries S1 then S0 on each JPEG. A slot authenticates only under the AAD
+it was sealed with, so trying the wrong scheme costs one extraction and yields a
+failed tag, never a misread fragment; the chance of the two agreeing by accident is
+that of forging AES-GCM.
+
+**This is the one place the pre-1.0 carve-out below is set aside, deliberately.**
+Galleries written with S0 are photos in people's libraries, hiding data they have
+no other copy of, and the carve-out's premise, that the format has no users, does
+not hold for them. The S0 read path is kept, and `tests/golden/gallery-slot-jpeg/`
+pins it with a carrier no current writer can reproduce, which is why
+`scripts/gen-golden.ts` keeps that set as written rather than regenerating it.
 
 ### Argon2 cost is a format constant on three paths (SPEC §5.3, §9.1, §10.2)
 

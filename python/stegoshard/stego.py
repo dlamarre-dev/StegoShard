@@ -329,6 +329,13 @@ def extract_bytes_jpeg(
         carriers = eligible_coefficients(decode(jpeg_bytes))
     except JpegUnsupported:
         return None
+    return extract_bytes_from_carriers(carriers, seed, length, margin)
+
+
+def extract_bytes_from_carriers(
+    carriers: list, seed: bytes, length: int, margin: int = 1
+) -> bytes | None:
+    """`extract_bytes_jpeg` over carriers already decoded, so both schemes share one decode."""
     capacity = len(carriers)
     bits = length * 8
     if capacity < bits * margin:
@@ -339,6 +346,42 @@ def extract_bytes_jpeg(
     for i, pos in enumerate(positions):
         block, k = carriers[pos]
         if abs(block[k]) & 1:
+            out[i >> 3] |= 1 << (7 - (i & 7))
+    return bytes(out)
+
+
+def extract_bytes_stc_jpeg(jpeg_bytes: bytes, seed: bytes, length: int) -> bytes | None:
+    """Read `length` bytes written by embedding scheme S1 (SPEC §9.3.1), or None.
+
+    Mirrors extractBytesStcJpeg: the same carriers as S0, `length*8*STC_WIDTH`
+    of them in a keyed order, and the payload is their syndrome.
+    """
+    from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+
+    try:
+        carriers = eligible_coefficients(decode(jpeg_bytes))
+    except JpegUnsupported:
+        return None
+    return extract_bytes_stc_from_carriers(carriers, seed, length)
+
+
+def extract_bytes_stc_from_carriers(carriers: list, seed: bytes, length: int) -> bytes | None:
+    """`extract_bytes_stc_jpeg` over carriers already decoded."""
+    from .stc import STC_WIDTH, keyed_order, keyed_order_stream_len, stc_extract
+
+    m = length * 8
+    n = m * STC_WIDTH
+    if len(carriers) < n:
+        return None
+    order = keyed_order(_keystream_from_seed(seed, keyed_order_stream_len(n)), len(carriers), n)
+    y = bytearray(n)
+    for i, pos in enumerate(order):
+        block, k = carriers[pos]
+        y[i] = abs(block[k]) & 1
+    message = stc_extract(y, m, STC_WIDTH)
+    out = bytearray(length)
+    for i, bit in enumerate(message):
+        if bit:
             out[i >> 3] |= 1 << (7 - (i & 7))
     return bytes(out)
 

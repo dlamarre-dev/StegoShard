@@ -61,7 +61,9 @@ export const DEFAULT_CALIBRATION: Calibration = {
   argon2: 2.5,
   reencodePerMB: 600,
   screenPerMB: 150,
-  embedPerMB: 250,
+  // Embedding scheme S1 (SPEC §9.3.1) runs a syndrome-trellis code per photo:
+  // measured at 1.6 times S0's embed (877 ms against 534 on a 1.6 MB photo).
+  embedPerMB: 410,
   extractPerMB: 150,
   renderPerImage: 90,
   paperPerPage: 300,
