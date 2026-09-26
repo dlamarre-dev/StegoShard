@@ -133,7 +133,7 @@ def test_stego_jpeg_key_image_round_trip():
     by the pure-Python coefficient reader and restores the file (SPEC §5.4)."""
     from stegoshard import extract_key_block_from_image
 
-    d = FIXTURES / "stego-jpeg"
+    d = FIXTURES / "stego-jpeg-s1"
     manifest = json.loads((d / "manifest.json").read_text())
     payloads = []
     for img in sorted(d.glob("page-*.png")):

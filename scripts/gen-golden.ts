@@ -58,7 +58,7 @@ const SETS = [
   ['color-grid', 'eight-colour grid images (SPEC §2.2)'],
   ['keyfile', 'QR-grid images with a separate .key file (SPEC §5.2)'],
   ['stego', 'key block hidden in a PNG cover by spatial LSB (SPEC §5.3)'],
-  ['stego-jpeg', 'key block hidden in a JPEG cover by DCT coefficient (SPEC §5.4)'],
+  ['stego-jpeg-s1', 'key block hidden in a JPEG cover by key-photo scheme S1-key (SPEC §5.4.1)'],
   [
     'gallery-slot-jpeg-s1',
     'one gallery carrier photo and its fragment, embedding scheme S1 (SPEC §9.3.1)',
@@ -71,13 +71,15 @@ const SETS = [
  * Sets the current encoder can no longer produce, kept byte for byte across a
  * regeneration. `gallery-slot-jpeg` holds a carrier written by embedding scheme
  * S0, which no writer uses since S1; regenerating it would silently turn it into
- * a second S1 fixture and leave the S0 reader pinned by nothing.
+ * a second S1 fixture and leave the S0 reader pinned by nothing. `stego-jpeg` is
+ * the same for the key photo: written by S0, which no writer uses since S1-key.
  */
 const FROZEN = [
   [
     'gallery-slot-jpeg',
     'one gallery carrier photo and its fragment, embedding scheme S0 (SPEC §9.3), frozen',
   ],
+  ['stego-jpeg', 'key block hidden in a JPEG cover by key-photo scheme S0 (SPEC §5.4), frozen'],
 ] as const;
 
 function versionConstants(): Record<string, number> {

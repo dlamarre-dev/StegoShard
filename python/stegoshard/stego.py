@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+from collections.abc import Callable
 
 from argon2.low_level import ARGON2_VERSION, Type, hash_secret_raw
 from cryptography.hazmat.primitives import hashes
@@ -33,8 +34,15 @@ def _min_capacity_rgba(payload_len: int) -> int:
     return payload_len * 8 * 16
 
 
-def _min_capacity_jpeg(payload_len: int) -> int:
-    return payload_len * 8 * 2
+# S1-key (SPEC §5.4.1): the code width is min(64, floor(N / m)), and below 2
+# (the x2 floor S0 always had) the photo carries nothing.
+KEY_STC_MAX_WIDTH = 64
+
+
+def _key_stc_width(carriers: int, bits: int) -> int:
+    """S1-key's code width, or 0 below the floor. Mirrors keyStcWidth in stego.ts."""
+    w = min(KEY_STC_MAX_WIDTH, carriers // bits)
+    return w if w >= 2 else 0
 
 
 # Fixed application salt: ASCII "StegoShard-stego" (exactly 16 bytes) (SPEC §5.3).
@@ -43,6 +51,8 @@ STEGO_SALT = b"StegoShard-stego"
 GALLERY_SALT = b"StegoShard-gllry"
 # HKDF info binding the keystream to the specific cover (SPEC §5.3/§5.4/§9.3).
 STEGO_COVER_INFO = b"stegoshard/stego/cover"
+# The cover-key label of key-photo scheme S1-key (SPEC §5.4.1), JPEG only.
+STEGO_COVER_INFO_S1 = b"stegoshard/stego/cover/s1"
 
 
 def _cover_fingerprint_rgba(rgba: bytes, width: int, height: int) -> bytes:
@@ -71,17 +81,29 @@ def _cover_fingerprint_jpeg(carriers: list[tuple[list[int], int]]) -> bytes:
     return hashlib.sha256(bytes(buf)).digest()
 
 
-def _cover_key(seed: bytes, fingerprint: bytes) -> bytes:
-    """Per-cover keystream key: HKDF-SHA256(seed, salt=fingerprint, info=COVER)."""
-    return HKDF(
-        algorithm=hashes.SHA256(), length=32, salt=fingerprint, info=STEGO_COVER_INFO
-    ).derive(seed)
+def _cover_key(seed: bytes, fingerprint: bytes, info: bytes = STEGO_COVER_INFO) -> bytes:
+    """Per-cover keystream key: HKDF-SHA256(seed, salt=fingerprint, info)."""
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=fingerprint, info=info).derive(seed)
 
 
 def _keystream_from_seed(seed: bytes, length: int) -> bytes:
     """AES-256-CTR keystream of `length` bytes from a 32-byte seed (counter 0)."""
     encryptor = Cipher(algorithms.AES(seed), modes.CTR(b"\x00" * 16)).encryptor()
     return encryptor.update(b"\x00" * length) + encryptor.finalize()
+
+
+def _stego_seed(password: str, iterations: int, memory_kib: int, parallelism: int) -> bytes:
+    """The Argon2id seed of the key-photo paths (SPEC §5.3), before any cover binding."""
+    return hash_secret_raw(
+        secret=normalize_password(password).encode("utf-8"),
+        salt=STEGO_SALT,
+        time_cost=iterations,
+        memory_cost=memory_kib,
+        parallelism=parallelism,
+        hash_len=32,
+        type=Type.ID,
+        version=ARGON2_VERSION,
+    )
 
 
 def _keystream(
@@ -92,16 +114,7 @@ def _keystream(
     parallelism: int,
     fingerprint: bytes,
 ) -> bytes:
-    seed = hash_secret_raw(
-        secret=normalize_password(password).encode("utf-8"),
-        salt=STEGO_SALT,
-        time_cost=iterations,
-        memory_cost=memory_kib,
-        parallelism=parallelism,
-        hash_len=32,
-        type=Type.ID,
-        version=ARGON2_VERSION,
-    )
+    seed = _stego_seed(password, iterations, memory_kib, parallelism)
     # Bind the keystream to this cover, then AES-256-CTR over zero bytes (counter
     # 0, matches WebCrypto).
     return _keystream_from_seed(_cover_key(seed, fingerprint), length)
@@ -170,33 +183,58 @@ def _extract_fixed_jpeg(
     iterations: int,
     memory_kib: int,
     parallelism: int,
+    accept: Callable[[bytes], bool],
 ) -> bytes | None:
-    """De-whitened fixed-length payload from a baseline JPEG, or None. Magic
-    validation is the caller's job. Mirrors extractFixedStegoJpeg in stego.ts."""
+    """De-whitened fixed-length payload from a baseline JPEG, or None.
+
+    Tries S1-key (SPEC §5.4.1) then S0 (§5.4) and returns the first output
+    `accept` (the payload's own magic check) takes; one Argon2id seed serves
+    both. Mirrors extractFixedStegoJpeg in stego.ts."""
     from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+    from .stc import keyed_order, keyed_order_stream_len, stc_extract
 
     try:
         carriers = eligible_coefficients(decode(jpeg_bytes))
     except JpegUnsupported:
         return None
     capacity = len(carriers)
-    if capacity < _min_capacity_jpeg(length):
-        return None
     bits = length * 8
+    w = _key_stc_width(capacity, bits)
+    if w == 0:
+        return None
     fingerprint = _cover_fingerprint_jpeg(carriers)
-    stream = _keystream(
-        password, _stream_len(length), iterations, memory_kib, parallelism, fingerprint
+    seed = _stego_seed(password, iterations, memory_kib, parallelism)
+
+    # S1-key: the payload is the syndrome of the parities in the keyed order.
+    n = bits * w
+    s1 = _keystream_from_seed(
+        _cover_key(seed, fingerprint, STEGO_COVER_INFO_S1), length + keyed_order_stream_len(n)
     )
-    pad = stream[:length]
-    positions = _pick_positions(stream, length, capacity, bits)
+    order = keyed_order(s1[length:], capacity, n)
+    y = bytearray(n)
+    for i, pos in enumerate(order):
+        block, k = carriers[pos]
+        y[i] = abs(block[k]) & 1
+    out = bytearray(length)
+    for i, bit in enumerate(stc_extract(y, bits, w)):
+        if bit:
+            out[i >> 3] |= 1 << (7 - (i & 7))
+    for j in range(length):
+        out[j] ^= s1[j]
+    if accept(bytes(out)):
+        return bytes(out)
+
+    # S0: one carrier per bit, drawn by rejection sampling.
+    s0 = _keystream_from_seed(_cover_key(seed, fingerprint), _stream_len(length))
+    positions = _pick_positions(s0, length, capacity, bits)
     out = bytearray(length)
     for i, pos in enumerate(positions):
         block, k = carriers[pos]
         if abs(block[k]) & 1:
             out[i >> 3] |= 1 << (7 - (i & 7))
     for j in range(length):
-        out[j] ^= pad[j]
-    return bytes(out)
+        out[j] ^= s0[j]
+    return bytes(out) if accept(bytes(out)) else None
 
 
 def _is_key_block(b: bytes) -> bool:
@@ -243,10 +281,9 @@ def extract_key_block_jpeg(
 
     Returns None for a wrong password, no key, or a non-baseline JPEG.
     """
-    out = _extract_fixed_jpeg(
-        jpeg_bytes, KEY_BLOCK_LEN, password, iterations, memory_kib, parallelism
+    return _extract_fixed_jpeg(
+        jpeg_bytes, KEY_BLOCK_LEN, password, iterations, memory_kib, parallelism, _is_key_block
     )
-    return out if out is not None and _is_key_block(out) else None
 
 
 def extract_key_factor(
@@ -275,7 +312,13 @@ def extract_key_factor_jpeg(
 ) -> bytes | None:
     """Recover the 32-byte key factor from a baseline JPEG (SSKF), or None."""
     out = _extract_fixed_jpeg(
-        jpeg_bytes, KEY_FACTOR_BLOCK_LEN, password, iterations, memory_kib, parallelism
+        jpeg_bytes,
+        KEY_FACTOR_BLOCK_LEN,
+        password,
+        iterations,
+        memory_kib,
+        parallelism,
+        lambda b: _parse_key_factor(b) is not None,
     )
     return _parse_key_factor(out) if out is not None else None
 

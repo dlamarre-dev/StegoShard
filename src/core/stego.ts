@@ -85,6 +85,27 @@ const subtle = globalThis.crypto.subtle;
 // reuse across covers leaks nothing; the per-cover hash would be pure cost.
 const STEGO_COVER_INFO = new TextEncoder().encode('stegoshard/stego/cover');
 
+/**
+ * The cover-key label of key-photo scheme S1-key (SPEC §5.4.1), JPEG only.
+ * Like the gallery's S1, the scheme is told apart by the label alone: nothing
+ * is stored in the photo, and a reader tries S1-key before S0.
+ */
+const STEGO_COVER_INFO_S1 = new TextEncoder().encode('stegoshard/stego/cover/s1');
+
+/**
+ * Widest code S1-key uses (SPEC §5.4.1). The width is `min(64, ⌊N/m⌋)`: every
+ * ordinary photo reaches 64, about 88 changes for a key block where S0 makes
+ * 368, and a small one still works down to the ×2 floor S0 always had. Taking
+ * N into the code adds no dependency S0 lacked: S0 already draws modulo N.
+ */
+const KEY_STC_MAX_WIDTH = 64;
+
+/** S1-key's code width for `carriers` carriers and `bits` payload bits, or 0 below the floor. */
+function keyStcWidth(carriers: number, bits: number): number {
+  const w = Math.min(KEY_STC_MAX_WIDTH, Math.floor(carriers / bits));
+  return w >= 2 ? w : 0;
+}
+
 /** SHA-256 over an RGBA cover's embedding-invariant bits (RGB, LSB masked; alpha excluded). */
 async function coverFingerprintRgba(
   rgba: Uint8Array | Uint8ClampedArray,
@@ -129,8 +150,12 @@ async function coverFingerprintJpeg(model: JpegModel): Promise<Uint8Array> {
 }
 
 /** Derive the per-cover keystream key from a base secret and the cover fingerprint. */
-async function coverKey(baseSeed: Uint8Array, fingerprint: Uint8Array): Promise<Uint8Array> {
-  return hkdf(baseSeed, STEGO_COVER_INFO, 32, fingerprint);
+async function coverKey(
+  baseSeed: Uint8Array,
+  fingerprint: Uint8Array,
+  info: Uint8Array = STEGO_COVER_INFO,
+): Promise<Uint8Array> {
+  return hkdf(baseSeed, info, 32, fingerprint);
 }
 
 /**
@@ -153,10 +178,8 @@ export const STEGO_SALT = Uint8Array.from([
 function minCapacityRgba(payloadLen: number): number {
   return payloadLen * 8 * 16;
 }
-/** Eligible JPEG coefficients are far sparser than pixel LSBs; smaller margin. */
-function minCapacityJpeg(payloadLen: number): number {
-  return payloadLen * 8 * 2;
-}
+// The JPEG floor, far lower since eligible coefficients are far sparser than
+// pixel LSBs, is two carriers per payload bit: `keyStcWidth` returns 0 below it.
 
 /** Thrown when a cover image is too small to carry the payload deniably. */
 export class StegoCapacityError extends Error {
@@ -261,11 +284,12 @@ async function keystream(
   len: number,
   params: Argon2Params,
   fingerprint: Uint8Array,
+  info: Uint8Array = STEGO_COVER_INFO,
 ): Promise<{ stream: Uint8Array; tag: Uint8Array }> {
   const seed = await stegoSeed(password, params);
   // Bind the keystream to this specific cover (SPEC §5.3): whitening pad and
   // carrier positions become unique per cover even under a reused password.
-  const ckey = await coverKey(seed, fingerprint);
+  const ckey = await coverKey(seed, fingerprint, info);
   seed.fill(0);
   const stream = await keystreamFromSeed(ckey, len);
   const tag = await coverGuardTag(ckey);
@@ -592,63 +616,72 @@ async function embedFixedStegoJpeg(
   const mpf = assertMpfUsable(mpfTrailerLink(cover));
   const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
 
+  const inPlace = model.restartInterval === 0;
+  const carriers = inPlace ? eligibleInPlace(model) : eligibleCoefficients(model);
+  const w = keyStcWidth(carriers.count, bits);
+  if (w === 0) throw new StegoCapacityError(carriers.count);
+  const n = bits * w;
+
+  // S1-key (SPEC §5.4.1): the whitened payload is the syndrome of a
+  // syndrome-trellis code over `n` carriers in a keyed order, and the writer
+  // flips the set of least UERD cost that gives it, as the gallery's S1 does.
   const fingerprint = await coverFingerprintJpeg(model);
-  const { stream, tag } = await keystream(password, streamLen(len), params, fingerprint);
-  const pad = stream.subarray(0, len);
-  const bitAt = (i: number): number => ((payload[i >> 3]! ^ pad[i >> 3]!) >> (7 - (i & 7))) & 1;
-
-  if (model.restartInterval === 0) {
-    // Byte-faithful in-place edit: toggle only the carrier LSB bits whose value
-    // must change, leaving every other byte of the original JPEG untouched.
-    const carriers = eligibleInPlace(model);
-    if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
-    // Reserved per branch, and after the capacity check, so the ordering matches
-    // the RGBA path above. Capacity on this path depends on which branch runs, so
-    // there is no single earlier point that could hold the check for both.
-    const claim = await reserveCoverUse(tag, payload, opts);
-    // The whole remainder, the `onClaim` hand-off included: see embedFixedStego.
-    try {
-      opts?.onClaim?.(claim);
-      const reader = new StreamReader(stream.subarray(len));
-      const positions = pickPositions(reader, carriers.count, bits);
-      const toggles: number[] = [];
-      for (let i = 0; i < bits; i++) {
-        const p = positions[i]!;
-        if (carriers.get(p) !== bitAt(i)) toggles.push(carriers.bitPos(p));
-      }
-      stream.fill(0);
-      return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
-    } catch (e) {
-      claim.release();
-      throw e;
-    }
-  }
-
-  // Rare restart-marker files: fall back to a full re-encode of the scan.
-  const carriers = eligibleCoefficients(model);
-  if (carriers.count < minCapacityJpeg(len)) throw new StegoCapacityError(carriers.count);
+  const { stream, tag } = await keystream(
+    password,
+    len + keyedOrderStreamLen(n),
+    params,
+    fingerprint,
+    STEGO_COVER_INFO_S1,
+  );
   const claim = await reserveCoverUse(tag, payload, opts);
+  // The whole remainder, the `onClaim` hand-off included: see embedFixedStego.
   try {
     opts?.onClaim?.(claim);
-    const reader = new StreamReader(stream.subarray(len));
-    const positions = pickPositions(reader, carriers.count, bits);
-    for (let i = 0; i < bits; i++) carriers.setLsb(positions[i]!, bitAt(i));
+    const message = new Uint8Array(bits);
+    for (let i = 0; i < bits; i++) {
+      message[i] = ((payload[i >> 3]! ^ stream[i >> 3]!) >> (7 - (i & 7))) & 1;
+    }
+    const order = keyedOrder(stream.subarray(len), carriers.count, n);
     stream.fill(0);
+    const x = new Uint8Array(n);
+    for (let i = 0; i < n; i++) x[i] = carriers.get(order[i]!);
+    const { y } = stcEmbed(x, stcCosts(uerdCosts(model), order), message, w);
+    message.fill(0);
+    if (inPlace) {
+      // Byte-faithful in-place edit: toggle only the carrier LSB bits whose value
+      // must change, leaving every other byte of the original JPEG untouched.
+      const where = carriers as ReturnType<typeof eligibleInPlace>;
+      const toggles: number[] = [];
+      for (let i = 0; i < n; i++) if (y[i] !== x[i]) toggles.push(where.bitPos(order[i]!));
+      return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
+    }
+    // Rare restart-marker files: fall back to a full re-encode of the scan.
+    const writable = carriers as ReturnType<typeof eligibleCoefficients>;
+    for (let i = 0; i < n; i++) if (y[i] !== x[i]) writable.setLsb(order[i]!, y[i]!);
     return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
   } catch (e) {
+    stream.fill(0);
     claim.release();
     throw e;
   }
 }
 
-/** Recover a fixed-length de-whitened payload from a baseline JPEG, or null when
- *  the cover is too small / not a decodable baseline JPEG. Magic validation is
- *  the caller's job. */
+/**
+ * Recover a fixed-length de-whitened payload from a baseline JPEG, or null when
+ * the cover is too small, is not a decodable baseline JPEG, or yields nothing
+ * `accept` recognizes.
+ *
+ * Tries S1-key (SPEC §5.4.1) first, then S0 (§5.4), and returns the first output
+ * `accept` takes, which is the magic check of the payload's own format. Both
+ * cover keys come from one Argon2id seed: the second scheme costs an HKDF and a
+ * keystream, never a second derivation (CRYPTO-REVIEW §5.7).
+ */
 async function extractFixedStegoJpeg(
   jpegBytes: Uint8Array,
   len: number,
   password: string,
   params: Argon2Params,
+  accept: (out: Uint8Array) => boolean,
 ): Promise<Uint8Array | null> {
   let model: JpegModel;
   try {
@@ -657,22 +690,43 @@ async function extractFixedStegoJpeg(
     return null; // not a baseline JPEG → no payload here
   }
   const carriers = eligibleCoefficients(model);
-  if (carriers.count < minCapacityJpeg(len)) return null;
+  const bits = len * 8;
+  const w = keyStcWidth(carriers.count, bits);
+  if (w === 0) return null; // below the ×2 floor both schemes share
 
   const fingerprint = await coverFingerprintJpeg(model);
-  const { stream } = await keystream(password, streamLen(len), params, fingerprint);
-  const pad = stream.subarray(0, len);
-  const reader = new StreamReader(stream.subarray(len));
-  const bits = len * 8;
-  const positions = pickPositions(reader, carriers.count, bits);
-
+  const seed = await stegoSeed(password, params);
   const out = new Uint8Array(len);
-  for (let i = 0; i < bits; i++) {
-    if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+  try {
+    // S1-key: the payload is the syndrome of the parities in the keyed order.
+    const n = bits * w;
+    const k1 = await coverKey(seed, fingerprint, STEGO_COVER_INFO_S1);
+    const s1 = await keystreamFromSeed(k1, len + keyedOrderStreamLen(n));
+    k1.fill(0);
+    const order = keyedOrder(s1.subarray(len), carriers.count, n);
+    const y = new Uint8Array(n);
+    for (let i = 0; i < n; i++) y[i] = carriers.get(order[i]!);
+    const message = stcExtract(y, bits, w);
+    for (let i = 0; i < bits; i++) if (message[i]) out[i >> 3]! |= 1 << (7 - (i & 7));
+    for (let j = 0; j < len; j++) out[j]! ^= s1[j]!;
+    s1.fill(0);
+    if (accept(out)) return out;
+
+    // S0: one carrier per bit, drawn by rejection sampling.
+    const k0 = await coverKey(seed, fingerprint);
+    const s0 = await keystreamFromSeed(k0, streamLen(len));
+    k0.fill(0);
+    const positions = pickPositions(new StreamReader(s0.subarray(len)), carriers.count, bits);
+    out.fill(0);
+    for (let i = 0; i < bits; i++) {
+      if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+    }
+    for (let j = 0; j < len; j++) out[j]! ^= s0[j]!;
+    s0.fill(0);
+    return accept(out) ? out : null;
+  } finally {
+    seed.fill(0);
   }
-  for (let j = 0; j < len; j++) out[j]! ^= pad[j]!;
-  stream.fill(0);
-  return out;
 }
 
 /**
@@ -702,8 +756,7 @@ export async function extractKeyBlockStegoJpeg(
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
 ): Promise<Uint8Array | null> {
-  const out = await extractFixedStegoJpeg(jpegBytes, KEY_BLOCK_LEN, password, params);
-  return out && isSerializedKeyBlock(out) ? out : null;
+  return extractFixedStegoJpeg(jpegBytes, KEY_BLOCK_LEN, password, params, isSerializedKeyBlock);
 }
 
 /** Hide the 32-byte key factor (SSKF envelope) in a baseline JPEG's coefficients. */
@@ -723,7 +776,13 @@ export async function extractKeyFactorStegoJpeg(
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
 ): Promise<Uint8Array | null> {
-  const out = await extractFixedStegoJpeg(jpegBytes, KEY_FACTOR_BLOCK_LEN, password, params);
+  const out = await extractFixedStegoJpeg(
+    jpegBytes,
+    KEY_FACTOR_BLOCK_LEN,
+    password,
+    params,
+    (b) => parseKeyFactorBlock(b) !== null,
+  );
   return out ? parseKeyFactorBlock(out) : null;
 }
 

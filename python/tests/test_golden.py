@@ -53,7 +53,7 @@ if not GOLDEN.exists():
         "would report green while nothing checked the wire format."
     )
 
-IMAGE_SETS = ["embedded", "color-grid", "keyfile", "stego", "stego-jpeg"]
+IMAGE_SETS = ["embedded", "color-grid", "keyfile", "stego", "stego-jpeg", "stego-jpeg-s1"]
 BINARY_SETS = ["binary-branded", "binary-disguised"]
 # One carrier photo and its fragment, read by its own test below rather than by
 # the image or binary decode paths.

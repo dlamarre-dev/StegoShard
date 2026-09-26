@@ -77,6 +77,22 @@ not hold for them. The S0 read path is kept, and `tests/golden/gallery-slot-jpeg
 pins it with a carrier no current writer can reproduce, which is why
 `scripts/gen-golden.ts` keeps that set as written rather than regenerating it.
 
+### Key-photo schemes, and the second old decode branch kept (SPEC §5.4, §5.4.1)
+
+A JPEG key photo is the same case one level down: nothing in it names how the key
+block was spread over its coefficients. Two schemes exist; the PNG key photo of
+§5.3 has only one.
+
+| Scheme | Written for       | Read for | Identified by                                           |
+| ------ | ----------------- | -------- | ------------------------------------------------------- |
+| S0     | none since S1-key | JPEG     | cover key `HKDF(seed, fp, "stegoshard/stego/cover")`    |
+| S1-key | JPEG key photos   | JPEG     | cover key `HKDF(seed, fp, "stegoshard/stego/cover/s1")` |
+
+A reader tries S1-key then S0 and keeps the first output whose §5.1 (or §10.3)
+magic validates; one Argon2id seed serves both. The S0 read path is kept for the
+same reason as the gallery's, and `tests/golden/stego-jpeg/` pins it the same
+way: frozen in `scripts/gen-golden.ts`, next to `tests/golden/stego-jpeg-s1/`.
+
 ### Argon2 cost is a format constant on three paths (SPEC §5.3, §9.1, §10.2)
 
 `DEFAULT_ARGON2` (`src/core/crypto.ts`: `iterations 4`, `memoryKiB 262144`,

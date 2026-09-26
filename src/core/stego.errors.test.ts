@@ -345,7 +345,7 @@ describe('the restart-marker fallback refuses too', () => {
 
   it('refuses a key block when a restart-marked cover is too small for it', async () => {
     // The same fallback, reached from the whitened key-block path rather than the
-    // raw-bytes one. Its guard uses minCapacityJpeg (payload * 8 * 2, so 1472
+    // raw-bytes one. Its guard is keyStcWidth's floor (payload * 8 * 2, so 1472
     // carriers for a 92-byte key block) instead of a caller-supplied margin, and
     // it was the last line in the file with no coverage at all.
     const small = jpegWithRestarts(4, 24, 24);

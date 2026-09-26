@@ -16,9 +16,10 @@ constant moving in the same commit fails CI.
 - `color-grid/` — eight-colour grid images (SPEC §2.2)
 - `keyfile/` — QR-grid images with a separate .key file (SPEC §5.2)
 - `stego/` — key block hidden in a PNG cover by spatial LSB (SPEC §5.3)
-- `stego-jpeg/` — key block hidden in a JPEG cover by DCT coefficient (SPEC §5.4)
+- `stego-jpeg-s1/` — key block hidden in a JPEG cover by key-photo scheme S1-key (SPEC §5.4.1)
 - `gallery-slot-jpeg-s1/` — one gallery carrier photo and its fragment, embedding scheme S1 (SPEC §9.3.1)
 - `gallery-slot-jpeg/` — one gallery carrier photo and its fragment, embedding scheme S0 (SPEC §9.3), frozen
+- `stego-jpeg/` — key block hidden in a JPEG cover by key-photo scheme S0 (SPEC §5.4), frozen
 - `binary-branded/` — branded .ssbn container (SPEC §8)
 - `binary-disguised/` — disguised SQLite .db container (SPEC §8)
 
@@ -84,6 +85,13 @@ b2690df1556ea94dfef0ffa6df64008c8f45e9ae5d146f60392293fa9bebb346  stego-jpeg/pag
 f0d879affc179200615547915b7a67c8e5608ce2a090fab4ecbab38c81c0d76e  stego-jpeg/page-02.png
 20c146172650480d0890bd81495cfcbd34e293a202cb6f34e903312cf6574543  stego-jpeg/page-03.png
 5d94bf7ecf1a8af5732563b0d61ac1b5c6c5262b0176ff1e2f39d62f4e25227b  stego-jpeg/page-04.png
+81f3b862e8a812f4f9aa4ba89e8991ddc505878637ecc60d9a20f24939344bed  stego-jpeg-s1/expected.bin
+21be1a2dae0b4e787fa8755a23374f954011add27a936e47021dda57bef78116  stego-jpeg-s1/key.jpg
+112407b9a3362d53262a44910b6ec5e1bbb653786b3a033ffffcd560c3794996  stego-jpeg-s1/manifest.json
+914c339c2442e1b00a32251241116d7015cb740b119c304f5da7beaa460a3da0  stego-jpeg-s1/page-01.png
+d3e81f3d8badfbe40e2c3f1606968b071aba1f76c7634a26f8087b0720aa032c  stego-jpeg-s1/page-02.png
+ccb4a7b68bfd3cdc97c2b230265fd4ebc729e88af057597dc91ec50d97b03ee1  stego-jpeg-s1/page-03.png
+a91d8ab4fac2e7eef769be2298f70a6af25a3d19aacf827f4fc224ff9207d433  stego-jpeg-s1/page-04.png
 81f3b862e8a812f4f9aa4ba89e8991ddc505878637ecc60d9a20f24939344bed  stego/expected.bin
 8ecd6e83127dc03faf96bd92222d5f9eb778fa82dc9765e91bc8a28712de994c  stego/key.png
 112407b9a3362d53262a44910b6ec5e1bbb653786b3a033ffffcd560c3794996  stego/manifest.json
