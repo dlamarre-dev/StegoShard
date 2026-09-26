@@ -96,25 +96,31 @@ With the original, they need nothing else.
 The gallery carrier changes the least significant bit of a coefficient's
 magnitude, on a password-chosen subset of the AC coefficients with `|v| ≥ 2`
 (SPEC §9.3.1). The payload is the syndrome of a syndrome-trellis code over those
-carriers, so a slot flips about 2,400 of them where writing one bit per carrier
-flipped 8,400. Each change is ±1 in magnitude, but its direction is set by the
+carriers, and the writer picks the flips by cost: UERD prices a change by how busy
+its block and the blocks around it are, so about 3,300 flips land almost all in
+the busiest quarter of the photo, where writing one bit per carrier flipped 8,400
+spread evenly. Each change is ±1 in magnitude, but its direction is set by the
 parity, not chosen: this is still LSB **replacement** (the JSteg family), not ±1
 matching, and it leaves the one structure LSB replacement always leaves, pairs of
 magnitudes `{2i, 2i+1}` drifting toward equal counts.
 
 The global Westfeld-Pfitzmann chi-square does not see it, and neither does F5's
-calibrated estimator. A calibrated estimator aimed at that pair structure does:
-on 27 cover/carrier pairs from nine phone photos it still scores the carrier
-above its own cover in 25 of 27 pairs, and separates carriers from covers it was
-not paired with at an AUC of 0.56, down from 0.68 before the code
-(`tests/steganalysis/bench/s1-stc.md` and `s0-baseline.md`, made by
-`scripts/stego-bench.ts`). That is weak evidence on one photo, and it grows with
-every photo a warden can pool, which a gallery hands over by construction. Treat
-the carrier as detectable by targeted steganalysis, as
-[CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.4 does.
+calibrated estimator. A calibrated estimator aimed at that pair structure does,
+more weakly than before: on 27 cover/carrier pairs from nine phone photos it
+still scores the carrier above its own cover in 26 of 27 pairs, though by half
+the margin it had at uniform cost, and separates carriers from covers it was not
+paired with at an AUC of 0.55, down from 0.68 before the code
+(`tests/steganalysis/bench/s3-uerd.md`, `s1-stc.md` and `s0-baseline.md`, made by
+`scripts/stego-bench.ts`). A calibrated histogram-shape distance that caught every
+pair at uniform cost now catches 18 of 27, which is chance. That is weak evidence
+on one photo, and it grows with every photo a warden can pool, which a gallery
+hands over by construction. These are first-order and calibration attacks; the
+adaptive, selection-channel-aware detectors that target this kind of embed have
+not been run against it. Treat the carrier as detectable by targeted
+steganalysis, as [CRYPTO-REVIEW.md](CRYPTO-REVIEW.md) §5.4 does.
 
 Put the original beside the carrier and none of that matters. A diff shows on the
-order of 2,400 coefficients changed by exactly ±1, with 0 and ±1 never touched.
+order of 3,300 coefficients changed by exactly ±1, with 0 and ±1 never touched.
 That signature is unmistakable, takes seconds to read, and yields a payload-size
 estimate accurate to within a few bytes. No steganalysis is involved; it is
 subtraction.

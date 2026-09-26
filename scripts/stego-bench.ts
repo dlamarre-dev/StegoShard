@@ -26,7 +26,8 @@
  * report, save the timings.
  *
  * Run with:
- *   npm run bench:stego -- --corpus <dir> [--scheme s0|s1] [--pairs 3] [--label s1] [--seed <text>]
+ *   npm run bench:stego -- --corpus <dir> [--scheme s0|s1] [--costs uerd|uniform] [--pairs 3]
+ *                          [--label s1] [--seed <text>]
  *                          [--out tests/steganalysis/bench] [--work .bench]
  */
 
@@ -47,6 +48,7 @@ import {
   type JpegModel,
 } from '../src/core/index';
 import { fileToGalleryCover, fileToImageData } from '../src/api/node/image-io';
+import { componentQuantTables } from '../src/core/costs/uerd';
 import { format, resolveConfig } from 'prettier';
 import { isEntryModule } from './entry-module';
 
@@ -165,6 +167,46 @@ function histogramShift(cover: JpegModel, stego: JpegModel): number[] {
   const z: number[] = [];
   for (let k = 1; k < MAXB; k++) z.push(hc[k]! > 0 ? (hs[k]! - hc[k]!) / Math.sqrt(hc[k]!) : 0);
   return z;
+}
+
+/**
+ * Where the changes land against texture: the change rate per carrier in each
+ * quartile of cover block energy (the dequantized AC energy Σ|c_k|·q_k, ranked
+ * within each component over the blocks that hold a carrier), divided by the
+ * image's overall rate. Uniform placement gives about 1 in every quartile; a
+ * content-adaptive embed gives less than 1 in the quietest and more in the
+ * busiest.
+ */
+function energyQuartileRates(cover: JpegModel, stego: JpegModel): number[] {
+  const quant = componentQuantTables(cover);
+  const changed = [0, 0, 0, 0];
+  const carriers = [0, 0, 0, 0];
+  cover.components.forEach((comp, ci) => {
+    const q = quant[ci]!;
+    const held: { b: number; e: number }[] = [];
+    comp.blocks.forEach((block, b) => {
+      let e = 0;
+      let any = false;
+      for (let k = 1; k < 64; k++) {
+        e += Math.abs(block[k]!) * q[k]!;
+        if (Math.abs(block[k]!) >= 2) any = true;
+      }
+      if (any) held.push({ b, e });
+    });
+    held.sort((x, y) => x.e - y.e || x.b - y.b);
+    held.forEach(({ b }, rank) => {
+      const quartile = Math.min(3, Math.floor((4 * rank) / held.length));
+      const block = comp.blocks[b]!;
+      const other = stego.components[ci]!.blocks[b]!;
+      for (let k = 1; k < 64; k++) {
+        if (Math.abs(block[k]!) < 2) continue;
+        carriers[quartile]!++;
+        if (other[k] !== block[k]) changed[quartile]!++;
+      }
+    });
+  });
+  const overall = changed.reduce((a, b) => a + b, 0) / carriers.reduce((a, b) => a + b, 0);
+  return changed.map((c, i) => (carriers[i]! > 0 && overall > 0 ? c / carriers[i]! / overall : 0));
 }
 
 // --- statistics ---------------------------------------------------------------
@@ -361,6 +403,7 @@ interface PairResult {
   embedMs: number;
   comparison: Omit<Comparison, 'transitions'>;
   twoToOne: number;
+  energyQuartiles: number[];
   /** z(k) for k = 1..MAXB-1; see histogramShift. */
   histogramZ: number[];
   bitsPerChange: number;
@@ -380,6 +423,11 @@ async function main(): Promise<void> {
   const scheme = arg('scheme', 's1').toUpperCase();
   if (scheme !== 'S0' && scheme !== 'S1')
     throw new Error(`--scheme must be s0 or s1, not ${scheme}`);
+  // How the S1 writer prices a flip; S0 has no costs. Writer-only, so two
+  // reports that differ in this alone differ in placement, never in format.
+  const costs = arg('costs', 'uerd');
+  if (costs !== 'uerd' && costs !== 'uniform')
+    throw new Error(`--costs must be uerd or uniform, not ${costs}`);
   const outDir = arg('out', join('tests', 'steganalysis', 'bench'));
   const workDir = arg('work', '.bench');
   mkdirSync(outDir, { recursive: true });
@@ -436,7 +484,7 @@ async function main(): Promise<void> {
       const e0 = performance.now();
       const stegoJpeg =
         scheme === 'S1'
-          ? await embedBytesStcJpeg(coverJpeg, payload, posKey, GALLERY_EMBED_MARGIN)
+          ? await embedBytesStcJpeg(coverJpeg, payload, posKey, GALLERY_EMBED_MARGIN, costs)
           : await embedBytesStegoJpeg(coverJpeg, payload, posKey, GALLERY_EMBED_MARGIN);
       const embedMs = performance.now() - e0;
       sampleRss();
@@ -458,6 +506,7 @@ async function main(): Promise<void> {
         embedMs: Math.round(embedMs),
         comparison: counts,
         twoToOne: cmp.transitions[2]![1]!,
+        energyQuartiles: energyQuartileRates(cover, stego),
         histogramZ: histogramShift(cover, stego),
         bitsPerChange: payloadBits / cmp.changed,
         ratePerNonzeroAc: payloadBits / cmp.nonzeroAc,
@@ -500,6 +549,7 @@ async function main(): Promise<void> {
     seed,
     corpus: { images: files.length, pairsPerImage: pairs },
     scheme,
+    costs: scheme === 'S1' ? costs : 'n/a',
     slot: { bytes: GALLERY_SLOT_BYTES, bits: payloadBits, embedMargin: GALLERY_EMBED_MARGIN },
     summary: {
       pairs: results.length,
@@ -517,6 +567,7 @@ async function main(): Promise<void> {
         Math.max(...results.map((r) => r.ratePerCarrier)),
       ],
       twoToOne: results.reduce((a, r) => a + r.twoToOne, 0),
+      meanEnergyQuartiles: [0, 1, 2, 3].map((i) => mean((r) => r.energyQuartiles[i]!)),
       changedDc: results.reduce((a, r) => a + r.comparison.changedDc, 0),
       changedBelow2: results.reduce((a, r) => a + r.comparison.changedBelow2, 0),
       notUnit: results.reduce((a, r) => a + r.comparison.notUnit, 0),
@@ -583,7 +634,7 @@ function markdown(r: any): string {
 
 Generated by \`scripts/stego-bench.ts\` at commit \`${r.commit}\`, seed \`${r.seed}\`.
 ${r.corpus.images} photos, ${r.corpus.pairsPerImage} pairs each (${s.pairs} pairs), one gallery slot
-of ${r.slot.bytes} bytes (${r.slot.bits} bits) per pair, embed margin ${r.slot.embedMargin}, embedding scheme ${r.scheme}.
+of ${r.slot.bytes} bytes (${r.slot.bits} bits) per pair, embed margin ${r.slot.embedMargin}, embedding scheme ${r.scheme}${r.scheme === 'S1' ? `, costs ${r.costs}` : ''}.
 The corpus is not in git; images are named by the first 12 hex digits of their SHA-256.
 
 This measures. It is not a bar to clear: see the header of the script.
@@ -601,6 +652,7 @@ This measures. It is not a bar to clear: see the header of the script.
 | DC coefficients changed | ${s.changedDc} |
 | coefficients changed with \\|v\\| < 2 | ${s.changedBelow2} |
 | changes other than ±1 | ${s.notUnit} |
+| change rate by cover block-energy quartile, quietest to busiest, ÷ mean rate | ${s.meanEnergyQuartiles.map((z: number) => fmt(z, 2)).join(', ')} |
 | count shift per magnitude k = 1..${MAXB - 1}, mean z = Δh(k)/√h(k) | ${s.meanHistogramZ.map((z: number) => fmt(z, 2)).join(', ')} |
 | embed time per image, mean | ${fmt(s.meanEmbedMs, 0)} ms |
 | peak RSS | ${s.peakRssMiB} MiB |

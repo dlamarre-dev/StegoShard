@@ -1,0 +1,1194 @@
+{
+  "label": "s3-uerd",
+  "commit": "8aeccb7",
+  "seed": "stegoshard-bench-v1",
+  "corpus": { "images": 9, "pairsPerImage": 3 },
+  "scheme": "S1",
+  "costs": "uerd",
+  "slot": { "bytes": 2109, "bits": 16872, "embedMargin": 16 },
+  "summary": {
+    "pairs": 27,
+    "extractionFailures": 0,
+    "meanChanges": 3321.962962962963,
+    "minChanges": 3031,
+    "maxChanges": 3665,
+    "meanBitsPerChange": 5.09272208112496,
+    "ratePerNonzeroAc": [0.007157344061996378, 0.015295951087769495],
+    "ratePerCarrier": [0.01366803492834246, 0.03646352242986413],
+    "twoToOne": 0,
+    "meanEnergyQuartiles": [
+      0.02428295402736451, 0.07813230510297665, 0.291888867308024, 2.025993723794496
+    ],
+    "changedDc": 0,
+    "changedBelow2": 0,
+    "notUnit": 0,
+    "meanHistogramZ": [
+      0, -0.0747831529923031, 0.10502207732422958, -0.06085321889442517, 0.0729799100052824,
+      -0.09986667429972433, 0.1178858549039359, -0.04666432575849885
+    ],
+    "meanEmbedMs": 1229.962962962963,
+    "peakRssMiB": 1527
+  },
+  "transitions": [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 7916, 0, 0, 0, 0, 0, 0],
+    [0, 0, 6840, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 5742, 0, 0, 0, 0],
+    [0, 0, 0, 0, 5251, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 4678, 0, 0],
+    [0, 0, 0, 0, 0, 0, 4051, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 3713],
+    [0, 0, 0, 0, 0, 0, 0, 0, 3488, 48014]
+  ],
+  "detectors": {
+    "chiSquarePairs": {
+      "aucUnpaired": 0.5,
+      "pairedStegoHigher": 0,
+      "pairedN": 0,
+      "signTestP": 1,
+      "meanPairedDelta": 0,
+      "sdCover": 0
+    },
+    "f5Beta": {
+      "aucUnpaired": 0.5061728395061729,
+      "pairedStegoHigher": 15,
+      "pairedN": 27,
+      "signTestP": 0.7011080384254388,
+      "meanPairedDelta": 0.000011443317019521615,
+      "sdCover": 0.08404111593413686
+    },
+    "pairRate": {
+      "aucUnpaired": 0.551440329218107,
+      "pairedStegoHigher": 26,
+      "pairedN": 27,
+      "signTestP": 4.172325134277313e-7,
+      "meanPairedDelta": 0.0010568283018978929,
+      "sdCover": 0.02423402262503352
+    },
+    "histogramShape": {
+      "aucUnpaired": 0.5185185185185185,
+      "pairedStegoHigher": 18,
+      "pairedN": 27,
+      "signTestP": 0.12207812070846416,
+      "meanPairedDelta": 0.000002918600239327497,
+      "sdCover": 0.0015990138168580428
+    }
+  },
+  "images": [
+    {
+      "id": "img-bd22d8fe3fdd",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1322,
+      "originalToCoverTwoToOne": 233672
+    },
+    {
+      "id": "img-c172a47cdb97",
+      "width": 2256,
+      "height": 4000,
+      "normalizeMs": 2300,
+      "originalToCoverTwoToOne": 382634
+    },
+    {
+      "id": "img-f29cf41e534a",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1660,
+      "originalToCoverTwoToOne": 293131
+    },
+    {
+      "id": "img-6ee09af34a29",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1903,
+      "originalToCoverTwoToOne": 348362
+    },
+    {
+      "id": "img-b08957f9cb23",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1786,
+      "originalToCoverTwoToOne": 351211
+    },
+    {
+      "id": "img-f09c67bb8b55",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1709,
+      "originalToCoverTwoToOne": 331176
+    },
+    {
+      "id": "img-5b0cfee7f550",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1543,
+      "originalToCoverTwoToOne": 122156
+    },
+    {
+      "id": "img-1a4243d49b99",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1715,
+      "originalToCoverTwoToOne": 285531
+    },
+    {
+      "id": "img-e9b722259a17",
+      "width": 4000,
+      "height": 2256,
+      "normalizeMs": 1957,
+      "originalToCoverTwoToOne": 330707
+    }
+  ],
+  "pairs": [
+    {
+      "image": "img-bd22d8fe3fdd",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1114,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1665487,
+        "carriers": 742499,
+        "changed": 3605,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.024177922395657064, 0.04619733769957137, 0.07142445284680805, 2.0485765286336197
+      ],
+      "histogramZ": [
+        0, -0.054131917827848534, 0.07686414170526805, -0.07585974543449063, 0.09027770867192543,
+        -0.15860057634996585, 0.18566408001900775, 0.09679232492243763
+      ],
+      "bitsPerChange": 4.680166435506242,
+      "ratePerNonzeroAc": 0.01013037027608141,
+      "ratePerCarrier": 0.02272326292695344,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3717838741013333,
+        "pairRate": 0.05677656764697159,
+        "histogramShape": 0.003627528237457291
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3716605858335738,
+        "pairRate": 0.05864808775570707,
+        "histogramShape": 0.0036330819167698365
+      }
+    },
+    {
+      "image": "img-bd22d8fe3fdd",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1150,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1665487,
+        "carriers": 742499,
+        "changed": 3665,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.007927367915993062, 0.04074024050976925, 0.07602955408812238, 2.0501885043080548
+      ],
+      "histogramZ": [
+        0, -0.08821497720093835, 0.12526008277895534, -0.1300452778876982, 0.1547617862947293,
+        -0.1932944524265209, 0.22627809752316572, 0.1871318281833794
+      ],
+      "bitsPerChange": 4.603547066848567,
+      "ratePerNonzeroAc": 0.01013037027608141,
+      "ratePerCarrier": 0.02272326292695344,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3717838741013333,
+        "pairRate": 0.05677656764697159,
+        "histogramShape": 0.003627528237457291
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3719310754527403,
+        "pairRate": 0.060642296877312374,
+        "histogramShape": 0.0036188224698863072
+      }
+    },
+    {
+      "image": "img-bd22d8fe3fdd",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1077,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1665487,
+        "carriers": 742499,
+        "changed": 3620,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.00802591254478303, 0.034901036892293825, 0.08866702822470149, 2.044755010369055
+      ],
+      "histogramZ": [
+        0, -0.16039086763806973, 0.22774560505264607, -0.05057316362299375, 0.06018513911461695,
+        -0.11399416425153797, 0.13344605751366181, 0.06452821661495842
+      ],
+      "bitsPerChange": 4.660773480662983,
+      "ratePerNonzeroAc": 0.01013037027608141,
+      "ratePerCarrier": 0.02272326292695344,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3717838741013333,
+        "pairRate": 0.05677656764697159,
+        "histogramShape": 0.003627528237457291
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.37187487235747785,
+        "pairRate": 0.05865149609662346,
+        "histogramShape": 0.0036361589553078905
+      }
+    },
+    {
+      "image": "img-c172a47cdb97",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1422,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2357299,
+        "carriers": 1234413,
+        "changed": 3031,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.019502112703993324, 0.2391163149891019, 0.7655210200346425, 1.8574043920094472
+      ],
+      "histogramZ": [
+        0, -0.03945732616564139, 0.053421384556345625, -0.04644573627028742, 0.05357796925011376,
+        0.007620001474851428, -0.008681222812046545, 0.024060160169211853
+      ],
+      "bitsPerChange": 5.566479709666777,
+      "ratePerNonzeroAc": 0.007157344061996378,
+      "ratePerCarrier": 0.01366803492834246,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.44781821714870257,
+        "pairRate": 0.051025838393629286,
+        "histogramShape": 0.005531539645014828
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.44772377443856337,
+        "pairRate": 0.05236802384636563,
+        "histogramShape": 0.005542496904199039
+      }
+    },
+    {
+      "image": "img-c172a47cdb97",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1081,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2357299,
+        "carriers": 1234413,
+        "changed": 3070,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.01925436599537582, 0.24603380612344578, 0.7160739187983861, 1.8924973839541666
+      ],
+      "histogramZ": [
+        0, -0.06004375720858472, 0.08129341128139551, 0.0029028585168929637, -0.00334862307813211,
+        -0.09906001917306856, 0.11285589655660509, 0.014436096101527112
+      ],
+      "bitsPerChange": 5.495765472312703,
+      "ratePerNonzeroAc": 0.007157344061996378,
+      "ratePerCarrier": 0.01366803492834246,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.44781821714870257,
+        "pairRate": 0.051025838393629286,
+        "histogramShape": 0.005531539645014828
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4479013826467469,
+        "pairRate": 0.05117674182032528,
+        "histogramShape": 0.005530338849487793
+      }
+    },
+    {
+      "image": "img-c172a47cdb97",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1190,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2357299,
+        "carriers": 1234413,
+        "changed": 3047,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.023279646973076634, 0.23642780350962367, 0.7517661173568991, 1.869075562822211
+      ],
+      "histogramZ": [
+        0, -0.006862143680981111, 0.009290675575016632, -0.02322286813514371, 0.02678898462505688,
+        -0.08001001548593999, 0.09115283952648873, -0.1154887688122169
+      ],
+      "bitsPerChange": 5.537249753856252,
+      "ratePerNonzeroAc": 0.007157344061996378,
+      "ratePerCarrier": 0.01366803492834246,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.44781821714870257,
+        "pairRate": 0.051025838393629286,
+        "histogramShape": 0.005531539645014828
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4478499143283298,
+        "pairRate": 0.05107792627516583,
+        "histogramShape": 0.00552703666178842
+      }
+    },
+    {
+      "image": "img-f29cf41e534a",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1266,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2018689,
+        "carriers": 876023,
+        "changed": 3442,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.020802808309187196, 0.052296662205784473, 0.16397658399321915, 2.024587010965556
+      ],
+      "histogramZ": [
+        0, -0.11370408811636855, 0.1625025990749411, -0.07547980417370344, 0.08981312702907322,
+        -0.027959952747719785, 0.032717594077307816, 0.011987443735004533
+      ],
+      "bitsPerChange": 4.9018012783265545,
+      "ratePerNonzeroAc": 0.008357899607121256,
+      "ratePerCarrier": 0.019259768293754843,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3791139534598789,
+        "pairRate": 0.07368377594517328,
+        "histogramShape": 0.003468047581522783
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.37904257307527117,
+        "pairRate": 0.07442964798183127,
+        "histogramShape": 0.0034731509625127066
+      }
+    },
+    {
+      "image": "img-f29cf41e534a",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1106,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2018689,
+        "carriers": 876023,
+        "changed": 3430,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.008350235125390359, 0.04591967125314035, 0.1625187782758263, 2.0297906783975854
+      ],
+      "histogramZ": [
+        0, -0.0018950681352728092, 0.002708376651249018, -0.020585401138282756, 0.02449448918974724,
+        -0.05125991337081961, 0.05998225580839765, -0.28170492777260653
+      ],
+      "bitsPerChange": 4.918950437317784,
+      "ratePerNonzeroAc": 0.008357899607121256,
+      "ratePerCarrier": 0.019259768293754843,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3791139534598789,
+        "pairRate": 0.07368377594517328,
+        "histogramShape": 0.003468047581522783
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.37918918261743934,
+        "pairRate": 0.07396991666451658,
+        "histogramShape": 0.003474651956921464
+      }
+    },
+    {
+      "image": "img-f29cf41e534a",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1097,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2018689,
+        "carriers": 876023,
+        "changed": 3436,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.016671307613555838, 0.05238798350183648, 0.1642629226148604, 2.024995455086506
+      ],
+      "histogramZ": [
+        0, -0.013265476946909664, 0.01895863655874313, -0.04460170246627931, 0.053071393244452356,
+        -0.009319984249239929, 0.010905864692435938, 0.07791838427752946
+      ],
+      "bitsPerChange": 4.910360884749709,
+      "ratePerNonzeroAc": 0.008357899607121256,
+      "ratePerCarrier": 0.019259768293754843,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3791139534598789,
+        "pairRate": 0.07368377594517328,
+        "histogramShape": 0.003468047581522783
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3791937998851493,
+        "pairRate": 0.07370051102049247,
+        "histogramShape": 0.003459116664790418
+      }
+    },
+    {
+      "image": "img-6ee09af34a29",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1142,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2185194,
+        "carriers": 1017637,
+        "changed": 3335,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.019103634349308368, 0.06614429834543789, 0.18755961101152507, 2.0545936725359173
+      ],
+      "histogramZ": [
+        0, -0.07642287230088488, 0.10946289707968516, -0.08651624518757238, 0.10396233053368469,
+        -0.052786150730834015, 0.061878692286036506, -0.131308572707885
+      ],
+      "bitsPerChange": 5.059070464767617,
+      "ratePerNonzeroAc": 0.007721053599817682,
+      "ratePerCarrier": 0.016579585844461238,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3112767850515032,
+        "pairRate": 0.031018426249705633,
+        "histogramShape": 0.003150362114901157
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3111531267838534,
+        "pairRate": 0.031151560750755758,
+        "histogramShape": 0.003149911816578499
+      }
+    },
+    {
+      "image": "img-6ee09af34a29",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1088,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2185194,
+        "carriers": 1017637,
+        "changed": 3311,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.023090529950447625, 0.06662374961704481, 0.2110828481744232, 2.038886599724987
+      ],
+      "histogramZ": [
+        0, -0.006947533845534989, 0.009951172461789561, 0.00640861075463499, -0.007700913372865532,
+        -0.14516191450979354, 0.1701664037866004, 0.05709068378603696
+      ],
+      "bitsPerChange": 5.0957414678344914,
+      "ratePerNonzeroAc": 0.007721053599817682,
+      "ratePerCarrier": 0.016579585844461238,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3112767850515032,
+        "pairRate": 0.031018426249705633,
+        "histogramShape": 0.003150362114901157
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.31148067883008324,
+        "pairRate": 0.032155286727401866,
+        "histogramShape": 0.003152763705955226
+      }
+    },
+    {
+      "image": "img-6ee09af34a29",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1313,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2185194,
+        "carriers": 1017637,
+        "changed": 3348,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.03425302180373301, 0.054357159157759606, 0.21396884500094177, 2.04003721651834
+      ],
+      "histogramZ": [
+        0, -0.0017368834613837472, 0.0024877931154473902, -0.11215068820611233, 0.1347659840251468,
+        -0.11876883914437653, 0.13922705764358215, -0.09134509405765914
+      ],
+      "bitsPerChange": 5.039426523297491,
+      "ratePerNonzeroAc": 0.007721053599817682,
+      "ratePerCarrier": 0.016579585844461238,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.3112767850515032,
+        "pairRate": 0.031018426249705633,
+        "histogramShape": 0.003150362114901157
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.31099207778754906,
+        "pairRate": 0.032338657481793986,
+        "histogramShape": 0.003140605651243953
+      }
+    },
+    {
+      "image": "img-b08957f9cb23",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1154,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2188679,
+        "carriers": 1148281,
+        "changed": 3204,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.028138247607786673, 0.030414208286923705, 0.415583638741988, 2.1178997108374915
+      ],
+      "histogramZ": [
+        0, -0.028955734067359035, 0.03865813493583696, 0, 0, -0.14920532449436594,
+        0.17435228961895866, -0.04533559208467004
+      ],
+      "bitsPerChange": 5.265917602996255,
+      "ratePerNonzeroAc": 0.007708759484602356,
+      "ratePerCarrier": 0.01469326758868256,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4432669189467034,
+        "pairRate": 0.035394545075994155,
+        "histogramShape": 0.004904949529063026
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.44319543869676475,
+        "pairRate": 0.03427027539460592,
+        "histogramShape": 0.004893617021276643
+      }
+    },
+    {
+      "image": "img-b08957f9cb23",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1128,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2188679,
+        "carriers": 1148281,
+        "changed": 3240,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.024347400360626523, 0.04273996638215068, 0.37196926497620275, 2.1458559189591755
+      ],
+      "histogramZ": [
+        0, -0.042581961863763285, 0.05685019843505435, 0.062461950854116266, -0.07341576842134462,
+        -0.05738666326706383, 0.06705857293036872, -0.12089491222578677
+      ],
+      "bitsPerChange": 5.207407407407407,
+      "ratePerNonzeroAc": 0.007708759484602356,
+      "ratePerCarrier": 0.01469326758868256,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4432669189467034,
+        "pairRate": 0.035394545075994155,
+        "histogramShape": 0.004904949529063026
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.443158749636641,
+        "pairRate": 0.035688094663581915,
+        "histogramShape": 0.004916582235731207
+      }
+    },
+    {
+      "image": "img-b08957f9cb23",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1152,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2188679,
+        "carriers": 1148281,
+        "changed": 3201,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.010561732115200152, 0.033647208773202035, 0.38763432487014265, 2.1413440464786246
+      ],
+      "histogramZ": [
+        0, -0.06983441745657179, 0.09323432543348914, 0.002839179584278012, -0.0033370803827883913,
+        -0.061212440818201416, 0.07152914445905996, 0.055410168103485605
+      ],
+      "bitsPerChange": 5.2708528584817245,
+      "ratePerNonzeroAc": 0.007708759484602356,
+      "ratePerCarrier": 0.01469326758868256,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4432669189467034,
+        "pairRate": 0.035394545075994155,
+        "histogramShape": 0.004904949529063026
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.443455298681918,
+        "pairRate": 0.03669030732860523,
+        "histogramShape": 0.00490104694360017
+      }
+    },
+    {
+      "image": "img-f09c67bb8b55",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1306,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2176425,
+        "carriers": 1072579,
+        "changed": 3169,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.053743677524138736, 0.10649734305890915, 0.4010751980792473, 1.8699511396102135
+      ],
+      "histogramZ": [
+        0, -0.08339732897847242, 0.11395454702990508, -0.09452581476510166, 0.11030771250565581,
+        -0.12122622241931574, 0.14047092999321953, -0.11968781604752132
+      ],
+      "bitsPerChange": 5.32407699589776,
+      "ratePerNonzeroAc": 0.007752162376374099,
+      "ratePerCarrier": 0.015730309841979005,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.26449053643970516,
+        "pairRate": 0.08343652732688511,
+        "histogramShape": 0.007228263724717642
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.2643969024854887,
+        "pairRate": 0.08370259070332764,
+        "histogramShape": 0.007239671282224502
+      }
+    },
+    {
+      "image": "img-f09c67bb8b55",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1153,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2176425,
+        "carriers": 1072579,
+        "changed": 3187,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.023751171645085337, 0.07431287855898867, 0.4210736096278675, 1.8711361824378128
+      ],
+      "histogramZ": [
+        0, 0.0230673463131945, -0.03151934279550566, 0.024393758649058496, -0.028466506453072467,
+        -0.08485835569352103, 0.09832965099525368, -0.07285345324631733
+      ],
+      "bitsPerChange": 5.2940069030436145,
+      "ratePerNonzeroAc": 0.007752162376374099,
+      "ratePerCarrier": 0.015730309841979005,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.26449053643970516,
+        "pairRate": 0.08343652732688511,
+        "histogramShape": 0.007228263724717642
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.2643298428506289,
+        "pairRate": 0.08366872843035089,
+        "histogramShape": 0.007236068895643357
+      }
+    },
+    {
+      "image": "img-f09c67bb8b55",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1042,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2176425,
+        "carriers": 1072579,
+        "changed": 3164,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.023923825547688675, 0.08046706060842579, 0.38123354927463377, 1.8972657946824572
+      ],
+      "histogramZ": [
+        0, -0.040811458861805656, 0.055764991099740785, 0.03659063797358774, -0.0426997596796087,
+        -0.06465398529030174, 0.07491782932971708, 0.031222908534136
+      ],
+      "bitsPerChange": 5.332490518331226,
+      "ratePerNonzeroAc": 0.007752162376374099,
+      "ratePerCarrier": 0.015730309841979005,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.26449053643970516,
+        "pairRate": 0.08343652732688511,
+        "histogramShape": 0.007228263724717642
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.26424917514563856,
+        "pairRate": 0.08357640848101144,
+        "histogramShape": 0.007236969492288643
+      }
+    },
+    {
+      "image": "img-5b0cfee7f550",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1055,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1103037,
+        "carriers": 462709,
+        "changed": 3479,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [0, 0.015007399279103148, 0.08275897840467003, 2.0748212233879797],
+      "histogramZ": [
+        0, -0.06602122907979605, 0.09209180751252198, -0.1193087410886034, 0.143077604877575, 0, 0,
+        -0.008077660376319443
+      ],
+      "bitsPerChange": 4.849669445242886,
+      "ratePerNonzeroAc": 0.015295951087769495,
+      "ratePerCarrier": 0.03646352242986413,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.42799651516811804,
+        "pairRate": 0.09259684161171577,
+        "histogramShape": 0.005020075800217637
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4280299517151758,
+        "pairRate": 0.09498670226011774,
+        "histogramShape": 0.005026154827573298
+      }
+    },
+    {
+      "image": "img-5b0cfee7f550",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 3494,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1103037,
+        "carriers": 462709,
+        "changed": 3471,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [0, 0.016713320558276464, 0.0908496957787173, 2.069162285912478],
+      "histogramZ": [
+        0, -0.021126793305534734, 0.029469378404007034, 0.03212158413923937, -0.038520893620885586,
+        0.05685848790792992, -0.06660821596406676, -0.1130872452684722
+      ],
+      "bitsPerChange": 4.860847018150389,
+      "ratePerNonzeroAc": 0.015295951087769495,
+      "ratePerCarrier": 0.03646352242986413,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.42799651516811804,
+        "pairRate": 0.09259684161171577,
+        "histogramShape": 0.005020075800217637
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4280131514187033,
+        "pairRate": 0.09330556026191739,
+        "histogramShape": 0.00502675522533678
+      }
+    },
+    {
+      "image": "img-5b0cfee7f550",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 999,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 1103037,
+        "carriers": 462709,
+        "changed": 3467,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.004318704242937518, 0.015059342974329348, 0.08304542424858583, 2.074009093671353
+      ],
+      "histogramZ": [
+        0, -0.20070453640257996, 0.2799590948380668, -0.05506557281012464, 0.06603581763580385,
+        -0.16425785395624198, 0.19242373500730398, -0.048465962257916655
+      ],
+      "bitsPerChange": 4.866455148543409,
+      "ratePerNonzeroAc": 0.015295951087769495,
+      "ratePerCarrier": 0.03646352242986413,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.42799651516811804,
+        "pairRate": 0.09259684161171577,
+        "histogramShape": 0.005020075800217637
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.4280439251109473,
+        "pairRate": 0.09490747668212873,
+        "histogramShape": 0.005031633457165407
+      }
+    },
+    {
+      "image": "img-1a4243d49b99",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1217,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2130036,
+        "carriers": 896180,
+        "changed": 3411,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.042340795847167836, 0.05577626145130335, 0.16112792345746904, 2.0101507316110436
+      ],
+      "histogramZ": [
+        0, -0.25519063000137165, 0.371106468821538, -0.154739250776183, 0.18822290892806587,
+        -0.13290457139831321, 0.15716949344311795, -0.27473719361701265
+      ],
+      "bitsPerChange": 4.946350043975373,
+      "ratePerNonzeroAc": 0.007920992884627302,
+      "ratePerCarrier": 0.01882657501841148,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23252031234557255,
+        "pairRate": 0.08017522870584426,
+        "histogramShape": 0.0027901985065105495
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.2327177425304229,
+        "pairRate": 0.0814654784409038,
+        "histogramShape": 0.0027921497992420045
+      }
+    },
+    {
+      "image": "img-1a4243d49b99",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1029,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2130036,
+        "carriers": 896180,
+        "changed": 3407,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.04239050620331361, 0.0732922913123406, 0.1664220676471906, 2.0005986985170843
+      ],
+      "histogramZ": [
+        0, -0.16353765725440014, 0.23782175114619689, -0.15810314753218696, 0.19231471129606728,
+        -0.05221251019219448, 0.06174515813836776, -0.1186365154255282
+      ],
+      "bitsPerChange": 4.952157323158204,
+      "ratePerNonzeroAc": 0.007920992884627302,
+      "ratePerCarrier": 0.01882657501841148,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23252031234557255,
+        "pairRate": 0.08017522870584426,
+        "histogramShape": 0.0027901985065105495
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23272155527481883,
+        "pairRate": 0.08105262210542419,
+        "histogramShape": 0.0027980036774362857
+      }
+    },
+    {
+      "image": "img-1a4243d49b99",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1038,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2130036,
+        "carriers": 896180,
+        "changed": 3428,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.01915037321452868, 0.060702750996972095, 0.16438782291769782, 2.0101518276702874
+      ],
+      "histogramZ": [
+        0, -0.12939243211337154, 0.1881666602475404, -0.25902005021230634, 0.31506878233611024,
+        -0.1423977550696213, 0.1683958858319121, 0.031220135638296894
+      ],
+      "bitsPerChange": 4.921820303383897,
+      "ratePerNonzeroAc": 0.007920992884627302,
+      "ratePerCarrier": 0.01882657501841148,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23252031234557255,
+        "pairRate": 0.08017522870584426,
+        "histogramShape": 0.0027901985065105495
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23245236078249232,
+        "pairRate": 0.08254877023948082,
+        "histogramShape": 0.0027871214679725145
+      }
+    },
+    {
+      "image": "img-e9b722259a17",
+      "pair": 0,
+      "extracted": true,
+      "embedMs": 1086,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2233217,
+        "carriers": 1111881,
+        "changed": 3180,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.08111499406058804, 0.11894297129058132, 0.3973544261574875, 2.133490910779568
+      ],
+      "histogramZ": [
+        0, -0.08435861794160732, 0.11424300070036732, -0.04838045584618411, 0.0573901992064435,
+        -0.1720417778114987, 0.2092629864832172, -0.026436530831825754
+      ],
+      "bitsPerChange": 5.305660377358491,
+      "ratePerNonzeroAc": 0.007555020403301605,
+      "ratePerCarrier": 0.015174285737412547,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23567243046662348,
+        "pairRate": 0.023043613420726583,
+        "histogramShape": 0.0017286952606101937
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23574816656633177,
+        "pairRate": 0.024438706289115486,
+        "histogramShape": 0.0017340237907614252
+      }
+    },
+    {
+      "image": "img-e9b722259a17",
+      "pair": 1,
+      "extracted": true,
+      "embedMs": 1220,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2233217,
+        "carriers": 1111881,
+        "changed": 3179,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.04250217187554292, 0.0945741533769328, 0.40243552217553713, 2.150088613235338
+      ],
+      "histogramZ": [
+        0, -0.13563542492572156, 0.18368482465549255, -0.12806591253401675, 0.1519152331935269,
+        -0.3167132727893499, 0.3852341342077408, -0.1268953479927636
+      ],
+      "bitsPerChange": 5.30732934885184,
+      "ratePerNonzeroAc": 0.007555020403301605,
+      "ratePerCarrier": 0.015174285737412547,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23567243046662348,
+        "pairRate": 0.023043613420726583,
+        "histogramShape": 0.0017286952606101937
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23605823202310883,
+        "pairRate": 0.02478390709975742,
+        "histogramShape": 0.001736875680138109
+      }
+    },
+    {
+      "image": "img-e9b722259a17",
+      "pair": 2,
+      "extracted": true,
+      "embedMs": 1090,
+      "comparison": {
+        "totalAc": 13324500,
+        "nonzeroAc": 2233217,
+        "carriers": 1111881,
+        "changed": 3166,
+        "changedDc": 0,
+        "changedBelow2": 0,
+        "notUnit": 0,
+        "signFlips": 0
+      },
+      "twoToOne": 0,
+      "energyQuartiles": [
+        0.03491729281373568, 0.11027901706712141, 0.38119629053885373, 2.1605163493350443
+      ],
+      "histogramZ": [
+        0, -0.09759134232460455, 0.13216347139846416, -0.12806591253401675, 0.1519152331935269,
+        -0.19159197983553267, 0.23304287131085552, -0.2167795528209712
+      ],
+      "bitsPerChange": 5.329121920404296,
+      "ratePerNonzeroAc": 0.007555020403301605,
+      "ratePerCarrier": 0.015174285737412547,
+      "cover": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.23567243046662348,
+        "pairRate": 0.023043613420726583,
+        "histogramShape": 0.0017286952606101937
+      },
+      "stego": {
+        "chiSquarePairs": 0,
+        "f5Beta": 0.2355640619880904,
+        "pairRate": 0.024592675602559955,
+        "histogramShape": 0.0017329730946752644
+      }
+    }
+  ]
+}

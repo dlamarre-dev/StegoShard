@@ -61,6 +61,7 @@ import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-
 import { type MpfLink, mpfTrailerLink, retargetMpfIndex } from './mpf';
 import { normalizeCoverBytes } from './normalize';
 import { STC_WIDTH, keyedOrder, keyedOrderStreamLen, stcEmbed, stcExtract } from './stc';
+import { stcCosts, uerdCosts } from './costs/uerd';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -940,10 +941,17 @@ export async function extractBytesStegoModel(
  * one per bit.
  *
  * The code spans `bits · STC_WIDTH` carriers, taken in a keyed order from the
- * photo's; its syndrome is the payload. Of those carriers, the STC flips the
- * fewest whose parities give that syndrome: about 2 400 for a gallery slot where
- * S0 flips 8 400 (see `STC_WIDTH`). Costs are uniform at this step, so fewest is
- * the only criterion.
+ * photo's; its syndrome is the payload. Of those carriers, the STC flips the set
+ * of least total cost whose parities give that syndrome. `costs` picks the price
+ * of a flip:
+ *
+ *  - `'uerd'` (the default): UERD (`costs/uerd.ts`), cheap in busy blocks and
+ *    coarse modes, dear in smooth ones, so the flips go where texture hides them;
+ *  - `'uniform'`: one per flip, so the fewest flips win, about 2 400 for a gallery
+ *    slot where S0 flips 8 400 (see `STC_WIDTH`). Kept for the bench.
+ *
+ * Costs are the writer's alone: the reader needs parities only, so this choice
+ * never changes what a reader must do.
  *
  * `seed` must be the S1 position key, never the S0 one: the two schemes are told
  * apart by the key and the AAD alone, since nothing is stored in the photo.
@@ -953,6 +961,7 @@ export async function embedBytesStcJpeg(
   data: Uint8Array,
   seed: Uint8Array,
   margin = STC_WIDTH,
+  costs: 'uerd' | 'uniform' = 'uerd',
 ): Promise<Uint8Array> {
   const cover = normalizeCoverBytes(jpegBytes).bytes;
   const mpf = assertMpfUsable(mpfTrailerLink(cover));
@@ -972,7 +981,8 @@ export async function embedBytesStcJpeg(
   for (let i = 0; i < n; i++) x[i] = carriers.get(order[i]!);
   const message = new Uint8Array(m);
   for (let i = 0; i < m; i++) message[i] = (data[i >> 3]! >> (7 - (i & 7))) & 1;
-  const { y } = stcEmbed(x, null, message, STC_WIDTH);
+  const prices = costs === 'uerd' ? stcCosts(uerdCosts(model), order) : null;
+  const { y } = stcEmbed(x, prices, message, STC_WIDTH);
 
   if (inPlace) {
     const where = carriers as ReturnType<typeof eligibleInPlace>;

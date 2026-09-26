@@ -41,7 +41,11 @@ import { extractKeyFactorImage, fileToGalleryCover } from './image-io';
 // (SPEC §9.8: two engines must not produce two files). Twelve covers at 768
 // square, encoded on the way in and again by the post-save verify, are seconds
 // of real work, and the v8 coverage instrumentation roughly triples it.
-const SLOW = { timeout: 180_000 };
+//
+// 300s since the S1 writer prices every carrier with UERD (SPEC §9.3.1): the
+// stego-key round trip already took 172s of the 180 on CI, and the costs pushed
+// it over. The margin is for coverage-instrumented CI, not for a regression.
+const SLOW = { timeout: 300_000 };
 const PW = 'correct horse battery staple';
 
 function tmp(): string {

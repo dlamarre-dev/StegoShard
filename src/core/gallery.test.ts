@@ -403,11 +403,17 @@ describe('gallery deniability', () => {
     }
     expect(counts.carrier.length).toBeGreaterThan(0);
     expect(counts.decoy.length).toBeGreaterThan(0);
-    // Both are about m / 7.1 = 2 390 for one slot; S0 would be 8 400.
+    // Both about 3 400 for one slot under UERD costs (2 390 at uniform cost);
+    // S0 would be 8 400. What matters is that the two roles cannot be told
+    // apart by count: a decoy on another path would sit thousands away.
     for (const n of [...counts.carrier, ...counts.decoy]) {
       expect(n).toBeGreaterThan(2000);
-      expect(n).toBeLessThan(2700);
+      expect(n).toBeLessThan(4200);
     }
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(Math.abs(mean(counts.carrier) - mean(counts.decoy))).toBeLessThan(
+      0.1 * mean(counts.carrier),
+    );
   }, 240000);
 
   it('decoy payloads look like ciphertext (Shannon entropy ≈ 8 bits/byte)', async () => {
