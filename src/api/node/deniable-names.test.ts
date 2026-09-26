@@ -173,9 +173,12 @@ describe('deniable destinations name nothing after the project', () => {
       // source left in them (see `deniable-names.ts`).
       const photos = written.filter((n) => n !== 'recovery.key');
       expect(photos).toHaveLength(10);
+      // The exact shape is the whole check: nothing of `PXL_20260921_143000` fits
+      // in `IMG_` and four digits. This also asserted `not.toMatch(/PXL|2026/)`,
+      // which `IMG_2026.jpg`, a fair draw from the 10,000 names, fails about once
+      // in a thousand runs; it did in the mutation dry run of 26 September.
       for (const n of photos) {
         expect(n).toMatch(/^IMG_\d{4}\.jpg$/);
-        expect(n).not.toMatch(/PXL|2026/);
       }
       expect(new Set(photos).size).toBe(10);
     },
