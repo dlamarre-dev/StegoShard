@@ -7,6 +7,8 @@ the writer runs (Filler, Judas and Fridrich, IEEE TIFS 2011). SPEC §9.3.1.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 STC_HEIGHT = 9
 STC_WIDTH = 16
 
@@ -26,7 +28,7 @@ def stc_submatrix(w: int) -> list[int]:
     return cols
 
 
-def stc_extract(y: list[int] | bytes, m: int, w: int) -> list[int]:
+def stc_extract(y: Sequence[int], m: int, w: int) -> list[int]:
     """The message H·y, one bit per entry, with H truncated below row m."""
     if len(y) != m * w:
         raise ValueError(f"stc: expected {m * w} parities, got {len(y)}")
