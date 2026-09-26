@@ -18,6 +18,7 @@ import {
   extractBytesStcJpeg,
   extractBytesStegoJpeg,
 } from './stego';
+import { uerdCosts } from './costs/uerd';
 
 /** Textured q85 baseline JPEG; 448² of noise gives about 285 000 carriers. */
 function noisyJpeg(side: number, seed: number): Uint8Array {
@@ -52,6 +53,26 @@ function changes(a: Uint8Array, b: Uint8Array): [number, number][] {
   return out;
 }
 
+/** Total UERD cost, priced on the cover, of every carrier the embed changed. */
+function priceOf(coverJpeg: Uint8Array, stegoJpeg: Uint8Array): number {
+  const x = decode(coverJpeg);
+  const y = decode(stegoJpeg);
+  const raw = uerdCosts(x);
+  let i = 0;
+  let total = 0;
+  x.components.forEach((c, ci) =>
+    c.blocks.forEach((blk, bi) => {
+      const other = y.components[ci]!.blocks[bi]!;
+      for (let k = 1; k < 64; k++) {
+        if (Math.abs(blk[k]!) < 2) continue;
+        if (blk[k] !== other[k]) total += raw[i]!;
+        i++;
+      }
+    }),
+  );
+  return total;
+}
+
 describe('embedding scheme S1', () => {
   const cover = noisyJpeg(448, 1);
   const data = bytes(SLOT, 1);
@@ -77,12 +98,32 @@ describe('embedding scheme S1', () => {
 
   it('changes about a quarter of what S0 changes for the same slot', async () => {
     const s0 = changes(cover, await embedBytesStegoJpeg(cover, data, key(3), 16)).length;
-    const s1 = changes(cover, await embedBytesStcJpeg(cover, data, key(3))).length;
-    // S0 flips half its 16 872 bits; S1 about one in 7.1 (see STC_WIDTH).
+    const s1 = changes(cover, await embedBytesStcJpeg(cover, data, key(3), 16, 'uniform')).length;
+    // S0 flips half its 16 872 bits; S1 at uniform cost about one in 7.1 (see STC_WIDTH).
     expect(s0).toBeGreaterThan(8000);
     expect(s1).toBeGreaterThan(2000);
     expect(s1).toBeLessThan(2700);
   });
+
+  /**
+   * What the UERD costs buy, and what they cost. The trellis now minimizes the
+   * total cost rather than the count, so it takes more flips than at uniform
+   * cost, each cheaper: the total UERD price of the flips falls well below
+   * uniform's, for a count that rises by a bounded amount.
+   */
+  it('trades a bounded rise in changes for a lower total cost under UERD', async () => {
+    const uniform = changes(cover, await embedBytesStcJpeg(cover, data, key(3), 16, 'uniform'));
+    const uerd = changes(cover, await embedBytesStcJpeg(cover, data, key(3)));
+    expect(uerd.length).toBeGreaterThan(uniform.length);
+    expect(uerd.length).toBeLessThan(uniform.length * 1.6);
+    const price = (stego: Uint8Array) => priceOf(cover, stego);
+    const pu = price(await embedBytesStcJpeg(cover, data, key(3), 16, 'uniform'));
+    const pe = price(await embedBytesStcJpeg(cover, data, key(3)));
+    expect(pe).toBeLessThan(pu * 0.8);
+    expect(
+      await extractBytesStcJpeg(await embedBytesStcJpeg(cover, data, key(3)), key(3), SLOT),
+    ).toEqual(data);
+  }, 120000); // five embeds, each several times slower under coverage
 
   it('is deterministic for a cover, a payload and a key', async () => {
     expect(await embedBytesStcJpeg(cover, data, key(4))).toEqual(

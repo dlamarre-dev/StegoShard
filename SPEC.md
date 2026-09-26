@@ -896,7 +896,7 @@ Huffman size categories and the file size are exactly as under S0. What changes
 is which carriers are written: instead of one carrier per payload bit, the
 payload is the syndrome of a syndrome-trellis code (Filler, Judas and Fridrich,
 IEEE TIFS 6(3), 2011) over a keyed sequence of carriers, and the writer flips
-the fewest carriers that give that syndrome.
+the set of carriers of least total cost that gives that syndrome.
 
 ```
 m      = SLOT_BYTES · 8 = 16 872            payload bits, MSB-first per byte
@@ -936,15 +936,31 @@ for i in 0 .. m-1:
     acc >>= 1
 ```
 
-**The writer** chooses `y` with `H · y` equal to the payload and the fewest
+**The writer** gives each carrier in the code a cost of flipping it, chooses
+`y` with `H · y` equal to the payload and the least total cost over the
 positions where `y` differs from the cover's parities, by the Viterbi pass the
-paper describes, and flips exactly those carriers. Which `y` it chooses is not
-part of the format: any `y` with the right syndrome is read the same way. The
-reference writer breaks ties toward leaving a parity unchanged, so that its
-output is a function of its inputs; `tests/vectors/stc-vectors.json` pins it.
+paper describes, and flips exactly those carriers. Neither the costs nor the `y`
+they select is part of the format: any `y` with the right syndrome is read the
+same way, so a writer **MAY** use any cost function, and change it, without a
+reader noticing. The reference writer breaks ties toward leaving a parity
+unchanged, so that its output is a function of its inputs;
+`tests/vectors/stc-vectors.json` pins the trellis.
+
+The reference writer prices a flip with UERD (Guo, Ni, Su, Tang and Shi, IEEE
+TIFS 10(12), 2015): a change to mode `k` of a block costs `q_k / (D + ¼·ΣD_n)`,
+where `q_k` is the mode's quantization step, `D = Σ|c_k|·q_k` the block's
+dequantized AC energy and `ΣD_n` that of its eight neighbours in the same
+component. A flip is cheap in busy blocks and coarse modes and dear in smooth
+ones, so the changes go where texture hides them. The costs reach the trellis as
+integers: scaled so that the median carrier of the code costs 64, rounded, and
+clamped to `1 .. 4095`. Only IEEE arithmetic and a sort are involved, so the
+output is the same on every engine.
 
 At this height and width the code reaches about 83 % of the rate-distortion
-bound: about 2 380 changes for a slot, against the 8 436 of S0.
+bound at uniform cost: about 2 380 changes for a slot, against the 8 436 of S0.
+Under UERD the trellis trades count for placement, about 3 320 changes (3 030 to
+3 670 on the bench corpus, `tests/steganalysis/bench/s3-uerd.md`), nearly all of
+them in the busiest quarter of the photo's blocks.
 
 ### 9.4 Encode
 
@@ -1271,6 +1287,12 @@ rate at **3.1%**, a factor of two under the crossing. The previous value of 4 pu
 it at 12.5%, comfortably above: the margin was the defect, not the re-encoding
 that exposed it.
 
+Those rates are S0's, one change per two payload bits. S1 (§9.3.1) changes far
+fewer carriers for the same slot: about 2 380 at uniform cost and about 3 320
+(at most 3 670 measured) under the reference writer's UERD costs, which over the
+269 952 carriers a cover must have is a rate of at most **1.4%**, under half of
+S0's 3.1% and a factor of four under the crossing.
+
 **What this does not claim.** A first-order chi-square (Westfeld-Pfitzmann
 pair-of-values) attack does not move at any rate up to 20% on this corpus; it
 fires only near saturation. It therefore constrains nothing, and no number here
@@ -1283,6 +1305,9 @@ refuse files a conforming implementation produced. The reference implementation
 reads at margin 4 and writes at 16.
 
 #### 9.8.2 Concentration: measured, and deliberately not a rule
+
+_This subsection describes S0, and S1 at uniform cost. The reference S1 writer
+concentrates on purpose; see the end of the subsection._
 
 An average rate cannot see concentration, and the obvious worry is a photo whose
 carriers are massed in one textured patch: the average looks healthy while the
@@ -1306,6 +1331,17 @@ Carrier _density_ does vary, and widely: across the corpus a photo yields betwee
 near-black frame. A slot needs 269 952 of them, so a dark or smooth photo is
 refused however large it is. That is the filter working: a photo with almost no
 texture is not a cover, and no margin can make it one.
+
+**S1 under UERD concentrates by design.** The reference writer's costs (§9.3.1)
+send the flips into busy blocks, which is where a content-adaptive embed hides
+them, so the uniformity argument above does not hold for it and is not claimed.
+The bar is re-derived instead. On the bench corpus, ranking each photo's blocks by
+dequantized AC energy, the change rate per carrier in the quietest to the busiest
+quarter is **0.02, 0.08, 0.29 and 2.03** times the photo's mean rate
+(`tests/steganalysis/bench/s3-uerd.md`; uniform cost gives 0.97 to 1.01). At the
+§9.8.1 ceiling of 1.4% that puts the busiest quarter under **3%**, still a factor
+of two under the 6% where the histogram distance crosses the photo's own noise,
+while the smooth blocks a detector reads most easily are left almost untouched.
 
 #### 9.8.3 The container-preserving mode
 
