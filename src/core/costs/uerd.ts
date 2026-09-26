@@ -86,11 +86,12 @@ export function uerdCosts(model: JpegModel): Float64Array {
     }
 
     // Blocks come in MCU order: h·v of them per MCU, raster within it. Place each
-    // on the component's own block grid to find its neighbours.
+    // on the component's own block grid to find its neighbours. The decoder
+    // makes every block of every MCU, so the grid has no hole.
     const per = comp.h * comp.v;
     const cols = model.mcusPerLine * comp.h;
     const rows = model.mcusPerColumn * comp.v;
-    const grid = new Int32Array(cols * rows).fill(-1);
+    const grid = new Int32Array(cols * rows);
     for (let b = 0; b < n; b++) {
       const mcu = (b / per) | 0;
       const sub = b % per;
@@ -103,14 +104,12 @@ export function uerdCosts(model: JpegModel): Float64Array {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const b = grid[r * cols + c]!;
-        if (b < 0) continue;
         let around = 0;
         for (let dr = -1; dr <= 1; dr++) {
           if (r + dr < 0 || r + dr >= rows) continue;
           for (let dc = -1; dc <= 1; dc++) {
             if ((dr === 0 && dc === 0) || c + dc < 0 || c + dc >= cols) continue;
-            const nb = grid[(r + dr) * cols + c + dc]!;
-            if (nb >= 0) around += energy[nb]!;
+            around += energy[grid[(r + dr) * cols + c + dc]!]!;
           }
         }
         denom[b] = energy[b]! + 0.25 * around;
@@ -150,7 +149,8 @@ export function stcCosts(raw: Float64Array, order: Uint32Array): Int32Array {
   for (let i = 0; i < order.length; i++) picked[i] = raw[order[i]!]!;
   const sorted = Float64Array.from(picked).sort();
   const median = sorted[sorted.length >> 1]!;
-  const scale = median > 0 ? STC_MEDIAN_COST / median : 0;
+  // Every UERD cost is positive (a carrier's block has D ≥ 2q), so the median is.
+  const scale = STC_MEDIAN_COST / median;
   const out = new Int32Array(order.length);
   for (let i = 0; i < order.length; i++) {
     out[i] = Math.min(STC_MAX_COST, Math.max(1, Math.round(picked[i]! * scale)));

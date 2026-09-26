@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 import jpeg from 'jpeg-js';
-import { decode, eligibleCoefficients } from '../jpeg-coeff';
+import { type JpegModel, decode, eligibleCoefficients } from '../jpeg-coeff';
 import { STC_MAX_COST } from '../stc';
 import { embedBytesStcJpeg, extractBytesStcJpeg } from '../stego';
 import { componentQuantTables, stcCosts, uerdCosts } from './uerd';
@@ -77,6 +77,49 @@ describe('uerdCosts', () => {
     });
     expect(counts[1]).toBeGreaterThan(100); // the quiet half still has carriers
     expect(sums[1]! / counts[1]!).toBeGreaterThan((3 * sums[0]!) / counts[0]!);
+  });
+});
+
+describe('componentQuantTables', () => {
+  /** SOI, the given segments, SOS, EOI; each segment as [marker, ...payload]. */
+  function file(...segments: number[][]): Uint8Array {
+    const out = [0xff, 0xd8];
+    for (const [marker, ...body] of segments) {
+      const len = body.length + 2;
+      out.push(0xff, marker!, len >> 8, len & 0xff, ...body);
+    }
+    // A one-component SOS and an empty scan: the segment walk needs a scan before EOI.
+    out.push(0xff, 0xda, 0, 8, 1, 1, 0x00, 0, 63, 0);
+    return Uint8Array.from([...out, 0xff, 0xd9]);
+  }
+  /** SOF0 for one 8×8 component using quantization table `tq`. */
+  const sof = (tq: number) => [0xc0, 8, 0, 8, 0, 8, 1, 1, 0x11, tq];
+  const oneComponent = (bytes: Uint8Array) =>
+    ({ bytes, components: [{ blocks: [] }] }) as unknown as JpegModel;
+
+  it('reads a 16-bit table as well as an 8-bit one', () => {
+    const wide = [0x12, ...Array.from({ length: 64 }, (_, i) => [1, i]).flat()];
+    const q = componentQuantTables(oneComponent(file([0xdb, ...wide], sof(2))));
+    expect(q[0]![0]).toBe(256);
+    expect(q[0]![63]).toBe(256 + 63);
+  });
+
+  it('lets a later definition of a table replace an earlier one', () => {
+    const narrow = (v: number) => [0x00, ...new Array<number>(64).fill(v)];
+    const q = componentQuantTables(
+      oneComponent(file([0xdb, ...narrow(3)], [0xdb, ...narrow(7)], sof(0))),
+    );
+    expect(q[0]![5]).toBe(7);
+  });
+
+  it('refuses a frame naming a table that is not defined, or no frame at all', () => {
+    const narrow = [0x00, ...new Array<number>(64).fill(1)];
+    expect(() => componentQuantTables(oneComponent(file([0xdb, ...narrow], sof(1))))).toThrow(
+      /table 1/,
+    );
+    expect(() => componentQuantTables(oneComponent(file([0xdb, ...narrow])))).toThrow(
+      /no baseline frame/,
+    );
   });
 });
 
