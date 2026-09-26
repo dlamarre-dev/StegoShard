@@ -69,7 +69,7 @@
 #   crypto   63 min, 463       66 min, 127 re-tested   106 min, 148 re-tested
 #
 # A forced run of either file would have needed four to five hours. The four
-# shards are now eleven, planned by scripts/mutation-shards.ts from named anchors
+# shards are now thirteen, planned by scripts/mutation-shards.ts from named anchors
 # rather than hard-coded lines, because a cut inside a function silently drops
 # the mutants that span it. tests/mutation/shards.test.ts checks on every PR that
 # the ranges still produce every mutant exactly once. Why this and not a lighter
@@ -213,10 +213,16 @@ jobs:
     # incremental nights reached 116 minutes (see "Stryker can split a file" at the
     # top). The answer was more shards, not a longer limit: a limit raised to fit
     # one file's forced run would have had to be four to five hours, and a hang
-    # would then cost that too. The cuts in scripts/mutation-shards.ts were sized
-    # to keep each shard well under 120 on a forced run, and 120 stays what it was
-    # for, a ceiling that catches a hang.
-    timeout-minutes: 120
+    # would then cost that too.
+    #
+    # More shards were not enough on their own, though. The first cold run with
+    # eleven of them (26 September, on the branch) took 49 to 106 minutes per
+    # shard and lost two at 120. Each shard has a floor the ranges cannot lower:
+    # a dry run of 9 to 15 minutes, then its timeouts, 9 to 21 per shard at 15 to
+    # 20 minutes each, four at a time. Those two were split again, to thirteen,
+    # and the limit is 180 so a shard that lands near 110 is not one bad runner
+    # away from losing the week's measurement. A hang is still caught.
+    timeout-minutes: 180
     strategy:
       # One slow shard must not cancel the others: a partial table is still worth
       # reading, and the aggregate job below is built to say which shard is absent.

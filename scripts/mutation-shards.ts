@@ -39,6 +39,17 @@
  * 1.5 times that plus Stryker's 60 s. crypto's last range is 18 mutants and holds
  * about a third of the file's cost on its own: `randomIntBelow` is reached by
  * every test that saves, and 8 of those 18 time out. No finer cut exists there.
+ *
+ * The model was optimistic, and the first cold run on the runner is the number to
+ * trust. With eleven shards the job took 49 to 106 minutes where the model said
+ * about 50, and two shards (the first crypto range, the last stego one) were
+ * cancelled at 120 with 98% and 90% done. Timeouts set the floor: every shard
+ * had 9 to 21 of them, each waiting 1.5 times its covering tests, about 15 to 20
+ * minutes when the gallery round trips are among them, four at a time. Those two
+ * ranges were cut again (`encryptBytes`, `extractBytesStegoJpeg`, the latter by
+ * mutant count since the model has no costs for the S1 code), and the job limit
+ * went to 180 in mutation.yml for the spread.
+ *
  * If a shard nears the job limit again, split its file further here. The shard
  * names are the cache keys, so renaming or adding one starts that shard cold.
  *
@@ -60,11 +71,15 @@ export type ShardGroup =
   | { readonly shard: string; readonly files: readonly string[] };
 
 export const GROUPS: readonly ShardGroup[] = [
-  { shard: 'crypto', file: 'src/core/crypto.ts', cutBefore: ['gateKek', 'randomIntBelow'] },
+  {
+    shard: 'crypto',
+    file: 'src/core/crypto.ts',
+    cutBefore: ['encryptBytes', 'gateKek', 'randomIntBelow'],
+  },
   {
     shard: 'stego',
     file: 'src/core/stego.ts',
-    cutBefore: ['pickPositions', 'embedKeyBlockStegoJpeg'],
+    cutBefore: ['pickPositions', 'embedKeyBlockStegoJpeg', 'extractBytesStegoJpeg'],
   },
   { shard: 'vault', file: 'src/core/vault.ts', cutBefore: ['multiRegionBlobLen'] },
   { shard: 'reed-solomon', file: 'src/core/reed-solomon.ts', cutBefore: ['invertMatrix'] },
