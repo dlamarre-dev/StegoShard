@@ -748,9 +748,13 @@ steganalysis** (within-category chi-square, calibration, ML detectors), which JP
 coefficient-LSB (JSteg-style) is in fact known to be detectable by. The gallery
 carrier now uses Syndrome-Trellis Codes (SPEC §9.3.1), in integer arithmetic with a
 generated submatrix and frozen cross-implementation vectors, which answers the
-determinism objection this paragraph used to raise; adaptive costs are planned on
-top of it, UERD rather than J-UNIWARD, for the float-free reason given here. The
-736-bit key photo still writes one bit per carrier.
+determinism objection this paragraph used to raise, and its writer prices each
+flip with UERD rather than J-UNIWARD, for the float-free reason given here. The
+JPEG key photo uses the same code and costs (S1-key, SPEC §5.4.1): about 123
+changes for a key block where one bit per carrier made 368. Fewer, better-placed
+changes lower the signal; they do not remove it, and neither carrier has been run
+against the adaptive, selection-channel-aware detectors aimed at this kind of
+embed.
 An adversary holding the _original_ cover can diff it against the carrier.
 Deniability is a hiding property layered on top of the password-wrapped key
 block: defense-in-depth, not the vault's confidentiality boundary (that remains

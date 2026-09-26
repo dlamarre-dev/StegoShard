@@ -587,7 +587,7 @@ await generate('color-grid', 'embedded', pseudoRandom(20_000, 77), false, CODEC_
 await generate('color-grid-keyfile', 'keyfile', content, false, CODEC_COLOR_GRID);
 await generate('keyfile', 'keyfile', content);
 await generate('stego', 'stego', content);
-await generate('stego-jpeg', 'stego', content, true);
+await generate('stego-jpeg-s1', 'stego', content, true);
 await generateBinary('binary-branded', 'embedded', 'branded', content);
 await generateBinary('binary-disguised', 'keyfile', 'disguised', content);
 await generateGallery('gallery-png', false);

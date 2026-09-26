@@ -569,7 +569,7 @@ already relies on the distinction.
   DC coefficient is never used) whose value satisfies **|coef| ≥ 2**, enumerated
   in a fixed order: component order as in SOF, then interleaved MCU/block order,
   then zig-zag index. Capacity `N` = the number of such coefficients; a cover with
-  `N < 736 × 2` is rejected.
+  `N < 736 × 2` is rejected (both schemes share this floor, §5.4.1).
 - **Embedding:** bit _i_ of `whitened` is written to the **LSB of the magnitude**
   of the selected coefficient, preserving its sign. Because `|coef| ≥ 2` and the
   LSB pair `{2m, 2m+1}` never straddles a Huffman size-category boundary, the flip
@@ -584,6 +584,48 @@ Extraction decodes the JPEG to coefficients, rebuilds the same carrier set and
 key-derived positions, reads each carrier's magnitude LSB, de-whitens, and
 validates against §5.1; any failure (wrong password, no key, non-baseline JPEG)
 ⇒ treat as absent.
+
+The keyed selection above, one carrier per payload bit, is **key-photo scheme
+S0**. No writer produces it any more: a writer **MUST** use S1-key (§5.4.1) for a
+JPEG key photo, and a reader **MUST** read both (below). The PNG path of §5.3 is
+unchanged.
+
+#### 5.4.1 Key-photo scheme S1-key: syndrome-trellis coding (normative)
+
+S1-key writes the same carriers as S0, with the same write (the magnitude LSB,
+sign kept), so the carrier set, the cover fingerprint `fp` and the file size are
+exactly as under S0. What changes is which carriers are written: the whitened
+payload is the syndrome of a syndrome-trellis code over a keyed sequence of
+carriers, with the code, the carrier order and the reader's computation of §9.3.1,
+and only these differences:
+
+```
+m      = payload bytes · 8        736 for the key block, 296 for the §10.3 factor
+w      = min(64, ⌊N / m⌋)         code width; below 2 the cover is refused
+n      = m · w                    carriers in the code
+ckey   = HKDF-SHA256(ikm = seed, salt = fp, info = "stegoshard/stego/cover/s1", L = 32)
+stream = AES-256-CTR(ckey, counter 0), m/8 + 4n + 65 536 bytes
+pad    = stream[0 .. m/8)         the whitening pad, as in §5.3
+order  = keyed order of §9.3.1 over N carriers, drawing from stream[m/8 ..]
+```
+
+`seed` is the §5.3 Argon2id seed and `Ĥ` is §9.3.1's generator taken to `w`
+columns. `N` enters the width, which adds no dependency S0 lacked: S0 already
+draws positions modulo `N`. The ×2 floor is S0's own, so no cover S0 accepted is
+refused. A reader computes the syndrome of the parities in `order`, XORs it with
+`pad`, and validates against §5.1 (or §10.3 for a factor).
+
+**Reading both schemes.** A reader **MUST** try S1-key first and S0 second on a
+JPEG, and take the first output that validates. Both cover keys derive from one
+Argon2id seed, so the second attempt costs an HKDF and a keystream, never a second
+derivation. The label alone tells the schemes apart: a key block validates under
+the scheme that wrote it, and under the other only by the §5.1 magic's chance.
+
+**The writer** prices each flip as §9.3.1's reference writer does (UERD, scaled
+and clamped the same way) and flips the set of least total cost. As in §9.3.1,
+the costs are not part of the format. On the nine photos of the bench corpus,
+after normalization, a key block takes about **123 changes** (112 to 137) where S0
+takes about 368, nearly all of them in the busiest quarter of the photo's blocks.
 
 ---
 

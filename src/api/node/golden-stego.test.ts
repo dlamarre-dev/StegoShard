@@ -43,10 +43,11 @@ function manifest(dir: string): { password: string } {
 describe('golden stego covers', () => {
   // Production Argon2 (t=4, m=256 MiB), because that is what produced the files
   // and the whole point is to read them as they are. It costs about a second a
-  // call, which is why there are two cases here and not a sweep.
+  // call, which is why there are three cases here and not a sweep.
   it.each([
     ['stego', 'key.png'],
-    ['stego-jpeg', 'key.jpg'],
+    ['stego-jpeg', 'key.jpg'], // key-photo scheme S0, frozen (SPEC §5.4)
+    ['stego-jpeg-s1', 'key.jpg'], // S1-key (SPEC §5.4.1)
   ])('recovers the key block from tests/golden/%s/%s', async (dir, file) => {
     const bytes = new Uint8Array(readFileSync(join(ROOT, dir, file)));
     const out = await extractKeyImage(bytes, file, manifest(dir).password);
