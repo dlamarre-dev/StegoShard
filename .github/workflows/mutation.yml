@@ -58,6 +58,23 @@
 # to crypto applies to it, and moving the other files between shards changes
 # nothing while one file is the tallest column.
 #
+# **Stryker can split a file, and since 26 September the nightly does.** The
+# paragraph above was wrong on that point: `--mutate file:start-end` mutates one
+# line range. It became necessary when the gallery round trips got slow enough
+# (the §9.8 re-encode, then UERD costs for S1) to raise the cost of every mutant
+# they cover about fivefold in a week, with the mutant counts nearly unchanged:
+#
+#            forced 20 Sep    incremental 24 Sep       incremental 26 Sep
+#   stego    51 min, 358      116 min, 179 re-tested   cancelled at 120, 158/159
+#   crypto   63 min, 463       66 min, 127 re-tested   106 min, 148 re-tested
+#
+# A forced run of either file would have needed four to five hours. The four
+# shards are now eleven, planned by scripts/mutation-shards.ts from named anchors
+# rather than hard-coded lines, because a cut inside a function silently drops
+# the mutants that span it. tests/mutation/shards.test.ts checks on every PR that
+# the ranges still produce every mutant exactly once. Why this and not a lighter
+# test selection is in that script's header.
+#
 # WHY THIS IS INCREMENTAL, AND WHAT THAT COSTS
 # Mutation testing is deterministic given the same code and the same tests, so
 # re-running unchanged mutants every night buys no information at all. Stryker's
@@ -137,8 +154,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Resolves the shard anchors against this commit's sources. A matrix cannot be
+  # computed inside the jobs it defines, hence a job of its own. It fails loudly if
+  # an anchor no longer names exactly one top-level declaration, though
+  # tests/mutation/shards.test.ts should have caught that on the PR.
+  plan:
+    name: Plan the mutation shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.shards.outputs.matrix }}
+      count: ${{ steps.shards.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve the shard ranges
+        id: shards
+        run: npx tsx scripts/mutation-shards.ts
+
   stryker:
     name: Mutation score (${{ matrix.shard }})
+    needs: plan
     runs-on: ubuntu-latest
     # Raised from 90 to 120 once three forced runs existed instead of one.
     #
@@ -164,21 +208,20 @@ jobs:
     # shard is currently largest, and which shard that is changes when the tests
     # change. 120 still catches a hang by a wide margin: an incremental night is 3
     # to 4 minutes, and the slowest forced shard ever recorded is 74.
+    #
+    # That last sentence stopped being true in the week of 20 September, when
+    # incremental nights reached 116 minutes (see "Stryker can split a file" at the
+    # top). The answer was more shards, not a longer limit: a limit raised to fit
+    # one file's forced run would have had to be four to five hours, and a hang
+    # would then cost that too. The cuts in scripts/mutation-shards.ts were sized
+    # to keep each shard well under 120 on a forced run, and 120 stays what it was
+    # for, a ceiling that catches a hang.
     timeout-minutes: 120
     strategy:
       # One slow shard must not cancel the others: a partial table is still worth
       # reading, and the aggregate job below is built to say which shard is absent.
       fail-fast: false
-      matrix:
-        include:
-          - shard: crypto
-            files: src/core/crypto.ts
-          - shard: vault
-            files: src/core/vault.ts
-          - shard: stego
-            files: src/core/stego.ts
-          - shard: codes
-            files: src/core/reed-solomon.ts,src/core/access.ts,src/core/gf256.ts,src/core/erasure.ts
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -201,7 +244,8 @@ jobs:
           fi
 
       # One file per shard: they mutate different sets, so a shared file would
-      # invalidate the others' results.
+      # invalidate the others' results. The shard name is the key, so renaming or
+      # adding a shard in scripts/mutation-shards.ts starts that shard cold.
       #
       # Rolling key with restore-keys, because a cache entry is immutable: the run
       # restores the most recent entry for its shard and writes a new one under a
@@ -234,7 +278,7 @@ jobs:
           # each shard uploads under its own artifact name, so the aggregate job
           # gets one directory per shard with an identically named file inside.
           npm run mutation -- \
-            --mutate '${{ matrix.files }}' \
+            --mutate '${{ matrix.mutate }}' \
             --incremental \
             --incrementalFile 'reports/mutation/incremental-${{ matrix.shard }}.json' \
             ${{ steps.mode.outputs.force }}
@@ -261,7 +305,7 @@ jobs:
 
   summarise:
     name: Mutation score (all shards)
-    needs: stryker
+    needs: [plan, stryker]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -278,5 +322,7 @@ jobs:
           pattern: mutation-report-*
           path: reports
 
-      - name: Write one table for all four shards
+      - name: Write one table for all shards
+        env:
+          EXPECTED_SHARDS: ${{ needs.plan.outputs.count }}
         run: node scripts/mutation-summary.mjs reports
