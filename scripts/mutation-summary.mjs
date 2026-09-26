@@ -44,14 +44,64 @@ function reportPaths(root) {
 // complete run whose quality dropped rather than as a run that did not finish.
 const SCORED = new Set(['Killed', 'Timeout', 'Survived', 'NoCoverage']);
 
+// What each shard was asked to mutate, from the plan job: `{ include: [{ shard,
+// mutate }] }`. A shard's report cannot be taken at its word. Stryker's
+// incremental mode carries every result of the stored file into the new report,
+// including files and lines outside this run's `--mutate`, so a shard whose
+// range moved reports its old range too, with verdicts nobody re-measured. The
+// first branch run showed both: `codes` restored a stored file from when it
+// still held reed-solomon.ts and reported all 177 of those mutants again, and a
+// crypto range reported lines 293-1015 when it had been given 289-774.
+const PLAN = process.env.MUTATION_SHARDS
+  ? new Map(JSON.parse(process.env.MUTATION_SHARDS).include.map((s) => [s.shard, s.mutate]))
+  : null;
+
+/** The files and 1-based line ranges a `--mutate` value names. */
+function scopeOf(mutate) {
+  return mutate.split(',').map((part) => {
+    const m = /^(.*?):(\d+)-(\d+)$/.exec(part);
+    return m ? { file: m[1], start: Number(m[2]), end: Number(m[3]) } : { file: part };
+  });
+}
+
+/**
+ * Whether a reported mutant lies wholly inside the shard's scope, which is the
+ * test Stryker itself applies when it decides what a range mutates.
+ */
+function inScope(scope, file, m) {
+  return scope.some(
+    (s) =>
+      s.file === file &&
+      (s.start === undefined || (m.location.start.line >= s.start && m.location.end.line <= s.end)),
+  );
+}
+
+/** The shard a report belongs to, from its artifact directory. */
+function shardOf(path) {
+  return /mutation-report-([^/\\]+)[/\\]/.exec(path)?.[1];
+}
+
 function rowsFrom(paths) {
   const byFile = new Map();
   let killed = 0;
   let total = 0;
   const unscored = new Map();
+  const outOfScope = new Map();
   for (const path of paths) {
     const report = JSON.parse(readFileSync(path, 'utf-8'));
-    for (const [file, entry] of Object.entries(report.files ?? {})) {
+    const mutate = PLAN?.get(shardOf(path) ?? '');
+    const scope = mutate ? scopeOf(mutate) : null;
+    if (PLAN && !scope) {
+      outOfScope.set(`no plan entry for ${path}`, 0);
+      continue;
+    }
+    for (const [file, raw] of Object.entries(report.files ?? {})) {
+      const name = String(file).replace(/^.*src\//, 'src/');
+      const mutants = scope ? raw.mutants.filter((m) => inScope(scope, name, m)) : raw.mutants;
+      if (mutants.length < raw.mutants.length) {
+        outOfScope.set(name, (outOfScope.get(name) ?? 0) + raw.mutants.length - mutants.length);
+      }
+      const entry = { mutants };
       for (const m of entry.mutants) {
         if (!SCORED.has(m.status) && m.status !== 'Ignored') {
           unscored.set(m.status, (unscored.get(m.status) ?? 0) + 1);
@@ -63,7 +113,6 @@ function rowsFrom(paths) {
       const nc = live.filter((m) => m.status === 'NoCoverage').length;
       killed += k;
       total += live.length;
-      const name = String(file).replace(/^.*src\//, 'src/');
       const row = byFile.get(name) ?? { file: name, killed: 0, mutants: 0, noCoverage: 0 };
       row.killed += k;
       row.mutants += live.length;
@@ -73,11 +122,11 @@ function rowsFrom(paths) {
   }
   const rows = [...byFile.values()].map((r) => ({ ...r, pct: (100 * r.killed) / r.mutants }));
   rows.sort((a, b) => a.pct - b.pct);
-  return { rows, killed, total, unscored };
+  return { rows, killed, total, unscored, outOfScope };
 }
 
 function render(paths) {
-  const { rows, killed, total, unscored } = rowsFrom(paths);
+  const { rows, killed, total, unscored, outOfScope } = rowsFrom(paths);
   const score = total > 0 ? `${((100 * killed) / total).toFixed(2)}%` : 'no report';
   const out = [
     `## Mutation score: ${score}`,
@@ -110,9 +159,22 @@ function render(paths) {
       'from its own. They mean the run had trouble, not that a test got weaker.',
     );
   }
+  // Said out loud because a range that moved leaves these behind every time, and
+  // a count that keeps growing would mean a stored file that should be retired.
+  if (outOfScope.size > 0) {
+    const detail = [...outOfScope].map(([file, n]) => (n ? `${n} in ${file}` : file)).join(', ');
+    out.push(
+      '',
+      `**Left out as outside their shard's range: ${detail}.** These are carried over`,
+      'from a stored incremental file and were not measured in this run.',
+    );
+  }
+  if (!PLAN) {
+    out.push('', 'MUTATION_SHARDS was not set, so reports were taken as they are, unfiltered.');
+  }
   out.push(
     '',
-    'Each shard fails on its own below the break threshold in stryker.config.mjs. A score',
+    `A file below the break threshold of ${strykerConfig.thresholds.break} fails this job. A score`,
     'below 100% is not by itself a gap, since some mutants are equivalent and no test can',
     'kill them. Only the Sunday rebuild is a measurement; the other nights re-test just',
     'what changed.',

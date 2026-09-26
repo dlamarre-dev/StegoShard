@@ -69,7 +69,7 @@
 #   crypto   63 min, 463       66 min, 127 re-tested   106 min, 148 re-tested
 #
 # A forced run of either file would have needed four to five hours. The four
-# shards are now thirteen, planned by scripts/mutation-shards.ts from named anchors
+# shards are now fourteen, planned by scripts/mutation-shards.ts from named anchors
 # rather than hard-coded lines, because a cut inside a function silently drops
 # the mutants that span it. tests/mutation/shards.test.ts checks on every PR that
 # the ranges still produce every mutant exactly once. Why this and not a lighter
@@ -219,7 +219,8 @@ jobs:
     # eleven of them (26 September, on the branch) took 49 to 106 minutes per
     # shard and lost two at 120. Each shard has a floor the ranges cannot lower:
     # a dry run of 9 to 15 minutes, then its timeouts, 9 to 21 per shard at 15 to
-    # 20 minutes each, four at a time. Those two were split again, to thirteen,
+    # 20 minutes each, four at a time. Those two were split again, and later one
+    # more (fourteen shards, see scripts/mutation-shards.ts for the cold runs),
     # and the limit is 180 so a shard that lands near 110 is not one bad runner
     # away from losing the week's measurement. A hang is still caught.
     timeout-minutes: 180
@@ -267,12 +268,19 @@ jobs:
       # against a working runner. Retiring the old prefix is what forces the
       # rebuild. Bump the generation whenever a change makes stored results
       # untrustworthy rather than merely stale.
+      #
+      # `v3` on 26 September, with the range shards. `restore-keys` is a prefix,
+      # so the new `codes` shard restored the old four-file `codes` entry, and
+      # Stryker carries every stored result into its report, in or out of this
+      # run's `--mutate`: reed-solomon.ts came back a second time through `codes`.
+      # The summary now drops what lies outside each shard's range, which covers a
+      # range that moves; retiring `v2` covers the one-time change of layout.
       - name: Restore the incremental results
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/mutation/incremental-${{ matrix.shard }}.json
-          key: stryker-v2-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: stryker-v2-${{ matrix.shard }}-
+          key: stryker-v3-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: stryker-v3-${{ matrix.shard }}-
 
       - name: Install dependencies
         run: npm ci
@@ -300,7 +308,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/mutation/incremental-${{ matrix.shard }}.json
-          key: stryker-v2-${{ matrix.shard }}-${{ github.run_id }}
+          key: stryker-v3-${{ matrix.shard }}-${{ github.run_id }}
 
       # Distinct names per shard. upload-artifact v4 and later refuse a second
       # upload under a name that already exists, so a shared name would fail the
@@ -335,4 +343,5 @@ jobs:
       - name: Write one table for all shards
         env:
           EXPECTED_SHARDS: ${{ needs.plan.outputs.count }}
+          MUTATION_SHARDS: ${{ needs.plan.outputs.matrix }}
         run: node scripts/mutation-summary.mjs reports

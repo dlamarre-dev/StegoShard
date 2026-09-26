@@ -50,6 +50,11 @@
  * mutant count since the model has no costs for the S1 code), and the job limit
  * went to 180 in mutation.yml for the spread.
  *
+ * The second cold run, thirteen shards, passed: 15 to 109 minutes, except the
+ * first stego range at 135, up from 103 on the same code. Six of its twelve
+ * timeouts were in `StreamReader`'s eighteen lines, so that class is a shard of
+ * its own now, and fourteen is the count.
+ *
  * If a shard nears the job limit again, split its file further here. The shard
  * names are the cache keys, so renaming or adding one starts that shard cold.
  *
@@ -79,7 +84,7 @@ export const GROUPS: readonly ShardGroup[] = [
   {
     shard: 'stego',
     file: 'src/core/stego.ts',
-    cutBefore: ['pickPositions', 'embedKeyBlockStegoJpeg', 'extractBytesStegoJpeg'],
+    cutBefore: ['StreamReader', 'pickPositions', 'embedKeyBlockStegoJpeg', 'extractBytesStegoJpeg'],
   },
   { shard: 'vault', file: 'src/core/vault.ts', cutBefore: ['multiRegionBlobLen'] },
   { shard: 'reed-solomon', file: 'src/core/reed-solomon.ts', cutBefore: ['invertMatrix'] },
