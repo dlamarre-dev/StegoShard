@@ -58,12 +58,15 @@ import { FORMAT_VERSION } from './header';
 import {
   GALLERY_SALT,
   StegoCapacityError,
+  embedBytesStcJpeg,
   embedBytesStegoJpeg,
   embedBytesStegoRgba,
+  extractBytesStcModel,
   extractBytesStegoJpeg,
+  extractBytesStegoModel,
   extractBytesStegoRgba,
 } from './stego';
-import { decode as decodeJpeg, eligibleCoefficients } from './jpeg-coeff';
+import { type JpegModel, decode as decodeJpeg, eligibleCoefficients } from './jpeg-coeff';
 import {
   MAX_FILE_BYTES,
   VerificationError,
@@ -147,6 +150,29 @@ export const GALLERY_MAX_BLOB = GALLERY_SLOT_DATA * GALLERY_K_MAX;
 export const GALLERY_MAX_IMAGES = 256;
 
 const LABEL_POS = new TextEncoder().encode('stegoshard/gallery/pos');
+/** The position key of embedding scheme S1, domain-separated from S0's. */
+const LABEL_POS_S1 = new TextEncoder().encode('stegoshard/gallery/pos/s1');
+
+/**
+ * The embedding scheme a writer uses for a JPEG cover (SPEC §9.3.1): 1 is S1,
+ * the syndrome-trellis code. Not stored in the photo, so a reader tries S1 and
+ * then S0, and the AAD tells them apart. A raster cover is always written with
+ * S0 at this version. Listed in scripts/check-golden.ts, because a change here
+ * is a change to what the golden carriers hold.
+ */
+const STEGO_SCHEME = 1;
+
+/** Which scheme a cover is written with. */
+function schemeFor(cover: GalleryCover): 'S0' | 'S1' {
+  return cover.kind === 'jpeg' && STEGO_SCHEME === 1 ? 'S1' : 'S0';
+}
+
+/** The keys a gallery reads and writes with: one position key per scheme, one AEAD key. */
+interface GalleryKeys {
+  posKey: Uint8Array;
+  stcKey: Uint8Array;
+  aeadKey: CryptoKey;
+}
 const LABEL_AEAD = new TextEncoder().encode('stegoshard/gallery/aead');
 
 /** A cover photo to hide fragments in: a baseline JPEG, or raw RGBA (for PNG). */
@@ -334,10 +360,7 @@ export class GalleryRestoreError extends Error {
 }
 
 /** Argon2id(password, GALLERY_SALT) → HKDF-split position key + AEAD key. */
-async function galleryKeys(
-  password: string,
-  params: Argon2Params,
-): Promise<{ posKey: Uint8Array; aeadKey: CryptoKey }> {
+async function galleryKeys(password: string, params: Argon2Params): Promise<GalleryKeys> {
   const seed = (await argon2id({
     password: normalizePassword(password),
     salt: GALLERY_SALT,
@@ -348,6 +371,7 @@ async function galleryKeys(
     outputType: 'binary',
   })) as Uint8Array;
   const posKey = await hkdf(seed, LABEL_POS, 32);
+  const stcKey = await hkdf(seed, LABEL_POS_S1, 32);
   const aeadRaw = await hkdf(seed, LABEL_AEAD, 32);
   seed.fill(0);
   const aeadKey = await subtle.importKey(
@@ -358,7 +382,12 @@ async function galleryKeys(
     ['encrypt', 'decrypt'],
   );
   aeadRaw.fill(0);
-  return { posKey, aeadKey };
+  return { posKey, stcKey, aeadKey };
+}
+
+function wipeKeys(keys: GalleryKeys): void {
+  keys.posKey.fill(0);
+  keys.stcKey.fill(0);
 }
 
 /**
@@ -369,18 +398,30 @@ async function galleryKeys(
 async function embedSlot(
   cover: GalleryCover,
   slot: Uint8Array,
-  posKey: Uint8Array,
+  keys: GalleryKeys,
 ): Promise<GalleryImage> {
   try {
     if (cover.kind === 'jpeg') {
+      // Carriers and decoys alike: a decoy that went through any other path
+      // would carry a different number of changes and sort itself out of the set.
       return {
         kind: 'jpeg',
         name: cover.name,
-        jpeg: await embedBytesStegoJpeg(cover.jpeg, slot, posKey, GALLERY_EMBED_MARGIN),
+        jpeg:
+          schemeFor(cover) === 'S1'
+            ? await embedBytesStcJpeg(cover.jpeg, slot, keys.stcKey, GALLERY_EMBED_MARGIN)
+            : await embedBytesStegoJpeg(cover.jpeg, slot, keys.posKey, GALLERY_EMBED_MARGIN),
       };
     }
     const rgba = Uint8Array.from(cover.rgba);
-    await embedBytesStegoRgba(rgba, cover.width, cover.height, slot, posKey, GALLERY_EMBED_MARGIN);
+    await embedBytesStegoRgba(
+      rgba,
+      cover.width,
+      cover.height,
+      slot,
+      keys.posKey,
+      GALLERY_EMBED_MARGIN,
+    );
     return { kind: 'rgba', name: cover.name, rgba, width: cover.width, height: cover.height };
   } catch (err) {
     if (err instanceof StegoCapacityError) {
@@ -421,17 +462,49 @@ async function extractSlot(cover: GalleryCover, posKey: Uint8Array): Promise<Uin
  */
 async function openSlot(
   img: GalleryCover,
-  posKey: Uint8Array,
-  aeadKey: CryptoKey,
+  keys: GalleryKeys,
+  only?: 'S0' | 'S1',
 ): Promise<Uint8Array | null> {
-  const slot = await extractSlot(img, posKey);
-  if (!slot) return null;
+  if (img.kind !== 'jpeg') {
+    if (only === 'S1') return null;
+    const slot = await extractSlot(img, keys.posKey);
+    return slot && openSealed(slot, keys.aeadKey, 'S0');
+  }
+  // S1 first, since it is what writers produce now; S0 for everything delivered
+  // before. Decoded once for both: the decode is most of either attempt's cost,
+  // and a decoy, which opens under neither, pays for both attempts.
+  let model: JpegModel;
+  try {
+    model = decodeJpeg(img.jpeg);
+  } catch {
+    return null;
+  }
+  if (only !== 'S0') {
+    const s1 = await extractBytesStcModel(model, keys.stcKey, GALLERY_SLOT_BYTES);
+    const opened = s1 && (await openSealed(s1, keys.aeadKey, 'S1'));
+    if (opened || only === 'S1') return opened;
+  }
+  const s0 = await extractBytesStegoModel(
+    model,
+    keys.posKey,
+    GALLERY_SLOT_BYTES,
+    GALLERY_READ_MARGIN,
+  );
+  return s0 && openSealed(s0, keys.aeadKey, 'S0');
+}
+
+/** AES-GCM-open a slot under one scheme's AAD, or null on a failed tag. */
+async function openSealed(
+  slot: Uint8Array,
+  aeadKey: CryptoKey,
+  scheme: 'S0' | 'S1',
+): Promise<Uint8Array | null> {
   try {
     return await decryptBytes(
       aeadKey,
       slot.subarray(0, IV_LEN),
       slot.subarray(IV_LEN),
-      galleryFragAad(),
+      galleryFragAad(scheme),
     );
   } catch {
     return null;
@@ -447,17 +520,22 @@ async function openSlot(
  * photo and the fragment it opens to hold the carrier set, the position draw,
  * the bit order, the slot layout and the AAD still. It is also the unit a reader
  * that knows more than one embedding scheme tries each scheme against.
+ *
+ * `scheme` restricts the attempt to one embedding scheme (SPEC §9.3.1), which is
+ * how a test shows a carrier opens under the scheme that wrote it and not merely
+ * under one of them; a reader leaves it out and tries them all.
  */
 export async function readGallerySlot(
   cover: GalleryCover,
   password: string,
   params: Argon2Params = DEFAULT_ARGON2,
+  scheme?: 'S0' | 'S1',
 ): Promise<Uint8Array | null> {
-  const { posKey, aeadKey } = await galleryKeys(password, params);
+  const keys = await galleryKeys(password, params);
   try {
-    return await openSlot(cover, posKey, aeadKey);
+    return await openSlot(cover, keys, scheme);
   } finally {
-    posKey.fill(0);
+    wipeKeys(keys);
   }
 }
 
@@ -741,9 +819,7 @@ export async function galleryEncode(
   const { shards, shardLen } = encodeShards(blob, k, m);
   const setId = randomBytes(SET_ID_LEN);
   const hash = await sha256Short(blob);
-  const { posKey, aeadKey } = await opaqueStage(options.onProgress, 'derive', () =>
-    galleryKeys(password, params),
-  );
+  const keys = await opaqueStage(options.onProgress, 'derive', () => galleryKeys(password, params));
 
   // Which covers carry which shard is a CSPRNG permutation, never the input
   // order. The images come back in input order and are written in it, so if the
@@ -774,16 +850,20 @@ export async function galleryEncode(
       // header||shard, zero-padded to the fixed fragment length, then sealed.
       const frag = new Uint8Array(GALLERY_FRAG_LEN);
       frag.set(encodeImagePayload(header, shards[shard]!), 0);
-      const { iv, ciphertext } = await encryptBytes(aeadKey, frag, galleryFragAad());
+      const { iv, ciphertext } = await encryptBytes(
+        keys.aeadKey,
+        frag,
+        galleryFragAad(schemeFor(clean[i]!)),
+      );
       slot = concatBytes(iv, ciphertext);
     } else {
       slot = randomBytes(GALLERY_SLOT_BYTES);
     }
     await report(options.onProgress, { phase: 'embed', done: i, total: covers.length });
-    images.push(await embedSlot(clean[i]!, slot, posKey));
+    images.push(await embedSlot(clean[i]!, slot, keys));
   }
   await report(options.onProgress, { phase: 'embed', done: covers.length, total: covers.length });
-  posKey.fill(0);
+  wipeKeys(keys);
   return { images, k, m, decoys, setId, keyBlock, shares, normalization };
 }
 
@@ -839,12 +919,12 @@ export async function galleryDecode(
 ): Promise<{ filename: string; content: Uint8Array; bundled: boolean }> {
   const params = options.params ?? DEFAULT_ARGON2;
   const on = options.onProgress;
-  const { posKey, aeadKey } = await opaqueStage(on, 'derive', () => galleryKeys(password, params));
+  const keys = await opaqueStage(on, 'derive', () => galleryKeys(password, params));
 
   const frags: { header: Header; shard: Uint8Array }[] = [];
   for (const [i, img] of images.entries()) {
     await report(on, { phase: 'extract', done: i, total: images.length });
-    const frag = await openSlot(img, posKey, aeadKey);
+    const frag = await openSlot(img, keys);
     if (!frag) continue;
     try {
       frags.push(decodeImagePayload(frag));
@@ -852,7 +932,7 @@ export async function galleryDecode(
       continue; // authenticated but malformed (should not happen), so skip
     }
   }
-  posKey.fill(0);
+  wipeKeys(keys);
   await report(on, { phase: 'extract', done: images.length, total: images.length });
   if (frags.length === 0) throw new GalleryRestoreError();
 

@@ -48,6 +48,8 @@ const LABEL_VAULT_BLOB = enc.encode('stegoshard/v2/aad/vault-blob');
 const LABEL_SLOT_ARRAY = enc.encode('stegoshard/v2/aad/slot-array');
 const LABEL_VAULT_REGION = enc.encode('stegoshard/v2/aad/vault-region');
 const LABEL_GALLERY_FRAG = enc.encode('stegoshard/v2/aad/gallery-frag');
+/** The same site under embedding scheme S1 (SPEC §9.3.1): one label per scheme. */
+const LABEL_GALLERY_FRAG_S1 = enc.encode('stegoshard/v2/aad/gallery-frag/s1');
 
 /**
  * Which container a slot array belongs to. Not stored anywhere: the decoder
@@ -170,8 +172,12 @@ export function regionBlockAad(
  * be re-encoded. So the value here is purely domain separation — real, but
  * smaller than the other sites, and this site was never meaningfully unbound.
  */
-export function galleryFragAad(): Uint8Array {
-  return LABEL_GALLERY_FRAG;
+export function galleryFragAad(scheme: 'S0' | 'S1' = 'S0'): Uint8Array {
+  // A slot authenticates only under the scheme that wrote it. Nothing in the
+  // photo says which one that was, so this label and the position key are the
+  // whole of the distinction, and a reader that tried the wrong scheme gets a
+  // failed tag rather than a fragment read at the wrong positions.
+  return scheme === 'S1' ? LABEL_GALLERY_FRAG_S1 : LABEL_GALLERY_FRAG;
 }
 
 /**

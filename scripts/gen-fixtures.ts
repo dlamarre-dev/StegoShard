@@ -213,8 +213,10 @@ async function generateGallery(
 }
 
 /**
- * One gallery carrier photo and the fragment it opens to: the S0 embedding
- * scheme (SPEC §9.3) pinned on a single image.
+ * One gallery carrier photo and the fragment it opens to: the embedding scheme
+ * the writer uses now (S1, SPEC §9.3.1), pinned on a single image. The S0 set in
+ * the golden corpus was made the same way by the writer before it, and is kept
+ * rather than regenerated (see FROZEN in gen-golden.ts).
  *
  * A whole gallery needs at least five carriers of about 300 KB each, which is why
  * `gallery-jpeg` stays out of the golden corpus. One photo is enough to hold the
@@ -245,7 +247,7 @@ async function generateGallerySlot(name: string): Promise<void> {
     writeFileSync(join(dir, 'fragment.bin'), fragment);
     writeFileSync(
       join(dir, 'manifest.json'),
-      JSON.stringify({ password: PASSWORD, scheme: 'S0' }, null, 2),
+      JSON.stringify({ password: PASSWORD, scheme: 'S1' }, null, 2),
     );
     console.log(`fixture ${name}: one carrier, fragment of ${fragment.length} bytes`);
     return;
@@ -592,7 +594,7 @@ await generateGallery('gallery-png', false);
 await generateGallery('gallery-jpeg', true);
 await generateGallery('gallery-keyfile', false, 'keyfile');
 await generateGallery('gallery-stego', false, 'stego');
-await generateGallerySlot('gallery-slot-jpeg');
+await generateGallerySlot('gallery-slot-jpeg-s1');
 await generateBinary('binary-disguised-stego', 'stego', 'disguised', content);
 await generateDisguisedNpStego('binary-disguised-np-stego', content);
 await generateBundle('bundle-images', false);

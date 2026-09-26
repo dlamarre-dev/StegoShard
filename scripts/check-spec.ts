@@ -75,6 +75,7 @@ import { SHARE_VERSION } from '../src/core/shamir';
 import { DEFAULT_ARGON2 } from '../src/core/crypto';
 import { JUMBF_APP11_PREFIX } from '../src/core/normalize';
 import { PROFILE_QUANT_SUM } from '../src/core/jpeg-encode';
+import { STC_HEIGHT, STC_WIDTH } from '../src/core/stc';
 import { PROFILE_QUALITY, QUANT_CHROMA } from '../src/core/jpeg-profile';
 import { GALLERY_EMBED_MARGIN, GALLERY_READ_MARGIN } from '../src/core/gallery';
 
@@ -221,6 +222,26 @@ const RULES: Rule[] = [
     count: 1,
     expected: GALLERY_EMBED_MARGIN,
     source: 'GALLERY_EMBED_MARGIN in src/core/gallery.ts',
+  },
+  {
+    // Embedding scheme S1's two code parameters (§9.3.1). Both are format: a
+    // reader with another height or width computes another syndrome.
+    id: 'stc-height',
+    file: SPEC,
+    scope: 'raw',
+    pattern: /^h {6}= (\d+) +constraint height$/gm,
+    count: 1,
+    expected: STC_HEIGHT,
+    source: 'STC_HEIGHT in src/core/stc.ts',
+  },
+  {
+    id: 'stc-width',
+    file: SPEC,
+    scope: 'raw',
+    pattern: /^w {6}= (\d+) +code width/gm,
+    count: 1,
+    expected: STC_WIDTH,
+    source: 'STC_WIDTH in src/core/stc.ts',
   },
   {
     id: 'gallery-read-margin',

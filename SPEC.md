@@ -816,9 +816,12 @@ decoded blindly by trial-authentication ("winnowing").
 `seed = Argon2id(NFC(password), GALLERY_SALT, DEFAULT_ARGON2, 32 bytes)` where
 `GALLERY_SALT` is the 16 ASCII bytes `"StegoShard-gllry"` (`53 74 65 67 6f 53 68
 61 72 64 2d 67 6c 6c 72 79`), distinct from the §5 stego salt. HKDF-SHA256 (RFC
-5869, empty salt) splits the seed into two 32-byte subkeys by `info` label:
+5869, empty salt) splits the seed into three 32-byte subkeys by `info` label:
 
-- `posKey` ← `info = "stegoshard/gallery/pos"`, drives carrier selection.
+- `posKey` ← `info = "stegoshard/gallery/pos"`, drives carrier selection under
+  embedding scheme S0 (§9.3).
+- `stcKey` ← `info = "stegoshard/gallery/pos/s1"`, drives it under embedding
+  scheme S1 (§9.3.1).
 - `aeadKey` ← `info = "stegoshard/gallery/aead"`, seals fragments (AES-256-GCM).
 
 The gallery Argon2 cost is the format-defined v2-candidate `DEFAULT_ARGON2` and is **not stored**
@@ -847,10 +850,12 @@ nonce)` pair. A decoy image embeds `SLOT_BYTES` of CSPRNG bytes at the same
 `posKey`-selected carriers; without the password it is indistinguishable from a
 sealed fragment (both are uniform).
 
-Each fragment is sealed with the constant
+Each fragment is sealed with a constant that names the embedding scheme it is
+written with:
 
 ```
-AAD = "stegoshard/v2/aad/gallery-frag"
+AAD = "stegoshard/v2/aad/gallery-frag"        scheme S0 (§9.3)
+AAD = "stegoshard/v2/aad/gallery-frag/s1"     scheme S1 (§9.3.1)
 ```
 
 and nothing else can go in it. Blind winnowing (§9.5) trial-opens every photo with
@@ -861,7 +866,13 @@ cannot be bound either, since carriers are lossy. The value here is therefore on
 domain separation — real, but smaller than at the other sites, and this one was
 never meaningfully unbound.
 
-### 9.3 Carrier selection
+### 9.3 Carrier selection, embedding scheme S0
+
+Nothing in a photo names the scheme it was written with; the position key and the
+AAD are the whole of the distinction. A writer **MUST** use S1 (§9.3.1) for a
+JPEG cover and S0 for a raster cover. A reader **MUST** try S1 and then S0 on a
+JPEG, and S0 on a raster, so that every gallery delivered before S1 stays
+readable. S0 is:
 
 Identical to §5.3/§5.4: an AES-CTR keystream seeded by `posKey` drives
 rejection-sampled distinct carrier positions (RGB LSBs for a PNG cover; eligible
@@ -876,6 +887,64 @@ cover with fewer than `SLOT_BYTES·8·16` eligible carriers (the ×16 margin of
 §9.8.1, which keeps embedding sparse). A reader skips a cover with fewer than
 `SLOT_BYTES·8·4`: the margin writers used before §9.8.1 raised it, so that no
 gallery already delivered becomes unreadable.
+
+#### 9.3.1 Embedding scheme S1: syndrome-trellis coding (normative)
+
+S1 writes the same carriers as S0, the least significant bit of the magnitude
+of an AC coefficient with `|coef| ≥ 2`, sign kept, so the eligible set, the
+Huffman size categories and the file size are exactly as under S0. What changes
+is which carriers are written: instead of one carrier per payload bit, the
+payload is the syndrome of a syndrome-trellis code (Filler, Judas and Fridrich,
+IEEE TIFS 6(3), 2011) over a keyed sequence of carriers, and the writer flips
+the fewest carriers that give that syndrome.
+
+```
+m      = SLOT_BYTES · 8 = 16 872            payload bits, MSB-first per byte
+h      = 9                                  constraint height
+w      = 16                                 code width, carriers per payload bit
+n      = m · w = 269 952                    carriers in the code
+N      = eligible carriers of the photo, in the §5.4 order
+```
+
+A writer **MUST** refuse a cover with `N < n`, which is the ×16 margin of §9.3; a
+reader **MUST** return nothing from one.
+
+**Carrier order.** `order` is the first `n` entries of a partial Fisher-Yates
+shuffle of `0 .. N-1`: starting from the identity, step `i = 0 .. n-1` draws
+`r`, uniform in `[0, N - i)`, and swaps entries `i` and `i + r`. Draws are
+big-endian u32 values read in turn from the AES-256-CTR keystream of `stcKey`
+(counter 0, the §5.3 construction), `4n + 65 536` bytes long; a draw at or above
+`⌊2³² / (N - i)⌋ · (N - i)` is rejected and the next one read. Running out of
+keystream is an error, never a shorter order.
+
+**Parities.** `y_j` is the magnitude LSB of carrier `order[j]`, `j = 0 .. n-1`.
+
+**The code.** `Ĥ` has `w` columns of `h` bits. Column `j` is the `j`-th output of
+xorshift32 (`s ^= s << 13; s ^= s >>> 17; s ^= s << 5`, on 32 bits) from
+`s = 0x53544331`, masked to its low `h` bits, with bits 0 and `h - 1` set. The
+parity-check matrix `H` is `m × n`: block `i` (columns `i·w .. i·w + w - 1`)
+holds `Ĥ` with its bit `b` in row `i + b`, and bits whose row would be `≥ m` are
+dropped (the truncated tail). The payload is `H · y` over GF(2), which a reader
+computes as:
+
+```
+acc = 0
+for i in 0 .. m-1:
+    for j in 0 .. w-1:
+        if y[i·w + j]: acc ^= (Ĥ[j] if m - i ≥ h else Ĥ[j] & (2^(m-i) - 1))
+    bit[i] = acc & 1
+    acc >>= 1
+```
+
+**The writer** chooses `y` with `H · y` equal to the payload and the fewest
+positions where `y` differs from the cover's parities, by the Viterbi pass the
+paper describes, and flips exactly those carriers. Which `y` it chooses is not
+part of the format: any `y` with the right syndrome is read the same way. The
+reference writer breaks ties toward leaving a parity unchanged, so that its
+output is a function of its inputs; `tests/vectors/stc-vectors.json` pins it.
+
+At this height and width the code reaches about 83 % of the rate-distortion
+bound: about 2 380 changes for a slot, against the 8 436 of S0.
 
 ### 9.4 Encode
 
@@ -920,8 +989,10 @@ gallery already delivered becomes unreadable.
 
 ### 9.5 Decode (blind winnowing)
 
-For **every** photo: extract `SLOT_BYTES` at `posKey` carriers, split
-`NONCE ‖ ciphertext`, and AES-GCM-open with `aeadKey`. A failed tag (decoy,
+For **every** photo: extract `SLOT_BYTES` under each embedding scheme in turn
+(for a JPEG, S1 at `stcKey` then S0 at `posKey`; for a raster, S0), split
+`NONCE ‖ ciphertext`, and AES-GCM-open with `aeadKey` and that scheme's AAD
+(§9.2). The first that authenticates is the fragment. A failed tag (decoy,
 recompressed/destroyed carrier, foreign image, or wrong password) is dropped
 silently. Surviving fragments are grouped by `SET_ID` (§3); once a group has
 `≥ K` distinct valid shard indices, reconstruct (§7.5), verify `HASH_GLOBAL`,
@@ -1593,14 +1664,15 @@ Every AEAD site binds its context. The labels are never stored, so they cost
 nothing on disk and make cross-site confusion impossible: a ciphertext sealed at
 one site cannot be opened at another even under an identical key.
 
-| Site                          | Label                            | Bound fields                                                                                                             |
-| ----------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Key block (§5.1)              | `stegoshard/v2/aad/key-block`    | magic ‖ ver ‖ Argon2 params ‖ salt ‖ iv                                                                                  |
-| Vault blob (§6.1)             | `stegoshard/v2/aad/vault-blob`   | magic ‖ ver ‖ KB_LEN ‖ key block ‖ contentSalt ‖ IV                                                                      |
-| Slot array (§10.1)            | `stegoshard/v2/aad/slot-array`   | kind ‖ SLOT_COUNT ‖ REGION_COUNT ‖ vault_salt                                                                            |
-| Region block (§10.6)          | `stegoshard/v2/aad/vault-region` | vault_salt ‖ slot_array ‖ index ‖ R ‖ contentSalt ‖ IV                                                                   |
-| Gallery fragment (§9.2)       | `stegoshard/v2/aad/gallery-frag` | (constant: domain separation only)                                                                                       |
-| Segmented chunk (§8.1, §10.7) | _(none)_                         | head ‖ region_index ‖ contentSalt ‖ noncePrefix — the head already opens with `"SSCS"` and a version, which separates it |
+| Site                          | Label                               | Bound fields                                                                                                             |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Key block (§5.1)              | `stegoshard/v2/aad/key-block`       | magic ‖ ver ‖ Argon2 params ‖ salt ‖ iv                                                                                  |
+| Vault blob (§6.1)             | `stegoshard/v2/aad/vault-blob`      | magic ‖ ver ‖ KB_LEN ‖ key block ‖ contentSalt ‖ IV                                                                      |
+| Slot array (§10.1)            | `stegoshard/v2/aad/slot-array`      | kind ‖ SLOT_COUNT ‖ REGION_COUNT ‖ vault_salt                                                                            |
+| Region block (§10.6)          | `stegoshard/v2/aad/vault-region`    | vault_salt ‖ slot_array ‖ index ‖ R ‖ contentSalt ‖ IV                                                                   |
+| Gallery fragment (§9.2), S0   | `stegoshard/v2/aad/gallery-frag`    | (constant: domain separation only)                                                                                       |
+| Gallery fragment (§9.2), S1   | `stegoshard/v2/aad/gallery-frag/s1` | (constant: domain separation only)                                                                                       |
+| Segmented chunk (§8.1, §10.7) | _(none)_                            | head ‖ region_index ‖ contentSalt ‖ noncePrefix — the head already opens with `"SSCS"` and a version, which separates it |
 
 Integers are big-endian and fixed-width; every variable-length field is either
 fixed by construction or immediately preceded by its length, so no two distinct

@@ -57,7 +57,7 @@ IMAGE_SETS = ["embedded", "color-grid", "keyfile", "stego", "stego-jpeg"]
 BINARY_SETS = ["binary-branded", "binary-disguised"]
 # One carrier photo and its fragment, read by its own test below rather than by
 # the image or binary decode paths.
-GALLERY_SETS = ["gallery-slot-jpeg"]
+GALLERY_SETS = ["gallery-slot-jpeg", "gallery-slot-jpeg-s1"]
 
 
 def _manifest(name: str) -> dict:
@@ -187,21 +187,32 @@ def test_provenance_records_the_version_constants() -> None:
         assert constant in text, f"PROVENANCE.md does not record {constant}"
 
 
-def test_gallery_carrier_scheme_s0_opens_to_its_fragment():
-    """One S0 gallery carrier and the fragment it opens to (SPEC §9.3).
+@pytest.mark.parametrize(("name", "scheme"), list(zip(GALLERY_SETS, ["S0", "S1"], strict=True)))
+def test_gallery_carrier_opens_to_its_fragment_under_its_scheme(name: str, scheme: str) -> None:
+    """One gallery carrier per embedding scheme and its fragment (SPEC §9.3, §9.3.1).
 
-    Mirrors the gallery case in src/api/node/golden-stego.test.ts: a reader that
-    learns a new embedding scheme must keep reading this one.
+    Mirrors the gallery cases in src/api/node/golden-stego.test.ts: each carrier
+    opens under the scheme that wrote it, and under that one only.
     """
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from stegoshard.aad import gallery_frag_aad
-    from stegoshard.gallery import IV_LEN, _extract_slot, _gallery_keys
+    from stegoshard.gallery import (
+        GALLERY_SLOT_BYTES,
+        _extract_slot,
+        _gallery_key_set,
+        _open_sealed,
+    )
+    from stegoshard.stego import extract_bytes_stc_jpeg
 
-    d = GOLDEN / GALLERY_SETS[0]
+    d = GOLDEN / name
     manifest = json.loads((d / "manifest.json").read_text())
+    carrier = (d / "carrier.jpg").read_bytes()
     # The frozen gallery cost (SPEC §9.1): not stored, so the reader assumes it.
-    pos_key, aead_key = _gallery_keys(manifest["password"], 4, 256 * 1024, 1)
-    slot = _extract_slot((d / "carrier.jpg").read_bytes(), pos_key)
-    assert slot is not None, "the S0 carrier no longer yields a slot"
-    fragment = AESGCM(aead_key).decrypt(slot[:IV_LEN], slot[IV_LEN:], gallery_frag_aad())
-    assert fragment == (d / "fragment.bin").read_bytes()
+    pos_key, s1_key, aead_key = _gallery_key_set(manifest["password"], 4, 256 * 1024, 1)
+    aead = AESGCM(aead_key)
+    slots = {
+        "S0": _extract_slot(carrier, pos_key),
+        "S1": extract_bytes_stc_jpeg(carrier, s1_key, GALLERY_SLOT_BYTES),
+    }
+    other = "S1" if scheme == "S0" else "S0"
+    assert _open_sealed(slots[scheme], aead, scheme) == (d / "fragment.bin").read_bytes()
+    assert _open_sealed(slots[other], aead, other) is None

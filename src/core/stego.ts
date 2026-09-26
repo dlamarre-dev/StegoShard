@@ -60,6 +60,7 @@ import {
 import { coverGuardTag, reserveCoverUse, type StegoEmbedOptions } from './stego-guard';
 import { type MpfLink, mpfTrailerLink, retargetMpfIndex } from './mpf';
 import { normalizeCoverBytes } from './normalize';
+import { STC_WIDTH, keyedOrder, keyedOrderStreamLen, stcEmbed, stcExtract } from './stc';
 
 const subtle = globalThis.crypto.subtle;
 
@@ -902,6 +903,20 @@ export async function extractBytesStegoJpeg(
   } catch {
     return null;
   }
+  return extractBytesStegoModel(model, seed, length, margin);
+}
+
+/**
+ * `extractBytesStegoJpeg` over a model already decoded, so that a reader trying
+ * both schemes on one photo decodes it once: the decode is most of either
+ * extraction's cost on a phone-sized photo.
+ */
+export async function extractBytesStegoModel(
+  model: JpegModel,
+  seed: Uint8Array,
+  length: number,
+  margin = 1,
+): Promise<Uint8Array | null> {
   const carriers = eligibleCoefficients(model);
   const payloadBits = length * 8;
   if (carriers.count < payloadBits * margin) return null;
@@ -913,5 +928,101 @@ export async function extractBytesStegoJpeg(
     if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
   }
   stream.fill(0);
+  return out;
+}
+
+// --- Embedding scheme S1: syndrome-trellis coding (SPEC §9.3.1) -----------------
+
+/**
+ * Embed `data` into a baseline JPEG by embedding scheme S1: the same carriers
+ * and the same write as S0 (the LSB of a `|v| ≥ 2` magnitude, so the carrier set
+ * cannot change), with the carriers chosen by a syndrome-trellis code instead of
+ * one per bit.
+ *
+ * The code spans `bits · STC_WIDTH` carriers, taken in a keyed order from the
+ * photo's; its syndrome is the payload. Of those carriers, the STC flips the
+ * fewest whose parities give that syndrome: about 2 400 for a gallery slot where
+ * S0 flips 8 400 (see `STC_WIDTH`). Costs are uniform at this step, so fewest is
+ * the only criterion.
+ *
+ * `seed` must be the S1 position key, never the S0 one: the two schemes are told
+ * apart by the key and the AAD alone, since nothing is stored in the photo.
+ */
+export async function embedBytesStcJpeg(
+  jpegBytes: Uint8Array,
+  data: Uint8Array,
+  seed: Uint8Array,
+  margin = STC_WIDTH,
+): Promise<Uint8Array> {
+  const cover = normalizeCoverBytes(jpegBytes).bytes;
+  const mpf = assertMpfUsable(mpfTrailerLink(cover));
+  const model = decodeJpeg(cover); // throws JpegUnsupportedError if not baseline
+  const m = data.length * 8;
+  const n = m * STC_WIDTH;
+  const inPlace = model.restartInterval === 0;
+  const carriers = inPlace ? eligibleInPlace(model) : eligibleCoefficients(model);
+  if (carriers.count < m * Math.max(margin, STC_WIDTH)) {
+    throw new StegoCapacityError(carriers.count);
+  }
+
+  const stream = await keystreamFromSeed(seed, keyedOrderStreamLen(n));
+  const order = keyedOrder(stream, carriers.count, n);
+  stream.fill(0);
+  const x = new Uint8Array(n);
+  for (let i = 0; i < n; i++) x[i] = carriers.get(order[i]!);
+  const message = new Uint8Array(m);
+  for (let i = 0; i < m; i++) message[i] = (data[i >> 3]! >> (7 - (i & 7))) & 1;
+  const { y } = stcEmbed(x, null, message, STC_WIDTH);
+
+  if (inPlace) {
+    const where = carriers as ReturnType<typeof eligibleInPlace>;
+    const toggles: number[] = [];
+    for (let i = 0; i < n; i++) if (y[i] !== x[i]) toggles.push(where.bitPos(order[i]!));
+    return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
+  }
+  const writable = carriers as ReturnType<typeof eligibleCoefficients>;
+  for (let i = 0; i < n; i++) if (y[i] !== x[i]) writable.setLsb(order[i]!, y[i]!);
+  return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
+}
+
+/**
+ * Extract `length` bytes written by `embedBytesStcJpeg`, or null when the photo
+ * does not decode or has fewer carriers than an S1 writer accepts.
+ *
+ * Unlike S0 there is no looser read margin to keep: no S1 writer ever used one.
+ */
+export async function extractBytesStcJpeg(
+  jpegBytes: Uint8Array,
+  seed: Uint8Array,
+  length: number,
+): Promise<Uint8Array | null> {
+  let model: JpegModel;
+  try {
+    model = decodeJpeg(jpegBytes);
+  } catch {
+    return null;
+  }
+  return extractBytesStcModel(model, seed, length);
+}
+
+/** `extractBytesStcJpeg` over a model already decoded; see `extractBytesStegoModel`. */
+export async function extractBytesStcModel(
+  model: JpegModel,
+  seed: Uint8Array,
+  length: number,
+): Promise<Uint8Array | null> {
+  const carriers = eligibleCoefficients(model);
+  const m = length * 8;
+  const n = m * STC_WIDTH;
+  if (carriers.count < n) return null;
+
+  const stream = await keystreamFromSeed(seed, keyedOrderStreamLen(n));
+  const order = keyedOrder(stream, carriers.count, n);
+  stream.fill(0);
+  const y = new Uint8Array(n);
+  for (let i = 0; i < n; i++) y[i] = carriers.get(order[i]!);
+  const message = stcExtract(y, m, STC_WIDTH);
+  const out = new Uint8Array(length);
+  for (let i = 0; i < m; i++) if (message[i]) out[i >> 3]! |= 1 << (7 - (i & 7));
   return out;
 }

@@ -33,6 +33,7 @@ import {
   galleryDecode,
   galleryEncode,
   inspectJpegCover,
+  readGallerySlot,
   shamirRecover,
 } from './index';
 import { withC2pa } from './jpeg-fixtures';
@@ -126,7 +127,7 @@ describe('gallery cover normalization', () => {
     expect(res.images.length).toBeGreaterThan(k + m);
     expect(res.normalization.removed.covers).toBe(dirty.length);
     expect(res.normalization.uniform).toBe(true);
-  }, 120000);
+  }, 240000);
 
   it('normalizes a mixed set down to one profile, not just the dirty half', async () => {
     const secret = enc.encode('half and half');
@@ -142,7 +143,7 @@ describe('gallery cover normalization', () => {
     expect(res.normalization.covers?.withManifest).toEqual([]);
     expect(res.normalization.covers?.divergent).toEqual([]);
     expect(res.normalization.uniform).toBe(true);
-  }, 120000);
+  }, 240000);
 
   it('still restores after the manifests are gone', async () => {
     const secret = enc.encode('round trip through normalization');
@@ -151,7 +152,7 @@ describe('gallery cover normalization', () => {
     const { images } = await galleryEncode('n.txt', secret, 'pw', dirty, { params: FAST });
     const out = await galleryDecode(images as GalleryCover[], 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('round trip through normalization');
-  }, 120000);
+  }, 240000);
 
   it('reports a raster cover set as non-uniform when it is mixed with JPEGs', async () => {
     const secret = enc.encode('mixed formats');
@@ -161,7 +162,7 @@ describe('gallery cover normalization', () => {
     const res = await galleryEncode('n.txt', secret, 'pw', mixed, { params: FAST });
     expect(res.normalization.raster).toBe(1);
     expect(res.normalization.uniform).toBe(false);
-  }, 120000);
+  }, 240000);
 
   /**
    * `fileToGalleryCover` calls anything with an SOI a JPEG, so a truncated photo
@@ -216,7 +217,7 @@ describe('gallery round-trip', () => {
     }
     const out = await galleryDecode(images as GalleryCover[], 'hunter2', { params: FAST });
     expect(dec.decode(out.content)).toBe('gallery jpeg secret');
-  }, 120000);
+  }, 240000);
 
   it('round-trips a compressible secret larger than the compressed-blob ceiling', async () => {
     // 20 KB of repetition gzips to well under a gallery bucket but inflates back on
@@ -314,7 +315,7 @@ describe('gallery resilience', () => {
     });
     const out = await galleryDecode(damaged as GalleryCover[], 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('resilient secret');
-  }, 120000);
+  }, 240000);
 
   it('noise: foreign and undersized images are ignored, not fatal', async () => {
     const secret = enc.encode('ignore the noise');
@@ -328,7 +329,7 @@ describe('gallery resilience', () => {
     ];
     const out = await galleryDecode(withNoise, 'pw', { params: FAST });
     expect(dec.decode(out.content)).toBe('ignore the noise');
-  }, 120000);
+  }, 240000);
 
   it('a mid-capacity foreign photo is skipped, not fatal (keystream guard)', async () => {
     const secret = enc.encode('guarded');
@@ -342,7 +343,7 @@ describe('gallery resilience', () => {
       params: FAST,
     });
     expect(dec.decode(out.content)).toBe('guarded');
-  }, 120000);
+  }, 240000);
 });
 
 describe('gallery deniability', () => {
@@ -358,7 +359,7 @@ describe('gallery deniability', () => {
         expect(drift).toBeLessThan(64);
       }
     });
-  }, 120000);
+  }, 240000);
 
   it('the Huffman size-category histogram is identical before and after embedding', async () => {
     const secret = enc.encode('histogram');
@@ -370,7 +371,44 @@ describe('gallery deniability', () => {
         expect(acHistogram(img.jpeg)).toEqual(acHistogram(cover.jpeg));
       }
     });
-  }, 120000);
+  }, 240000);
+
+  /**
+   * Carriers and decoys are written by the same code with the same number of
+   * changes. A decoy that took another path (S0, or no STC) would carry about
+   * 8 400 changes against a carrier's 2 400, and the set would sort itself: the
+   * deniability would be gone and no extraction test would notice, since decoys
+   * extract to nothing either way. Which photo is which is found the way a
+   * reader finds it, by opening each slot.
+   */
+  it('changes carriers and decoys alike', async () => {
+    const secret = enc.encode('alike');
+    const { covers } = await coversFor('a.txt', secret, (n, s) => jpegCover(`${n}.jpg`, s));
+    const { images } = await galleryEncode('a.txt', secret, 'pw', covers, { params: FAST });
+    const counts = { carrier: [] as number[], decoy: [] as number[] };
+    for (const [i, img] of images.entries()) {
+      const cover = covers[i]!;
+      if (img.kind !== 'jpeg' || cover.kind !== 'jpeg') continue;
+      const a = decodeJpeg(cover.jpeg);
+      const b = decodeJpeg(img.jpeg);
+      let changed = 0;
+      a.components.forEach((c, ci) =>
+        c.blocks.forEach((blk, bi) => {
+          const other = b.components[ci]!.blocks[bi]!;
+          for (let k = 0; k < 64; k++) if (blk[k] !== other[k]) changed++;
+        }),
+      );
+      const role = (await readGallerySlot(img, 'pw', FAST)) ? 'carrier' : 'decoy';
+      counts[role].push(changed);
+    }
+    expect(counts.carrier.length).toBeGreaterThan(0);
+    expect(counts.decoy.length).toBeGreaterThan(0);
+    // Both are about m / 7.1 = 2 390 for one slot; S0 would be 8 400.
+    for (const n of [...counts.carrier, ...counts.decoy]) {
+      expect(n).toBeGreaterThan(2000);
+      expect(n).toBeLessThan(2700);
+    }
+  }, 240000);
 
   it('decoy payloads look like ciphertext (Shannon entropy ≈ 8 bits/byte)', async () => {
     const secret = enc.encode('small');

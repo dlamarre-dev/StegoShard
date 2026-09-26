@@ -9,6 +9,20 @@ format** is versioned separately; see [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Added
 
+- **Gallery photos now carry their slot with a quarter of the changes.** A gallery JPEG
+  is written with embedding scheme S1 (SPEC §9.3.1): the slot is the syndrome of a
+  syndrome-trellis code (Filler, Judas and Fridrich, 2011) over a keyed sequence of the
+  photo's carriers, so the writer flips about 2,390 coefficients per photo where writing
+  one bit per carrier flipped 8,420. Every change is still the LSB of a `|v| ≥ 2`
+  magnitude, so the carrier set, the size categories and the file size behave exactly as
+  before. On the nine-photo bench (`tests/steganalysis/bench/s1-stc.md`) the calibrated
+  pair estimator drops from an AUC of 0.68 to 0.56, and its paired shift to an eighth; it
+  still ranks 25 carriers of 27 above their cover, because the direction of each change is
+  still set by the parity, which the next step addresses. Galleries written before are read as
+  they always were: a reader tries S1 and then the earlier scheme, which is pinned by a
+  frozen golden carrier. The Python reader reads both. Saving a gallery takes about 0.35 s
+  more per photo on a desktop.
+
 - **A stego bench, and the reference every future embedding scheme is measured
   against.** `npm run bench:stego -- --corpus <dir>` runs photos through the real gallery
   pipeline, embeds gallery slots at the real size and margin, and reports what changed

@@ -147,6 +147,9 @@ const CONSTANTS = [
   // records that lesson once; this is it happening twice more.
   ['src/core/shamir.ts', 'SHARE_VERSION'],
   ['src/core/crypto.ts', 'KEY_FACTOR_BLOCK_VERSION'],
+  // The gallery embedding scheme a writer uses (SPEC §9.3.1). Nothing stores it,
+  // so a change here moves every carrier byte while every version above stays put.
+  ['src/core/gallery.ts', 'STEGO_SCHEME'],
 ] as const;
 
 function arg(name: string): string | undefined {

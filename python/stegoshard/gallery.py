@@ -21,7 +21,13 @@ from .aad import gallery_frag_aad
 from .crypto import normalize_password
 from .format import split_payload
 from .pipeline import RestoredFile, decode_vault
-from .stego import GALLERY_SALT, extract_bytes_jpeg, extract_bytes_rgba
+from .stego import (
+    GALLERY_SALT,
+    extract_bytes_from_carriers,
+    extract_bytes_jpeg,
+    extract_bytes_rgba,
+    extract_bytes_stc_from_carriers,
+)
 
 # Fixed slot geometry (SPEC §9.2). SLOT_BYTES is what blind decode reads per image.
 GALLERY_SLOT_DATA = 2048
@@ -51,7 +57,24 @@ def _hkdf(seed: bytes, info: bytes, length: int = 32) -> bytes:
 def _gallery_keys(
     password: str, iterations: int, memory_kib: int, parallelism: int
 ) -> tuple[bytes, bytes]:
-    """Argon2id(password, GALLERY_SALT) → HKDF-split (position key, AEAD key)."""
+    """Argon2id(password, GALLERY_SALT) → HKDF-split (S0 position key, AEAD key)."""
+    pos_key, _s1_key, aead_key = _gallery_key_set(password, iterations, memory_kib, parallelism)
+    return pos_key, aead_key
+
+
+def _gallery_key_set(
+    password: str, iterations: int, memory_kib: int, parallelism: int
+) -> tuple[bytes, bytes, bytes]:
+    """(S0 position key, S1 position key, AEAD key), from one Argon2id (SPEC §9.3.1)."""
+    seed = _gallery_seed(password, iterations, memory_kib, parallelism)
+    return (
+        _hkdf(seed, b"stegoshard/gallery/pos"),
+        _hkdf(seed, b"stegoshard/gallery/pos/s1"),
+        _hkdf(seed, b"stegoshard/gallery/aead"),
+    )
+
+
+def _gallery_seed(password: str, iterations: int, memory_kib: int, parallelism: int) -> bytes:
     seed = hash_secret_raw(
         secret=normalize_password(password).encode("utf-8"),
         salt=GALLERY_SALT,
@@ -62,7 +85,37 @@ def _gallery_keys(
         type=Type.ID,
         version=ARGON2_VERSION,
     )
-    return _hkdf(seed, b"stegoshard/gallery/pos"), _hkdf(seed, b"stegoshard/gallery/aead")
+    return seed
+
+
+def _open_slot(image_bytes: bytes, pos_key: bytes, s1_key: bytes, aead: AESGCM) -> bytes | None:
+    """A photo's authenticated fragment: S1 first for a JPEG, then S0, else None."""
+    if image_bytes[:2] != b"\xff\xd8":  # a raster: S0 only
+        return _open_sealed(_extract_slot(image_bytes, pos_key), aead, "S0")
+    from .jpeg_coeff import JpegUnsupported, decode, eligible_coefficients
+
+    # Decoded once for both attempts, as the TypeScript reader does: the decode is
+    # most of the cost, and a decoy pays for both.
+    try:
+        carriers = eligible_coefficients(decode(image_bytes))
+    except JpegUnsupported:
+        return None
+    s1 = extract_bytes_stc_from_carriers(carriers, s1_key, GALLERY_SLOT_BYTES)
+    opened = _open_sealed(s1, aead, "S1")
+    if opened is not None:
+        return opened
+    s0 = extract_bytes_from_carriers(carriers, pos_key, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN)
+    return _open_sealed(s0, aead, "S0")
+
+
+def _open_sealed(slot: bytes | None, aead: AESGCM, scheme: str) -> bytes | None:
+    """AES-GCM-open a slot under one scheme's AAD; None on a failed tag."""
+    if slot is None:
+        return None
+    try:
+        return aead.decrypt(slot[:IV_LEN], slot[IV_LEN:], gallery_frag_aad(scheme))
+    except Exception:  # noqa: BLE001 - any AEAD failure means "not this scheme"
+        return None
 
 
 def _extract_slot(image_bytes: bytes, pos_key: bytes) -> bytes | None:
@@ -75,9 +128,7 @@ def _extract_slot(image_bytes: bytes, pos_key: bytes) -> bytes | None:
         rgba = img.convert("RGBA")
         width, height = rgba.size
         data = rgba.tobytes()
-    return extract_bytes_rgba(
-        data, width, height, pos_key, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN
-    )
+    return extract_bytes_rgba(data, width, height, pos_key, GALLERY_SLOT_BYTES, GALLERY_READ_MARGIN)
 
 
 def decode_gallery(
@@ -96,21 +147,17 @@ def decode_gallery(
     The gallery Argon2 cost is the frozen default (not stored); override only to
     match test fixtures.
     """
-    pos_key, aead_key = _gallery_keys(password, iterations, memory_kib, parallelism)
+    pos_key, s1_key, aead_key = _gallery_key_set(password, iterations, memory_kib, parallelism)
     aead = AESGCM(aead_key)
 
     fragments: list[bytes] = []
     for image_bytes in images:
-        slot = _extract_slot(image_bytes, pos_key)
-        if slot is None:
-            continue
-        try:
-            # slot = nonce(12) || AES-GCM(header || shard || pad). A failed tag is
-            # a decoy / destroyed carrier / foreign image / wrong password, so drop it.
-            frag = aead.decrypt(slot[:IV_LEN], slot[IV_LEN:], gallery_frag_aad())
-        except Exception:  # noqa: BLE001 - any AEAD failure means "not a fragment"
-            continue
-        fragments.append(frag)
+        # slot = nonce(12) || AES-GCM(header || shard || pad). A failed tag under
+        # every scheme is a decoy / destroyed carrier / foreign image / wrong
+        # password, so drop it.
+        frag = _open_slot(image_bytes, pos_key, s1_key, aead)
+        if frag is not None:
+            fragments.append(frag)
 
     if not fragments:
         raise GalleryRestoreError(
