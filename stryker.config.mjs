@@ -210,7 +210,14 @@ export default {
   // `break` is a regression alarm set below the weakest shard (vault.ts, 79.51%
   // on both forced runs), not a quality target. See "THE THRESHOLD" above for the
   // calibration; raise it deliberately and record the new one there.
-  thresholds: { high: 80, low: 60, break: 75 },
+  /**
+   * `break` is applied per file by scripts/mutation-summary.mjs in the nightly,
+   * not here. Since the files are cut into line ranges, a shard can be 17 mutants,
+   * and Stryker would judge that range alone: 13 of 17 is 76.5% and one more
+   * survivor fails the night with nothing wrong in the file. The workflow sets
+   * STRYKER_NO_BREAK so each shard only measures; a local run still breaks here.
+   */
+  thresholds: { high: 80, low: 60, break: process.env.STRYKER_NO_BREAK ? null : 75 },
 
   // Argon2id at the production parameters takes seconds per call, and a mutation
   // run performs thousands. The suite's own fast parameters keep this bounded;
@@ -233,8 +240,13 @@ export default {
    *
    * 20 minutes is headroom, not a target: the dry run is the full selection once,
    * so a real hang still fails well inside the job's 120-minute limit.
+   *
+   * 30 since 26 September. The dry runs had grown to 7-12 minutes by then, and
+   * the first range-sharded run measured crypto's at 14 on the runner, with
+   * stego.ts at 16 locally after the S1 writer added UERD and STC tests. Six
+   * minutes of margin is the margin that ran out on 23 September.
    */
-  dryRunTimeoutMinutes: 20,
+  dryRunTimeoutMinutes: 30,
 
   // Four workers on a four-vCPU GitHub runner, while vitest parallelises inside
   // each of them. That is very likely oversubscribed, and it is a plausible part
