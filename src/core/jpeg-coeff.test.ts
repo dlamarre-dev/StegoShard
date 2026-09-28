@@ -277,4 +277,25 @@ describe('jpeg decoder: forged sizes', () => {
     ];
     expect(() => decode(forgedJpeg(9000, 9000, four))).toThrow(/8x8 blocks/);
   });
+
+  it('refuses a scan small enough to decode from padding but with no bytes', () => {
+    // One block at two synthetic bits fits the pad bound, so only the empty
+    // range can refuse it. The fuzzer found a mutated file of this shape.
+    expect(() => decode(forgedJpeg(8, 8))).toThrow(/empty entropy-coded scan/);
+  });
+});
+
+describe('jpeg decoder: a marker ends the scan', () => {
+  it('does not read past a marker as scan data', () => {
+    // 64 blocks at two bits each need sixteen bytes. The scan holds one, then a
+    // marker, then twenty that would decode under the forged tables. The reader
+    // used to stop for a single padded byte, then read the marker code and what
+    // follows as data, accepting the file with coefficients from outside
+    // [scanStart, scanEnd). Found by the parser fuzzer.
+    const f = forgedJpeg(64, 64);
+    const eoi = f.length - 2;
+    const after = new Array(20).fill(0x00);
+    const b = new Uint8Array([...f.subarray(0, eoi), 0x00, 0xff, 0x6f, ...after, 0xff, 0xd9]);
+    expect(() => decode(b)).toThrow(/runs past its data/);
+  });
 });

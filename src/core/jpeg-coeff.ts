@@ -156,6 +156,11 @@ class BitReader {
       } else {
         this.marker = next;
         // Don't consume the marker; feed 1-bits so any in-flight read completes.
+        // Step back onto the 0xFF too, so every later fill() stops here again.
+        // Leaving pos past it made the stop one byte long: the next fill() read
+        // the marker code and whatever followed as scan data, decoding
+        // coefficients from outside [scanStart, scanEnd). Found by the fuzzer.
+        this.pos--;
         this.pad();
         return;
       }
@@ -396,6 +401,10 @@ function decodeScan(
   // The entropy scan ends at the next real marker (skipping FF00 stuffing and
   // RSTn restart markers), located by a forward scan from the scan start.
   const scanEnd = findScanEnd(bytes, scanStart);
+  // A scan with no entropy bytes decoded entirely from pad bits, which a
+  // permissive DHT allows. It carries no coefficient we could embed in, and the
+  // encoder cannot splice a new scan into an empty range.
+  if (scanEnd <= scanStart) throw new JpegUnsupportedError('empty entropy-coded scan');
 
   return {
     bytes,
