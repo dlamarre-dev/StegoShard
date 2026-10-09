@@ -42,16 +42,59 @@ import { spawnSync } from 'node:child_process';
 /** Severities that fail the build, matching the old `--audit-level=moderate`. */
 const BLOCKING = ['moderate', 'high', 'critical'] as const;
 
+/**
+ * Advisories reviewed and accepted, by GHSA id, each with why it does not
+ * reach us. Only the named advisory is waived, wherever it shows up: anything
+ * else in the same package, or the same package pulled in by a new path, still
+ * fails. An entry that no longer matches anything is reported so it gets
+ * removed rather than outliving the reason it was added.
+ */
+const ACCEPTED: Record<string, string> = {
+  'GHSA-hp3w-g68c-fv3c':
+    'sprintf-js, no patched release. Reached only through @microsoft/api-extractor ' +
+    '-> @rushstack/ts-command-line -> argparse@1, a dev-only build tool, and ' +
+    "argparse only formats its own usage and help strings with it: the caller's " +
+    'arguments are passed as values, never as the format, so the precision ' +
+    'specifier the DoS needs cannot be supplied.',
+};
+
 const ATTEMPTS = 3;
 /** Backoff between attempts. The observed outages cleared within minutes. */
 const BACKOFF_MS = [5_000, 20_000];
 
 interface AuditReport {
   metadata?: { vulnerabilities?: Record<string, number> };
+  vulnerabilities?: Record<string, { via?: (string | { url?: string; severity?: string })[] }>;
+}
+
+interface Advisory {
+  id: string;
+  severity: string;
 }
 
 type Outcome =
-  { kind: 'report'; counts: Record<string, number> } | { kind: 'unreachable'; detail: string };
+  | { kind: 'report'; counts: Record<string, number>; advisories: Advisory[] }
+  | { kind: 'unreachable'; detail: string };
+
+/** Accepted ids that matched an advisory in at least one scope. */
+const acceptedSeen = new Set<string>();
+
+/**
+ * The advisories themselves, deduplicated. npm lists every package on the
+ * path to a vulnerable one, but only the vulnerable package's `via` carries the
+ * advisory object; the others name a package and add nothing to waive.
+ */
+function advisoriesOf(report: AuditReport): Advisory[] {
+  const byId = new Map<string, Advisory>();
+  for (const pkg of Object.values(report.vulnerabilities ?? {})) {
+    for (const via of pkg.via ?? []) {
+      if (typeof via === 'string') continue;
+      const id = via.url?.split('/').pop() ?? '';
+      byId.set(id, { id, severity: via.severity ?? '' });
+    }
+  }
+  return [...byId.values()];
+}
 
 /**
  * npm settings that say how to reach a registry, which the child must keep.
@@ -126,7 +169,7 @@ function runAudit(args: string[]): Outcome {
   }
 
   const counts = parsed?.metadata?.vulnerabilities;
-  if (counts) return { kind: 'report', counts };
+  if (parsed && counts) return { kind: 'report', counts, advisories: advisoriesOf(parsed) };
 
   const fromStderr = (r.stderr ?? '').trim().split('\n').slice(-3).join(' ');
   const detail = (parsed as { message?: string } | null)?.message || fromStderr || 'no output';
@@ -144,13 +187,26 @@ function auditScope(label: string, args: string[]): void {
 
     if (out.kind === 'report') {
       const blocking = BLOCKING.filter((s) => (out.counts[s] ?? 0) > 0);
-      if (blocking.length === 0) {
+      const serious = out.advisories.filter((a) =>
+        (BLOCKING as readonly string[]).includes(a.severity),
+      );
+      const waived = serious.filter((a) => a.id in ACCEPTED);
+      const open = serious.filter((a) => !(a.id in ACCEPTED));
+      for (const a of waived) acceptedSeen.add(a.id);
+
+      // Fail closed if npm counted something this could not itemise: a change
+      // in the report's shape must not read as "everything was accepted".
+      if (blocking.length === 0 || (serious.length > 0 && open.length === 0)) {
         const total = out.counts.total ?? 0;
-        console.log(`  ${label}: clean (${total} advisories, none at moderate or above)`);
+        const note = waived.length ? `, ${waived.map((a) => a.id).join(', ')} accepted` : '';
+        console.log(
+          `  ${label}: clean (${total} advisories, none open at moderate or above${note})`,
+        );
         return;
       }
       const summary = blocking.map((s) => `${out.counts[s]} ${s}`).join(', ');
       console.error(`\n  ${label}: VULNERABLE (${summary})`);
+      for (const a of open) console.error(`    ${a.severity}: ${a.id}`);
       console.error('  Run `npm audit` for the detail. This is a real finding, not an outage.');
       process.exit(1);
     }
@@ -173,4 +229,8 @@ function auditScope(label: string, args: string[]): void {
 console.log('Auditing dependencies (advisories at moderate and above fail the build)');
 auditScope('all dependencies', []);
 auditScope('production only', ['--omit=dev']);
+for (const id of Object.keys(ACCEPTED)) {
+  if (!acceptedSeen.has(id))
+    console.log(`  note: ${id} is accepted but no longer reported; remove it`);
+}
 console.log('Audit clean.');
