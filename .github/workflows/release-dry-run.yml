@@ -233,7 +233,7 @@ jobs:
       # Uploaded only so `release-assembly` below can consume them the way the
       # real publish job does. Kept for a day: these are ~70 MB each and the
       # dry run has no use for them beyond the next job.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ matrix.archive }}
           path: ${{ matrix.archive }}
