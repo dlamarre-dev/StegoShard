@@ -163,7 +163,7 @@ jobs:
       # bundle for no reader: the largest live artifact count in the repo, and
       # every one of them a build that was already validated and superseded.
       - name: Upload validated browser builds
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: validated-browser-builds
           path: dist-release
@@ -220,7 +220,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload browser diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-diagnostics
           path: |
@@ -276,7 +276,7 @@ jobs:
       # a *persistent* failure here stays visible; it just no longer votes on
       # whether the scan found anything.
       - name: Upload CBOM
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         continue-on-error: true
         with:
           name: crypto-bom
@@ -510,7 +510,7 @@ jobs:
           --output-file python-runtime.cdx.json
 
       - name: Upload Python runtime SBOM
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: python-runtime-sbom
           path: python-runtime.cdx.json
