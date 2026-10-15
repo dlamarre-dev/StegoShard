@@ -78,3 +78,9 @@ updates:
       codeql-action:
         patterns:
           - github/codeql-action*
+      # Every other action, as one weekly PR. With main requiring branches to
+      # be up to date, each separate PR merged meant a rebase and another
+      # half-hour CI run for every one still open.
+      actions:
+        patterns:
+          - '*'
