@@ -49,14 +49,7 @@ const BLOCKING = ['moderate', 'high', 'critical'] as const;
  * fails. An entry that no longer matches anything is reported so it gets
  * removed rather than outliving the reason it was added.
  */
-const ACCEPTED: Record<string, string> = {
-  'GHSA-hp3w-g68c-fv3c':
-    'sprintf-js, no patched release. Reached only through @microsoft/api-extractor ' +
-    '-> @rushstack/ts-command-line -> argparse@1, a dev-only build tool, and ' +
-    "argparse only formats its own usage and help strings with it: the caller's " +
-    'arguments are passed as values, never as the format, so the precision ' +
-    'specifier the DoS needs cannot be supplied.',
-};
+const ACCEPTED: Record<string, string> = {};
 
 const ATTEMPTS = 3;
 /** Backoff between attempts. The observed outages cleared within minutes. */
