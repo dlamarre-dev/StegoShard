@@ -5,7 +5,20 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # Hold a new release back for a week (a major for two) before proposing it.
+    # A compromised publish is usually caught and yanked within days, and this is
+    # the cheapest way not to be the first to install it. Security updates are
+    # not subject to cooldown, so a fix still arrives as soon as it exists.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
+      # Every security fix in one PR, separate from routine bumps. This is the
+      # fast lane in docs/DEPENDENCIES.md: triage within a day.
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
       # The test runner and everything peered to it, as one PR.
       #
       # This group exists because of a specific failure on 8 September.
@@ -33,6 +46,22 @@ updates:
           - vitest
           - '@vitest/*'
           - '@stryker-mutator/*'
+      # Everything that ends up inside a shipped artifact (the union of
+      # `.bundled/*.json`), runtime or not. Never merged on a green CI alone: these
+      # are tiers A and B in docs/DEPENDENCIES.md, and a bump without a reason to
+      # take it is closed. Listed before `dev-dependencies` so the three bundled
+      # devDependencies land here and not in the routine batch.
+      shipped:
+        patterns:
+          - fflate
+          - hash-wasm
+          - jsqr
+          - pdf-lib
+          - qrcode
+          - webextension-polyfill
+          - fast-png
+          - jpeg-js
+          - '@pdf-lib/*'
       dev-dependencies:
         dependency-type: development
         update-types:
@@ -74,6 +103,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       codeql-action:
         patterns:
