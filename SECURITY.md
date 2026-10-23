@@ -37,6 +37,13 @@ Security-relevant areas include, but are not limited to:
 The project is in early development (pre-1.0). Only the latest `main` is supported until
 a stable release is tagged.
 
+## Dependencies
+
+Third-party code we ship is held at a reviewed set and changed only for a reason;
+security fixes follow a fast lane with published targets (72 hours for a critical or
+high advisory that reaches shipped code). The lockfiles are re-audited daily. See
+[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
+
 ## Threat model (summary)
 
 The vault key is stored locally, wrapped by a password-derived key. A compromised support

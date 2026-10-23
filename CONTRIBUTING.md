@@ -63,6 +63,9 @@ export the declaration rollup cannot see. It is compared by an ordinary test.
 consumer, **and** what each build inlines into an artifact we hand out. The second
 half comes from `.bundled/<build>.json`, written by the bundler and committed.
 
+A change to a shipped dependency also follows [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md):
+its tier sets the review it needs before it lands.
+
 So a change to dependencies, or to what a build bundles, means: run the builds,
 then `npm run notices`, and commit both. CI fails if `.bundled/` moves without the
 notices following. A package whose licence is not on the approved list, or that
