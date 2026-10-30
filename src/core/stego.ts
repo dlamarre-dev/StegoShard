@@ -634,10 +634,17 @@ async function embedFixedStegoJpeg(
     STEGO_COVER_INFO_S1,
   );
   const claim = await reserveCoverUse(tag, payload, opts);
+  // The whitened payload. Allocated outside the `try` so the failure path can
+  // wipe it as well as `stream`: an `stcEmbed` that throws used to leave it.
+  const message = new Uint8Array(bits);
   // The whole remainder, the `onClaim` hand-off included: see embedFixedStego.
   try {
     opts?.onClaim?.(claim);
-    const message = new Uint8Array(bits);
+    // `<=` here only adds i === bits, a write one past the end of `message`, which
+    // a typed array ignores: an equivalent mutant no test can kill. The `>=` the
+    // directive also hides is the same as the ConditionalExpression `false`
+    // mutant on this condition, which stays live.
+    // Stryker disable next-line EqualityOperator: equivalent, see above
     for (let i = 0; i < bits; i++) {
       message[i] = ((payload[i >> 3]! ^ stream[i >> 3]!) >> (7 - (i & 7))) & 1;
     }
@@ -661,6 +668,7 @@ async function embedFixedStegoJpeg(
     return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
   } catch (e) {
     stream.fill(0);
+    message.fill(0);
     claim.release();
     throw e;
   }
@@ -697,32 +705,61 @@ async function extractFixedStegoJpeg(
   const fingerprint = await coverFingerprintJpeg(model);
   const seed = await stegoSeed(password, params);
   const out = new Uint8Array(len);
+  // Each derived secret is wiped in a `finally` right after its last use: as
+  // early as before, and also when something between deriving it and wiping it
+  // throws, which used to leave it behind.
+  //
+  // The three loop bounds marked below survive `<` → `<=` as equivalent mutants:
+  // the extra index is one past the end of `message` or `out`, where a typed
+  // array reads undefined (falsy) and ignores the write. The `>=` the directive
+  // also hides is the same as the ConditionalExpression `false` mutant on each
+  // condition, which stays live.
   try {
     // S1-key: the payload is the syndrome of the parities in the keyed order.
     const n = bits * w;
     const k1 = await coverKey(seed, fingerprint, STEGO_COVER_INFO_S1);
-    const s1 = await keystreamFromSeed(k1, len + keyedOrderStreamLen(n));
-    k1.fill(0);
-    const order = keyedOrder(s1.subarray(len), carriers.count, n);
-    const y = new Uint8Array(n);
-    for (let i = 0; i < n; i++) y[i] = carriers.get(order[i]!);
-    const message = stcExtract(y, bits, w);
-    for (let i = 0; i < bits; i++) if (message[i]) out[i >> 3]! |= 1 << (7 - (i & 7));
-    for (let j = 0; j < len; j++) out[j]! ^= s1[j]!;
-    s1.fill(0);
+    let s1: Uint8Array;
+    try {
+      s1 = await keystreamFromSeed(k1, len + keyedOrderStreamLen(n));
+    } finally {
+      k1.fill(0);
+    }
+    // The whitened payload bits, as sensitive as their counterpart on embed.
+    let message: Uint8Array = new Uint8Array(0);
+    try {
+      const order = keyedOrder(s1.subarray(len), carriers.count, n);
+      const y = new Uint8Array(n);
+      for (let i = 0; i < n; i++) y[i] = carriers.get(order[i]!);
+      message = stcExtract(y, bits, w);
+      // Stryker disable next-line EqualityOperator: equivalent, see above
+      for (let i = 0; i < bits; i++) if (message[i]) out[i >> 3]! |= 1 << (7 - (i & 7));
+      // Stryker disable next-line EqualityOperator: equivalent, see above
+      for (let j = 0; j < len; j++) out[j]! ^= s1[j]!;
+    } finally {
+      s1.fill(0);
+      message.fill(0);
+    }
     if (accept(out)) return out;
 
     // S0: one carrier per bit, drawn by rejection sampling.
     const k0 = await coverKey(seed, fingerprint);
-    const s0 = await keystreamFromSeed(k0, streamLen(len));
-    k0.fill(0);
-    const positions = pickPositions(new StreamReader(s0.subarray(len)), carriers.count, bits);
-    out.fill(0);
-    for (let i = 0; i < bits; i++) {
-      if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+    let s0: Uint8Array;
+    try {
+      s0 = await keystreamFromSeed(k0, streamLen(len));
+    } finally {
+      k0.fill(0);
     }
-    for (let j = 0; j < len; j++) out[j]! ^= s0[j]!;
-    s0.fill(0);
+    try {
+      const positions = pickPositions(new StreamReader(s0.subarray(len)), carriers.count, bits);
+      out.fill(0);
+      for (let i = 0; i < bits; i++) {
+        if (carriers.get(positions[i]!)) out[i >> 3]! |= 1 << (7 - (i & 7));
+      }
+      // Stryker disable next-line EqualityOperator: equivalent, see above
+      for (let j = 0; j < len; j++) out[j]! ^= s0[j]!;
+    } finally {
+      s0.fill(0);
+    }
     return accept(out) ? out : null;
   } finally {
     seed.fill(0);
