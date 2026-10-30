@@ -38,6 +38,13 @@ import {
   withMpfGainMap,
   withTrailer,
 } from './jpeg-fixtures';
+import { encode as encodeJpeg } from './jpeg-coeff';
+import {
+  embedBytesStcJpeg,
+  embedBytesStegoJpeg,
+  extractBytesStcJpeg,
+  extractBytesStegoJpeg,
+} from './stego';
 import { parseMpfIndex } from './mpf';
 import { parseJpegSegments } from './jpeg-segments';
 
@@ -136,6 +143,85 @@ describe('JPEG stego round-trip', () => {
     for (let i = 0; i < lc.length; i++) if (lc[i] !== ls[i]) logicalDiff++;
     expect(logicalDiff).toBeGreaterThan(0);
     expect(logicalDiff).toBeLessThanOrEqual(92 * 8); // ≤ 736 payload bits
+  });
+
+  describe('keeps bits a re-encode would normalise, here the padding at the end of the scan', () => {
+    // The test above cannot tell the in-place edit from the re-encode fallback:
+    // this encoder reproduces a jpeg-js file, and every JPEG in the repository,
+    // byte for byte, so both paths give the same output. Forcing the fallback on
+    // an ordinary file survived mutation on all three JPEG writers for that reason
+    // (#240). What the in-place edit is *for* only shows on a file the encoder
+    // would not write the same way. The scan's final padding is the simplest:
+    // the standard fills it with 1s, some encoders use 0s, a decoder ignores it,
+    // and a re-encode rewrites it, leaving a change outside the carrier bits.
+
+    /**
+     * Index of the last scan byte, which holds the padding. Looked up rather
+     * than assumed: a flipped bit that makes an 0xFF byte gets a stuffed 0x00
+     * after it, which moves everything behind it by one.
+     */
+    const scanTail = (b: Uint8Array) => decodeJpeg(b).scanEnd - 1;
+
+    /** A cover whose final scan byte is padded with 0s, and that byte's index. */
+    function zeroPaddedCover(): { cover: Uint8Array; last: number } {
+      const original = noisyJpeg(160, 160, 85, 3);
+      const last = decodeJpeg(original).scanEnd - 1;
+      const coefficients = (b: Uint8Array) =>
+        decodeJpeg(b).components.flatMap((c) => c.blocks.flatMap((blk) => [...blk]));
+      const before = coefficients(original);
+
+      // Clear trailing bits of the last scan byte for as long as that changes no
+      // coefficient: those bits are padding.
+      let cover = original;
+      for (let bits = 1; bits <= 7; bits++) {
+        const candidate = original.slice();
+        candidate[last] = candidate[last]! & ((0xff << bits) & 0xff);
+        if (coefficients(candidate).some((v, i) => v !== before[i])) break;
+        cover = candidate;
+      }
+      expect(cover[last], 'the fixture has no padding to change').not.toBe(original[last]);
+      expect(
+        encodeJpeg(decodeJpeg(cover))[last],
+        'a re-encode no longer rewrites the padding, so this proves nothing',
+      ).toBe(original[last]);
+      return { cover, last };
+    }
+
+    it('on a key photo', async () => {
+      // A fixed key factor rather than a key block: same writer, but a key block
+      // carries a random salt, and some salts flip bits into an 0xFF that gets a
+      // stuffed 0x00 after it. The assertions below allow for that anyway; a
+      // fixed payload keeps the run the same every time.
+      const { cover, last } = zeroPaddedCover();
+      const factor = Uint8Array.from({ length: KEY_FACTOR_LEN }, (_, i) => (i * 7 + 2) & 0xff);
+
+      const stego = await embedKeyFactorStegoJpeg(cover, factor, 'pw', FAST);
+
+      expect(stego[scanTail(stego)], 'the embed rewrote the cover’s padding').toBe(cover[last]);
+      expect([...(await extractKeyFactorStegoJpeg(stego, 'pw', FAST))!]).toEqual([...factor]);
+    });
+
+    it('on a gallery photo', async () => {
+      const { cover, last } = zeroPaddedCover();
+      const seed = new Uint8Array(32).fill(5);
+      const data = new Uint8Array(64).fill(0x5a);
+
+      const stego = await embedBytesStcJpeg(cover, data, seed);
+
+      expect(stego[scanTail(stego)], 'the embed rewrote the cover’s padding').toBe(cover[last]);
+      expect([...(await extractBytesStcJpeg(stego, seed, data.length))!]).toEqual([...data]);
+    });
+
+    it('on a gallery photo written by S0', async () => {
+      const { cover, last } = zeroPaddedCover();
+      const seed = new Uint8Array(32).fill(6);
+      const data = new Uint8Array(64).fill(0xa5);
+
+      const stego = await embedBytesStegoJpeg(cover, data, seed);
+
+      expect(stego[scanTail(stego)], 'the embed rewrote the cover’s padding').toBe(cover[last]);
+      expect([...(await extractBytesStegoJpeg(stego, seed, data.length))!]).toEqual([...data]);
+    });
   });
 
   it('only eligible AC coefficients change, by ±1 in magnitude', async () => {

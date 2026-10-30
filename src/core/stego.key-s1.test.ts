@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import jpeg from 'jpeg-js';
+import { KEY_FACTOR_BLOCK_LEN } from './crypto';
 
 const argon2Calls = { n: 0 };
 
@@ -121,6 +122,26 @@ describe('key-photo scheme S1-key', () => {
   it('carries the key factor too, and nothing under another password', async () => {
     const factor = Uint8Array.from({ length: 32 }, (_, i) => (i * 29 + 3) & 0xff);
     const stego = await embedKeyFactorStegoJpeg(noisyJpeg(160, 3), factor, 'pw', FAST);
+    expect(await extractKeyFactorStegoJpeg(stego, 'pw', FAST)).toEqual(factor);
+    expect(await extractKeyFactorStegoJpeg(stego, 'other', FAST)).toBeNull();
+  });
+
+  it('has keystream to spare for the S0 fallback on a key-factor photo near the floor', async () => {
+    // A wrong password makes S1 find nothing, so the reader falls back to S0,
+    // which draws carrier positions by rejection sampling. Picking 296 distinct
+    // positions out of barely twice as many takes about N·ln 2 draws, well past
+    // one per bit. `streamLen`'s fixed 1024 bytes of slack are what cover that:
+    // without them the stream holds 2·bits − 256 draws, and this read threw
+    // "keystream exhausted" instead of returning null. That `+ 1024` → `- 1024`
+    // mutant survived (#240) because every other S0 read here had room to spare.
+    const bits = KEY_FACTOR_BLOCK_LEN * 8;
+    const small = noisyJpeg(40, 7, 90);
+    const n = eligibleCoefficients(decode(small)).count;
+    expect(n).toBeGreaterThanOrEqual(bits * 2);
+    expect(n, 'roomy enough that the slack is never touched').toBeLessThan(bits * 3);
+
+    const factor = Uint8Array.from({ length: 32 }, (_, i) => (i * 13 + 1) & 0xff);
+    const stego = await embedKeyFactorStegoJpeg(small, factor, 'pw', FAST);
     expect(await extractKeyFactorStegoJpeg(stego, 'pw', FAST)).toEqual(factor);
     expect(await extractKeyFactorStegoJpeg(stego, 'other', FAST)).toBeNull();
   });
