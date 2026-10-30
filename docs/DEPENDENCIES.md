@@ -12,12 +12,12 @@ What counts is what we **distribute**: the union of `.bundled/*.json`, written b
 `scripts/bundled-packages.ts`. That includes three `devDependencies` the bundlers
 inline, so the `dependencies` field alone is not the answer.
 
-| Tier                    | What                             | Packages                                                                                                                        | Review before an update lands                                |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **A — crypto**          | handles keys or secrets          | `hash-wasm` (Argon2id); Python `argon2-cffi`, `cryptography`                                                                    | full checklist, known-answer vectors, JS↔Python cross-decode |
-| **B — untrusted input** | parses images, archives, QR, PDF | `fflate`, `jsqr`, `pdf-lib`, `@pdf-lib/*`, `qrcode`, `fast-png`, `jpeg-js`, their transitive deps; Python `pillow`, `zxing-cpp` | full checklist, targeted fuzz run                            |
-| **C — build chain**     | produces what ships              | `vite`, `typescript`, `tsx`, GitHub Actions, `webextension-polyfill`                                                            | checklist, diff of the built output                          |
-| **D — test and lint**   | never distributed                | vitest, eslint, playwright, stryker, …                                                                                          | green CI                                                     |
+| Tier                    | What                             | Packages                                                                                                                                                                                                                  | Review before an update lands                                |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **A — crypto**          | handles keys or secrets          | `hash-wasm` (Argon2id); Python `argon2-cffi`, `cryptography`                                                                                                                                                              | full checklist, known-answer vectors, JS↔Python cross-decode |
+| **B — untrusted input** | parses images, archives, QR, PDF | `fflate`, `jsqr`, `pdf-lib`, `@pdf-lib/*`, `qrcode`, `fast-png`, `jpeg-js`, their transitive deps; Python `pillow`, `zxing-cpp`                                                                                           | full checklist, targeted fuzz run                            |
+| **C — build chain**     | produces what ships              | `vite` (and `rolldown` under it), `typescript`, `tsx`, `@microsoft/api-extractor`, `webextension-polyfill`, GitHub Actions in the workflows that build or publish (`pages.yml`, `release-cli.yml`, `release-dry-run.yml`) | checklist, diff of the built output                          |
+| **D — test and lint**   | never distributed                | vitest, eslint, playwright, stryker, GitHub Actions used only by test jobs (for example `ruby/setup-ruby`), …                                                                                                             | green CI                                                     |
 
 Every shipped npm package is pinned to an exact version in `package.json`, so the
 manifest says what the lockfile already enforces.
@@ -57,8 +57,8 @@ re-audits the committed lockfiles daily because CI only runs on pushes.
 
 - **Tiers A, B, C:** no update without a reason: a bug that affects us, an end of
   support, or a prerequisite for a security fix. Dependabot still proposes the
-  `shipped` group weekly so drift stays visible; a bump with no reason is closed, not
-  merged. When updates are taken, they are batched at most quarterly and get the full
+  `shipped` and `build-chain` groups weekly so drift stays visible; a bump with no
+  reason is closed, not merged. When updates are taken, they are batched at most quarterly and get the full
   checklist.
 - **Tier D:** the weekly grouped PR, merged on green CI.
 
