@@ -324,6 +324,32 @@ describe('capacity refusals', () => {
     const out = await extractBytesStegoJpeg(jpegBytes, SEED, Math.ceil(carriers / 8) + 16);
     expect(out).toBeNull();
   });
+
+  it('agrees with the writer on a cover that meets the capacity check exactly', async () => {
+    // Both sides test `carriers < bits × margin`, so a cover with exactly
+    // `bits × margin` carriers holds the payload. Nothing sat on that boundary,
+    // and turning the reader's `<` into `<=` survived mutation (#240): a reader
+    // that refuses what the writer accepted is a photo nobody can open.
+    const cover = texturedJpeg(128, 128, 85, 1);
+    const carriers = jpegStegoCapacityBits(cover);
+    const data = new Uint8Array(64).fill(0x3c);
+    const bits = data.length * 8;
+    // Exact in floating point, because `bits` is a power of two.
+    const margin = carriers / bits;
+    expect(bits * margin).toBe(carriers);
+    expect(margin, 'the fixture is too dense to say anything').toBeGreaterThan(2);
+
+    const stego = await embedBytesStegoJpeg(cover, data, SEED, margin);
+    const out = await extractBytesStegoJpeg(stego, SEED, data.length, margin);
+    expect([...out!]).toEqual([...data]);
+
+    // One carrier short, and both sides refuse.
+    const over = (carriers + 1) / bits;
+    await expect(embedBytesStegoJpeg(cover, data, SEED, over)).rejects.toBeInstanceOf(
+      StegoCapacityError,
+    );
+    expect(await extractBytesStegoJpeg(stego, SEED, data.length, over)).toBeNull();
+  });
 });
 
 describe('the restart-marker fallback refuses too', () => {
