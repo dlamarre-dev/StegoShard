@@ -659,12 +659,24 @@ async function embedFixedStegoJpeg(
       // must change, leaving every other byte of the original JPEG untouched.
       const where = carriers as ReturnType<typeof eligibleInPlace>;
       const toggles: number[] = [];
-      for (let i = 0; i < n; i++) if (y[i] !== x[i]) toggles.push(where.bitPos(order[i]!));
+      // `<=` only adds i === n, where `y[n]` and `x[n]` are both undefined and so
+      // never differ: an equivalent mutant. The `>=` the directive also hides is
+      // the same as the ConditionalExpression `false` mutant, which stays live.
+      // The comparison sits on its own line because the directive covers every
+      // EqualityOperator on the next one, and `!==` → `===` is not equivalent.
+      // Stryker disable next-line EqualityOperator: equivalent, see above
+      for (let i = 0; i < n; i++) {
+        if (y[i] !== x[i]) toggles.push(where.bitPos(order[i]!));
+      }
       return keepTrailerResolvable(mpf, cover, applyScanToggles(model, toggles));
     }
     // Rare restart-marker files: fall back to a full re-encode of the scan.
+    // Every selected carrier is written, as embedBytesStegoJpeg does: `setLsb`
+    // only sets the bit, so writing the value a carrier already has changes
+    // nothing. A `y[i] !== x[i]` guard here was redundant, and its forced-`true`
+    // mutant could never be told apart (#240).
     const writable = carriers as ReturnType<typeof eligibleCoefficients>;
-    for (let i = 0; i < n; i++) if (y[i] !== x[i]) writable.setLsb(order[i]!, y[i]!);
+    for (let i = 0; i < n; i++) writable.setLsb(order[i]!, y[i]!);
     return keepTrailerResolvable(mpf, cover, encodeJpeg(model));
   } catch (e) {
     stream.fill(0);
