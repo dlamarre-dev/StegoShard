@@ -62,6 +62,18 @@ updates:
           - fast-png
           - jpeg-js
           - '@pdf-lib/*'
+      # The tools that produce what ships: the bundler (vite, which brings
+      # rolldown with it), the emitted and rolled-up library types, and the
+      # packaging scripts. Tier C in docs/DEPENDENCIES.md, so the same rule as
+      # `shipped`: no bump without a reason, and a diff of the built output when
+      # there is one. Without this group they arrived in the routine dev batch:
+      # vite 8.3.5 rode in with an eslint plugin in #241.
+      build-chain:
+        patterns:
+          - vite
+          - typescript
+          - tsx
+          - '@microsoft/api-extractor'
       dev-dependencies:
         dependency-type: development
         update-types:
