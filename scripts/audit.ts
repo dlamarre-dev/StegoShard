@@ -49,7 +49,16 @@ const BLOCKING = ['moderate', 'high', 'critical'] as const;
  * fails. An entry that no longer matches anything is reported so it gets
  * removed rather than outliving the reason it was added.
  */
-const ACCEPTED: Record<string, string> = {};
+const ACCEPTED: Record<string, string> = {
+  'GHSA-g3hv-75wg-m249':
+    'minimatch <11.0.1, fixed only in a new major. Dev-only, reached through ' +
+    'eslint, @typescript-eslint, @stryker-mutator/core and @microsoft/api-extractor, ' +
+    'and in no shipped bundle (.bundled/*.json). Two independent conditions keep ' +
+    'it out of reach: the amplification needs optimizationLevel >= 2, which no ' +
+    'dependent sets (the default is 1), and it needs an attacker-supplied pattern, ' +
+    'while every pattern these tools compile comes from config committed here. ' +
+    'Drop once the dependents accept minimatch 11.',
+};
 
 const ATTEMPTS = 3;
 /** Backoff between attempts. The observed outages cleared within minutes. */
