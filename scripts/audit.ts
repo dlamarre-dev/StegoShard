@@ -52,7 +52,9 @@ const BLOCKING = ['moderate', 'high', 'critical'] as const;
 const ACCEPTED: Record<string, string> = {
   'GHSA-g3hv-75wg-m249':
     'minimatch <11.0.1, fixed only in a new major. Dev-only, reached through ' +
-    'eslint, @typescript-eslint, @stryker-mutator/core and @microsoft/api-extractor, ' +
+    '@stryker-mutator/core (~10.2.4) and @microsoft/api-extractor (pins 10.2.3); ' +
+    'eslint and @typescript-eslint moved to 11 in 10.15.0 and 8.73.0. Not ' +
+    'forced through an override: 11.0 removed makeRe() and Minimatch#regexp. ' +
     'and in no shipped bundle (.bundled/*.json). Two independent conditions keep ' +
     'it out of reach: the amplification needs optimizationLevel >= 2, which no ' +
     'dependent sets (the default is 1), and it needs an attacker-supplied pattern, ' +
