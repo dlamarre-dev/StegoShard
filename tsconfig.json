@@ -18,10 +18,9 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
-      "@core": ["src/core/index.ts"],
-      "@core/*": ["src/core/*"]
+      "@core": ["./src/core/index.ts"],
+      "@core/*": ["./src/core/*"]
     }
   },
   "include": ["src", "tests", "scripts", "*.config.ts"],

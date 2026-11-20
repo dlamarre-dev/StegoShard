@@ -18,6 +18,9 @@
     "declaration": true,
     "declarationMap": true,
     "allowImportingTsExtensions": false,
+    // Explicit since TypeScript 6, which no longer infers it. `src` keeps the
+    // layout api-extractor reads: .types/api/index.d.ts, .types/core/...
+    "rootDir": "src",
     "outDir": ".types",
     // Only what the library needs. `chrome` and `webextension-polyfill` would
     // drag the extension's ambient types into a consumer's compilation.
