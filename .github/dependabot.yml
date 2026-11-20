@@ -110,6 +110,15 @@ updates:
       - dependency-name: '@vitest/*'
         update-types:
           - version-update:semver-major
+      # Hold TypeScript below 7 until typescript-eslint supports it. 8.x declares
+      # `typescript >=4.8.4 <6.1.0` as a peer, so the 7.0.2 bump in #248 failed
+      # `npm ci` with ERESOLVE on every job. Only 7+ is held: 6.0.x still fits
+      # the peer range and may come through the build-chain group.
+      #
+      # REMOVE THIS once a typescript-eslint release widens its peer range to 7.
+      - dependency-name: typescript
+        versions:
+          - '>=7'
 
   - package-ecosystem: github-actions
     directory: /
